@@ -6,6 +6,7 @@ import { getScenesFor, frameColorFromVariant, type MockupScene } from "@/lib/moc
 import { compositeMockup } from "@/lib/mockup-composite";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Canvas3DPreview } from "./Canvas3DPreview";
 
 interface MockupSlot {
   scene: MockupScene;
