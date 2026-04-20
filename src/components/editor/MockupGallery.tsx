@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useEditorStore } from "@/stores/editorStore";
-import { supabase } from "@/integrations/supabase/client";
 import { Loader2, AlertCircle, ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
 import { getScenesFor, frameColorFromVariant, type MockupScene } from "@/lib/mockup-scenes";
 import { compositeMockup } from "@/lib/mockup-composite";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Canvas3DPreview } from "./Canvas3DPreview";
+import { renderArtworkSnapshot } from "@/lib/editor-snapshot";
 
 interface MockupSlot {
   scene: MockupScene;
