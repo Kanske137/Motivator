@@ -21,17 +21,24 @@ function parseSizeRatio(size: string | null, orientation: "portrait" | "landscap
 }
 
 function applyLabelVisibility(map: mapboxgl.Map, show: boolean) {
-  try {
-    const style = map.getStyle();
-    if (!style?.layers) return;
-    for (const layer of style.layers) {
-      if (layer.type === "symbol") {
-        map.setLayoutProperty(layer.id, "visibility", show ? "visible" : "none");
+  const apply = () => {
+    try {
+      const style = map.getStyle();
+      if (!style?.layers) return;
+      let count = 0;
+      for (const layer of style.layers) {
+        if (layer.type === "symbol") {
+          map.setLayoutProperty(layer.id, "visibility", show ? "visible" : "none");
+          count++;
+        }
       }
+      console.log(`[MapPreview] labels ${show ? "ON" : "OFF"} (${count} symbol layers)`);
+    } catch (e) {
+      console.warn("[MapPreview] applyLabelVisibility failed", e);
     }
-  } catch (e) {
-    console.warn("[MapPreview] applyLabelVisibility failed", e);
-  }
+  };
+  if (map.isStyleLoaded()) apply();
+  else map.once("idle", apply);
 }
 
 export function MapPreview({ borderCss, innerPadding }: Props) {
@@ -168,12 +175,11 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
     setTimeout(() => mapRef.current?.resize(), 320);
   }, [orientation, size, mapShape]);
 
-  const aspect = mapShape === "square" || mapShape === "circle"
-    ? 1
-    : parseSizeRatio(size, orientation);
+  // Outer poster frame: ALWAYS uses poster aspect (independent of mapShape)
+  const posterAspect = parseSizeRatio(size, orientation);
 
   const frameStyle: React.CSSProperties = {
-    aspectRatio: `${aspect}`,
+    aspectRatio: `${posterAspect}`,
     width: "100%",
     maxWidth: "min(100%, 70vh)",
     maxHeight: "78vh",
@@ -181,10 +187,23 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
     padding: innerPadding,
   };
 
-  const mapClipStyle: React.CSSProperties =
-    mapShape === "circle"
-      ? { borderRadius: "9999px", overflow: "hidden" }
-      : { overflow: "hidden" };
+  // Inner map wrapper kept ALWAYS within the poster frame.
+  // Square/circle: fit a centered square that hugs the poster's shorter side.
+  const isShaped = mapShape === "square" || mapShape === "circle";
+  const isPortraitFrame = posterAspect <= 1;
+  const mapWrapperStyle: React.CSSProperties = isShaped
+    ? {
+        position: "absolute",
+        left: "50%",
+        top: "50%",
+        transform: "translate(-50%, -50%)",
+        width: isPortraitFrame ? "100%" : "auto",
+        height: isPortraitFrame ? "auto" : "100%",
+        aspectRatio: "1 / 1",
+        borderRadius: mapShape === "circle" ? "9999px" : "0",
+        overflow: "hidden",
+      }
+    : { position: "absolute", inset: 0, overflow: "hidden" };
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-4 min-h-[60vh] gap-2">
@@ -192,30 +211,33 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
       <style>{`
         .mapboxgl-ctrl-logo, .mapboxgl-ctrl-attrib { display: none !important; }
       `}</style>
-      <div className="relative bg-card shadow-2xl" style={frameStyle}>
-        <div className="absolute inset-0" style={mapClipStyle}>
+      <div
+        className="relative bg-card shadow-[0_30px_60px_-20px_rgba(0,0,0,0.25)]"
+        style={frameStyle}
+      >
+        <div style={mapWrapperStyle}>
           <div ref={mapContainerRef} className="absolute inset-0" />
-
-          {textVisible &&
-            layout?.layers
-              .filter((l) => l.type === "text")
-              .map((l, i) => (
-                <div
-                  key={`text-${i}`}
-                  className="absolute -translate-x-1/2 -translate-y-1/2 text-center px-2 text-foreground pointer-events-none"
-                  style={{
-                    left: l.x,
-                    top: l.y,
-                    fontFamily: textFont,
-                    width: "90%",
-                  }}
-                >
-                  <div className="whitespace-pre-line text-sm md:text-base lg:text-lg font-medium tracking-wide leading-tight">
-                    {text || "Lägg till text…"}
-                  </div>
-                </div>
-              ))}
         </div>
+
+        {textVisible &&
+          layout?.layers
+            .filter((l) => l.type === "text")
+            .map((l, i) => (
+              <div
+                key={`text-${i}`}
+                className="absolute -translate-x-1/2 -translate-y-1/2 text-center px-2 text-foreground pointer-events-none"
+                style={{
+                  left: l.x,
+                  top: l.y,
+                  fontFamily: textFont,
+                  width: "90%",
+                }}
+              >
+                <div className="whitespace-pre-line text-sm md:text-base lg:text-lg font-medium tracking-wide leading-tight">
+                  {text || "Lägg till text…"}
+                </div>
+              </div>
+            ))}
       </div>
       <p className="text-[10px] text-muted-foreground">© Mapbox · © OpenStreetMap</p>
     </div>

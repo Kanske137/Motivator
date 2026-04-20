@@ -111,7 +111,7 @@ export default function EditorPage() {
       {window.self === window.top && (
         <header className="border-b bg-background sticky top-0 z-30">
           <div className="px-4 py-3 flex items-center justify-between">
-            <h1 className="font-semibold text-sm md:text-base">{config.title}</h1>
+            <h1 className="font-serif-display text-xl md:text-2xl font-semibold">{config.title}</h1>
             <CartDrawer />
           </div>
         </header>
@@ -120,7 +120,7 @@ export default function EditorPage() {
       {/* Main: split on desktop, stacked on mobile */}
       <div className="flex-1 flex flex-col md:flex-row min-h-0">
         {/* Preview */}
-        <div className="flex-1 bg-[hsl(var(--paper))] flex items-center justify-center min-h-[65vh] md:min-h-[70vh]">
+        <div className="flex-1 paper-grain flex items-center justify-center min-h-[65vh] md:min-h-[70vh]">
           <MapPreview borderCss={borderCss} />
         </div>
 
@@ -139,12 +139,21 @@ export default function EditorPage() {
             <div className="text-xs text-muted-foreground truncate">
               {summary}
             </div>
-            <Button onClick={handleAddToCart} disabled={isAdding} size="lg" className="w-full rounded-full">
-              {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : (
-                <>
-                  <ShoppingCart className="h-4 w-4 mr-2" />
-                  Lägg i varukorg · {currentPrice()} kr
-                </>
+            <Button
+              onClick={handleAddToCart}
+              disabled={isAdding}
+              className="w-full h-14 rounded-full text-base font-semibold"
+            >
+              {isAdding ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <span className="flex items-center justify-between w-full">
+                  <span className="flex items-center">
+                    <ShoppingCart className="h-4 w-4 mr-2" />
+                    Lägg i varukorg
+                  </span>
+                  <span className="text-base">{currentPrice()} kr</span>
+                </span>
               )}
             </Button>
           </div>
@@ -160,8 +169,19 @@ export default function EditorPage() {
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Ditt val</div>
           <div className="text-xs font-medium leading-tight truncate">{summary}</div>
         </div>
-        <Button onClick={handleAddToCart} disabled={isAdding} className="flex-1 rounded-full">
-          {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : `Lägg i varukorg · ${currentPrice()} kr`}
+        <Button
+          onClick={handleAddToCart}
+          disabled={isAdding}
+          className="flex-1 h-12 rounded-full font-semibold"
+        >
+          {isAdding ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <span className="flex items-center justify-between w-full">
+              <span>Lägg i varukorg</span>
+              <span>{currentPrice()} kr</span>
+            </span>
+          )}
         </Button>
       </div>
     </div>
