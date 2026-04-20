@@ -21,17 +21,24 @@ function parseSizeRatio(size: string | null, orientation: "portrait" | "landscap
 }
 
 function applyLabelVisibility(map: mapboxgl.Map, show: boolean) {
-  try {
-    const style = map.getStyle();
-    if (!style?.layers) return;
-    for (const layer of style.layers) {
-      if (layer.type === "symbol") {
-        map.setLayoutProperty(layer.id, "visibility", show ? "visible" : "none");
+  const apply = () => {
+    try {
+      const style = map.getStyle();
+      if (!style?.layers) return;
+      let count = 0;
+      for (const layer of style.layers) {
+        if (layer.type === "symbol") {
+          map.setLayoutProperty(layer.id, "visibility", show ? "visible" : "none");
+          count++;
+        }
       }
+      console.log(`[MapPreview] labels ${show ? "ON" : "OFF"} (${count} symbol layers)`);
+    } catch (e) {
+      console.warn("[MapPreview] applyLabelVisibility failed", e);
     }
-  } catch (e) {
-    console.warn("[MapPreview] applyLabelVisibility failed", e);
-  }
+  };
+  if (map.isStyleLoaded()) apply();
+  else map.once("idle", apply);
 }
 
 export function MapPreview({ borderCss, innerPadding }: Props) {
