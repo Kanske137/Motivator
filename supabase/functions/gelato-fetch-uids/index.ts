@@ -1,6 +1,9 @@
 // Edge function: explore Gelato Product Catalog API to fetch all UIDs
 // for posters and canvas (with all sizes, frames, depths, orientations).
-import { corsHeaders } from "@supabase/supabase-js/cors";
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 const GELATO_BASE = "https://product.gelatoapis.com/v3";
 
