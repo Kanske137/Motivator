@@ -68,8 +68,10 @@ Deno.serve(async (req) => {
 
     const { w, h } = pxFromSize(size, orientation);
 
-    // Map: square that hugs the shorter side of the poster when shaped, else fills poster
-    const mapSize = mapShape === "rect" ? { w, h } : { w: Math.min(w, h), h: Math.min(w, h) };
+    // Map fills the full poster always — shape is applied as a clip, centered on the
+    // poster rectangle (not the map rect). This way square/circle hug the shorter
+    // poster side regardless of orientation.
+    const mapSize = { w, h };
 
     // Mapbox static. attribution=false&logo=false. Labels = whether style symbols render.
     // We can't toggle layers via static API; instead we pick a no-labels variant when available.
@@ -99,43 +101,42 @@ Deno.serve(async (req) => {
     const mapDataUrl = `data:image/png;base64,${btoa(binary)}`;
 
     // Build SVG that mirrors the editor frame
-    const mapX = (w - mapSize.w * 2) / 2;
-    const mapY = (h - mapSize.h * 2) / 2;
-    // Map image is @2x → its natural pixel size is mapSize*2; we draw at mapSize (logical) scaled to fit poster.
-    // Simpler: draw it at (mapSize.w, mapSize.h) and let the print pixels = same scale as poster.
     const drawW = mapSize.w * 2;
     const drawH = mapSize.h * 2;
     const dx = (w - drawW) / 2;
     const dy = (h - drawH) / 2;
 
+    // Shape clip is computed against the POSTER rect (w x h), centered, hugging
+    // the shorter poster side. This matches MapPreview's shape masking exactly.
     let clipDef = "";
     let clipAttr = "";
     if (mapShape === "circle") {
-      clipDef = `<clipPath id="mc"><circle cx="${dx + drawW / 2}" cy="${dy + drawH / 2}" r="${Math.min(drawW, drawH) / 2}"/></clipPath>`;
+      const r = Math.min(w, h) / 2;
+      clipDef = `<clipPath id="mc"><circle cx="${w / 2}" cy="${h / 2}" r="${r}"/></clipPath>`;
       clipAttr = ` clip-path="url(#mc)"`;
     } else if (mapShape === "square") {
-      const sq = Math.min(drawW, drawH);
-      const sx = dx + (drawW - sq) / 2;
-      const sy = dy + (drawH - sq) / 2;
+      const sq = Math.min(w, h);
+      const sx = (w - sq) / 2;
+      const sy = (h - sq) / 2;
       clipDef = `<clipPath id="mc"><rect x="${sx}" y="${sy}" width="${sq}" height="${sq}"/></clipPath>`;
       clipAttr = ` clip-path="url(#mc)"`;
     }
 
-    // Text block — multi-line, centered horizontally, anchored near bottom (~82% y) to mimic editor layout
+    // Text block — sized to match editor proportions (~3.5% of poster width)
     let textSvg = "";
     if (textVisible && text.trim()) {
       const lines = text.split("\n");
-      const fontSize = Math.round(Math.min(w, h) * 0.045);
-      const lineHeight = Math.round(fontSize * 1.2);
+      const fontSize = Math.round(w * 0.035);
+      const lineHeight = Math.round(fontSize * 1.25);
       const totalH = lineHeight * lines.length;
-      const baseY = Math.round(h * 0.86) - totalH + lineHeight;
+      const baseY = Math.round(h * 0.88) - totalH + lineHeight;
       const tspans = lines
         .map(
           (ln, i) =>
             `<tspan x="${w / 2}" y="${baseY + i * lineHeight}">${escapeXml(ln)}</tspan>`
         )
         .join("");
-      textSvg = `<text text-anchor="middle" font-family="${escapeXml(textFont)}, Inter, sans-serif" font-size="${fontSize}" font-weight="500" fill="#1a1a1a" letter-spacing="1">${tspans}</text>`;
+      textSvg = `<text text-anchor="middle" font-family="${escapeXml(textFont)}, Inter, sans-serif" font-size="${fontSize}" font-weight="400" fill="#1a1a1a" letter-spacing="${(fontSize * 0.05).toFixed(2)}">${tspans}</text>`;
     }
 
     const svg = `<?xml version="1.0" encoding="UTF-8"?>
