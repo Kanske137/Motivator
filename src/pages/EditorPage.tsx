@@ -11,13 +11,14 @@ import { useCartStore } from "@/stores/cartStore";
 import { CartDrawer } from "@/components/CartDrawer";
 import { toast } from "sonner";
 
-const FRAME_BORDER_CSS: Record<string, string> = {
-  Ingen: "0",
-  Vit: "16px solid hsl(0 0% 98%)",
-  Svart: "16px solid hsl(0 0% 8%)",
-  Ek: "16px solid hsl(30 35% 55%)",
-  Valnöt: "16px solid hsl(20 25% 25%)",
+const FRAME_COLORS: Record<string, string> = {
+  Ingen: "",
+  Vit: "hsl(0 0% 98%)",
+  Svart: "hsl(0 0% 8%)",
+  Ek: "hsl(30 35% 55%)",
+  Valnöt: "hsl(20 25% 25%)",
 };
+const FRAME_WIDTH_CM = 2;
 
 export default function EditorPage() {
   const [params, setParams] = useSearchParams();
@@ -25,7 +26,7 @@ export default function EditorPage() {
   const [configs, setConfigs] = useState<ProductConfig[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const { config, setConfig, currentPrice, mapStyleId, mapCenter, mapZoom, text, orientation, size, variant } =
+  const { config, setConfig, currentPrice, mapStyleId, mapCenter, mapZoom, text, orientation, size, variant, posterBgColor } =
     useEditorStore();
   const addItem = useCartStore((s) => s.addItem);
   const isAdding = useCartStore((s) => s.isLoading);
@@ -48,7 +49,7 @@ export default function EditorPage() {
     setConfig(next);
   };
 
-  const borderCss = config?.product_type === "posters" ? FRAME_BORDER_CSS[variant ?? "Ingen"] : undefined;
+  const frameColor = config?.product_type === "posters" ? FRAME_COLORS[variant ?? "Ingen"] : "";
 
   const orientationLabel = orientation === "portrait" ? "Stående" : "Liggande";
   const variantLabel = config?.product_type === "canvas" ? `${variant ?? ""} djup` : `${variant ?? ""} ram`;
@@ -67,6 +68,7 @@ export default function EditorPage() {
       _map_zoom: mapZoom.toFixed(2),
       _size: size,
       _variant: variant,
+      _bg_color: posterBgColor,
     };
 
     if (inIframe) {
@@ -121,7 +123,7 @@ export default function EditorPage() {
       <div className="flex-1 flex flex-col md:flex-row min-h-0">
         {/* Preview */}
         <div className="flex-1 paper-grain flex items-center justify-center min-h-[65vh] md:min-h-[70vh]">
-          <MapPreview borderCss={borderCss} />
+          <MapPreview frameColor={frameColor} frameWidthCm={FRAME_WIDTH_CM} />
         </div>
 
         {/* Control panel */}

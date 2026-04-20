@@ -1,23 +1,20 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useEditorStore } from "@/stores/editorStore";
 import { getMapboxToken, reverseGeocode, styleUrl } from "@/lib/mapbox";
 
 interface Props {
-  borderCss?: string;
+  frameColor?: string; // CSS color for border. Empty/undefined = no border.
+  frameWidthCm?: number; // physical frame width in cm (default 2)
   innerPadding?: string;
 }
 
-function parseSizeRatio(size: string | null, orientation: "portrait" | "landscape"): number {
-  if (!size) return orientation === "portrait" ? 3 / 4 : 4 / 3;
+function parseCm(size: string | null): { w: number; h: number } | null {
+  if (!size) return null;
   const m = size.match(/(\d+)\s*[xX×]\s*(\d+)/);
-  if (!m) return orientation === "portrait" ? 3 / 4 : 4 / 3;
-  const a = parseInt(m[1], 10);
-  const b = parseInt(m[2], 10);
-  const small = Math.min(a, b);
-  const large = Math.max(a, b);
-  return orientation === "portrait" ? small / large : large / small;
+  if (!m) return null;
+  return { w: parseInt(m[1], 10), h: parseInt(m[2], 10) };
 }
 
 function applyLabelVisibility(map: mapboxgl.Map, show: boolean) {
@@ -41,8 +38,10 @@ function applyLabelVisibility(map: mapboxgl.Map, show: boolean) {
   else map.once("idle", apply);
 }
 
-export function MapPreview({ borderCss, innerPadding }: Props) {
+export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding }: Props) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [borderPx, setBorderPx] = useState(0);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const programmaticRef = useRef(false);
   const reverseTimerRef = useRef<number | null>(null);
@@ -58,6 +57,7 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
     size,
     showLabels,
     mapShape,
+    posterBgColor,
     currentLayout,
     updateFromMap,
   } = useEditorStore();
@@ -176,15 +176,45 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
   }, [orientation, size, mapShape]);
 
   // Outer poster frame: ALWAYS uses poster aspect (independent of mapShape)
-  const posterAspect = parseSizeRatio(size, orientation);
+  const sizeCm = parseCm(size);
+  const posterAspect = sizeCm
+    ? (orientation === "portrait"
+        ? Math.min(sizeCm.w, sizeCm.h) / Math.max(sizeCm.w, sizeCm.h)
+        : Math.max(sizeCm.w, sizeCm.h) / Math.min(sizeCm.w, sizeCm.h))
+    : (orientation === "portrait" ? 3 / 4 : 4 / 3);
+
+  // Compute frame border in pixels relative to physical short side (Gelato ~2cm)
+  useEffect(() => {
+    const el = frameRef.current;
+    if (!el) return;
+    const compute = () => {
+      if (!frameColor || !sizeCm) {
+        setBorderPx(0);
+        return;
+      }
+      const rect = el.getBoundingClientRect();
+      const shortPx = Math.min(rect.width, rect.height);
+      const shortCm = Math.min(sizeCm.w, sizeCm.h);
+      const px = Math.round((frameWidthCm / shortCm) * shortPx);
+      setBorderPx(px);
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [frameColor, frameWidthCm, sizeCm?.w, sizeCm?.h]);
 
   const frameStyle: React.CSSProperties = {
     aspectRatio: `${posterAspect}`,
     width: "100%",
     maxWidth: "min(100%, 70vh)",
     maxHeight: "78vh",
-    border: borderCss,
+    background: posterBgColor,
+    borderStyle: frameColor ? "solid" : undefined,
+    borderColor: frameColor,
+    borderWidth: frameColor ? `${borderPx}px` : 0,
     padding: innerPadding,
+    boxSizing: "border-box",
   };
 
   // Inner map wrapper kept ALWAYS within the poster frame.
@@ -212,7 +242,8 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
         .mapboxgl-ctrl-logo, .mapboxgl-ctrl-attrib { display: none !important; }
       `}</style>
       <div
-        className="relative bg-card shadow-[0_30px_60px_-20px_rgba(0,0,0,0.25)]"
+        ref={frameRef}
+        className="relative shadow-[0_30px_60px_-20px_rgba(0,0,0,0.25)]"
         style={frameStyle}
       >
         <div style={mapWrapperStyle}>

@@ -28,6 +28,17 @@ interface Props {
 const cardClass =
   "rounded-2xl bg-card border border-border shadow-[0_1px_2px_rgba(0,0,0,0.04)] px-4";
 
+const BG_SWATCHES = [
+  "#EFE7D6", // beige
+  "#FFFFFF", // white
+  "#F8F4EC", // off-white
+  "#E5E5E5", // light gray
+  "#D9CDB5", // sand
+  "#D6E4D2", // light green
+  "#CFE0EA", // light blue
+  "#1A1A1A", // black
+];
+
 export function ControlPanel({ configs, activeHandle, onProductChange }: Props) {
   const {
     config,
@@ -39,6 +50,8 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
     setShowLabels,
     mapShape,
     setMapShape,
+    posterBgColor,
+    setPosterBgColor,
     text,
     setText,
     textFont,
@@ -198,10 +211,39 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
               })}
             </div>
           </div>
+
+          <div className="space-y-2 pt-1">
+            <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Bakgrundsfärg</Label>
+            <div className="flex flex-wrap gap-2 items-center">
+              {BG_SWATCHES.map((c) => {
+                const selected = posterBgColor.toLowerCase() === c.toLowerCase();
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setPosterBgColor(c)}
+                    className={cn(
+                      "h-8 w-8 rounded-full transition border",
+                      selected ? "ring-2 ring-primary ring-offset-2 ring-offset-card border-transparent" : "border-border",
+                    )}
+                    style={{ background: c }}
+                    aria-label={c}
+                  />
+                );
+              })}
+              <label className="h-8 w-8 rounded-full border border-dashed border-border flex items-center justify-center cursor-pointer relative overflow-hidden">
+                <input
+                  type="color"
+                  value={posterBgColor}
+                  onChange={(e) => setPosterBgColor(e.target.value)}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                />
+                <span className="text-[10px] text-muted-foreground">+</span>
+              </label>
+            </div>
+          </div>
         </AccordionContent>
       </AccordionItem>
-
-      {/* 3. Text */}
       <AccordionItem value="text" className={cn(cardClass, "border-b-0")}>
         <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
           Text
