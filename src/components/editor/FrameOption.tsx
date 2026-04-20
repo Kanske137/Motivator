@@ -33,7 +33,7 @@ export function FrameOption({ name, thumbnail, svg, selected, onClick, priceLabe
         className={cn(
           "text-[10px] leading-none",
           priceLabel.startsWith("+") && "text-foreground/70",
-          priceLabel.startsWith("−") && "text-emerald-600",
+          priceLabel.startsWith("−") && "text-primary",
           !priceLabel.startsWith("+") && !priceLabel.startsWith("−") && "text-muted-foreground"
         )}
       >
