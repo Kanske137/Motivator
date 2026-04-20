@@ -181,7 +181,7 @@ export function StepMockup() {
 
       <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4 z-40">
         <Button
-          className="w-full h-14 text-base bg-emerald-600 hover:bg-emerald-700 text-white"
+          className="w-full h-14 text-base"
           size="lg"
           disabled={adding || isLoading || !finalImage || !uid}
           onClick={addToCart}
