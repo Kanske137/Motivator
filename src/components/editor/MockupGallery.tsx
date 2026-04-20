@@ -23,14 +23,21 @@ export function MockupGallery() {
     showLabels, mapShape, posterBgColor,
   } = useEditorStore();
   const [slots, setSlots] = useState<MockupSlot[]>([]);
+  const [printUrl, setPrintUrl] = useState<string | null>(null);
+  const [printLoading, setPrintLoading] = useState(false);
+  const [printError, setPrintError] = useState<string | undefined>();
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
   const debounceRef = useRef<number | null>(null);
   const reqIdRef = useRef(0);
 
+  const isCanvas = config?.product_type === "canvas";
+
   useEffect(() => {
     if (!config || !size) return;
-    const scenes = getScenesFor(config.product_type);
+    const scenes = isCanvas ? [] : getScenesFor(config.product_type);
     setSlots(scenes.map((s) => ({ scene: s, url: null, loading: true })));
+    setPrintLoading(true);
+    setPrintError(undefined);
 
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
     debounceRef.current = window.setTimeout(async () => {
@@ -55,22 +62,27 @@ export function MockupGallery() {
 
         if (printRes.error || !printRes.data?.url) {
           const msg = printRes.error?.message || "Ingen tryckfil";
+          setPrintError(msg);
+          setPrintLoading(false);
+          setPrintUrl(null);
           setSlots(scenes.map((s) => ({ scene: s, url: null, loading: false, error: msg })));
           return;
         }
-        const printUrl: string = printRes.data.url;
+        const newPrintUrl: string = printRes.data.url;
+        setPrintUrl(newPrintUrl);
+        setPrintLoading(false);
 
-        const canvasDepthCm = config.product_type === "canvas"
-          ? (variant?.match(/(\d+)/)?.[1] ? parseInt(variant!.match(/(\d+)/)![1], 10) : 2)
-          : 2;
-        const frameColor = config.product_type === "canvas" ? null : frameColorFromVariant(variant);
+        if (isCanvas) return; // canvas uses 3D — no scene compositing needed
+
+        const canvasDepthCm = 2;
+        const frameColor = frameColorFromVariant(variant);
 
         const results = await Promise.all(
           scenes.map(async (scene) => {
             try {
               const url = await compositeMockup({
                 scene,
-                printUrl,
+                printUrl: newPrintUrl,
                 size,
                 orientation,
                 productType: config.product_type,
@@ -98,6 +110,8 @@ export function MockupGallery() {
         if (myReq !== reqIdRef.current) return;
         console.error("[MockupGallery] failed", e);
         const msg = e instanceof Error ? e.message : "Något gick fel";
+        setPrintError(msg);
+        setPrintLoading(false);
         setSlots(scenes.map((s) => ({ scene: s, url: null, loading: false, error: msg })));
       }
     }, 700);
@@ -106,7 +120,7 @@ export function MockupGallery() {
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
     };
   }, [
-    config, size, variant, orientation,
+    config, size, variant, orientation, isCanvas,
     mapStyleId, mapCenter, mapZoom,
     text, textFont, textVisible,
     showLabels, mapShape, posterBgColor,
