@@ -187,21 +187,23 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
     padding: innerPadding,
   };
 
-  // Inner map wrapper styled by mapShape
+  // Inner map wrapper kept ALWAYS within the poster frame.
+  // Square/circle: fit a centered square that hugs the poster's shorter side.
   const isShaped = mapShape === "square" || mapShape === "circle";
-  const mapWrapperClass = isShaped
-    ? "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 aspect-square"
-    : "absolute inset-0";
+  const isPortraitFrame = posterAspect <= 1;
   const mapWrapperStyle: React.CSSProperties = isShaped
     ? {
-        width: "min(100%, 100cqh)",
-        height: "auto",
-        maxWidth: "100%",
-        maxHeight: "100%",
+        position: "absolute",
+        left: "50%",
+        top: "50%",
+        transform: "translate(-50%, -50%)",
+        width: isPortraitFrame ? "100%" : "auto",
+        height: isPortraitFrame ? "auto" : "100%",
+        aspectRatio: "1 / 1",
         borderRadius: mapShape === "circle" ? "9999px" : "0",
         overflow: "hidden",
       }
-    : { overflow: "hidden" };
+    : { position: "absolute", inset: 0, overflow: "hidden" };
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-4 min-h-[60vh] gap-2">
@@ -211,9 +213,9 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
       `}</style>
       <div
         className="relative bg-card shadow-[0_30px_60px_-20px_rgba(0,0,0,0.25)]"
-        style={{ ...frameStyle, containerType: "size" } as React.CSSProperties}
+        style={frameStyle}
       >
-        <div className={mapWrapperClass} style={mapWrapperStyle}>
+        <div style={mapWrapperStyle}>
           <div ref={mapContainerRef} className="absolute inset-0" />
         </div>
 
