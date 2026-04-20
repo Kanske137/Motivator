@@ -5,6 +5,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import EditorPage from "./pages/EditorPage.tsx";
+import AdminConfigs from "./pages/AdminConfigs.tsx";
 
 import { useCartSync } from "./hooks/useCartSync";
 
@@ -15,6 +17,8 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/" element={<Index />} />
+      <Route path="/editor" element={<EditorPage />} />
+      <Route path="/admin/configs" element={<AdminConfigs />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
