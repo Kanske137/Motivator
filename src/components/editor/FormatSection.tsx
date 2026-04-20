@@ -67,32 +67,37 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
 
   return (
     <div className="space-y-5">
-      {/* Produkt */}
+      {/* Produkt — segmented pill toggle */}
       <div className="space-y-2">
-        <Label className="text-xs uppercase tracking-wider text-muted-foreground">Produkt</Label>
-        <div className="grid grid-cols-2 gap-2">
-          {configs.map((c) => (
-            <Button
-              key={c.shopify_handle}
-              variant={c.shopify_handle === activeHandle ? "default" : "outline"}
-              onClick={() => onProductChange(c.shopify_handle)}
-              className="h-auto py-2.5"
-              size="sm"
-            >
-              {c.product_type === "posters" ? "Poster" : "Canvas"}
-            </Button>
-          ))}
+        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Produkt</Label>
+        <div className="flex p-1 bg-muted rounded-full">
+          {configs.map((c) => {
+            const active = c.shopify_handle === activeHandle;
+            return (
+              <button
+                key={c.shopify_handle}
+                onClick={() => onProductChange(c.shopify_handle)}
+                className={`flex-1 h-10 rounded-full text-sm font-medium transition ${
+                  active
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-foreground/70 hover:text-foreground"
+                }`}
+              >
+                {c.product_type === "posters" ? "Poster" : "Canvas"}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* Storlek dropdown */}
       <div className="space-y-2">
-        <Label className="text-xs uppercase tracking-wider text-muted-foreground">Storlek</Label>
+        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Storlek</Label>
         <Select value={size ?? undefined} onValueChange={setSize}>
-          <SelectTrigger>
+          <SelectTrigger className="h-12 rounded-full px-5 text-base">
             <SelectValue placeholder="Välj storlek" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="rounded-2xl">
             {config.sizes.map((s) => {
               const matchVariant =
                 s.variants.find((v) => v.name === variantNameForCompare) ?? s.variants[0];
@@ -115,7 +120,7 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
 
       {/* Ram / Djup */}
       <div className="space-y-2">
-        <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
           {isCanvas ? "Djup" : "Ram"}
         </Label>
         <div className={`grid gap-2 ${isCanvas ? "grid-cols-2" : "grid-cols-3"}`}>
@@ -137,24 +142,29 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
         </div>
       </div>
 
-      {/* Orientering */}
+      {/* Orientering — segmented pill */}
       <div className="space-y-2">
-        <Label className="text-xs uppercase tracking-wider text-muted-foreground">Orientering</Label>
-        <div className="grid grid-cols-2 gap-2">
-          <Button
-            size="sm"
-            variant={orientation === "portrait" ? "default" : "outline"}
-            onClick={() => setOrientation("portrait")}
-          >
-            Stående
-          </Button>
-          <Button
-            size="sm"
-            variant={orientation === "landscape" ? "default" : "outline"}
-            onClick={() => setOrientation("landscape")}
-          >
-            Liggande
-          </Button>
+        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Orientering</Label>
+        <div className="flex p-1 bg-muted rounded-full">
+          {([
+            { id: "portrait", label: "Stående" },
+            { id: "landscape", label: "Liggande" },
+          ] as const).map(({ id, label }) => {
+            const active = orientation === id;
+            return (
+              <button
+                key={id}
+                onClick={() => setOrientation(id)}
+                className={`flex-1 h-10 rounded-full text-sm font-medium transition ${
+                  active
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-foreground/70 hover:text-foreground"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>
