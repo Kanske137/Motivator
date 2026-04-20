@@ -2,9 +2,6 @@ import type { MockupScene } from "./mockup-scenes";
 import { parseSizeCm } from "./mockup-scenes";
 import type { Orientation, ProductType } from "./product-config";
 
-/**
- * Ladda en bild som <img>. CORS för cross-origin (Supabase Storage).
- */
 function loadImage(src: string, crossOrigin = false): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -23,19 +20,12 @@ interface CompositArgs {
   productType: ProductType;
   /** Endast canvas: 2 eller 4 (cm). */
   canvasDepthCm?: number;
+  /** Hex-färg för ram, eller null för ingen ram (poster). */
+  frameColor?: string | null;
+  /** Ramens bredd i cm (verklig). Standard 2.5. */
+  frameWidthCm?: number;
 }
 
-/**
- * Compositera tryckfilen ovanpå scen-bilden och returnera en data-URL.
- *
- * Skala:
- *  - postern placeras inom `scene.area`
- *  - dess fysiska bredd i scenen = `size.wCm`
- *  - referensbredden för area = `scene.referenceWidthCm`
- *  - poster-bredd i px = (size.wCm / referenceWidthCm) * area.w
- *  - höjd följer aspect ratio från size
- *  - clamp:as så den aldrig växer utanför area
- */
 export async function compositeMockup({
   scene,
   printUrl,
@@ -43,11 +33,12 @@ export async function compositeMockup({
   orientation,
   productType,
   canvasDepthCm = 2,
+  frameColor = null,
+  frameWidthCm = 2.5,
 }: CompositArgs): Promise<string> {
   const sizeCm = parseSizeCm(size);
   if (!sizeCm) throw new Error(`Ogiltig storlek: ${size}`);
 
-  // För landscape: byt bredd/höjd
   const realWcm = orientation === "landscape" ? sizeCm.hCm : sizeCm.wCm;
   const realHcm = orientation === "landscape" ? sizeCm.wCm : sizeCm.hCm;
 
@@ -62,52 +53,71 @@ export async function compositeMockup({
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Kunde inte skapa 2D-context");
 
+  // Skala bakgrund så scen-koordinater (1024-bas) mappar direkt om bilden är 1024.
+  // Om bilden inte är 1024 räknar vi om area-koordinaterna proportionellt.
+  const sceneBase = 1024;
+  const sx = bg.naturalWidth / sceneBase;
+  const sy = bg.naturalHeight / sceneBase;
+  const area = {
+    x: scene.area.x * sx,
+    y: scene.area.y * sy,
+    w: scene.area.w * sx,
+    h: scene.area.h * sy,
+  };
+
   // 1. Bakgrund
   ctx.drawImage(bg, 0, 0);
 
   // 2. Räkna ut poster-pixelstorlek inom area
-  const { area } = scene;
   let posterW = (realWcm / scene.referenceWidthCm) * area.w;
   let posterH = posterW * (realHcm / realWcm);
 
-  // Om för stor i höjd → clamp till area.h
-  if (posterH > area.h) {
-    const scale = area.h / posterH;
-    posterH = area.h;
-    posterW *= scale;
+  // Ramens bredd i px
+  const frameWpx = frameColor && productType !== "canvas"
+    ? (frameWidthCm / scene.referenceWidthCm) * area.w
+    : 0;
+
+  // Total bredd inkl. ram måste rymmas i area
+  const totalW = posterW + frameWpx * 2;
+  const totalH = posterH + frameWpx * 2;
+  if (totalH > area.h) {
+    const scale = area.h / totalH;
+    posterH *= scale; posterW *= scale;
   }
-  // Om för bred → clamp
-  if (posterW > area.w) {
-    const scale = area.w / posterW;
-    posterW = area.w;
-    posterH *= scale;
+  if (totalW > area.w) {
+    const scale = area.w / totalW;
+    posterW *= scale; posterH *= scale;
   }
 
-  // Centrera inom area (vertikal toppjustering kan kännas naturligare i rum)
-  const px = area.x + (area.w - posterW) / 2;
-  const py = area.y + (area.h - posterH) / 2;
+  const innerW = posterW;
+  const innerH = posterH;
+  const outerW = innerW + frameWpx * 2;
+  const outerH = innerH + frameWpx * 2;
 
-  // 3. Skugga
+  // Centrera (lite uppåtjusterat för att kännas naturligt på vägg)
+  const ox = area.x + (area.w - outerW) / 2;
+  const oy = area.y + (area.h - outerH) / 2;
+  const px = ox + frameWpx;
+  const py = oy + frameWpx;
+
+  // 3. Skugga (under hela enheten inkl. ram)
   if (scene.shadow) {
     ctx.save();
     ctx.fillStyle = `rgba(0,0,0,${scene.shadow.alpha})`;
     ctx.shadowColor = `rgba(0,0,0,${scene.shadow.alpha})`;
     ctx.shadowBlur = scene.shadow.blur;
     ctx.shadowOffsetY = scene.shadow.offsetY;
-    ctx.fillRect(px, py, posterW, posterH);
+    ctx.fillRect(ox, oy, outerW, outerH);
     ctx.restore();
   }
 
-  // 4. Canvas wrap (3D-djup på höger sida)
+  // 4. Canvas wrap (3D-djup på höger sida) — för canvas-produkter
   if (productType === "canvas" && scene.canvasWrap) {
-    // Djup i px = (canvasDepthCm / referenceWidthCm) * area.w
     const depthPx = (canvasDepthCm / scene.referenceWidthCm) * area.w;
     const angle = (scene.canvasWrap.angleDeg * Math.PI) / 180;
     const sideW = depthPx * Math.cos(angle);
     const sideTopOffset = depthPx * Math.sin(angle) * 0.5;
 
-    // Rita höger sidoremsa - mörkare version av högra kanten av printen
-    // Vi sampler kantbild via clipping
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(px + posterW, py);
@@ -116,23 +126,43 @@ export async function compositeMockup({
     ctx.lineTo(px + posterW, py + posterH);
     ctx.closePath();
     ctx.clip();
-    // Stretch en smal vertical strip från högra kanten av fg
     const stripSrcW = Math.max(2, fg.naturalWidth * 0.02);
     ctx.drawImage(
       fg,
       fg.naturalWidth - stripSrcW, 0, stripSrcW, fg.naturalHeight,
       px + posterW, py - sideTopOffset, sideW, posterH,
     );
-    // Mörka sidan något
-    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.fillStyle = "rgba(0,0,0,0.28)";
     ctx.fillRect(px + posterW, py - sideTopOffset, sideW, posterH + sideTopOffset * 2);
     ctx.restore();
   }
 
-  // 5. Postern själv (med ev. perspektivlutning för canvas)
+  // 5. Ram (endast poster med vald färg)
+  if (frameColor && frameWpx > 0 && productType !== "canvas") {
+    ctx.save();
+    // Bas-färg
+    ctx.fillStyle = frameColor;
+    ctx.fillRect(ox, oy, outerW, outerH);
+
+    // Trä-/material-textur via gradient på varje sida för djup
+    const grad = ctx.createLinearGradient(ox, oy, ox + outerW, oy + outerH);
+    grad.addColorStop(0, "rgba(255,255,255,0.18)");
+    grad.addColorStop(0.5, "rgba(0,0,0,0)");
+    grad.addColorStop(1, "rgba(0,0,0,0.22)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(ox, oy, outerW, outerH);
+
+    // Inner-shadow runt postern (mörk ring inuti glaset/ramen)
+    ctx.strokeStyle = "rgba(0,0,0,0.35)";
+    ctx.lineWidth = Math.max(1, frameWpx * 0.08);
+    ctx.strokeRect(px - 0.5, py - 0.5, innerW + 1, innerH + 1);
+    ctx.restore();
+  }
+
+  // 6. Postern själv (med ev. perspektivlutning för canvas)
   if (productType === "canvas" && scene.canvasWrap && scene.canvasWrap.angleDeg !== 0) {
     const angle = (scene.canvasWrap.angleDeg * Math.PI) / 180;
-    const skewY = Math.tan(angle) * 0.15; // mild lutning
+    const skewY = Math.tan(angle) * 0.12;
     ctx.save();
     ctx.transform(1, 0, skewY, 1, px - py * skewY, 0);
     ctx.drawImage(fg, px, py, posterW, posterH);
@@ -141,5 +171,5 @@ export async function compositeMockup({
     ctx.drawImage(fg, px, py, posterW, posterH);
   }
 
-  return canvas.toDataURL("image/jpeg", 0.88);
+  return canvas.toDataURL("image/jpeg", 0.9);
 }

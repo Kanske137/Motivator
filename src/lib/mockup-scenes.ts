@@ -10,30 +10,24 @@ import canvasSide from "@/assets/mockups/canvas-side.jpg";
 /**
  * Mockup-scen för composit på klienten.
  *
- * Varje scen är en bild på 1280x1280 px. `area` definierar var vi placerar
- * postern (centrerad inom denna ruta, behåller poster-aspect).
+ * Bilderna är 1024x1024. `area` definierar väggytan (i scen-pixlar) inom
+ * vilken postern centreras. `referenceWidthCm` = hur många cm av en
+ * verklig vägg som area.w motsvarar — så postern skalas trovärdigt.
  *
- * `referenceWidthCm` = hur många cm på en riktig vägg som `area.w` motsvarar.
- * Det låter oss skala postern proportionellt mot vald storlek.
- *
- * För canvas: `wrapAngleDeg` ger en perspektivlutning + `wrapDepthCm` ritar
- * en sidoremsa som simulerar djupet (2 cm eller 4 cm).
+ * För canvas: `canvasWrap.angleDeg` används för perspektivlutning + djup-strip.
  */
 export interface MockupScene {
   id: string;
   label: string;
   src: string;
-  /** Poster-areas i scenens pixelkoordinater (1280x1280-bas). */
+  /** Tom väggyta i scenens pixelkoordinater (1024-bas). */
   area: { x: number; y: number; w: number; h: number };
-  /** Hur många cm i verkligheten som area.w motsvarar (för storleksjämförelse). */
+  /** Hur många cm i verkligheten som area.w motsvarar. */
   referenceWidthCm: number;
-  /** Skugga under postern (px). */
+  /** Skugga under postern. */
   shadow?: { blur: number; offsetY: number; alpha: number };
   /** Endast canvas: rita 3D-djup på höger sida. */
-  canvasWrap?: {
-    /** Lutning i grader (positiv = höger sida vinklad bort från betraktaren). */
-    angleDeg: number;
-  };
+  canvasWrap?: { angleDeg: number };
 }
 
 const POSTER_SCENES: MockupScene[] = [
@@ -41,33 +35,33 @@ const POSTER_SCENES: MockupScene[] = [
     id: "livingroom",
     label: "Vardagsrum",
     src: livingroom,
-    area: { x: 320, y: 240, w: 640, h: 700 },
-    referenceWidthCm: 70,
-    shadow: { blur: 18, offsetY: 8, alpha: 0.18 },
+    area: { x: 180, y: 110, w: 680, h: 600 },
+    referenceWidthCm: 120,
+    shadow: { blur: 22, offsetY: 10, alpha: 0.18 },
   },
   {
     id: "bedroom",
     label: "Sovrum",
     src: bedroom,
-    area: { x: 300, y: 180, w: 680, h: 620,  },
-    referenceWidthCm: 75,
-    shadow: { blur: 22, offsetY: 10, alpha: 0.16 },
+    area: { x: 180, y: 80, w: 700, h: 600 },
+    referenceWidthCm: 130,
+    shadow: { blur: 24, offsetY: 12, alpha: 0.16 },
   },
   {
     id: "office",
     label: "Kontor",
     src: office,
-    area: { x: 380, y: 250, w: 520, h: 600 },
-    referenceWidthCm: 55,
-    shadow: { blur: 14, offsetY: 6, alpha: 0.14 },
+    area: { x: 140, y: 80, w: 760, h: 660 },
+    referenceWidthCm: 140,
+    shadow: { blur: 18, offsetY: 8, alpha: 0.15 },
   },
   {
     id: "wall",
     label: "På vägg",
     src: wall,
-    area: { x: 280, y: 200, w: 720, h: 880 },
-    referenceWidthCm: 80,
-    shadow: { blur: 20, offsetY: 10, alpha: 0.20 },
+    area: { x: 120, y: 80, w: 800, h: 700 },
+    referenceWidthCm: 130,
+    shadow: { blur: 26, offsetY: 14, alpha: 0.20 },
   },
 ];
 
@@ -76,36 +70,36 @@ const CANVAS_SCENES: MockupScene[] = [
     id: "canvas-livingroom",
     label: "Vardagsrum",
     src: canvasLivingroom,
-    area: { x: 350, y: 260, w: 600, h: 580 },
-    referenceWidthCm: 70,
-    shadow: { blur: 24, offsetY: 14, alpha: 0.22 },
+    area: { x: 140, y: 80, w: 700, h: 600 },
+    referenceWidthCm: 130,
+    shadow: { blur: 28, offsetY: 16, alpha: 0.22 },
     canvasWrap: { angleDeg: 6 },
   },
   {
     id: "canvas-side",
-    label: "Sidovy",
+    label: "Diagonal vy",
     src: canvasSide,
-    area: { x: 320, y: 240, w: 580, h: 700 },
-    referenceWidthCm: 60,
-    shadow: { blur: 28, offsetY: 16, alpha: 0.25 },
+    area: { x: 200, y: 100, w: 720, h: 700 },
+    referenceWidthCm: 130,
+    shadow: { blur: 32, offsetY: 18, alpha: 0.25 },
     canvasWrap: { angleDeg: 18 },
   },
   {
     id: "canvas-bedroom",
     label: "Sovrum",
     src: bedroom,
-    area: { x: 300, y: 180, w: 680, h: 620 },
-    referenceWidthCm: 75,
-    shadow: { blur: 24, offsetY: 14, alpha: 0.20 },
+    area: { x: 180, y: 80, w: 700, h: 600 },
+    referenceWidthCm: 130,
+    shadow: { blur: 26, offsetY: 14, alpha: 0.20 },
     canvasWrap: { angleDeg: 4 },
   },
   {
     id: "canvas-wall",
     label: "Närbild",
     src: wall,
-    area: { x: 280, y: 200, w: 720, h: 880 },
-    referenceWidthCm: 70,
-    shadow: { blur: 26, offsetY: 14, alpha: 0.22 },
+    area: { x: 120, y: 80, w: 800, h: 700 },
+    referenceWidthCm: 130,
+    shadow: { blur: 28, offsetY: 14, alpha: 0.22 },
     canvasWrap: { angleDeg: 10 },
   },
 ];
@@ -114,11 +108,22 @@ export function getScenesFor(productType: ProductType): MockupScene[] {
   return productType === "canvas" ? CANVAS_SCENES : POSTER_SCENES;
 }
 
-/**
- * Parse "21x30" eller "50x70" till {wCm, hCm}.
- */
+/** Parse "21x30" / "50x70" → {wCm, hCm}. */
 export function parseSizeCm(size: string): { wCm: number; hCm: number } | null {
   const m = size.match(/(\d+)\s*x\s*(\d+)/i);
   if (!m) return null;
   return { wCm: parseInt(m[1], 10), hCm: parseInt(m[2], 10) };
+}
+
+/** Mappa variant-namn → ramfärg (hex) eller null om ingen ram. */
+export function frameColorFromVariant(variant: string | null | undefined): string | null {
+  if (!variant) return null;
+  const v = variant.toLowerCase();
+  if (v.includes("ingen") || v.includes("no frame") || v.includes("utan ram")) return null;
+  if (v.includes("svart") || v.includes("black")) return "#1a1a1a";
+  if (v.includes("vit") || v.includes("white")) return "#f5f5f2";
+  if (v.includes("ek") || v.includes("oak")) return "#c8a371";
+  if (v.includes("valnöt") || v.includes("walnut")) return "#5a3a26";
+  if (v.includes("ram") || v.includes("frame")) return "#1a1a1a";
+  return null;
 }
