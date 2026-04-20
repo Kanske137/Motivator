@@ -21,11 +21,13 @@ export function MockupGallery() {
     mapStyleId, mapCenter, mapZoom,
     text, textFont, textVisible,
     showLabels, mapShape, posterBgColor,
+    currentLayout,
   } = useEditorStore();
+  const layout = currentLayout();
   const [slots, setSlots] = useState<MockupSlot[]>([]);
-  const [printUrl, setPrintUrl] = useState<string | null>(null);
-  const [printLoading, setPrintLoading] = useState(false);
-  const [printError, setPrintError] = useState<string | undefined>();
+  const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null);
+  const [snapshotLoading, setSnapshotLoading] = useState(false);
+  const [snapshotError, setSnapshotError] = useState<string | undefined>();
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
   const debounceRef = useRef<number | null>(null);
   const reqIdRef = useRef(0);
@@ -36,41 +38,24 @@ export function MockupGallery() {
     if (!config || !size) return;
     const scenes = isCanvas ? [] : getScenesFor(config.product_type);
     setSlots(scenes.map((s) => ({ scene: s, url: null, loading: true })));
-    setPrintLoading(true);
-    setPrintError(undefined);
+    setSnapshotLoading(true);
+    setSnapshotError(undefined);
 
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
     debounceRef.current = window.setTimeout(async () => {
       const myReq = ++reqIdRef.current;
       try {
-        const printRes = await supabase.functions.invoke("generate-print-file", {
-          body: {
-            styleId: mapStyleId,
-            center: mapCenter,
-            zoom: mapZoom,
-            size,
-            orientation,
-            text,
-            textFont,
-            textVisible,
-            showLabels,
-            mapShape,
-            posterBgColor,
-          },
+        // Single source of truth: snapshot the editor artwork directly.
+        const newSnapshot = await renderArtworkSnapshot({
+          mapStyleId, mapCenter, mapZoom,
+          showLabels, mapShape, posterBgColor,
+          text, textFont, textVisible,
+          size, orientation, layout,
         });
         if (myReq !== reqIdRef.current) return;
 
-        if (printRes.error || !printRes.data?.url) {
-          const msg = printRes.error?.message || "Ingen tryckfil";
-          setPrintError(msg);
-          setPrintLoading(false);
-          setPrintUrl(null);
-          setSlots(scenes.map((s) => ({ scene: s, url: null, loading: false, error: msg })));
-          return;
-        }
-        const newPrintUrl: string = printRes.data.url;
-        setPrintUrl(newPrintUrl);
-        setPrintLoading(false);
+        setSnapshotUrl(newSnapshot);
+        setSnapshotLoading(false);
 
         if (isCanvas) return; // canvas uses 3D — no scene compositing needed
 
@@ -82,7 +67,7 @@ export function MockupGallery() {
             try {
               const url = await compositeMockup({
                 scene,
-                printUrl: newPrintUrl,
+                printUrl: newSnapshot,
                 size,
                 orientation,
                 productType: config.product_type,
@@ -110,17 +95,17 @@ export function MockupGallery() {
         if (myReq !== reqIdRef.current) return;
         console.error("[MockupGallery] failed", e);
         const msg = e instanceof Error ? e.message : "Något gick fel";
-        setPrintError(msg);
-        setPrintLoading(false);
+        setSnapshotError(msg);
+        setSnapshotLoading(false);
         setSlots(scenes.map((s) => ({ scene: s, url: null, loading: false, error: msg })));
       }
-    }, 700);
+    }, 600);
 
     return () => {
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
     };
   }, [
-    config, size, variant, orientation, isCanvas,
+    config, size, variant, orientation, isCanvas, layout,
     mapStyleId, mapCenter, mapZoom,
     text, textFont, textVisible,
     showLabels, mapShape, posterBgColor,
