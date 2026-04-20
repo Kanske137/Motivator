@@ -79,22 +79,17 @@ function isCartNotFoundError(userErrors: Array<{ message: string }>): boolean {
 }
 
 async function storefrontApiRequest(query: string, variables: Record<string, unknown> = {}) {
-  const response = await fetch(SHOPIFY_STOREFRONT_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Shopify-Storefront-Access-Token": SHOPIFY_STOREFRONT_TOKEN,
-    },
-    body: JSON.stringify({ query, variables }),
+  const { data, error } = await supabase.functions.invoke("shopify-storefront", {
+    body: { query, variables },
   });
-
-  if (response.status === 402) {
-    toast.error("Shopify: Betalning krävs för API-åtkomst.");
+  if (error) {
+    console.error("Storefront proxy error:", error);
+    toast.error("Anslutning till butiken misslyckades");
     return null;
   }
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const data = await response.json();
-  if (data.errors) throw new Error(data.errors.map((e: { message: string }) => e.message).join(", "));
+  if (data?.errors) {
+    throw new Error(data.errors.map((e: { message: string }) => e.message).join(", "));
+  }
   return data;
 }
 
