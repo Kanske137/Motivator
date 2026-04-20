@@ -1,95 +1,101 @@
 import { create } from "zustand";
-import skuMap from "@/lib/gelato-sku-map.json";
-
-export type ProductType = "posters" | "canvas";
-export type Orientation = "portrait" | "landscape";
-export type Step = "product" | "image" | "map" | "text" | "style" | "size" | "mockup";
-
-export interface SizeOption {
-  size: string;
-  variant: string; // ram-namn för posters, djup för canvas
-  price: number;
-  variantId?: string; // Shopify variant id (gid://...)
-}
+import type { Orientation, ProductConfig } from "@/lib/product-config";
 
 interface EditorState {
-  step: Step;
-  productType: ProductType | null;
-  imageUrl: string | null; // original-uppladdad
-  styledImageUrl: string | null; // efter AI-stil
-  finalImageUrl: () => string | null;
-  mapAddress: string | null;
-  mapCoords: { lat: number; lng: number } | null;
-  text: string;
-  stylePreset: string | null;
-  size: string | null; // ex "30x40"
-  variant: string | null; // ex "Svart" eller "2cm"
-  orientation: Orientation;
-  mockupUrl: string | null;
+  config: ProductConfig | null;
 
-  setStep: (s: Step) => void;
-  next: () => void;
-  back: () => void;
-  setProductType: (t: ProductType) => void;
-  setImageUrl: (u: string | null) => void;
-  setStyledImageUrl: (u: string | null) => void;
-  setMap: (address: string, coords: { lat: number; lng: number }) => void;
-  clearMap: () => void;
+  // map
+  mapCenter: [number, number]; // [lng, lat]
+  mapZoom: number;
+  mapStyleId: string;
+  placeName: string;
+
+  // text
+  text: string;
+  textFont: string;
+  textVisible: boolean;
+
+  // format
+  size: string | null;
+  variant: string | null;
+  orientation: Orientation;
+
+  // setters
+  setConfig: (c: ProductConfig) => void;
+  setMapCenter: (c: [number, number]) => void;
+  setMapZoom: (z: number) => void;
+  setMapStyleId: (s: string) => void;
+  setPlaceName: (n: string) => void;
   setText: (t: string) => void;
-  setStylePreset: (s: string | null) => void;
-  setSize: (size: string, variant: string) => void;
+  setTextFont: (f: string) => void;
+  setTextVisible: (v: boolean) => void;
+  setSize: (s: string) => void;
+  setVariant: (v: string) => void;
   setOrientation: (o: Orientation) => void;
-  setMockupUrl: (u: string | null) => void;
-  reset: () => void;
-  getGelatoUid: () => string | null;
+
+  // computed
+  currentPrice: () => number;
+  currentLayout: () => ProductConfig["layouts"]["portrait"] | null;
 }
 
-const ORDER: Step[] = ["product", "image", "map", "text", "style", "size", "mockup"];
+export const useEditorStore = create<EditorState>((set, get) => ({
+  config: null,
+  mapCenter: [18.0686, 59.3293], // Stockholm
+  mapZoom: 12,
+  mapStyleId: "light-v11",
+  placeName: "Stockholm, Sverige",
 
-const initial = {
-  step: "product" as Step,
-  productType: null,
-  imageUrl: null,
-  styledImageUrl: null,
-  mapAddress: null,
-  mapCoords: null,
-  text: "",
-  stylePreset: null,
+  text: "STOCKHOLM\n59.3293°N · 18.0686°E",
+  textFont: "Inter",
+  textVisible: true,
+
   size: null,
   variant: null,
-  orientation: "portrait" as Orientation,
-  mockupUrl: null,
-};
+  orientation: "portrait",
 
-export const useEditorStore = create<EditorState>((set, get) => ({
-  ...initial,
-
-  finalImageUrl: () => get().styledImageUrl || get().imageUrl,
-  setStep: (step) => set({ step }),
-  next: () => {
-    const idx = ORDER.indexOf(get().step);
-    if (idx < ORDER.length - 1) set({ step: ORDER[idx + 1] });
+  setConfig: (config) => {
+    const firstSize = config.sizes[0];
+    const firstVariant = firstSize?.variants[0];
+    set({
+      config,
+      mapStyleId: config.map_styles[0] ?? "light-v11",
+      textFont: config.text_config.defaultFont ?? "Inter",
+      size: get().size && config.sizes.find((s) => s.size === get().size) ? get().size : firstSize?.size ?? null,
+      variant:
+        get().variant && firstSize?.variants.find((v) => v.name === get().variant)
+          ? get().variant
+          : firstVariant?.name ?? null,
+    });
   },
-  back: () => {
-    const idx = ORDER.indexOf(get().step);
-    if (idx > 0) set({ step: ORDER[idx - 1] });
-  },
-  setProductType: (productType) => set({ productType, size: null, variant: null }),
-  setImageUrl: (imageUrl) => set({ imageUrl, styledImageUrl: null, mockupUrl: null }),
-  setStyledImageUrl: (styledImageUrl) => set({ styledImageUrl, mockupUrl: null }),
-  setMap: (mapAddress, mapCoords) => set({ mapAddress, mapCoords }),
-  clearMap: () => set({ mapAddress: null, mapCoords: null }),
+  setMapCenter: (mapCenter) => set({ mapCenter }),
+  setMapZoom: (mapZoom) => set({ mapZoom }),
+  setMapStyleId: (mapStyleId) => set({ mapStyleId }),
+  setPlaceName: (placeName) => set({ placeName }),
   setText: (text) => set({ text }),
-  setStylePreset: (stylePreset) => set({ stylePreset }),
-  setSize: (size, variant) => set({ size, variant, mockupUrl: null }),
-  setOrientation: (orientation) => set({ orientation, mockupUrl: null }),
-  setMockupUrl: (mockupUrl) => set({ mockupUrl }),
-  reset: () => set(initial),
+  setTextFont: (textFont) => set({ textFont }),
+  setTextVisible: (textVisible) => set({ textVisible }),
+  setSize: (size) => {
+    const config = get().config;
+    if (!config) return set({ size });
+    const sizeDef = config.sizes.find((s) => s.size === size);
+    const currentVariant = get().variant;
+    const variantStillValid = sizeDef?.variants.find((v) => v.name === currentVariant);
+    set({
+      size,
+      variant: variantStillValid ? currentVariant : sizeDef?.variants[0]?.name ?? null,
+    });
+  },
+  setVariant: (variant) => set({ variant }),
+  setOrientation: (orientation) => set({ orientation }),
 
-  getGelatoUid: () => {
-    const { productType, size, variant, orientation } = get();
-    if (!productType || !size || !variant) return null;
-    const map = (skuMap as Record<string, Record<string, Record<string, string>>>)[productType];
-    return map?.[`${size}|${variant}`]?.[orientation] || null;
+  currentPrice: () => {
+    const { config, size, variant } = get();
+    if (!config || !size || !variant) return 0;
+    const sizeDef = config.sizes.find((s) => s.size === size);
+    return sizeDef?.variants.find((v) => v.name === variant)?.price ?? 0;
+  },
+  currentLayout: () => {
+    const { config, orientation } = get();
+    return config?.layouts[orientation] ?? null;
   },
 }));
