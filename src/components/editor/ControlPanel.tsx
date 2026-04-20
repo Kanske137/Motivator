@@ -28,6 +28,17 @@ interface Props {
 const cardClass =
   "rounded-2xl bg-card border border-border shadow-[0_1px_2px_rgba(0,0,0,0.04)] px-4";
 
+const BG_SWATCHES = [
+  "#EFE7D6", // beige
+  "#FFFFFF", // white
+  "#F8F4EC", // off-white
+  "#E5E5E5", // light gray
+  "#D9CDB5", // sand
+  "#D6E4D2", // light green
+  "#CFE0EA", // light blue
+  "#1A1A1A", // black
+];
+
 export function ControlPanel({ configs, activeHandle, onProductChange }: Props) {
   const {
     config,

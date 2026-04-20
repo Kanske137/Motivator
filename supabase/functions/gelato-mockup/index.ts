@@ -9,6 +9,7 @@ Deno.serve(async (req) => {
     if (!GELATO_API_KEY) throw new Error("GELATO_API_KEY not configured");
 
     const { productUid, imageUrl } = await req.json();
+    console.log("[gelato-mockup] request:", { productUid, imageUrl });
     if (!productUid || !imageUrl) {
       return new Response(JSON.stringify({ error: "productUid and imageUrl required" }), {
         status: 400,
@@ -32,17 +33,18 @@ Deno.serve(async (req) => {
     });
 
     const task = await create.json();
+    console.log("[gelato-mockup] create response:", create.status, JSON.stringify(task).slice(0, 500));
     if (!create.ok) {
-      console.error("Gelato mockup create failed", task);
-      // Fallback: returnera null så klienten visar tryckfilen istället
+      console.error("[gelato-mockup] create failed", task);
       return new Response(
         JSON.stringify({ mockupUrl: null, fallback: true, error: task?.message || "mockup_unavailable" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // Polla tills klar
+    // Poll until done
     const taskId = task.taskId || task.id;
+    console.log("[gelato-mockup] polling taskId:", taskId);
     const deadline = Date.now() + 30_000;
     let result = task;
     while (taskId && result.status !== "completed" && result.status !== "failed" && Date.now() < deadline) {
@@ -51,6 +53,7 @@ Deno.serve(async (req) => {
         headers: { "X-API-KEY": GELATO_API_KEY },
       });
       result = await poll.json();
+      console.log("[gelato-mockup] poll status:", result.status);
     }
 
     const mockupUrl =
