@@ -187,15 +187,45 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding }: Props
   }, [orientation, size, mapShape]);
 
   // Outer poster frame: ALWAYS uses poster aspect (independent of mapShape)
-  const posterAspect = parseSizeRatio(size, orientation);
+  const sizeCm = parseCm(size);
+  const posterAspect = sizeCm
+    ? (orientation === "portrait"
+        ? Math.min(sizeCm.w, sizeCm.h) / Math.max(sizeCm.w, sizeCm.h)
+        : Math.max(sizeCm.w, sizeCm.h) / Math.min(sizeCm.w, sizeCm.h))
+    : (orientation === "portrait" ? 3 / 4 : 4 / 3);
+
+  // Compute frame border in pixels relative to physical short side (Gelato ~2cm)
+  useEffect(() => {
+    const el = frameRef.current;
+    if (!el) return;
+    const compute = () => {
+      if (!frameColor || !sizeCm) {
+        setBorderPx(0);
+        return;
+      }
+      const rect = el.getBoundingClientRect();
+      const shortPx = Math.min(rect.width, rect.height);
+      const shortCm = Math.min(sizeCm.w, sizeCm.h);
+      const px = Math.round((frameWidthCm / shortCm) * shortPx);
+      setBorderPx(px);
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [frameColor, frameWidthCm, sizeCm?.w, sizeCm?.h]);
 
   const frameStyle: React.CSSProperties = {
     aspectRatio: `${posterAspect}`,
     width: "100%",
     maxWidth: "min(100%, 70vh)",
     maxHeight: "78vh",
-    border: borderCss,
+    background: posterBgColor,
+    borderStyle: frameColor ? "solid" : undefined,
+    borderColor: frameColor,
+    borderWidth: frameColor ? `${borderPx}px` : 0,
     padding: innerPadding,
+    boxSizing: "border-box",
   };
 
   // Inner map wrapper kept ALWAYS within the poster frame.
