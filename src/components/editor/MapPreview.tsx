@@ -223,7 +223,8 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding }: Props
         .mapboxgl-ctrl-logo, .mapboxgl-ctrl-attrib { display: none !important; }
       `}</style>
       <div
-        className="relative bg-card shadow-[0_30px_60px_-20px_rgba(0,0,0,0.25)]"
+        ref={frameRef}
+        className="relative shadow-[0_30px_60px_-20px_rgba(0,0,0,0.25)]"
         style={frameStyle}
       >
         <div style={mapWrapperStyle}>
