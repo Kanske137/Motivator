@@ -74,11 +74,16 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
   const w = Math.min(1600, Math.round(wCm * PX_PER_CM));
   const h = Math.min(1600, Math.round(hCm * PX_PER_CM));
 
-  const container = getOffscreenContainer(w, h);
+  // Map renders in shape-aware container so square/circle aren't squished.
+  const sq = Math.min(w, h);
+  const mapW = input.mapShape === "rect" ? w : sq;
+  const mapH = input.mapShape === "rect" ? h : sq;
+
+  const container = getOffscreenContainer(Math.max(w, mapW), Math.max(h, mapH));
   // Inner div for THIS map render (so concurrent renders don't collide)
   const mapDiv = document.createElement("div");
-  mapDiv.style.width = `${w}px`;
-  mapDiv.style.height = `${h}px`;
+  mapDiv.style.width = `${mapW}px`;
+  mapDiv.style.height = `${mapH}px`;
   container.appendChild(mapDiv);
 
   let map: mapboxgl.Map | null = null;
