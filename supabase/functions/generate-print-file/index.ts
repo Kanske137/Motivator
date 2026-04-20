@@ -68,8 +68,10 @@ Deno.serve(async (req) => {
 
     const { w, h } = pxFromSize(size, orientation);
 
-    // Map: square that hugs the shorter side of the poster when shaped, else fills poster
-    const mapSize = mapShape === "rect" ? { w, h } : { w: Math.min(w, h), h: Math.min(w, h) };
+    // Map fills the full poster always — shape is applied as a clip, centered on the
+    // poster rectangle (not the map rect). This way square/circle hug the shorter
+    // poster side regardless of orientation.
+    const mapSize = { w, h };
 
     // Mapbox static. attribution=false&logo=false. Labels = whether style symbols render.
     // We can't toggle layers via static API; instead we pick a no-labels variant when available.
