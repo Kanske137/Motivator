@@ -22,6 +22,7 @@ interface EditorState {
   country?: string;
   showLabels: boolean;
   mapShape: MapShape;
+  posterBgColor: string;
 
   // text
   text: string;
@@ -42,6 +43,7 @@ interface EditorState {
   setPlaceName: (n: string) => void;
   setShowLabels: (v: boolean) => void;
   setMapShape: (s: MapShape) => void;
+  setPosterBgColor: (c: string) => void;
   setText: (t: string) => void;
   setTextFont: (f: string) => void;
   setTextVisible: (v: boolean) => void;
@@ -74,6 +76,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   country: "Sverige",
   showLabels: false,
   mapShape: "rect",
+  posterBgColor: "#EFE7D6",
 
   text: "STOCKHOLM\nSverige\n59.3293°N · 18.0686°E",
   textFont: "Inter",
@@ -104,6 +107,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setPlaceName: (placeName) => set({ placeName }),
   setShowLabels: (showLabels) => set({ showLabels }),
   setMapShape: (mapShape) => set({ mapShape }),
+  setPosterBgColor: (posterBgColor) => set({ posterBgColor }),
   setText: (text) => set({ text, textIsCustom: true }),
   setTextFont: (textFont) => set({ textFont }),
   setTextVisible: (textVisible) => set({ textVisible }),
