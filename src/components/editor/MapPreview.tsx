@@ -175,12 +175,11 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
     setTimeout(() => mapRef.current?.resize(), 320);
   }, [orientation, size, mapShape]);
 
-  const aspect = mapShape === "square" || mapShape === "circle"
-    ? 1
-    : parseSizeRatio(size, orientation);
+  // Outer poster frame: ALWAYS uses poster aspect (independent of mapShape)
+  const posterAspect = parseSizeRatio(size, orientation);
 
   const frameStyle: React.CSSProperties = {
-    aspectRatio: `${aspect}`,
+    aspectRatio: `${posterAspect}`,
     width: "100%",
     maxWidth: "min(100%, 70vh)",
     maxHeight: "78vh",
@@ -188,10 +187,21 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
     padding: innerPadding,
   };
 
-  const mapClipStyle: React.CSSProperties =
-    mapShape === "circle"
-      ? { borderRadius: "9999px", overflow: "hidden" }
-      : { overflow: "hidden" };
+  // Inner map wrapper styled by mapShape
+  const isShaped = mapShape === "square" || mapShape === "circle";
+  const mapWrapperClass = isShaped
+    ? "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 aspect-square"
+    : "absolute inset-0";
+  const mapWrapperStyle: React.CSSProperties = isShaped
+    ? {
+        width: "min(100%, 100cqh)",
+        height: "auto",
+        maxWidth: "100%",
+        maxHeight: "100%",
+        borderRadius: mapShape === "circle" ? "9999px" : "0",
+        overflow: "hidden",
+      }
+    : { overflow: "hidden" };
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-4 min-h-[60vh] gap-2">
@@ -199,30 +209,33 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
       <style>{`
         .mapboxgl-ctrl-logo, .mapboxgl-ctrl-attrib { display: none !important; }
       `}</style>
-      <div className="relative bg-card shadow-2xl" style={frameStyle}>
-        <div className="absolute inset-0" style={mapClipStyle}>
+      <div
+        className="relative bg-card shadow-[0_30px_60px_-20px_rgba(0,0,0,0.25)]"
+        style={{ ...frameStyle, containerType: "size" } as React.CSSProperties}
+      >
+        <div className={mapWrapperClass} style={mapWrapperStyle}>
           <div ref={mapContainerRef} className="absolute inset-0" />
-
-          {textVisible &&
-            layout?.layers
-              .filter((l) => l.type === "text")
-              .map((l, i) => (
-                <div
-                  key={`text-${i}`}
-                  className="absolute -translate-x-1/2 -translate-y-1/2 text-center px-2 text-foreground pointer-events-none"
-                  style={{
-                    left: l.x,
-                    top: l.y,
-                    fontFamily: textFont,
-                    width: "90%",
-                  }}
-                >
-                  <div className="whitespace-pre-line text-sm md:text-base lg:text-lg font-medium tracking-wide leading-tight">
-                    {text || "Lägg till text…"}
-                  </div>
-                </div>
-              ))}
         </div>
+
+        {textVisible &&
+          layout?.layers
+            .filter((l) => l.type === "text")
+            .map((l, i) => (
+              <div
+                key={`text-${i}`}
+                className="absolute -translate-x-1/2 -translate-y-1/2 text-center px-2 text-foreground pointer-events-none"
+                style={{
+                  left: l.x,
+                  top: l.y,
+                  fontFamily: textFont,
+                  width: "90%",
+                }}
+              >
+                <div className="whitespace-pre-line text-sm md:text-base lg:text-lg font-medium tracking-wide leading-tight">
+                  {text || "Lägg till text…"}
+                </div>
+              </div>
+            ))}
       </div>
       <p className="text-[10px] text-muted-foreground">© Mapbox · © OpenStreetMap</p>
     </div>
