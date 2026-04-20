@@ -17,12 +17,16 @@ import { MAPBOX_STYLE_LABELS, type ProductConfig } from "@/lib/product-config";
 import { FormatSection } from "./FormatSection";
 import { Loader2, Search } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 interface Props {
   configs: ProductConfig[];
   activeHandle: string;
   onProductChange: (handle: string) => void;
 }
+
+const cardClass =
+  "rounded-2xl bg-card border border-border shadow-[0_1px_2px_rgba(0,0,0,0.04)] px-4";
 
 export function ControlPanel({ configs, activeHandle, onProductChange }: Props) {
   const {
@@ -47,7 +51,6 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
   const [results, setResults] = useState<GeocodeResult[]>([]);
   const [searching, setSearching] = useState(false);
 
-  // Debounced live search
   useEffect(() => {
     const q = query.trim();
     if (q.length < 2) {
@@ -80,44 +83,48 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
   };
 
   return (
-    <Accordion type="single" collapsible defaultValue="plats" className="w-full">
+    <Accordion type="single" collapsible defaultValue="plats" className="w-full space-y-3">
       {/* 1. Plats */}
-      <AccordionItem value="plats">
-        <AccordionTrigger className="text-sm font-semibold">Plats</AccordionTrigger>
-        <AccordionContent className="pt-3 space-y-4 overflow-visible">
+      <AccordionItem value="plats" className={cn(cardClass, "border-b")}>
+        <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
+          Plats
+        </AccordionTrigger>
+        <AccordionContent className="pt-1 pb-4 space-y-4 overflow-visible">
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Vald plats</Label>
-            <p className="text-sm font-medium">{placeName}</p>
+            <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Vald plats</Label>
+            <p className="text-sm font-medium font-serif-display text-base">{placeName}</p>
           </div>
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Sök adress eller stad</Label>
+            <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              Sök adress eller stad
+            </Label>
             <Popover open={results.length > 0}>
               <PopoverTrigger asChild>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                   <Input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="t.ex. Drottninggatan 1, Stockholm"
-                    className="pl-9 pr-9"
+                    className="pl-10 pr-10 h-12 rounded-full bg-background shadow-inner"
                   />
                   {searching && (
-                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                    <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
                   )}
                 </div>
               </PopoverTrigger>
               <PopoverContent
                 align="start"
-                sideOffset={4}
+                sideOffset={6}
                 onOpenAutoFocus={(e) => e.preventDefault()}
-                className="p-0 w-[var(--radix-popover-trigger-width)] z-[60]"
+                className="p-0 w-[var(--radix-popover-trigger-width)] z-[60] rounded-2xl overflow-hidden"
               >
                 <div className="max-h-[14rem] overflow-y-auto divide-y">
                   {results.slice(0, 4).map((r, i) => (
                     <button
                       key={i}
                       onClick={() => onPick(r)}
-                      className="block w-full text-left px-3 py-2 text-sm hover:bg-accent transition h-[3.5rem] leading-tight"
+                      className="block w-full text-left px-4 py-2 text-sm hover:bg-accent transition h-[3.5rem] leading-tight"
                     >
                       {r.place_name}
                     </button>
@@ -133,64 +140,75 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
       </AccordionItem>
 
       {/* 2. Kartstil */}
-      <AccordionItem value="kartstil">
-        <AccordionTrigger className="text-sm font-semibold">Kartstil</AccordionTrigger>
-        <AccordionContent className="pt-3 space-y-4">
+      <AccordionItem value="kartstil" className={cn(cardClass, "border-b")}>
+        <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
+          Kartstil
+        </AccordionTrigger>
+        <AccordionContent className="pt-1 pb-4 space-y-4">
           <div className="grid grid-cols-3 gap-2">
             {config.map_styles.map((s) => (
               <button
                 key={s}
                 onClick={() => setMapStyleId(s)}
-                className={`relative aspect-square rounded-md overflow-hidden border-2 transition ${
-                  s === mapStyleId ? "border-primary ring-2 ring-primary/30" : "border-border"
-                }`}
+                className={cn(
+                  "relative aspect-square rounded-xl overflow-hidden transition hover:-translate-y-0.5",
+                  s === mapStyleId
+                    ? "ring-2 ring-primary"
+                    : "ring-1 ring-border",
+                )}
               >
                 <div className="absolute inset-0" style={{ background: stylePreviewBg(s) }} />
-                <span className="absolute bottom-0 left-0 right-0 bg-background/80 backdrop-blur-sm text-[10px] py-1 font-medium">
+                <span className="absolute bottom-0 left-0 right-0 bg-background/85 backdrop-blur-sm text-[10px] py-1 font-medium">
                   {MAPBOX_STYLE_LABELS[s] ?? s}
                 </span>
               </button>
             ))}
           </div>
 
-          <div className="flex items-center justify-between pt-2 border-t">
-            <Label className="text-xs text-muted-foreground">Visa områdesnamn på kartan</Label>
+          <div className="flex items-center justify-between pt-2">
+            <Label className="text-xs text-foreground">Visa områdesnamn på kartan</Label>
             <Switch checked={showLabels} onCheckedChange={setShowLabels} />
           </div>
 
-          <div className="space-y-2 pt-2 border-t">
-            <Label className="text-xs text-muted-foreground">Form</Label>
+          <div className="space-y-2 pt-1">
+            <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Kartans form</Label>
             <div className="grid grid-cols-3 gap-2">
               {([
                 { id: "rect", label: "Standard", Icon: RectangleHorizontal },
                 { id: "square", label: "Kvadrat", Icon: Square },
                 { id: "circle", label: "Cirkel", Icon: Circle },
-              ] as const).map(({ id, label, Icon }) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setMapShape(id)}
-                  className={`flex flex-col items-center justify-center gap-1 py-3 rounded-md border-2 transition ${
-                    mapShape === id
-                      ? "border-primary bg-accent"
-                      : "border-border hover:bg-muted/60"
-                  }`}
-                >
-                  <Icon className="h-5 w-5" />
-                  <span className="text-[11px] font-medium">{label}</span>
-                </button>
-              ))}
+              ] as const).map(({ id, label, Icon }) => {
+                const selected = mapShape === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setMapShape(id)}
+                    className={cn(
+                      "flex flex-col items-center justify-center gap-1.5 aspect-square rounded-xl transition",
+                      selected
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background ring-1 ring-border hover:bg-accent/50",
+                    )}
+                  >
+                    <Icon className="h-7 w-7" />
+                    <span className="text-[11px] font-medium">{label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </AccordionContent>
       </AccordionItem>
 
       {/* 3. Text */}
-      <AccordionItem value="text">
-        <AccordionTrigger className="text-sm font-semibold">Text</AccordionTrigger>
-        <AccordionContent className="pt-3 space-y-4">
+      <AccordionItem value="text" className={cn(cardClass, "border-b")}>
+        <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
+          Text
+        </AccordionTrigger>
+        <AccordionContent className="pt-1 pb-4 space-y-4">
           <div className="flex items-center justify-between">
-            <Label className="text-xs text-muted-foreground">Visa text</Label>
+            <Label className="text-xs text-foreground">Visa text</Label>
             <Switch checked={textVisible} onCheckedChange={setTextVisible} />
           </div>
           <Textarea
@@ -199,9 +217,10 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
             placeholder="Din text här…"
             maxLength={config.text_config.maxChars}
             rows={3}
+            className="rounded-xl"
           />
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Typsnitt</Label>
+            <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Typsnitt</Label>
             <div className="grid grid-cols-3 gap-2">
               {config.text_config.fonts.map((f) => (
                 <Button
@@ -210,7 +229,7 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
                   variant={f === textFont ? "default" : "outline"}
                   onClick={() => setTextFont(f)}
                   style={{ fontFamily: f }}
-                  className="text-xs"
+                  className="text-xs rounded-full"
                 >
                   {f.split(" ")[0]}
                 </Button>
@@ -220,10 +239,12 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
         </AccordionContent>
       </AccordionItem>
 
-      {/* 4. Format (sist) */}
-      <AccordionItem value="format">
-        <AccordionTrigger className="text-sm font-semibold">Format</AccordionTrigger>
-        <AccordionContent className="pt-3">
+      {/* 4. Format */}
+      <AccordionItem value="format" className={cn(cardClass, "border-b")}>
+        <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
+          Format
+        </AccordionTrigger>
+        <AccordionContent className="pt-1 pb-4">
           <FormatSection configs={configs} activeHandle={activeHandle} onProductChange={onProductChange} />
         </AccordionContent>
       </AccordionItem>
