@@ -3,17 +3,15 @@ import { useEditorStore } from "@/stores/editorStore";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, AlertCircle } from "lucide-react";
 import { resolveProductUid } from "@/lib/gelato";
+import { getScenesFor } from "@/lib/gelato-scenes";
 
 interface Mockup {
   url: string | null;
   label: string;
   loading: boolean;
   error?: string;
-  fallback?: boolean;
+  isRealMockup?: boolean;
 }
-
-const ENV_LABELS_POSTER = ["Vardagsrum", "Sovrum", "Kontor", "På vägg"];
-const ENV_LABELS_CANVAS = ["Vardagsrum", "Sovrum", "Sidovy", "Närbild"];
 
 export function MockupGallery() {
   const { config, size, variant, orientation, mapStyleId, mapCenter, mapZoom, text, textFont } =
@@ -24,15 +22,14 @@ export function MockupGallery() {
 
   useEffect(() => {
     if (!config || !size) return;
-    const labels = config.product_type === "canvas" ? ENV_LABELS_CANVAS : ENV_LABELS_POSTER;
+    const scenes = getScenesFor(config.product_type);
 
-    setMockups(labels.map((label) => ({ label, url: null, loading: true })));
+    setMockups(scenes.map((s) => ({ label: s.label, url: null, loading: true })));
 
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
     debounceRef.current = window.setTimeout(async () => {
       const myReq = ++reqIdRef.current;
       try {
-        // Resolve productUid up-front (DB → local fallback)
         const resolved = resolveProductUid({
           productType: config.product_type,
           size,
@@ -51,46 +48,60 @@ export function MockupGallery() {
 
         if (printRes.error || !printRes.data?.url) {
           const msg = printRes.error?.message || "Ingen tryckfil";
-          setMockups(labels.map((label) => ({ label, url: null, loading: false, error: msg })));
+          setMockups(scenes.map((s) => ({ label: s.label, url: null, loading: false, error: msg })));
           return;
         }
         const printUrl: string = printRes.data.url;
 
         if (!resolved.productUid) {
-          // No mapping at all → show print preview in all slots with clear fallback label
           setMockups(
-            labels.map((label) => ({
-              label,
+            scenes.map((s) => ({
+              label: s.label,
               url: printUrl,
               loading: false,
-              fallback: true,
-              error: "Saknar Gelato-mapping för denna variant",
+              isRealMockup: false,
+              error: "Saknar Gelato-mapping",
             })),
           );
           return;
         }
 
-        // Step 2: gelato mockup
-        const mockupRes = await supabase.functions.invoke("gelato-mockup", {
-          body: { productUid: resolved.productUid, imageUrl: printUrl },
-        });
+        // Step 2: parallel mockup-requests, en per scen
+        const results = await Promise.all(
+          scenes.map(async (s) => {
+            try {
+              const r = await supabase.functions.invoke("gelato-mockup", {
+                body: {
+                  productUid: resolved.productUid,
+                  imageUrl: printUrl,
+                  mockupSceneId: s.mockupSceneId,
+                },
+              });
+              const mockupUrl: string | null = r.data?.mockupUrl ?? null;
+              const err: string | undefined = r.data?.error || r.error?.message;
+              return { scene: s, mockupUrl, error: err };
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "Mockup misslyckades";
+              return { scene: s, mockupUrl: null, error: msg };
+            }
+          }),
+        );
         if (myReq !== reqIdRef.current) return;
-        console.log("[MockupGallery] gelato-mockup:", mockupRes);
-        const mockupUrl: string | null = mockupRes.data?.mockupUrl ?? null;
 
         setMockups(
-          labels.map((label, i) => ({
-            label,
-            url: i === 0 && mockupUrl ? mockupUrl : printUrl,
+          results.map((r) => ({
+            label: r.scene.label,
+            url: r.mockupUrl ?? printUrl,
             loading: false,
-            fallback: !(i === 0 && mockupUrl),
+            isRealMockup: !!r.mockupUrl,
+            error: r.mockupUrl ? undefined : r.error || "Mockup ej tillgänglig",
           })),
         );
       } catch (e) {
         if (myReq !== reqIdRef.current) return;
         console.error("[MockupGallery] failed", e);
         const msg = e instanceof Error ? e.message : "Något gick fel";
-        setMockups(labels.map((label) => ({ label, url: null, loading: false, error: msg })));
+        setMockups(scenes.map((s) => ({ label: s.label, url: null, loading: false, error: msg })));
       }
     }, 900);
 
@@ -120,10 +131,10 @@ export function MockupGallery() {
               ) : m.url ? (
                 <>
                   <img src={m.url} alt={m.label} className="w-full h-full object-cover" />
-                  {m.fallback && m.error && i === 0 && (
-                    <div className="absolute top-1 left-1 right-1 bg-destructive/90 text-destructive-foreground text-[9px] px-1.5 py-0.5 rounded flex items-center gap-1">
+                  {!m.isRealMockup && (
+                    <div className="absolute top-1 left-1 right-1 bg-background/85 backdrop-blur-sm text-foreground text-[9px] px-1.5 py-0.5 rounded flex items-center gap-1">
                       <AlertCircle className="h-2.5 w-2.5 flex-shrink-0" />
-                      <span className="line-clamp-1">{m.error}</span>
+                      <span className="line-clamp-1">Tryckfil · {m.error ?? "Ingen mockup"}</span>
                     </div>
                   )}
                 </>
@@ -135,9 +146,6 @@ export function MockupGallery() {
               )}
               <div className="absolute bottom-0 inset-x-0 bg-background/85 backdrop-blur-sm text-[11px] py-1 text-center font-medium">
                 {m.label}
-                {m.fallback && !m.loading && m.url && (
-                  <span className="text-muted-foreground"> · Förhandsgranskning</span>
-                )}
               </div>
             </div>
           ))}

@@ -18,7 +18,7 @@ const FRAME_COLORS: Record<string, string> = {
   Ek: "hsl(30 35% 55%)",
   Valnöt: "hsl(20 25% 25%)",
 };
-const FRAME_WIDTH_CM = 2;
+const FRAME_WIDTH_CM = 1.2; // matchar Gelato frp_w12xt22-mm (12mm front)
 
 export default function EditorPage() {
   const [params, setParams] = useSearchParams();
