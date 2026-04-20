@@ -123,9 +123,9 @@ export function MockupGallery() {
       : 2;
     return (
       <Canvas3DPreview
-        printUrl={printUrl}
-        loading={printLoading}
-        error={printError}
+        printUrl={snapshotUrl}
+        loading={snapshotLoading}
+        error={snapshotError}
         widthCm={widthCm}
         heightCm={heightCm}
         depthCm={depthCm}
