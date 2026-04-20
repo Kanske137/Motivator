@@ -1,122 +1,110 @@
 
-## Mockups: exakt felorsak och fix
+## Bekräftad rotorsak
 
-Detta ska gå. Felet är nu exakt lokaliserat:
+Ja — det ska gå, men det som blockerar nu är inte längre host eller `productUid`.
 
-- `productUid` resolvas korrekt
-- `generate-print-file` fungerar korrekt
-- `gelato-mockup` når rätt Gelato-host
-- men Gelato returnerar `400 BAD_REQUEST` eftersom requesten saknar obligatoriskt fält: `mockupSceneId`
+Det exakta felet i loggarna är nu:
 
-Loggarna visar tydligt:
 ```text
-"There are errors in submitted data"
+"living-room" is not a valid UUID
+"bedroom" is not a valid UUID
+"office" is not a valid UUID
+"wall" is not a valid UUID
 reference: "mockupSceneId"
-"This value should not be blank."
 ```
 
-Det som visas längst ner idag är därför inte riktiga Gelato-mockups, utan samma tryckfil som återanvänds i alla rutor som fallback. Därför ser man bara delar av editorn/postern.
+Det betyder att Gelato inte vill ha scen-namn som `"living-room"` eller `"wall"`, utan ett riktigt `mockupSceneId` i UUID-format. Den nuvarande filen `src/lib/gelato-scenes.ts` innehåller alltså platshållare, inte riktiga Gelato-scener. Därför faller varje request tillbaka till tryckfilen, och det är därför ni ser delar av editorn/postern längst ner.
 
-## Vad som ska byggas
+Det finns också en separat testdetalj: preview-routen är `/`, som redirectar till `/editor?...`, inte `/index`. 404:an i browser-testet var alltså från fel route, inte från mockup-felet.
 
-### 1. Ge varje mockup-ruta ett riktigt Gelato-scene-id
-Skapa en lokal mapping för mockup-miljöer per produkttyp, t.ex.:
+## Vad som ska byggas nu
 
-- posters:
-  - Vardagsrum
-  - Sovrum
-  - Kontor
-  - På vägg
-- canvas:
-  - Vardagsrum
-  - Sovrum
-  - Sidovy
-  - Närbild
+### 1. Sluta använda gissade scene-id:n
+Byt strategi i `src/lib/gelato-scenes.ts`:
 
-Varje label kopplas till ett faktiskt `mockupSceneId` som Gelato accepterar.
+- ta bort de hårdkodade värdena som `"living-room"`, `"bedroom"`, `"office"`, `"wall"`
+- ersätt dem med en struktur som bara använder riktiga UUID:n
+- gör mappingen produktbaserad, eftersom giltiga scener sannolikt skiljer sig mellan posters och canvas, och ibland även per `productUid`
 
-Föreslagen ny hjälparfil:
-- `src/lib/gelato-scenes.ts`
+Exempel på ny struktur:
+- `productType`
+- `label`
+- `mockupSceneId` (UUID)
+- ev. `productUid`-specifik override om vissa produkter har egna scenlistor
 
-Den ska exportera något i stil med:
-- scenlista per `productType`
-- label
-- `mockupSceneId`
+### 2. Lägg till ett discovery-spår för riktiga Gelato-scener
+Det viktiga nästa steget är att faktiskt hämta eller verifiera vilka scener Gelato accepterar för en given produkt.
 
-## 2. Uppdatera `MockupGallery` så varje kort anropar Gelato med sin egen scen
-Idag anropas mockup-funktionen en gång och övriga rutor fylls med `printUrl`.
+Implementera en temporär backend-funktion, t.ex.:
+- `supabase/functions/gelato-list-mockup-scenes/index.ts`
 
-Det ska ändras till:
-- en lista av mockup-slots byggs från scene-mappingen
-- varje slot anropar `gelato-mockup` med:
+Den ska:
+- ta emot `productUid`
+- anropa relevant Gelato-endpoint för att läsa metadata/templates/mockup-config för produkten
+- logga och returnera alla tillgängliga mockup-scener med riktiga UUID:n och gärna label/namn om Gelato skickar dem
+- om Gelato inte exponerar detta direkt, prova närliggande produkt/template-endpoints och returnera rådata för analys
+
+Målet här är inte UI först, utan att få fram den verkliga scenkatalogen för era produkt-UID:n.
+
+### 3. Bygg in ett säkert fallback-läge om scenlista saknas
+Uppdatera `MockupGallery.tsx` så att den inte längre antar att det alltid finns mockup-scener.
+
+Ny logik:
+- om inga verifierade scene UUID:er finns för aktuell produkt:
+  - visa tydligt statusmeddelande, t.ex. “Mockup-scener ej konfigurerade för denna produkt ännu”
+  - visa tryckfil som fallback, men kalla den uttryckligen “Tryckfil”, inte mockup
+- om scene UUID:er finns:
+  - kör en request per scen som idag
+  - visa bara “riktig mockup” när Gelato faktiskt returnerar en mockup-URL
+
+### 4. Gör `gelato-mockup` mer diagnostisk
+Uppdatera `supabase/functions/gelato-mockup/index.ts` så att felsökningen blir definitiv:
+
+- validera att `mockupSceneId` ser ut som UUID innan requesten skickas
+- returnera tydligt fel om scen-id inte är UUID-format
+- logga:
   - `productUid`
-  - `imageUrl`
   - `mockupSceneId`
-- varje kort får egen loading/error/status
+  - host
+  - statuskod
+  - första `details[0]` från Gelato
+- behåll fallback-svar till klienten så UI inte kraschar
 
-Resultat:
-- riktiga miljöbilder när scen finns
-- tydlig fallback per kort om just den scenen misslyckas
-- inga fler “fejk-mockups” som bara visar printfilen utan förklaring
+Detta gör att nästa fel, om något återstår, blir mycket snabbare att isolera.
 
-## 3. Uppdatera edge function `gelato-mockup`
-`supabase/functions/gelato-mockup/index.ts` ska:
-- kräva `mockupSceneId` i body
-- validera att `productUid`, `imageUrl` och `mockupSceneId` finns
-- skicka body till Gelato som inkluderar `mockupSceneId`
-- behålla polling och fallback
-- logga scen-id tillsammans med host/status så vi ser exakt vilken scen som fungerar eller fallerar
+### 5. Lägg in verifierade scene UUID:er i en riktig källa
+När discovery-funktionen har returnerat de riktiga scenerna:
 
-Målet är att requesten blir semantiskt korrekt för Gelatos mockup-API, inte bara nätverksmässigt korrekt.
+- fyll `src/lib/gelato-scenes.ts` med de riktiga UUID-värdena
+eller
+- lagra dem i backend-konfiguration om ni vill kunna uppdatera utan kodändring
 
-## 4. Gör fallback-läget ärligt i UI
-När Gelato inte returnerar en mockup ska UI inte låtsas att det är en mockup.
+Rekommenderat nu:
+- börja med kodbaserad mapping för att få det stabilt snabbt
+- flytta till admin/backend senare om ni vill kunna underhålla scenlistan enklare
 
-`MockupGallery.tsx` ska därför:
-- visa badge som tydligt säger att bilden är “Tryckfil” eller “Preview”
-- visa feltext från backend på första raden när scenen inte gick att generera
-- bara kalla något “mockup” när det faktiskt kommer från Gelato
+### 6. Verifiera i rätt route
+Efter ändringen ska verifiering ske på:
+- `/`
+eller direkt:
+- `/editor?handle=personlig-karta-poster`
 
-Det gör att felsökning blir tydlig även framåt.
-
-## 5. Ramtjocklek: justera till Gelato-nivå, inte hårdkodade 2 cm
-Nuvarande logik skalar faktiskt med storlek, men baseras på:
-- `FRAME_WIDTH_CM = 2`
-
-Det stämmer dåligt mot Gelato-data för inramade posters. I UID:erna syns:
-- `frp_w12xt22-mm`
-
-Det tyder på en synlig frontbredd runt 12 mm, inte 20 mm.
-
-Ändring:
-- ersätt den hårdkodade konstanten med en produktbaserad fysisk profil
-- posters med ram använder ca `1.2 cm` som standard
-- canvas fortsätter utan poster-ram
-- beräkningen i `MapPreview.tsx` behålls, men drivs av rätt fysisk bredd
-
-Om vi vill göra det ännu bättre senare kan ramprofilen läsas från produktconfig, men nu räcker det att matcha Gelato bättre.
-
-## 6. Bakgrundsfärg: redan på plats
-Det här är redan implementerat i koden:
-- state finns i `editorStore`
-- swatches + color picker finns i `ControlPanel`
-- `MapPreview` applicerar `posterBgColor` på posterns bakgrund
-- standard är beige (`#EFE7D6`)
-
-Det behöver alltså inte byggas om, bara behållas när mockupfixen implementeras.
+Inte `/index`.
 
 ## Filer som ska ändras
-- `supabase/functions/gelato-mockup/index.ts`
+
+- `src/lib/gelato-scenes.ts`
 - `src/components/editor/MockupGallery.tsx`
-- `src/pages/EditorPage.tsx`
-- ny fil: `src/lib/gelato-scenes.ts`
+- `supabase/functions/gelato-mockup/index.ts`
+- ny temporär funktion: `supabase/functions/gelato-list-mockup-scenes/index.ts`
 
-## Förväntat resultat efter implementation
-- första riktiga Gelato-mockups börjar visas istället för editor/print-crops
-- varje miljöruta representerar en faktisk Gelato-scen
-- fallback visas bara när en specifik scen misslyckas
-- ramens visuella tjocklek känns rimlig i förhållande till liten/stor poster
-- bakgrundsfärgsval fortsätter fungera som nu
+## Förväntat resultat efter fixen
 
-## Teknisk not
-Den tidigare host-fixen var nödvändig, men inte tillräcklig. Den riktiga blockeraren nu är att mockup-requesten saknar `mockupSceneId`. Det är därför mockups fortfarande inte visas trots att UID och printfil fungerar.
+- mockup-anropen slutar falla på `"not a valid UUID"`
+- ni använder riktiga Gelato-scener i stället för gissade namn
+- mockup-rutorna visar riktiga miljöbilder när UUID:erna väl är korrekta
+- om en produkt saknar scen-data visas ett ärligt fallback-läge i UI i stället för att det ser trasigt eller missvisande ut
+
+## Teknisk slutsats
+
+Det nuvarande problemet är alltså inte att mockups “inte stöds”, utan att systemet skickar fel sorts identifierare. Gelato accepterar inte mänskliga scen-namn här, utan riktiga UUID-baserade `mockupSceneId`. Nästa implementation måste därför fokusera på att upptäcka och spara de riktiga scene UUID:erna, inte på fler UI- eller host-ändringar.
