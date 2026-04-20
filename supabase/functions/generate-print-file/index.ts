@@ -88,8 +88,15 @@ Deno.serve(async (req) => {
       throw new Error(`Mapbox static failed: ${mapRes.status}`);
     }
     const mapBuf = new Uint8Array(await mapRes.arrayBuffer());
-    const mapBase64 = btoa(String.fromCharCode(...mapBuf));
-    const mapDataUrl = `data:image/png;base64,${mapBase64}`;
+    let binary = "";
+    const CHUNK = 8192;
+    for (let i = 0; i < mapBuf.length; i += CHUNK) {
+      binary += String.fromCharCode.apply(
+        null,
+        Array.from(mapBuf.subarray(i, Math.min(i + CHUNK, mapBuf.length))),
+      );
+    }
+    const mapDataUrl = `data:image/png;base64,${btoa(binary)}`;
 
     // Build SVG that mirrors the editor frame
     const mapX = (w - mapSize.w * 2) / 2;
