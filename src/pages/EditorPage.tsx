@@ -11,13 +11,14 @@ import { useCartStore } from "@/stores/cartStore";
 import { CartDrawer } from "@/components/CartDrawer";
 import { toast } from "sonner";
 
-const FRAME_BORDER_CSS: Record<string, string> = {
-  Ingen: "0",
-  Vit: "16px solid hsl(0 0% 98%)",
-  Svart: "16px solid hsl(0 0% 8%)",
-  Ek: "16px solid hsl(30 35% 55%)",
-  Valnöt: "16px solid hsl(20 25% 25%)",
+const FRAME_COLORS: Record<string, string> = {
+  Ingen: "",
+  Vit: "hsl(0 0% 98%)",
+  Svart: "hsl(0 0% 8%)",
+  Ek: "hsl(30 35% 55%)",
+  Valnöt: "hsl(20 25% 25%)",
 };
+const FRAME_WIDTH_CM = 2;
 
 export default function EditorPage() {
   const [params, setParams] = useSearchParams();
@@ -25,7 +26,7 @@ export default function EditorPage() {
   const [configs, setConfigs] = useState<ProductConfig[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const { config, setConfig, currentPrice, mapStyleId, mapCenter, mapZoom, text, orientation, size, variant } =
+  const { config, setConfig, currentPrice, mapStyleId, mapCenter, mapZoom, text, orientation, size, variant, posterBgColor } =
     useEditorStore();
   const addItem = useCartStore((s) => s.addItem);
   const isAdding = useCartStore((s) => s.isLoading);

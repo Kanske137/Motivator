@@ -17,17 +17,6 @@ function parseCm(size: string | null): { w: number; h: number } | null {
   return { w: parseInt(m[1], 10), h: parseInt(m[2], 10) };
 }
 
-function parseSizeRatio(size: string | null, orientation: "portrait" | "landscape"): number {
-  if (!size) return orientation === "portrait" ? 3 / 4 : 4 / 3;
-  const m = size.match(/(\d+)\s*[xX×]\s*(\d+)/);
-  if (!m) return orientation === "portrait" ? 3 / 4 : 4 / 3;
-  const a = parseInt(m[1], 10);
-  const b = parseInt(m[2], 10);
-  const small = Math.min(a, b);
-  const large = Math.max(a, b);
-  return orientation === "portrait" ? small / large : large / small;
-}
-
 function applyLabelVisibility(map: mapboxgl.Map, show: boolean) {
   const apply = () => {
     try {
