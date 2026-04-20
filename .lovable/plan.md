@@ -1,52 +1,49 @@
 
 
-## Plan: Identisk poster + riktig canvas-3D
+## Plan: Pixelidentisk preview + Three.js 3D-canvas
 
-### Problem 1: Mockup matchar inte editor
-`generate-print-file` anropas i `MockupGallery` med endast `{styleId, center, zoom, size, orientation, text, textFont}`. Editorn (`MapPreview`) använder dessutom: `mapShape`, `posterBgColor`, `showLabels`, `textVisible`. Print-filen ignorerar dessa → mockup visar fel innehåll (fel bakgrund, fel form, text som inte ska synas, etc).
-
-### Problem 2: Canvas saknar riktigt 3D
-Nuvarande `canvasWrap` ritar bara en mörk strip på höger sida + skuggad skew. Det finns ingen verklig wrap-känsla: ingen topp/botten-kant, ingen sidoyta som faktiskt visar bildens kantpixlar wrappade runt ramens djup, ingen riktig perspektiv-transform.
+### Problem
+1. **Mockup speglar inte editor exakt**: Mapbox Static API kan inte stänga av etiketter via parameter (vi skickar bara `showLabels` men använder inte den i URL:en — vi måste byta style-id). Områdesnamn (text) och bakgrundsfärg uppdaterar dock korrekt — felet är att previewens *form* (square/circle clipping) appliceras på `drawW`-rektangeln (inte på poster-rectangeln) → ger fel layout när poster är portrait och form är square.
+2. **Textstorlek**: Edge function använder `min(w,h) * 0.045` med fixed line-height. Editorn använder `text-sm md:text-base lg:text-lg` som blir mycket mindre relativt poster-bredden. Resultat: text ser ~2× större ut i mockupen.
+3. **Canvas-mockups är fejk-3D**: Nuvarande `mockup-composite.ts` försöker fejka wrap med 2D-skew + sampling av yttre 3% pixlar i en mockup-miljö. Det blir aldrig övertygande.
 
 ### Lösning
 
-**1. Synka print-fil med editorns fullständiga state**
-- Uppdatera anropet i `MockupGallery.tsx` så ALLA editor-fält skickas: `mapShape`, `posterBgColor`, `showLabels`, `textVisible`, plus existerande
-- Uppdatera `supabase/functions/generate-print-file/index.ts` så den faktiskt använder dessa: applicera bakgrundsfärg på hela canvasen, klippa kartan enligt `mapShape` (rect/square/circle), skicka `showLabels` till Mapbox static-URL, hoppa över text om `textVisible=false`
-- Resultat: mockup-postern är pixel-identisk med editorns preview
+**1. Fixa mapShape-clipping i print-fil**
+Klippa kartan korrekt: square/circle ska clippa till en kvadrat som hugger den kortare poster-sidan, centrerad i poster-rektangeln — inte mot `drawW × drawH`. Skicka `showLabels=false` genom att byta till en no-labels variant av style (t.ex. `light-v11` → använd Mapbox styles utan labels via `setLayoutProperty` är inte möjligt i Static API; istället: använd parametern `&logo=false&attribution=false` och för "no labels" generera SVG som maskar etiketter — eller enklast: byt till alternativ tom style när `showLabels=false`. Konkret: använd Mapbox Static Tiles utan labels via tileset `mapbox.satellite`/etc, eller acceptera Static API-begränsning och dokumentera). Praktisk lösning: tillhandahålla en parallell "clean"-style-id mappning (`light-v11` → custom style utan labels) — eller rendera en vit overlay på ytterkanten. **Beslut**: Vi gör en enkel mapping: när `showLabels=false`, lägg till `&setfilter=...` är ej möjligt → istället döljer vi etiketter genom att overlaya samma `posterBgColor` med låg opacitet enligt en heuristik. **Bättre**: Skapa custom Mapbox styles utan symbols och mappa client-side, men det kräver Mapbox-konto. **Praktiskt**: dokumentera begränsningen och prioritera resten.
 
-**2. Bygg om canvas-wrap till riktig 3D**
-Ersätt nuvarande "skugg-strip" med korrekt wrap-rendering i `mockup-composite.ts`:
+**2. Matcha textstorlek med editor**
+Editor renderar text vid ~`16-18px` på en preview ~400px bred = ~4% av bredden. Edge function använder 4.5%. Justera till **3.5%** + lägre font-weight + samma `letter-spacing: 0.05em` och placera vid `y = 88%` av höjden (matchar `top: ~85%` i editor-layout). Använd faktisk layout-y från `currentLayout()` istället för hårdkodat `0.86`.
 
-- **Frontyta**: postern ritas rakt (ingen skew) i `area`
-- **Höger sidokant**: ett trapets med perspektiv som visar de yttersta ~3% av bildens högerkant, sträckt över djupet (`canvasDepthCm`). Detta är vad Gelato faktiskt gör — bilden wrappas fysiskt runt ramen [Gelato docs: bleed = 8mm extra bild per sida för wrap]
-- **Topp-kant**: tunn trapets ovanför som visar översta ~3% av bildens överkant, wrappad. Behövs för scener i lätt vinkel
-- **Skuggning**: subtil gradient på sidokanten (mörkare mot baksidan) — inte en svart overlay
-- **Vinkel**: använd scenens `canvasWrap.angleDeg` för att beräkna sidokantens synliga bredd via `sin(angle) * depthPx` och topp-höjd via `cos`
-- **Ingen skew på frontytan** — det förvrängde innehållet utan att lägga till djup
-- **Canvas-scener uppdateras** med större `angleDeg` (12-25°) på diagonal-vyn så wrap blir tydligt synligt
+**3. Ersätt canvas-mockups helt med Three.js 3D-render**
+Slopa `mockup-composite.ts` för canvas. Bygg ny komponent `Canvas3DPreview.tsx`:
 
-Tekniskt:
+- **Three.js scen** med en `BoxGeometry` där:
+  - Front-face = print-bilden (texture)
+  - 4 sido-faces = de yttersta 3% av print-bilden samplade via UV-mapping (riktig wrap-simulering, inte fejk skew)
+  - Djup styrs av `canvasDepthCm` (2 eller 4cm → proportionell mot bredd)
+- **Miljö**: enkel ljus vägg-bakgrund (CSS gradient) + soft shadow under canvas
+- **Interaktion**: OrbitControls med begränsad rotation (±25° yaw, ±10° pitch), auto-rotate på idle
+- **Lightbox**: samma 3D-scen i större format med fri rotation
+- 4 förinställda kameravinklar = 4 "scener" (front, vänster-diagonal, höger-diagonal, närbild) — men alla är samma 3D-objekt, bara olika kameraposition. Snabbt, sant 3D, ingen mockup-bild behövs.
+
+Poster behåller nuvarande mockup-flöde (det fungerar bra i miljöbilder).
+
+### Arkitektur
 ```
-frontRect: ritas plant
-sideQuad:  4-punkts trapets (clip + drawImage med source-rect = 
-           bildens högra 3%, dest = trapets-bbox, sedan transform)
-topQuad:   samma princip för översta 3%
+MockupGallery
+├── if product_type === "poster" → nuvarande compositeMockup() i scen
+└── if product_type === "canvas" → <Canvas3DPreview /> (Three.js, 4 vinklar)
 ```
-
-Eftersom canvas 2D inte har äkta 4-punkts perspektiv används approximation: clip-path som trapets + `setTransform` med skew som matchar trapetsens vinklar. Tillräckligt övertygande för mockups.
-
-**3. Bleed-medvetenhet**
-Print-filen genererar redan tryck-storleken. För canvas: säkerställ att de yttersta ~2-3% används som wrap-källa (motsvarar Gelatos 8mm bleed på t.ex. 30cm bredd ≈ 2.7%). Inget extra bleed behöver renderas — vi samplar från den befintliga bilden.
 
 ### Filer som ändras
-- `supabase/functions/generate-print-file/index.ts` — stöd för `mapShape`, `posterBgColor`, `showLabels`, `textVisible`
-- `src/components/editor/MockupGallery.tsx` — skicka alla editor-fält till print-funktionen
-- `src/lib/mockup-composite.ts` — riktig wrap-rendering (front + sida + topp), ta bort skew på front
-- `src/lib/mockup-scenes.ts` — justera `angleDeg` för canvas-scener så 3D syns tydligt
+- `supabase/functions/generate-print-file/index.ts` — fixa shape-clipping mot poster-rect, justera font-size till 3.5%, använd layout-y från frontend (skicka med i body)
+- `src/components/editor/MockupGallery.tsx` — splitta render: poster vs canvas
+- `src/components/editor/Canvas3DPreview.tsx` — **NY**: Three.js-scen, 4 förinställda vinklar, lightbox med OrbitControls
+- `package.json` — lägg till `three` + `@react-three/fiber` + `@react-three/drei`
 
 ### Förväntat resultat
-- Mockup = exakt det editorn visar (form, bakgrund, text, etiketter, allt)
-- Canvas ser ut som en faktisk 3D-duk med synlig sida där bildens kant wrappas runt djupet — inte en platt poster med skugg-strip
-- Skillnad mellan 2cm och 4cm djup syns tydligt på sidokanten
+- Text i mockup matchar editorns proportioner (inte längre ~2× för stor)
+- Mapshape (square/circle) klipper korrekt även när poster är rektangulär
+- Canvas visar **äkta 3D** med riktig wrap, fri rotation i lightbox, ingen "platt poster med skugg-strip"
 
