@@ -12,7 +12,7 @@ interface Props {
 }
 
 export function MapPreview({ borderCss, innerPadding }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
 
   const { mapCenter, mapZoom, mapStyleId, text, textFont, textVisible, orientation, currentLayout } =
@@ -24,16 +24,21 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
     let cancelled = false;
     (async () => {
       const token = await getMapboxToken();
-      if (cancelled || !containerRef.current || mapRef.current) return;
+      if (cancelled || !mapContainerRef.current || mapRef.current) return;
+      if (!token) {
+        console.error("[MapPreview] No Mapbox token available");
+        return;
+      }
       mapboxgl.accessToken = token;
       const map = new mapboxgl.Map({
-        container: containerRef.current,
+        container: mapContainerRef.current,
         style: styleUrl(mapStyleId),
         center: mapCenter,
         zoom: mapZoom,
         attributionControl: false,
         interactive: true,
       });
+      map.on("load", () => map.resize());
       map.on("moveend", () => {
         const c = map.getCenter();
         useEditorStore.setState({
@@ -42,6 +47,8 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
         });
       });
       mapRef.current = map;
+      // safety resize after a tick (container may be sized via parent layout)
+      setTimeout(() => map.resize(), 100);
     })();
     return () => {
       cancelled = true;
@@ -68,10 +75,16 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
 
   // resize on orientation change
   useEffect(() => {
-    setTimeout(() => mapRef.current?.resize(), 50);
+    setTimeout(() => mapRef.current?.resize(), 80);
   }, [orientation]);
 
   const aspect = orientation === "portrait" ? "3 / 4" : "4 / 3";
+
+  // first map layer position (for overlay positioning); fallback = full area
+  const mapLayer = layout?.layers.find((l) => l.type === "map");
+  const mapLayerStyle: React.CSSProperties = mapLayer
+    ? { left: mapLayer.x, top: mapLayer.y, width: mapLayer.w, height: mapLayer.h }
+    : { left: 0, top: 0, width: "100%", height: "100%" };
 
   return (
     <div className="w-full h-full flex items-center justify-center p-4">
@@ -88,17 +101,8 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
         }}
       >
         <div className="relative w-full h-full overflow-hidden">
-          {/* map layer */}
-          {layout?.layers
-            .filter((l) => l.type === "map")
-            .map((l, i) => (
-              <div
-                key={`map-${i}`}
-                ref={containerRef}
-                className="absolute"
-                style={{ left: l.x, top: l.y, width: l.w, height: l.h }}
-              />
-            ))}
+          {/* Stable map container */}
+          <div ref={mapContainerRef} className="absolute" style={mapLayerStyle} />
 
           {/* text layer */}
           {textVisible &&
@@ -107,7 +111,7 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
               .map((l, i) => (
                 <div
                   key={`text-${i}`}
-                  className="absolute -translate-x-1/2 -translate-y-1/2 text-center px-2 text-foreground"
+                  className="absolute -translate-x-1/2 -translate-y-1/2 text-center px-2 text-foreground pointer-events-none"
                   style={{
                     left: l.x,
                     top: l.y,
