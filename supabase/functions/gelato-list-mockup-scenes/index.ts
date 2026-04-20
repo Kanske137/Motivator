@@ -1,21 +1,29 @@
 // Discovery: hämta tillgängliga mockup-scener för en Gelato-produkt
 import { corsHeaders } from "https://esm.sh/@supabase/supabase-js@2.95.0/cors";
 
-const HOSTS = [
-  "https://product.gelatoapis.com/v3",
-  "https://product.gelatoapis.com/v2",
-  "https://product.gelatoapis.com/v1",
-  "https://api.gelatoapis.com/v1",
-  "https://order.gelatoapis.com/v1",
-];
+const ATTEMPTS: Array<{ url: string }> = [];
 
-const ENDPOINTS = (uid: string) => [
-  `/products/${encodeURIComponent(uid)}`,
-  `/products/${encodeURIComponent(uid)}/mockups`,
-  `/products/${encodeURIComponent(uid)}/mockup-scenes`,
-  `/mockup-scenes?productUid=${encodeURIComponent(uid)}`,
-  `/mockups?productUid=${encodeURIComponent(uid)}`,
-];
+function buildUrls(uid: string): string[] {
+  const u = encodeURIComponent(uid);
+  return [
+    // Mockup Generator (ecommerce / mockup specific)
+    `https://ecommerce.gelatoapis.com/v1/products/${u}/mockups`,
+    `https://ecommerce.gelatoapis.com/v1/products/${u}`,
+    `https://ecommerce.gelatoapis.com/v1/mockup-scenes?productUid=${u}`,
+    `https://ecommerce.gelatoapis.com/v1/scenes?productUid=${u}`,
+    // Product catalog mockups
+    `https://product.gelatoapis.com/v3/products/${u}/mockups`,
+    `https://product.gelatoapis.com/v3/products/${u}/scenes`,
+    `https://product.gelatoapis.com/v3/products/${u}/preview-scenes`,
+    `https://product.gelatoapis.com/v2/products/${u}/mockups`,
+    // Mockup Generator dedicated
+    `https://order.gelatoapis.com/v4/mockups/scenes?productUid=${u}`,
+    `https://order.gelatoapis.com/v3/mockups/scenes?productUid=${u}`,
+    `https://order.gelatoapis.com/v1/mockups/scenes?productUid=${u}`,
+    `https://api.gelatoapis.com/v1/mockup-scenes?productUid=${u}`,
+    `https://api.gelatoapis.com/v1/mockups/scenes?productUid=${u}`,
+  ];
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
