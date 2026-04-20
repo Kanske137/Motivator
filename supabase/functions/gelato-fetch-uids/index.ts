@@ -118,15 +118,96 @@ function pickFirstUid(products: any[]): string | null {
   return products[0].productUid ?? products[0].uid ?? null;
 }
 
+async function buildPosters() {
+  const out: any[] = [];
+  await Promise.all(
+    POSTER_SIZES_MM.flatMap(([paperFormat, sizeLabel]) =>
+      ORIENTATIONS.map(async ([orientGelato, orientLabel]) => {
+        const hits = await searchProducts("posters", {
+          PaperType: ["200-gsm-uncoated"],
+          PaperFormat: [paperFormat],
+          Orientation: [orientGelato],
+          ProductStatus: ["activated"],
+        });
+        out.push({
+          size: sizeLabel,
+          frame: "Ingen",
+          orientation: orientLabel,
+          paperFormat,
+          gelatoUid: pickFirstUid(hits),
+          count: hits.length,
+        });
+      })
+    )
+  );
+  return out;
+}
+
+async function buildFramed() {
+  const out: any[] = [];
+  await Promise.all(
+    FRAMED_SIZES.flatMap(([frameSize, paperFormat, sizeLabel]) =>
+      FRAME_COLORS.flatMap(([colorGelato, colorLabel]) =>
+        ORIENTATIONS.map(async ([orientGelato, orientLabel]) => {
+          const hits = await searchProducts("mounted-framed-posters", {
+            PaperType: ["200-gsm-uncoated"],
+            PaperFormat: [paperFormat],
+            FrameSize: [frameSize],
+            FrameMaterial: ["wood"],
+            FrameColor: [colorGelato],
+            Orientation: [orientGelato],
+            ProductStatus: ["activated"],
+          });
+          out.push({
+            size: sizeLabel,
+            frame: colorLabel,
+            orientation: orientLabel,
+            frameSize,
+            paperFormat,
+            gelatoUid: pickFirstUid(hits),
+            count: hits.length,
+          });
+        })
+      )
+    )
+  );
+  return out;
+}
+
+async function buildCanvas() {
+  const out: any[] = [];
+  await Promise.all(
+    CANVAS_SIZES.flatMap(([canvasFormat, sizeLabel]) =>
+      CANVAS_DEPTHS.flatMap(([depthGelato, depthLabel]) =>
+        ORIENTATIONS.map(async ([orientGelato, orientLabel]) => {
+          const hits = await searchProducts("canvas", {
+            CanvasFormat: [canvasFormat],
+            CanvasFrame: [depthGelato],
+            Orientation: [orientGelato],
+          });
+          out.push({
+            size: sizeLabel,
+            depth: depthLabel,
+            orientation: orientLabel,
+            canvasFormat,
+            gelatoUid: pickFirstUid(hits),
+            count: hits.length,
+          });
+        })
+      )
+    )
+  );
+  return out;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const url = new URL(req.url);
-  const action = url.searchParams.get("action") ?? "build-mapping";
+  const action = url.searchParams.get("action") ?? "posters";
 
   try {
     if (action === "raw-search") {
-      // Debug: see raw structure of one search to confirm productUid shape
       const data = await gelato(`/catalogs/posters/products:search`, {
         method: "POST",
         body: JSON.stringify({
@@ -145,103 +226,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (action === "build-mapping") {
-      const result: any = { posters: [], framed: [], canvas: [], errors: [] };
-
-      // POSTERS
-      for (const [paperFormat, sizeLabel] of POSTER_SIZES_MM) {
-        for (const [orientGelato, orientLabel] of ORIENTATIONS) {
-          try {
-            const hits = await searchProducts("posters", {
-              PaperType: ["200-gsm-uncoated"],
-              PaperFormat: [paperFormat],
-              Orientation: [orientGelato],
-              ProductStatus: ["activated"],
-            });
-            const uid = pickFirstUid(hits);
-            result.posters.push({
-              size: sizeLabel,
-              frame: "Ingen",
-              orientation: orientLabel,
-              paperFormat,
-              gelatoUid: uid,
-              count: hits.length,
-            });
-          } catch (e) {
-            result.errors.push({ kind: "poster", sizeLabel, orientLabel, err: String(e) });
-          }
-        }
-      }
-
-      // FRAMED
-      for (const [frameSize, paperFormat, sizeLabel] of FRAMED_SIZES) {
-        for (const [colorGelato, colorLabel] of FRAME_COLORS) {
-          for (const [orientGelato, orientLabel] of ORIENTATIONS) {
-            try {
-              const hits = await searchProducts("mounted-framed-posters", {
-                PaperType: ["200-gsm-uncoated"],
-                PaperFormat: [paperFormat],
-                FrameSize: [frameSize],
-                FrameMaterial: ["wood"],
-                FrameColor: [colorGelato],
-                Orientation: [orientGelato],
-                ProductStatus: ["activated"],
-              });
-              const uid = pickFirstUid(hits);
-              result.framed.push({
-                size: sizeLabel,
-                frame: colorLabel,
-                orientation: orientLabel,
-                frameSize,
-                paperFormat,
-                gelatoUid: uid,
-                count: hits.length,
-              });
-            } catch (e) {
-              result.errors.push({ kind: "framed", sizeLabel, colorLabel, orientLabel, err: String(e) });
-            }
-          }
-        }
-      }
-
-      // CANVAS
-      for (const [canvasFormat, sizeLabel] of CANVAS_SIZES) {
-        for (const [depthGelato, depthLabel] of CANVAS_DEPTHS) {
-          for (const [orientGelato, orientLabel] of ORIENTATIONS) {
-            try {
-              const hits = await searchProducts("canvas", {
-                CanvasFormat: [canvasFormat],
-                CanvasFrame: [depthGelato],
-                Orientation: [orientGelato],
-              });
-              const uid = pickFirstUid(hits);
-              result.canvas.push({
-                size: sizeLabel,
-                depth: depthLabel,
-                orientation: orientLabel,
-                canvasFormat,
-                gelatoUid: uid,
-                count: hits.length,
-              });
-            } catch (e) {
-              result.errors.push({ kind: "canvas", sizeLabel, depthLabel, orientLabel, err: String(e) });
-            }
-          }
-        }
-      }
-
-      // Summary
-      result.summary = {
-        posters: result.posters.length,
-        postersWithUid: result.posters.filter((p: any) => p.gelatoUid).length,
-        framed: result.framed.length,
-        framedWithUid: result.framed.filter((p: any) => p.gelatoUid).length,
-        canvas: result.canvas.length,
-        canvasWithUid: result.canvas.filter((p: any) => p.gelatoUid).length,
-        errors: result.errors.length,
-      };
-
-      return new Response(JSON.stringify(result), {
+    if (action === "posters") {
+      const data = await buildPosters();
+      return new Response(JSON.stringify({ posters: data }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (action === "framed") {
+      const data = await buildFramed();
+      return new Response(JSON.stringify({ framed: data }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (action === "canvas") {
+      const data = await buildCanvas();
+      return new Response(JSON.stringify({ canvas: data }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -257,4 +256,4 @@ Deno.serve(async (req) => {
     });
   }
 });
-// rev 1776707165
+
