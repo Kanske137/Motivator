@@ -147,29 +147,26 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
     ctx.fillStyle = input.posterBgColor || "#ffffff";
     ctx.fillRect(0, 0, w, h);
 
-    // Map (with shape clip)
+    // Map (with shape clip) — source canvas is already correctly sized per shape
     ctx.save();
     if (input.mapShape === "circle") {
-      const r = Math.min(w, h) / 2;
+      const r = sq / 2;
       ctx.beginPath();
       ctx.arc(w / 2, h / 2, r, 0, Math.PI * 2);
       ctx.clip();
     } else if (input.mapShape === "square") {
-      const sq = Math.min(w, h);
       const sx = (w - sq) / 2;
       const sy = (h - sq) / 2;
       ctx.beginPath();
       ctx.rect(sx, sy, sq, sq);
       ctx.clip();
     }
-    // For shaped maps, the map should hug the shorter side just like in editor
     if (input.mapShape === "rect") {
       ctx.drawImage(mapCanvas, 0, 0, w, h);
     } else {
-      const sq = Math.min(w, h);
-      const sx = (w - sq) / 2;
-      const sy = (h - sq) / 2;
-      ctx.drawImage(mapCanvas, sx, sy, sq, sq);
+      const dx = (w - sq) / 2;
+      const dy = (h - sq) / 2;
+      ctx.drawImage(mapCanvas, dx, dy, sq, sq);
     }
     ctx.restore();
 
@@ -178,23 +175,23 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
       const lines = input.text.split("\n");
       const layer = input.layout?.layers?.find((l) => l.type === "text");
       const tx = w * parsePct(layer?.x, 0.5);
-      const tyFrac = parsePct(layer?.y, 0.86);
+      const yFrac = parsePct(layer?.y, 0.86);
 
-      // Editor renders text at roughly 16-18px on a ~400px wide preview
-      // → ~4% of width. Mirror that exactly.
-      const fontSize = Math.round(w * 0.04);
-      const lineHeight = Math.round(fontSize * 1.2);
+      // Match editor: text-sm/base/lg (~16px on ~570px preview) ≈ 2.8% of width
+      const fontSize = Math.round(w * 0.028);
+      const lineHeight = Math.round(fontSize * 1.15);
       const totalH = lineHeight * lines.length;
-      // tyFrac is the CENTER of the text block (translate(-50%,-50%) in editor)
-      const baseY = h * tyFrac - totalH / 2 + fontSize * 0.85;
+      // Center the block around h * yFrac (editor uses translate(-50%,-50%))
+      const centerY = h * yFrac;
+      const firstLineCenter = centerY - totalH / 2 + lineHeight / 2;
 
       ctx.save();
       ctx.fillStyle = "#1a1a1a";
       ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
       ctx.font = `500 ${fontSize}px ${input.textFont}, Inter, sans-serif`;
-      // Approximate letter-spacing 0.05em via canvas (no native support — use measure trick)
       lines.forEach((line, i) => {
-        ctx.fillText(line, tx, baseY + i * lineHeight);
+        ctx.fillText(line, tx, firstLineCenter + i * lineHeight);
       });
       ctx.restore();
     }
