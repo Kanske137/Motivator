@@ -1,12 +1,20 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useEditorStore } from "@/stores/editorStore";
 import { getMapboxToken, reverseGeocode, styleUrl } from "@/lib/mapbox";
 
 interface Props {
-  borderCss?: string;
+  frameColor?: string; // CSS color for border. Empty/undefined = no border.
+  frameWidthCm?: number; // physical frame width in cm (default 2)
   innerPadding?: string;
+}
+
+function parseCm(size: string | null): { w: number; h: number } | null {
+  if (!size) return null;
+  const m = size.match(/(\d+)\s*[xX×]\s*(\d+)/);
+  if (!m) return null;
+  return { w: parseInt(m[1], 10), h: parseInt(m[2], 10) };
 }
 
 function parseSizeRatio(size: string | null, orientation: "portrait" | "landscape"): number {
@@ -41,8 +49,10 @@ function applyLabelVisibility(map: mapboxgl.Map, show: boolean) {
   else map.once("idle", apply);
 }
 
-export function MapPreview({ borderCss, innerPadding }: Props) {
+export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding }: Props) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [borderPx, setBorderPx] = useState(0);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const programmaticRef = useRef(false);
   const reverseTimerRef = useRef<number | null>(null);
@@ -58,6 +68,7 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
     size,
     showLabels,
     mapShape,
+    posterBgColor,
     currentLayout,
     updateFromMap,
   } = useEditorStore();
