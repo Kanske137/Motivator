@@ -8,8 +8,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { Square, Circle, RectangleHorizontal } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useEditorStore } from "@/stores/editorStore";
 import { geocode, type GeocodeResult } from "@/lib/mapbox";
@@ -27,12 +27,14 @@ interface Props {
 export function ControlPanel({ configs, activeHandle, onProductChange }: Props) {
   const {
     config,
-    mapZoom,
-    setMapZoom,
     mapStyleId,
     setMapStyleId,
     applyPlace,
     placeName,
+    showLabels,
+    setShowLabels,
+    mapShape,
+    setMapShape,
     text,
     setText,
     textFont,
@@ -124,23 +126,16 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
               </PopoverContent>
             </Popover>
           </div>
-          <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Zoom: {mapZoom.toFixed(1)}</Label>
-            <Slider
-              value={[mapZoom]}
-              min={1}
-              max={20}
-              step={0.1}
-              onValueChange={(v) => setMapZoom(v[0])}
-            />
-          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Tips: dra och zooma direkt i kartan för att finjustera.
+          </p>
         </AccordionContent>
       </AccordionItem>
 
       {/* 2. Kartstil */}
       <AccordionItem value="kartstil">
         <AccordionTrigger className="text-sm font-semibold">Kartstil</AccordionTrigger>
-        <AccordionContent className="pt-3">
+        <AccordionContent className="pt-3 space-y-4">
           <div className="grid grid-cols-3 gap-2">
             {config.map_styles.map((s) => (
               <button
@@ -156,6 +151,36 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
                 </span>
               </button>
             ))}
+          </div>
+
+          <div className="flex items-center justify-between pt-2 border-t">
+            <Label className="text-xs text-muted-foreground">Visa områdesnamn på kartan</Label>
+            <Switch checked={showLabels} onCheckedChange={setShowLabels} />
+          </div>
+
+          <div className="space-y-2 pt-2 border-t">
+            <Label className="text-xs text-muted-foreground">Form</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { id: "rect", label: "Standard", Icon: RectangleHorizontal },
+                { id: "square", label: "Kvadrat", Icon: Square },
+                { id: "circle", label: "Cirkel", Icon: Circle },
+              ] as const).map(({ id, label, Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setMapShape(id)}
+                  className={`flex flex-col items-center justify-center gap-1 py-3 rounded-md border-2 transition ${
+                    mapShape === id
+                      ? "border-primary bg-accent"
+                      : "border-border hover:bg-muted/60"
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span className="text-[11px] font-medium">{label}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </AccordionContent>
       </AccordionItem>

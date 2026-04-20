@@ -139,11 +139,11 @@ export default function EditorPage() {
             <div className="text-xs text-muted-foreground truncate">
               {summary}
             </div>
-            <Button onClick={handleAddToCart} disabled={isAdding} size="lg" className="w-full">
+            <Button onClick={handleAddToCart} disabled={isAdding} size="lg" className="w-full rounded-full">
               {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : (
                 <>
                   <ShoppingCart className="h-4 w-4 mr-2" />
-                  Lägg i varukorg
+                  Lägg i varukorg · {currentPrice()} kr
                 </>
               )}
             </Button>
@@ -160,8 +160,8 @@ export default function EditorPage() {
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Ditt val</div>
           <div className="text-xs font-medium leading-tight truncate">{summary}</div>
         </div>
-        <Button onClick={handleAddToCart} disabled={isAdding} className="flex-1">
-          {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : "Lägg i varukorg"}
+        <Button onClick={handleAddToCart} disabled={isAdding} className="flex-1 rounded-full">
+          {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : `Lägg i varukorg · ${currentPrice()} kr`}
         </Button>
       </div>
     </div>

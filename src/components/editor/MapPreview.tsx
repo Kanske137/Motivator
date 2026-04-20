@@ -2,22 +2,61 @@ import { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useEditorStore } from "@/stores/editorStore";
-import { getMapboxToken, styleUrl } from "@/lib/mapbox";
+import { getMapboxToken, reverseGeocode, styleUrl } from "@/lib/mapbox";
 
 interface Props {
   borderCss?: string;
   innerPadding?: string;
 }
 
+function parseSizeRatio(size: string | null, orientation: "portrait" | "landscape"): number {
+  if (!size) return orientation === "portrait" ? 3 / 4 : 4 / 3;
+  const m = size.match(/(\d+)\s*[xX×]\s*(\d+)/);
+  if (!m) return orientation === "portrait" ? 3 / 4 : 4 / 3;
+  const a = parseInt(m[1], 10);
+  const b = parseInt(m[2], 10);
+  const small = Math.min(a, b);
+  const large = Math.max(a, b);
+  return orientation === "portrait" ? small / large : large / small;
+}
+
+function applyLabelVisibility(map: mapboxgl.Map, show: boolean) {
+  try {
+    const style = map.getStyle();
+    if (!style?.layers) return;
+    for (const layer of style.layers) {
+      if (layer.type === "symbol") {
+        map.setLayoutProperty(layer.id, "visibility", show ? "visible" : "none");
+      }
+    }
+  } catch (e) {
+    console.warn("[MapPreview] applyLabelVisibility failed", e);
+  }
+}
+
 export function MapPreview({ borderCss, innerPadding }: Props) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
+  const programmaticRef = useRef(false);
+  const reverseTimerRef = useRef<number | null>(null);
 
-  const { mapCenter, mapZoom, mapStyleId, text, textFont, textVisible, orientation, currentLayout } =
-    useEditorStore();
+  const {
+    mapCenter,
+    mapZoom,
+    mapStyleId,
+    text,
+    textFont,
+    textVisible,
+    orientation,
+    size,
+    showLabels,
+    mapShape,
+    currentLayout,
+    updateFromMap,
+  } = useEditorStore();
   const layout = currentLayout();
 
-  // init map once container is mounted
+  // init map
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -27,10 +66,6 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
         console.error("[MapPreview] No Mapbox token available");
         return;
       }
-      const rect = mapContainerRef.current.getBoundingClientRect();
-      if (rect.width < 4 || rect.height < 4) {
-        console.warn("[MapPreview] Container has no size yet", rect);
-      }
       mapboxgl.accessToken = token;
       const map = new mapboxgl.Map({
         container: mapContainerRef.current,
@@ -39,79 +74,128 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
         zoom: mapZoom,
         attributionControl: false,
         interactive: true,
+        scrollZoom: true,
+        dragPan: true,
+        doubleClickZoom: true,
+        touchZoomRotate: true,
+        boxZoom: false,
+        pitchWithRotate: false,
       });
-      map.on("load", () => map.resize());
+
+      map.on("load", () => {
+        map.resize();
+        applyLabelVisibility(map, useEditorStore.getState().showLabels);
+      });
+      map.on("style.load", () => {
+        applyLabelVisibility(map, useEditorStore.getState().showLabels);
+      });
+
       map.on("moveend", () => {
+        if (programmaticRef.current) {
+          programmaticRef.current = false;
+          return;
+        }
         const c = map.getCenter();
-        useEditorStore.setState({
-          mapCenter: [c.lng, c.lat],
-          mapZoom: map.getZoom(),
-        });
+        const z = map.getZoom();
+        useEditorStore.setState({ mapCenter: [c.lng, c.lat], mapZoom: z });
+
+        // debounced reverse geocode
+        if (reverseTimerRef.current) window.clearTimeout(reverseTimerRef.current);
+        reverseTimerRef.current = window.setTimeout(async () => {
+          const r = await reverseGeocode(c.lng, c.lat);
+          if (r) {
+            updateFromMap({
+              placeName: r.place_name,
+              center: [c.lng, c.lat],
+              city: r.city,
+              country: r.country,
+            });
+          }
+        }, 400);
       });
+
       mapRef.current = map;
-      // multiple resize ticks to catch late layout
       setTimeout(() => map.resize(), 50);
       setTimeout(() => map.resize(), 250);
       setTimeout(() => map.resize(), 600);
     })();
     return () => {
       cancelled = true;
+      if (reverseTimerRef.current) window.clearTimeout(reverseTimerRef.current);
       mapRef.current?.remove();
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // observe container size changes (orientation, sidebar, etc.)
+  // resize observer
   useEffect(() => {
     const el = mapContainerRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => {
-      mapRef.current?.resize();
-    });
+    const ro = new ResizeObserver(() => mapRef.current?.resize());
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
+  // style change
   useEffect(() => {
     if (mapRef.current) mapRef.current.setStyle(styleUrl(mapStyleId));
   }, [mapStyleId]);
 
+  // labels toggle (in case style already loaded)
+  useEffect(() => {
+    if (mapRef.current) applyLabelVisibility(mapRef.current, showLabels);
+  }, [showLabels]);
+
+  // programmatic flyTo only when state changes from outside (e.g. search)
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     const cur = map.getCenter();
-    if (Math.abs(cur.lng - mapCenter[0]) > 1e-6 || Math.abs(cur.lat - mapCenter[1]) > 1e-6) {
+    const curZoom = map.getZoom();
+    const lngDiff = Math.abs(cur.lng - mapCenter[0]);
+    const latDiff = Math.abs(cur.lat - mapCenter[1]);
+    const zoomDiff = Math.abs(curZoom - mapZoom);
+    if (lngDiff > 1e-4 || latDiff > 1e-4 || zoomDiff > 0.05) {
+      programmaticRef.current = true;
       map.flyTo({ center: mapCenter, zoom: mapZoom, duration: 800 });
     }
   }, [mapCenter, mapZoom]);
 
+  // resize on orientation/size changes
   useEffect(() => {
     setTimeout(() => mapRef.current?.resize(), 80);
-  }, [orientation]);
+    setTimeout(() => mapRef.current?.resize(), 320);
+  }, [orientation, size, mapShape]);
 
-  const isPortrait = orientation === "portrait";
-  // Stable preview frame: explicit max sizes so the canvas always has real dims.
+  const aspect = mapShape === "square" || mapShape === "circle"
+    ? 1
+    : parseSizeRatio(size, orientation);
+
   const frameStyle: React.CSSProperties = {
-    aspectRatio: isPortrait ? "3 / 4" : "4 / 3",
-    width: "min(100%, 70vh * 3 / 4)",
-    maxWidth: "100%",
-    maxHeight: "85vh",
+    aspectRatio: `${aspect}`,
+    width: "100%",
+    maxWidth: "min(100%, 70vh)",
+    maxHeight: "78vh",
     border: borderCss,
     padding: innerPadding,
   };
-  if (!isPortrait) {
-    frameStyle.width = "min(100%, 90vh * 4 / 3)";
-  }
+
+  const mapClipStyle: React.CSSProperties =
+    mapShape === "circle"
+      ? { borderRadius: "9999px", overflow: "hidden" }
+      : { overflow: "hidden" };
 
   return (
-    <div className="w-full h-full flex items-center justify-center p-4 min-h-[60vh]">
+    <div className="w-full h-full flex flex-col items-center justify-center p-4 min-h-[60vh] gap-2">
+      {/* Hide Mapbox watermark/attrib visually (credited below) */}
+      <style>{`
+        .mapboxgl-ctrl-logo, .mapboxgl-ctrl-attrib { display: none !important; }
+      `}</style>
       <div className="relative bg-card shadow-2xl" style={frameStyle}>
-        <div className="absolute inset-0 overflow-hidden">
-          {/* Stable, always-rendered map container that fills the preview */}
+        <div className="absolute inset-0" style={mapClipStyle}>
           <div ref={mapContainerRef} className="absolute inset-0" />
 
-          {/* text overlays */}
           {textVisible &&
             layout?.layers
               .filter((l) => l.type === "text")
@@ -133,6 +217,7 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
               ))}
         </div>
       </div>
+      <p className="text-[10px] text-muted-foreground">© Mapbox · © OpenStreetMap</p>
     </div>
   );
 }

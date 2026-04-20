@@ -29,7 +29,7 @@ const FRAME_THUMBS: Record<string, string> = {
 };
 
 function formatDiff(diff: number): string {
-  if (diff === 0) return "Ingen extra";
+  if (diff === 0) return "+0 kr";
   if (diff > 0) return `+${diff} kr`;
   return `−${Math.abs(diff)} kr`;
 }
