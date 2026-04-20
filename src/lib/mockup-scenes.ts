@@ -73,7 +73,7 @@ const CANVAS_SCENES: MockupScene[] = [
     area: { x: 140, y: 80, w: 700, h: 600 },
     referenceWidthCm: 130,
     shadow: { blur: 28, offsetY: 16, alpha: 0.22 },
-    canvasWrap: { angleDeg: 6 },
+    canvasWrap: { angleDeg: 12 },
   },
   {
     id: "canvas-side",
@@ -82,7 +82,7 @@ const CANVAS_SCENES: MockupScene[] = [
     area: { x: 200, y: 100, w: 720, h: 700 },
     referenceWidthCm: 130,
     shadow: { blur: 32, offsetY: 18, alpha: 0.25 },
-    canvasWrap: { angleDeg: 18 },
+    canvasWrap: { angleDeg: 25 },
   },
   {
     id: "canvas-bedroom",
@@ -91,7 +91,7 @@ const CANVAS_SCENES: MockupScene[] = [
     area: { x: 180, y: 80, w: 700, h: 600 },
     referenceWidthCm: 130,
     shadow: { blur: 26, offsetY: 14, alpha: 0.20 },
-    canvasWrap: { angleDeg: 4 },
+    canvasWrap: { angleDeg: 10 },
   },
   {
     id: "canvas-wall",
@@ -100,7 +100,7 @@ const CANVAS_SCENES: MockupScene[] = [
     area: { x: 120, y: 80, w: 800, h: 700 },
     referenceWidthCm: 130,
     shadow: { blur: 28, offsetY: 14, alpha: 0.22 },
-    canvasWrap: { angleDeg: 10 },
+    canvasWrap: { angleDeg: 18 },
   },
 ];
 

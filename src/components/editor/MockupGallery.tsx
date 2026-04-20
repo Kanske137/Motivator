@@ -15,8 +15,12 @@ interface MockupSlot {
 }
 
 export function MockupGallery() {
-  const { config, size, variant, orientation, mapStyleId, mapCenter, mapZoom, text, textFont } =
-    useEditorStore();
+  const {
+    config, size, variant, orientation,
+    mapStyleId, mapCenter, mapZoom,
+    text, textFont, textVisible,
+    showLabels, mapShape, posterBgColor,
+  } = useEditorStore();
   const [slots, setSlots] = useState<MockupSlot[]>([]);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
   const debounceRef = useRef<number | null>(null);
@@ -32,7 +36,19 @@ export function MockupGallery() {
       const myReq = ++reqIdRef.current;
       try {
         const printRes = await supabase.functions.invoke("generate-print-file", {
-          body: { styleId: mapStyleId, center: mapCenter, zoom: mapZoom, size, orientation, text, textFont },
+          body: {
+            styleId: mapStyleId,
+            center: mapCenter,
+            zoom: mapZoom,
+            size,
+            orientation,
+            text,
+            textFont,
+            textVisible,
+            showLabels,
+            mapShape,
+            posterBgColor,
+          },
         });
         if (myReq !== reqIdRef.current) return;
 
@@ -88,7 +104,12 @@ export function MockupGallery() {
     return () => {
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
     };
-  }, [config, size, variant, orientation, mapStyleId, mapCenter, mapZoom, text, textFont]);
+  }, [
+    config, size, variant, orientation,
+    mapStyleId, mapCenter, mapZoom,
+    text, textFont, textVisible,
+    showLabels, mapShape, posterBgColor,
+  ]);
 
   if (!config) return null;
 
