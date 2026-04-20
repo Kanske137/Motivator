@@ -1,140 +1,43 @@
 
-## Plan: Gör preview och canvas identiska med editorn
+
+## Plan: Snapshot ska rendera identiskt med editorn
 
 ### Grundorsak
-Nuvarande preview bygger inte på samma render som editorn. Det finns flera separata approximationer:
 
-1. `generate-print-file` räknar fel storlek:
-   - `pxFromSize()` cappar båda sidor till `1280`, vilket gör många stående format till `1280x1280` i stället för korrekt proportion.
-   - Det gör att form, textposition och innehåll skalar fel.
+`editor-snapshot.ts` skiljer sig från `MapPreview` på tre punkter som tillsammans ger förvrängd form, fel kartinnehåll och för stor text i förhandsvisningen:
 
-2. Kartbilden dubbel-skalar:
-   - Static API anropas med `@2x`, men SVG:n ritar sedan bilden som om den också måste förstoras 2x igen.
-   - Resultat: fel utsnitt/zoom/lokalisering jämfört med live-editorn.
+1. **Mapbox renderas i fel container-form**
+   Editorn lägger kartan i en 1:1 wrapper när formen är `square`/`circle`. Snapshoten renderar alltid Mapbox i hela poster-rektangeln (t.ex. 720×1008 stående) och ritar sedan in den portrait-canvas i en kvadratisk clip. Resultat: kartinnehållet squishas vertikalt → cirkeln ser stretchad ut, kvadraten visar fel utsnitt.
 
-3. Labels kan inte döljas identiskt med dagens backend-render:
-   - I editorn stängs symbol-lager av live.
-   - I preview används fortfarande standard-style i static-rendern, så `showLabels=false` kan aldrig bli exakt.
+2. **Texten är ~30% för stor och felplacerad**
+   Snapshoten använder `w * 0.04` med `+ fontSize * 0.85` Y-offset. Editorn använder Tailwinds `text-sm md:text-base lg:text-lg` (~2.8% av previewbredden) centrerad via `translate(-50%,-50%)`.
 
-4. Texten renderas två gånger med olika logik:
-   - Editorn använder layout från `currentLayout()`.
-   - Preview använder hårdkodad storlek och hårdkodad Y-position.
-   - Därför blir texten större och felplacerad.
-
-5. Canvas använder rätt 3D-teknik för objektet, men fel källa för innehållet:
-   - Textur kommer från print-filen, inte från exakt samma visuella output som editorn visar.
+3. **Ingen letter-spacing/leading-paritet**
+   Editorn har `tracking-wide` (~0.05em) och `leading-tight` (~1.15). Snapshoten kör 1.2 utan tracking.
 
 ### Lösning
-Byt preview-flödet till en enda källa för sanningen: en snapshot av exakt samma poster-render som användaren ser i editorn.
 
-### 1. Skapa en delad poster-render som används av både editor och preview
-Bryt ut själva posterinnehållet till en gemensam komponent, t.ex. `PosterArtwork`, som innehåller:
+**`src/lib/editor-snapshot.ts`:**
 
-- posterbakgrund
-- kartcontainer
-- shape-mask (`rect` / `square` / `circle`)
-- labels on/off
-- textlager med samma layout och samma typografi
-- samma proportioner och samma positioner som live-editorn
+- **Map-container per form:**
+  - `rect` → Mapbox renderas i `w × h` (oförändrat).
+  - `square`/`circle` → Mapbox renderas i `sq × sq` där `sq = min(w, h)`. Inget squishas eftersom källcanvasen redan är kvadratisk.
+- **Kompositering:**
+  - `rect` → `drawImage(map, 0, 0, w, h)`.
+  - `square`/`circle` → `drawImage(map, (w-sq)/2, (h-sq)/2, sq, sq)`. Cirkel-clip blir sann cirkel runt sant kvadratiskt innehåll.
+- **Text:**
+  - `fontSize = round(w * 0.028)`
+  - `lineHeight = round(fontSize * 1.15)`
+  - `ctx.textBaseline = "middle"`, centrera blocket kring `h * yFrac` (ta bort `+ fontSize * 0.85`).
+  - `ctx.font = '500 ${fontSize}px ${textFont}'` (matchar `font-medium`).
+  - Approximera `tracking-wide` genom att rita tecken för tecken med `~fontSize*0.05` extra spacing per tecken (eller acceptera utan om visuellt OK; testa först utan).
 
-`MapPreview` ska bara bli ett “viewer-shell” runt denna delade render.
-
-Resultat:
-- live-editor och snapshot använder exakt samma DOM/render-struktur
-- inga fler separata text-/shape-beräkningar för preview
-
-### 2. Byt mockup-preview från edge function till klient-snapshot
-För själva förhandsvisningarna i galleriet:
-
-- rendera `PosterArtwork` offscreen i exakt valt format/orientation
-- fånga den till bild med en DOM→image-lösning
-- använd den bilden som källa för:
-  - poster-mockups i miljöbilder
-  - canvas 3D-texturer
-
-Detta löser direkt:
-- områdesnamn av/på
-- bakgrundsfärg
-- form
-- text synlig/osynlig
-- textstorlek
-- textplacering
-- faktisk lokalisering/utsnitt
-
-för att allt kommer från samma visuella render som editorn.
-
-### 3. Gör canvas 3D helt beroende av samma snapshot
-Behåll Three.js-spåret, men mata `Canvas3DPreview` med snapshot-bilden i stället för `printUrl` från backend.
-
-Implementering:
-- front face = snapshot från `PosterArtwork`
-- side/top/bottom = croppade edge-strips från samma snapshot
-- djup = från vald canvas-variant (2 cm / 4 cm)
-- lightbox fortsätter använda riktig rotation
-
-Det gör att canvasens front alltid visar exakt samma innehåll som editorn, inte en separat approximation.
-
-### 4. Fixa `generate-print-file` separat för riktig export
-Preview och export ska inte längre vara samma pipeline.
-
-`generate-print-file` behöver ändå rättas för framtida produktionsfiler:
-- bevara aspect ratio när maxdimension cap:as
-- sluta dubbel-skala static-bilden
-- ta emot normaliserad layoutdata i stället för hårdkodad textplacering
-- på sikt: egen no-label style-mappning eller annan exportstrategi för helt korrekt label-off även i slutlig tryckfil
-
-Detta är viktigt, men ska inte längre blockera korrekt preview.
-
-### 5. Synka storlek och position från riktiga layoutdata
-Inför en liten render-spec som båda sidor använder:
-
-- poster aspect
-- map bounds / mask
-- text layers
-- text font
-- text visibility
-- background color
-
-Preview ska läsa direkt från samma state/layout som editorn.
-Inga magiska tal för fontstorlek eller `baseY`.
-
-### Filer att ändra
-- `src/components/editor/MapPreview.tsx` — göra tunnare och dela upp render
-- `src/components/editor/MockupGallery.tsx` — sluta använda backend-render som previewkälla
-- `src/components/editor/Canvas3DPreview.tsx` — använda snapshot i stället för print-url
-- `src/lib/mockup-composite.ts` — ta snapshot som input för poster-mockups
-- `supabase/functions/generate-print-file/index.ts` — rätta proportionalitet/exportlogik
-- Ny fil, t.ex. `src/components/editor/PosterArtwork.tsx` — gemensam render
-- Ny fil, t.ex. `src/lib/editor-snapshot.ts` eller hook — skapa snapshot från offscreen-render
-
-### Tekniska detaljer
-```text
-Editor state
-   -> PosterArtwork (single source of truth)
-      -> MapPreview (live)
-      -> Snapshot image (offscreen)
-         -> Poster mockup composite
-         -> Canvas3DPreview texture
-```
-
-```text
-Nu:
-Editor -> Mapbox live
-Preview -> generate-print-file -> SVG/static map
-Canvas -> printUrl -> 3D
-
-Efter ändring:
-Editor -> PosterArtwork
-Preview -> PosterArtwork snapshot
-Canvas -> PosterArtwork snapshot -> 3D
-Export -> generate-print-file (separat ansvar)
-```
+### Filer som ändras
+- `src/lib/editor-snapshot.ts` — map-container per form, ren centrering, ny font-skala/baseline.
 
 ### Förväntat resultat
-- Förhandsvisningen visar exakt samma innehåll som editorn
-- Om områdesnamn stängs av i editorn är de också av i preview
-- Form (`rect/square/circle`) blir identisk
-- Textstorlek och textplacering matchar
-- Kartans utsnitt/lokalisering matchar
-- Canvas visar exakt samma frontinnehåll som editorn, men i riktig 3D
-- Preview blir stabilare eftersom den inte längre bygger på en separat approximativ renderkedja
+- Cirkel = sann cirkel, inget vertikalt squish.
+- Kvadrat = sann kvadrat med rätt kartutsnitt.
+- Text matchar editorns storlek och position.
+- Canvas 3D ärver fixarna automatiskt eftersom den använder samma snapshot.
+
