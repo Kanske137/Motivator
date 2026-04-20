@@ -1,31 +1,122 @@
 
+## Mockups: exakt felorsak och fix
 
-# Fixa Gelato Mockup — fel API-host
+Detta ska gå. Felet är nu exakt lokaliserat:
 
-## Rotorsak (bekräftad i loggar)
-`gelato-mockup` edge function anropar `https://mockup.gelatoapis.com/v1/mockups` → DNS lookup misslyckas. Subdomänen existerar inte. Gelatos Mockup Generator ligger på samma host som deras övriga API, inte på en separat `mockup.`-subdomän.
+- `productUid` resolvas korrekt
+- `generate-print-file` fungerar korrekt
+- `gelato-mockup` når rätt Gelato-host
+- men Gelato returnerar `400 BAD_REQUEST` eftersom requesten saknar obligatoriskt fält: `mockupSceneId`
 
-## Fix
+Loggarna visar tydligt:
+```text
+"There are errors in submitted data"
+reference: "mockupSceneId"
+"This value should not be blank."
+```
 
-### 1. `supabase/functions/gelato-mockup/index.ts`
-- Byt `MOCKUP_BASE` från `https://mockup.gelatoapis.com/v1` till `https://order.gelatoapis.com/v1` (Gelatos officiella API-host).
-- Lägg till en kort host-fallback: om första anropet får DNS/connect-fel, prova `https://api.gelatoapis.com/v1` som sekundär.
-- Behåll: API-key header `X-API-KEY`, body `{ productUid, files: [{ type: "default", url }] }`, polling mot `/mockups/{taskId}`.
-- Lägg till logg av faktisk URL och HTTP-status så vi snabbt ser om hosten fortfarande är fel.
-- Behåll graceful fallback (200 + `fallback: true`) så klienten inte kraschar.
+Det som visas längst ner idag är därför inte riktiga Gelato-mockups, utan samma tryckfil som återanvänds i alla rutor som fallback. Därför ser man bara delar av editorn/postern.
 
-### 2. Inga klientändringar behövs
-`MockupGallery` och `src/lib/gelato.ts` fungerar redan — de fick rätt `productUid` (`flat_product_pf_130x180-mm_...`) och rätt print-URL. Det enda som felade var själva edge-anropet ut mot Gelato.
+## Vad som ska byggas
 
-### 3. Verifiering efter deploy
-- Loggarna ska visa `[gelato-mockup] create response: 200 ...` istället för DNS-fel.
-- Första thumbnailen i galleriet ska visa en riktig miljöbild från Gelato istället för tryckfilen med "Förhandsgranskning"-badge.
-- Om Gelato svarar med `taskId` ser vi `[gelato-mockup] poll status: completed` inom ~3-10 sek.
+### 1. Ge varje mockup-ruta ett riktigt Gelato-scene-id
+Skapa en lokal mapping för mockup-miljöer per produkttyp, t.ex.:
 
-## Filer som ändras
-- `supabase/functions/gelato-mockup/index.ts` (endast `MOCKUP_BASE` + host-fallback + lite mer logging)
+- posters:
+  - Vardagsrum
+  - Sovrum
+  - Kontor
+  - På vägg
+- canvas:
+  - Vardagsrum
+  - Sovrum
+  - Sidovy
+  - Närbild
 
-## Inte med
-- Inga ändringar i `MockupGallery.tsx`, `gelato.ts`, eller `generate-print-file`.
-- Inga DB-ändringar.
+Varje label kopplas till ett faktiskt `mockupSceneId` som Gelato accepterar.
 
+Föreslagen ny hjälparfil:
+- `src/lib/gelato-scenes.ts`
+
+Den ska exportera något i stil med:
+- scenlista per `productType`
+- label
+- `mockupSceneId`
+
+## 2. Uppdatera `MockupGallery` så varje kort anropar Gelato med sin egen scen
+Idag anropas mockup-funktionen en gång och övriga rutor fylls med `printUrl`.
+
+Det ska ändras till:
+- en lista av mockup-slots byggs från scene-mappingen
+- varje slot anropar `gelato-mockup` med:
+  - `productUid`
+  - `imageUrl`
+  - `mockupSceneId`
+- varje kort får egen loading/error/status
+
+Resultat:
+- riktiga miljöbilder när scen finns
+- tydlig fallback per kort om just den scenen misslyckas
+- inga fler “fejk-mockups” som bara visar printfilen utan förklaring
+
+## 3. Uppdatera edge function `gelato-mockup`
+`supabase/functions/gelato-mockup/index.ts` ska:
+- kräva `mockupSceneId` i body
+- validera att `productUid`, `imageUrl` och `mockupSceneId` finns
+- skicka body till Gelato som inkluderar `mockupSceneId`
+- behålla polling och fallback
+- logga scen-id tillsammans med host/status så vi ser exakt vilken scen som fungerar eller fallerar
+
+Målet är att requesten blir semantiskt korrekt för Gelatos mockup-API, inte bara nätverksmässigt korrekt.
+
+## 4. Gör fallback-läget ärligt i UI
+När Gelato inte returnerar en mockup ska UI inte låtsas att det är en mockup.
+
+`MockupGallery.tsx` ska därför:
+- visa badge som tydligt säger att bilden är “Tryckfil” eller “Preview”
+- visa feltext från backend på första raden när scenen inte gick att generera
+- bara kalla något “mockup” när det faktiskt kommer från Gelato
+
+Det gör att felsökning blir tydlig även framåt.
+
+## 5. Ramtjocklek: justera till Gelato-nivå, inte hårdkodade 2 cm
+Nuvarande logik skalar faktiskt med storlek, men baseras på:
+- `FRAME_WIDTH_CM = 2`
+
+Det stämmer dåligt mot Gelato-data för inramade posters. I UID:erna syns:
+- `frp_w12xt22-mm`
+
+Det tyder på en synlig frontbredd runt 12 mm, inte 20 mm.
+
+Ändring:
+- ersätt den hårdkodade konstanten med en produktbaserad fysisk profil
+- posters med ram använder ca `1.2 cm` som standard
+- canvas fortsätter utan poster-ram
+- beräkningen i `MapPreview.tsx` behålls, men drivs av rätt fysisk bredd
+
+Om vi vill göra det ännu bättre senare kan ramprofilen läsas från produktconfig, men nu räcker det att matcha Gelato bättre.
+
+## 6. Bakgrundsfärg: redan på plats
+Det här är redan implementerat i koden:
+- state finns i `editorStore`
+- swatches + color picker finns i `ControlPanel`
+- `MapPreview` applicerar `posterBgColor` på posterns bakgrund
+- standard är beige (`#EFE7D6`)
+
+Det behöver alltså inte byggas om, bara behållas när mockupfixen implementeras.
+
+## Filer som ska ändras
+- `supabase/functions/gelato-mockup/index.ts`
+- `src/components/editor/MockupGallery.tsx`
+- `src/pages/EditorPage.tsx`
+- ny fil: `src/lib/gelato-scenes.ts`
+
+## Förväntat resultat efter implementation
+- första riktiga Gelato-mockups börjar visas istället för editor/print-crops
+- varje miljöruta representerar en faktisk Gelato-scen
+- fallback visas bara när en specifik scen misslyckas
+- ramens visuella tjocklek känns rimlig i förhållande till liten/stor poster
+- bakgrundsfärgsval fortsätter fungera som nu
+
+## Teknisk not
+Den tidigare host-fixen var nödvändig, men inte tillräcklig. Den riktiga blockeraren nu är att mockup-requesten saknar `mockupSceneId`. Det är därför mockups fortfarande inte visas trots att UID och printfil fungerar.
