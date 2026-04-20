@@ -1,0 +1,807 @@
+{
+  "posters": [
+    {
+      "size": "70x100",
+      "frame": "Ingen",
+      "orientation": "Portrait",
+      "paperFormat": "700x1000-mm",
+      "gelatoUid": "flat_product_pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_ver",
+      "count": 1
+    },
+    {
+      "size": "70x100",
+      "frame": "Ingen",
+      "orientation": "Landscape",
+      "paperFormat": "700x1000-mm",
+      "gelatoUid": "flat_product_pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_hor",
+      "count": 1
+    },
+    {
+      "size": "50x70",
+      "frame": "Ingen",
+      "orientation": "Landscape",
+      "paperFormat": "500x700-mm",
+      "gelatoUid": "flat_product_pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_hor",
+      "count": 1
+    },
+    {
+      "size": "50x70",
+      "frame": "Ingen",
+      "orientation": "Portrait",
+      "paperFormat": "500x700-mm",
+      "gelatoUid": "flat_product_pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_ver",
+      "count": 1
+    },
+    {
+      "size": "13x18",
+      "frame": "Ingen",
+      "orientation": "Landscape",
+      "paperFormat": "130x180-mm",
+      "gelatoUid": "flat_product_pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_hor",
+      "count": 1
+    },
+    {
+      "size": "21x30",
+      "frame": "Ingen",
+      "orientation": "Portrait",
+      "paperFormat": "210x300-mm",
+      "gelatoUid": "flat_product_pf_210x300-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_ver",
+      "count": 1
+    },
+    {
+      "size": "40x50",
+      "frame": "Ingen",
+      "orientation": "Landscape",
+      "paperFormat": "400x500-mm",
+      "gelatoUid": "flat_product_pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_hor",
+      "count": 1
+    },
+    {
+      "size": "21x30",
+      "frame": "Ingen",
+      "orientation": "Landscape",
+      "paperFormat": "210x300-mm",
+      "gelatoUid": "flat_product_pf_210x300-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_hor",
+      "count": 1
+    },
+    {
+      "size": "13x18",
+      "frame": "Ingen",
+      "orientation": "Portrait",
+      "paperFormat": "130x180-mm",
+      "gelatoUid": "flat_product_pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_ver",
+      "count": 1
+    },
+    {
+      "size": "40x50",
+      "frame": "Ingen",
+      "orientation": "Portrait",
+      "paperFormat": "400x500-mm",
+      "gelatoUid": "flat_product_pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_ver",
+      "count": 1
+    },
+    {
+      "size": "30x40",
+      "frame": "Ingen",
+      "orientation": "Portrait",
+      "paperFormat": "300x400-mm",
+      "gelatoUid": "flat_product_pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_ver",
+      "count": 1
+    },
+    {
+      "size": "30x40",
+      "frame": "Ingen",
+      "orientation": "Landscape",
+      "paperFormat": "300x400-mm",
+      "gelatoUid": "flat_product_pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_hor",
+      "count": 1
+    }
+  ],
+  "framed": [
+    {
+      "size": "13x18",
+      "frame": "Vit",
+      "orientation": "Portrait",
+      "frameSize": "130x180-mm",
+      "paperFormat": "130x180-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_130x180-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      "count": 1
+    },
+    {
+      "size": "70x100",
+      "frame": "Ek",
+      "orientation": "Landscape",
+      "frameSize": "700x1000-mm",
+      "paperFormat": "700x1000-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_700x1000-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+      "count": 1
+    },
+    {
+      "size": "30x40",
+      "frame": "Valnöt",
+      "orientation": "Landscape",
+      "frameSize": "300x400-mm",
+      "paperFormat": "300x400-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_300x400-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+      "count": 1
+    },
+    {
+      "size": "50x70",
+      "frame": "Ek",
+      "orientation": "Landscape",
+      "frameSize": "500x700-mm",
+      "paperFormat": "500x700-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_500x700-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+      "count": 1
+    },
+    {
+      "size": "30x40",
+      "frame": "Svart",
+      "orientation": "Portrait",
+      "frameSize": "300x400-mm",
+      "paperFormat": "300x400-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_300x400-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      "count": 1
+    },
+    {
+      "size": "40x50",
+      "frame": "Svart",
+      "orientation": "Portrait",
+      "frameSize": "400x500-mm",
+      "paperFormat": "400x500-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_400x500-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      "count": 1
+    },
+    {
+      "size": "30x40",
+      "frame": "Vit",
+      "orientation": "Portrait",
+      "frameSize": "300x400-mm",
+      "paperFormat": "300x400-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_300x400-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      "count": 1
+    },
+    {
+      "size": "21x30",
+      "frame": "Svart",
+      "orientation": "Portrait",
+      "frameSize": "210x297mm",
+      "paperFormat": "A4",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_210x297mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      "count": 1
+    },
+    {
+      "size": "50x70",
+      "frame": "Valnöt",
+      "orientation": "Landscape",
+      "frameSize": "500x700-mm",
+      "paperFormat": "500x700-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_500x700-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+      "count": 1
+    },
+    {
+      "size": "13x18",
+      "frame": "Valnöt",
+      "orientation": "Portrait",
+      "frameSize": "130x180-mm",
+      "paperFormat": "130x180-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_130x180-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      "count": 1
+    },
+    {
+      "size": "21x30",
+      "frame": "Ek",
+      "orientation": "Portrait",
+      "frameSize": "210x297mm",
+      "paperFormat": "A4",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_210x297mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      "count": 1
+    },
+    {
+      "size": "70x100",
+      "frame": "Svart",
+      "orientation": "Landscape",
+      "frameSize": "700x1000-mm",
+      "paperFormat": "700x1000-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_700x1000-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+      "count": 1
+    },
+    {
+      "size": "21x30",
+      "frame": "Valnöt",
+      "orientation": "Portrait",
+      "frameSize": "210x297mm",
+      "paperFormat": "A4",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_210x297mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      "count": 1
+    },
+    {
+      "size": "40x50",
+      "frame": "Ek",
+      "orientation": "Landscape",
+      "frameSize": "400x500-mm",
+      "paperFormat": "400x500-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_400x500-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+      "count": 1
+    },
+    {
+      "size": "50x70",
+      "frame": "Vit",
+      "orientation": "Landscape",
+      "frameSize": "500x700-mm",
+      "paperFormat": "500x700-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_500x700-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+      "count": 1
+    },
+    {
+      "size": "13x18",
+      "frame": "Ek",
+      "orientation": "Landscape",
+      "frameSize": "130x180-mm",
+      "paperFormat": "130x180-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_130x180-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+      "count": 1
+    },
+    {
+      "size": "70x100",
+      "frame": "Vit",
+      "orientation": "Landscape",
+      "frameSize": "700x1000-mm",
+      "paperFormat": "700x1000-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_700x1000-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+      "count": 1
+    },
+    {
+      "size": "21x30",
+      "frame": "Vit",
+      "orientation": "Landscape",
+      "frameSize": "210x297mm",
+      "paperFormat": "A4",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_210x297mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+      "count": 1
+    },
+    {
+      "size": "30x40",
+      "frame": "Valnöt",
+      "orientation": "Portrait",
+      "frameSize": "300x400-mm",
+      "paperFormat": "300x400-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_300x400-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      "count": 1
+    },
+    {
+      "size": "13x18",
+      "frame": "Ek",
+      "orientation": "Portrait",
+      "frameSize": "130x180-mm",
+      "paperFormat": "130x180-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_130x180-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      "count": 1
+    },
+    {
+      "size": "21x30",
+      "frame": "Svart",
+      "orientation": "Landscape",
+      "frameSize": "210x297mm",
+      "paperFormat": "A4",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_210x297mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+      "count": 1
+    },
+    {
+      "size": "21x30",
+      "frame": "Vit",
+      "orientation": "Portrait",
+      "frameSize": "210x297mm",
+      "paperFormat": "A4",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_210x297mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      "count": 1
+    },
+    {
+      "size": "70x100",
+      "frame": "Vit",
+      "orientation": "Portrait",
+      "frameSize": "700x1000-mm",
+      "paperFormat": "700x1000-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_700x1000-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      "count": 1
+    },
+    {
+      "size": "30x40",
+      "frame": "Ek",
+      "orientation": "Portrait",
+      "frameSize": "300x400-mm",
+      "paperFormat": "300x400-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_300x400-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      "count": 1
+    },
+    {
+      "size": "30x40",
+      "frame": "Ek",
+      "orientation": "Landscape",
+      "frameSize": "300x400-mm",
+      "paperFormat": "300x400-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_300x400-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+      "count": 1
+    },
+    {
+      "size": "40x50",
+      "frame": "Ek",
+      "orientation": "Portrait",
+      "frameSize": "400x500-mm",
+      "paperFormat": "400x500-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_400x500-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      "count": 1
+    },
+    {
+      "size": "50x70",
+      "frame": "Valnöt",
+      "orientation": "Portrait",
+      "frameSize": "500x700-mm",
+      "paperFormat": "500x700-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_500x700-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      "count": 1
+    },
+    {
+      "size": "50x70",
+      "frame": "Svart",
+      "orientation": "Portrait",
+      "frameSize": "500x700-mm",
+      "paperFormat": "500x700-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_500x700-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      "count": 1
+    },
+    {
+      "size": "40x50",
+      "frame": "Valnöt",
+      "orientation": "Portrait",
+      "frameSize": "400x500-mm",
+      "paperFormat": "400x500-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_400x500-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      "count": 1
+    },
+    {
+      "size": "40x50",
+      "frame": "Vit",
+      "orientation": "Portrait",
+      "frameSize": "400x500-mm",
+      "paperFormat": "400x500-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_400x500-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      "count": 1
+    },
+    {
+      "size": "40x50",
+      "frame": "Vit",
+      "orientation": "Landscape",
+      "frameSize": "400x500-mm",
+      "paperFormat": "400x500-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_400x500-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+      "count": 1
+    },
+    {
+      "size": "70x100",
+      "frame": "Ek",
+      "orientation": "Portrait",
+      "frameSize": "700x1000-mm",
+      "paperFormat": "700x1000-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_700x1000-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      "count": 1
+    },
+    {
+      "size": "30x40",
+      "frame": "Vit",
+      "orientation": "Landscape",
+      "frameSize": "300x400-mm",
+      "paperFormat": "300x400-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_300x400-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+      "count": 1
+    },
+    {
+      "size": "40x50",
+      "frame": "Svart",
+      "orientation": "Landscape",
+      "frameSize": "400x500-mm",
+      "paperFormat": "400x500-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_400x500-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+      "count": 1
+    },
+    {
+      "size": "40x50",
+      "frame": "Valnöt",
+      "orientation": "Landscape",
+      "frameSize": "400x500-mm",
+      "paperFormat": "400x500-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_400x500-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+      "count": 1
+    },
+    {
+      "size": "21x30",
+      "frame": "Valnöt",
+      "orientation": "Landscape",
+      "frameSize": "210x297mm",
+      "paperFormat": "A4",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_210x297mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+      "count": 1
+    },
+    {
+      "size": "30x40",
+      "frame": "Svart",
+      "orientation": "Landscape",
+      "frameSize": "300x400-mm",
+      "paperFormat": "300x400-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_300x400-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+      "count": 1
+    },
+    {
+      "size": "13x18",
+      "frame": "Vit",
+      "orientation": "Landscape",
+      "frameSize": "130x180-mm",
+      "paperFormat": "130x180-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_130x180-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+      "count": 1
+    },
+    {
+      "size": "50x70",
+      "frame": "Svart",
+      "orientation": "Landscape",
+      "frameSize": "500x700-mm",
+      "paperFormat": "500x700-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_500x700-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+      "count": 1
+    },
+    {
+      "size": "13x18",
+      "frame": "Svart",
+      "orientation": "Portrait",
+      "frameSize": "130x180-mm",
+      "paperFormat": "130x180-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_130x180-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      "count": 1
+    },
+    {
+      "size": "13x18",
+      "frame": "Svart",
+      "orientation": "Landscape",
+      "frameSize": "130x180-mm",
+      "paperFormat": "130x180-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_130x180-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+      "count": 1
+    },
+    {
+      "size": "50x70",
+      "frame": "Ek",
+      "orientation": "Portrait",
+      "frameSize": "500x700-mm",
+      "paperFormat": "500x700-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_500x700-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      "count": 1
+    },
+    {
+      "size": "70x100",
+      "frame": "Valnöt",
+      "orientation": "Portrait",
+      "frameSize": "700x1000-mm",
+      "paperFormat": "700x1000-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_700x1000-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      "count": 1
+    },
+    {
+      "size": "13x18",
+      "frame": "Valnöt",
+      "orientation": "Landscape",
+      "frameSize": "130x180-mm",
+      "paperFormat": "130x180-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_130x180-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+      "count": 1
+    },
+    {
+      "size": "70x100",
+      "frame": "Valnöt",
+      "orientation": "Landscape",
+      "frameSize": "700x1000-mm",
+      "paperFormat": "700x1000-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_700x1000-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+      "count": 1
+    },
+    {
+      "size": "50x70",
+      "frame": "Vit",
+      "orientation": "Portrait",
+      "frameSize": "500x700-mm",
+      "paperFormat": "500x700-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_500x700-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      "count": 1
+    },
+    {
+      "size": "21x30",
+      "frame": "Ek",
+      "orientation": "Landscape",
+      "frameSize": "210x297mm",
+      "paperFormat": "A4",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_210x297mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+      "count": 1
+    },
+    {
+      "size": "70x100",
+      "frame": "Svart",
+      "orientation": "Portrait",
+      "frameSize": "700x1000-mm",
+      "paperFormat": "700x1000-mm",
+      "gelatoUid": "frame_and_poster_mounted_product_frs_700x1000-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      "count": 1
+    }
+  ],
+  "canvas": [
+    {
+      "size": "20x25",
+      "depth": "4cm",
+      "orientation": "Landscape",
+      "canvasFormat": "200x250-mm",
+      "gelatoUid": "canvas_product_cf_200x250-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor",
+      "count": 1
+    },
+    {
+      "size": "40x50",
+      "depth": "2cm",
+      "orientation": "Portrait",
+      "canvasFormat": "400x500-mm",
+      "gelatoUid": "canvas_product_cf_400x500-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver",
+      "count": 1
+    },
+    {
+      "size": "20x25",
+      "depth": "2cm",
+      "orientation": "Landscape",
+      "canvasFormat": "200x250-mm",
+      "gelatoUid": "canvas_product_cf_200x250-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor",
+      "count": 1
+    },
+    {
+      "size": "30x40",
+      "depth": "2cm",
+      "orientation": "Landscape",
+      "canvasFormat": "300x400-mm",
+      "gelatoUid": "canvas_product_cf_300x400-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor",
+      "count": 1
+    },
+    {
+      "size": "40x50",
+      "depth": "4cm",
+      "orientation": "Landscape",
+      "canvasFormat": "400x500-mm",
+      "gelatoUid": "canvas_product_cf_400x500-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor",
+      "count": 1
+    },
+    {
+      "size": "70x100",
+      "depth": "4cm",
+      "orientation": "Portrait",
+      "canvasFormat": "700x1000-mm",
+      "gelatoUid": "canvas_product_cf_700x1000-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver",
+      "count": 1
+    },
+    {
+      "size": "50x70",
+      "depth": "2cm",
+      "orientation": "Portrait",
+      "canvasFormat": "500x700-mm",
+      "gelatoUid": "canvas_product_cf_500x700-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver",
+      "count": 1
+    },
+    {
+      "size": "30x40",
+      "depth": "4cm",
+      "orientation": "Landscape",
+      "canvasFormat": "300x400-mm",
+      "gelatoUid": "canvas_product_cf_300x400-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor",
+      "count": 1
+    },
+    {
+      "size": "40x60",
+      "depth": "4cm",
+      "orientation": "Landscape",
+      "canvasFormat": "400x600-mm",
+      "gelatoUid": "canvas_product_cf_400x600-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor",
+      "count": 1
+    },
+    {
+      "size": "40x50",
+      "depth": "4cm",
+      "orientation": "Portrait",
+      "canvasFormat": "400x500-mm",
+      "gelatoUid": "canvas_product_cf_400x500-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver",
+      "count": 1
+    },
+    {
+      "size": "20x30",
+      "depth": "2cm",
+      "orientation": "Portrait",
+      "canvasFormat": "200x300-mm",
+      "gelatoUid": "canvas_product_cf_200x300-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver",
+      "count": 1
+    },
+    {
+      "size": "20x30",
+      "depth": "4cm",
+      "orientation": "Landscape",
+      "canvasFormat": "200x300-mm",
+      "gelatoUid": "canvas_product_cf_200x300-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor",
+      "count": 1
+    },
+    {
+      "size": "20x30",
+      "depth": "4cm",
+      "orientation": "Portrait",
+      "canvasFormat": "200x300-mm",
+      "gelatoUid": "canvas_product_cf_200x300-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver",
+      "count": 1
+    },
+    {
+      "size": "70x100",
+      "depth": "2cm",
+      "orientation": "Landscape",
+      "canvasFormat": "700x1000-mm",
+      "gelatoUid": "canvas_product_cf_700x1000-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor",
+      "count": 1
+    },
+    {
+      "size": "20x30",
+      "depth": "2cm",
+      "orientation": "Landscape",
+      "canvasFormat": "200x300-mm",
+      "gelatoUid": "canvas_product_cf_200x300-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor",
+      "count": 1
+    },
+    {
+      "size": "70x100",
+      "depth": "4cm",
+      "orientation": "Landscape",
+      "canvasFormat": "700x1000-mm",
+      "gelatoUid": "canvas_product_cf_700x1000-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor",
+      "count": 1
+    },
+    {
+      "size": "30x40",
+      "depth": "4cm",
+      "orientation": "Portrait",
+      "canvasFormat": "300x400-mm",
+      "gelatoUid": "canvas_product_cf_300x400-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver",
+      "count": 1
+    },
+    {
+      "size": "50x70",
+      "depth": "4cm",
+      "orientation": "Landscape",
+      "canvasFormat": "500x700-mm",
+      "gelatoUid": "canvas_product_cf_500x700-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor",
+      "count": 1
+    },
+    {
+      "size": "50x70",
+      "depth": "2cm",
+      "orientation": "Landscape",
+      "canvasFormat": "500x700-mm",
+      "gelatoUid": "canvas_product_cf_500x700-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor",
+      "count": 1
+    },
+    {
+      "size": "40x60",
+      "depth": "2cm",
+      "orientation": "Landscape",
+      "canvasFormat": "400x600-mm",
+      "gelatoUid": "canvas_product_cf_400x600-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor",
+      "count": 1
+    },
+    {
+      "size": "60x80",
+      "depth": "2cm",
+      "orientation": "Landscape",
+      "canvasFormat": "600x800-mm",
+      "gelatoUid": "canvas_product_cf_600x800-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor",
+      "count": 1
+    },
+    {
+      "size": "60x80",
+      "depth": "2cm",
+      "orientation": "Portrait",
+      "canvasFormat": "600x800-mm",
+      "gelatoUid": "canvas_product_cf_600x800-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver",
+      "count": 1
+    },
+    {
+      "size": "70x100",
+      "depth": "2cm",
+      "orientation": "Portrait",
+      "canvasFormat": "700x1000-mm",
+      "gelatoUid": "canvas_product_cf_700x1000-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver",
+      "count": 1
+    },
+    {
+      "size": "60x80",
+      "depth": "4cm",
+      "orientation": "Landscape",
+      "canvasFormat": "600x800-mm",
+      "gelatoUid": "canvas_product_cf_600x800-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor",
+      "count": 1
+    },
+    {
+      "size": "60x80",
+      "depth": "4cm",
+      "orientation": "Portrait",
+      "canvasFormat": "600x800-mm",
+      "gelatoUid": "canvas_product_cf_600x800-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver",
+      "count": 1
+    },
+    {
+      "size": "20x25",
+      "depth": "2cm",
+      "orientation": "Portrait",
+      "canvasFormat": "200x250-mm",
+      "gelatoUid": "canvas_product_cf_200x250-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver",
+      "count": 1
+    },
+    {
+      "size": "40x60",
+      "depth": "4cm",
+      "orientation": "Portrait",
+      "canvasFormat": "400x600-mm",
+      "gelatoUid": "canvas_product_cf_400x600-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver",
+      "count": 1
+    },
+    {
+      "size": "30x40",
+      "depth": "2cm",
+      "orientation": "Portrait",
+      "canvasFormat": "300x400-mm",
+      "gelatoUid": "canvas_product_cf_300x400-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver",
+      "count": 1
+    },
+    {
+      "size": "40x50",
+      "depth": "2cm",
+      "orientation": "Landscape",
+      "canvasFormat": "400x500-mm",
+      "gelatoUid": "canvas_product_cf_400x500-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor",
+      "count": 1
+    },
+    {
+      "size": "40x60",
+      "depth": "2cm",
+      "orientation": "Portrait",
+      "canvasFormat": "400x600-mm",
+      "gelatoUid": "canvas_product_cf_400x600-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver",
+      "count": 1
+    },
+    {
+      "size": "20x25",
+      "depth": "4cm",
+      "orientation": "Portrait",
+      "canvasFormat": "200x250-mm",
+      "gelatoUid": "canvas_product_cf_200x250-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver",
+      "count": 1
+    },
+    {
+      "size": "50x70",
+      "depth": "4cm",
+      "orientation": "Portrait",
+      "canvasFormat": "500x700-mm",
+      "gelatoUid": "canvas_product_cf_500x700-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver",
+      "count": 1
+    }
+  ],
+  "_meta": {
+    "paper": "200-gsm-uncoated (Premium Matte)",
+    "frame_material": "wood",
+    "canvas_depths": [
+      "2cm",
+      "4cm"
+    ],
+    "totals": {
+      "posters": 12,
+      "framed": 48,
+      "canvas": 32,
+      "total": 92
+    },
+    "note": "Orientation skickas som line item property till Gelato (Portrait/Landscape)."
+  }
+}
