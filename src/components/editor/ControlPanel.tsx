@@ -16,6 +16,7 @@ import { geocode, type GeocodeResult } from "@/lib/mapbox";
 import { MAPBOX_STYLE_LABELS, type ProductConfig } from "@/lib/product-config";
 import { FormatSection } from "./FormatSection";
 import { Loader2, Search } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface Props {
   configs: ProductConfig[];
@@ -77,42 +78,51 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
   };
 
   return (
-    <Accordion type="multiple" defaultValue={["plats", "format"]} className="w-full">
+    <Accordion type="single" collapsible defaultValue="plats" className="w-full">
       {/* 1. Plats */}
       <AccordionItem value="plats">
         <AccordionTrigger className="text-sm font-semibold">Plats</AccordionTrigger>
-        <AccordionContent className="pt-3 space-y-4">
+        <AccordionContent className="pt-3 space-y-4 overflow-visible">
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Vald plats</Label>
             <p className="text-sm font-medium">{placeName}</p>
           </div>
-          <div className="space-y-2 relative">
+          <div className="space-y-2">
             <Label className="text-xs text-muted-foreground">Sök adress eller stad</Label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="t.ex. Drottninggatan 1, Stockholm"
-                className="pl-9 pr-9"
-              />
-              {searching && (
-                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-              )}
-            </div>
-            {results.length > 0 && (
-              <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border bg-popover shadow-lg divide-y max-h-64 overflow-y-auto">
-                {results.map((r, i) => (
-                  <button
-                    key={i}
-                    onClick={() => onPick(r)}
-                    className="block w-full text-left px-3 py-2 text-sm hover:bg-accent transition"
-                  >
-                    {r.place_name}
-                  </button>
-                ))}
-              </div>
-            )}
+            <Popover open={results.length > 0}>
+              <PopoverTrigger asChild>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <Input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="t.ex. Drottninggatan 1, Stockholm"
+                    className="pl-9 pr-9"
+                  />
+                  {searching && (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                  )}
+                </div>
+              </PopoverTrigger>
+              <PopoverContent
+                align="start"
+                sideOffset={4}
+                onOpenAutoFocus={(e) => e.preventDefault()}
+                className="p-0 w-[var(--radix-popover-trigger-width)] z-[60]"
+              >
+                <div className="max-h-[14rem] overflow-y-auto divide-y">
+                  {results.slice(0, 4).map((r, i) => (
+                    <button
+                      key={i}
+                      onClick={() => onPick(r)}
+                      className="block w-full text-left px-3 py-2 text-sm hover:bg-accent transition h-[3.5rem] leading-tight"
+                    >
+                      {r.place_name}
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground">Zoom: {mapZoom.toFixed(1)}</Label>
