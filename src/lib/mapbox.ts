@@ -25,7 +25,7 @@ export async function geocode(query: string): Promise<GeocodeResult[]> {
   if (!token || !query.trim()) return [];
   const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
     query
-  )}.json?access_token=${token}&limit=5&language=sv`;
+  )}.json?access_token=${token}&limit=4&language=sv`;
   const res = await fetch(url);
   if (!res.ok) return [];
   const data = await res.json();

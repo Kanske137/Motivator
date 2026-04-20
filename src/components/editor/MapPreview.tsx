@@ -5,9 +5,7 @@ import { useEditorStore } from "@/stores/editorStore";
 import { getMapboxToken, styleUrl } from "@/lib/mapbox";
 
 interface Props {
-  /** Border style around the canvas, e.g. "8px solid #1a1a1a" for a black frame */
   borderCss?: string;
-  /** Optional padding inside the canvas to mimic mat board */
   innerPadding?: string;
 }
 
@@ -19,7 +17,7 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
     useEditorStore();
   const layout = currentLayout();
 
-  // init map once
+  // init map once container is mounted
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -28,6 +26,10 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
       if (!token) {
         console.error("[MapPreview] No Mapbox token available");
         return;
+      }
+      const rect = mapContainerRef.current.getBoundingClientRect();
+      if (rect.width < 4 || rect.height < 4) {
+        console.warn("[MapPreview] Container has no size yet", rect);
       }
       mapboxgl.accessToken = token;
       const map = new mapboxgl.Map({
@@ -47,8 +49,10 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
         });
       });
       mapRef.current = map;
-      // safety resize after a tick (container may be sized via parent layout)
-      setTimeout(() => map.resize(), 100);
+      // multiple resize ticks to catch late layout
+      setTimeout(() => map.resize(), 50);
+      setTimeout(() => map.resize(), 250);
+      setTimeout(() => map.resize(), 600);
     })();
     return () => {
       cancelled = true;
@@ -58,12 +62,21 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // react to style change
+  // observe container size changes (orientation, sidebar, etc.)
+  useEffect(() => {
+    const el = mapContainerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      mapRef.current?.resize();
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   useEffect(() => {
     if (mapRef.current) mapRef.current.setStyle(styleUrl(mapStyleId));
   }, [mapStyleId]);
 
-  // react to programmatic center/zoom updates (e.g. geocode)
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -73,38 +86,32 @@ export function MapPreview({ borderCss, innerPadding }: Props) {
     }
   }, [mapCenter, mapZoom]);
 
-  // resize on orientation change
   useEffect(() => {
     setTimeout(() => mapRef.current?.resize(), 80);
   }, [orientation]);
 
-  const aspect = orientation === "portrait" ? "3 / 4" : "4 / 3";
-
-  // first map layer position (for overlay positioning); fallback = full area
-  const mapLayer = layout?.layers.find((l) => l.type === "map");
-  const mapLayerStyle: React.CSSProperties = mapLayer
-    ? { left: mapLayer.x, top: mapLayer.y, width: mapLayer.w, height: mapLayer.h }
-    : { left: 0, top: 0, width: "100%", height: "100%" };
+  const isPortrait = orientation === "portrait";
+  // Stable preview frame: explicit max sizes so the canvas always has real dims.
+  const frameStyle: React.CSSProperties = {
+    aspectRatio: isPortrait ? "3 / 4" : "4 / 3",
+    width: "min(100%, 70vh * 3 / 4)",
+    maxWidth: "100%",
+    maxHeight: "85vh",
+    border: borderCss,
+    padding: innerPadding,
+  };
+  if (!isPortrait) {
+    frameStyle.width = "min(100%, 90vh * 4 / 3)";
+  }
 
   return (
-    <div className="w-full h-full flex items-center justify-center p-4">
-      <div
-        className="relative bg-card shadow-2xl"
-        style={{
-          aspectRatio: aspect,
-          maxHeight: "100%",
-          maxWidth: "100%",
-          height: "auto",
-          width: orientation === "portrait" ? "auto" : "100%",
-          border: borderCss,
-          padding: innerPadding,
-        }}
-      >
-        <div className="relative w-full h-full overflow-hidden">
-          {/* Stable map container */}
-          <div ref={mapContainerRef} className="absolute" style={mapLayerStyle} />
+    <div className="w-full h-full flex items-center justify-center p-4 min-h-[60vh]">
+      <div className="relative bg-card shadow-2xl" style={frameStyle}>
+        <div className="absolute inset-0 overflow-hidden">
+          {/* Stable, always-rendered map container that fills the preview */}
+          <div ref={mapContainerRef} className="absolute inset-0" />
 
-          {/* text layer */}
+          {/* text overlays */}
           {textVisible &&
             layout?.layers
               .filter((l) => l.type === "text")
