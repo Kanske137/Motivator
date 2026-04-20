@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useEditorStore } from "@/stores/editorStore";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, AlertCircle } from "lucide-react";
+import { resolveProductUid } from "@/lib/gelato";
 
 interface Mockup {
   url: string | null;
@@ -19,23 +20,34 @@ export function MockupGallery() {
     useEditorStore();
   const [mockups, setMockups] = useState<Mockup[]>([]);
   const debounceRef = useRef<number | null>(null);
+  const reqIdRef = useRef(0);
 
   useEffect(() => {
     if (!config || !size) return;
     const labels = config.product_type === "canvas" ? ENV_LABELS_CANVAS : ENV_LABELS_POSTER;
 
-    // Show skeletons immediately
     setMockups(labels.map((label) => ({ label, url: null, loading: true })));
 
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
     debounceRef.current = window.setTimeout(async () => {
+      const myReq = ++reqIdRef.current;
       try {
+        // Resolve productUid up-front (DB → local fallback)
+        const resolved = resolveProductUid({
+          productType: config.product_type,
+          size,
+          variant,
+          orientation,
+          dbMap: config.gelato_sku_map as Record<string, Record<string, string>>,
+        });
+        console.log("[MockupGallery] resolved UID:", resolved);
+
         // Step 1: print file
-        console.log("[MockupGallery] generating print file…", { mapStyleId, mapCenter, mapZoom, size, orientation });
         const printRes = await supabase.functions.invoke("generate-print-file", {
           body: { styleId: mapStyleId, center: mapCenter, zoom: mapZoom, size, orientation, text, textFont },
         });
-        console.log("[MockupGallery] generate-print-file result:", printRes);
+        if (myReq !== reqIdRef.current) return;
+        console.log("[MockupGallery] generate-print-file:", printRes);
 
         if (printRes.error || !printRes.data?.url) {
           const msg = printRes.error?.message || "Ingen tryckfil";
@@ -44,26 +56,28 @@ export function MockupGallery() {
         }
         const printUrl: string = printRes.data.url;
 
-        // Step 2: resolve productUid (use variant or fallback to first SKU for size)
-        const skuMap = (config.gelato_sku_map ?? {}) as Record<string, Record<string, string>>;
-        const sizeSkus = skuMap?.[size] ?? {};
-        const productUid = (variant && sizeSkus[variant]) || Object.values(sizeSkus)[0];
-        console.log("[MockupGallery] productUid:", productUid, "for size:", size, "variant:", variant);
-
-        if (!productUid) {
-          // No mapping → show print file in all slots as preview
-          setMockups(labels.map((label) => ({ label, url: printUrl, loading: false, fallback: true })));
+        if (!resolved.productUid) {
+          // No mapping at all → show print preview in all slots with clear fallback label
+          setMockups(
+            labels.map((label) => ({
+              label,
+              url: printUrl,
+              loading: false,
+              fallback: true,
+              error: "Saknar Gelato-mapping för denna variant",
+            })),
+          );
           return;
         }
 
-        // Step 3: gelato mockup
+        // Step 2: gelato mockup
         const mockupRes = await supabase.functions.invoke("gelato-mockup", {
-          body: { productUid, imageUrl: printUrl },
+          body: { productUid: resolved.productUid, imageUrl: printUrl },
         });
-        console.log("[MockupGallery] gelato-mockup result:", mockupRes);
+        if (myReq !== reqIdRef.current) return;
+        console.log("[MockupGallery] gelato-mockup:", mockupRes);
         const mockupUrl: string | null = mockupRes.data?.mockupUrl ?? null;
 
-        // First slot = real mockup if we got one, otherwise print preview
         setMockups(
           labels.map((label, i) => ({
             label,
@@ -73,11 +87,12 @@ export function MockupGallery() {
           })),
         );
       } catch (e) {
+        if (myReq !== reqIdRef.current) return;
         console.error("[MockupGallery] failed", e);
         const msg = e instanceof Error ? e.message : "Något gick fel";
         setMockups(labels.map((label) => ({ label, url: null, loading: false, error: msg })));
       }
-    }, 600);
+    }, 900);
 
     return () => {
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
@@ -103,7 +118,15 @@ export function MockupGallery() {
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
               ) : m.url ? (
-                <img src={m.url} alt={m.label} className="w-full h-full object-cover" />
+                <>
+                  <img src={m.url} alt={m.label} className="w-full h-full object-cover" />
+                  {m.fallback && m.error && i === 0 && (
+                    <div className="absolute top-1 left-1 right-1 bg-destructive/90 text-destructive-foreground text-[9px] px-1.5 py-0.5 rounded flex items-center gap-1">
+                      <AlertCircle className="h-2.5 w-2.5 flex-shrink-0" />
+                      <span className="line-clamp-1">{m.error}</span>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-destructive/5 text-destructive text-[10px] p-2 text-center gap-1">
                   <AlertCircle className="h-4 w-4" />
