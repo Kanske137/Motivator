@@ -1,49 +1,52 @@
 
 
-## Plan: Rena väggar + ramar i mockups + klickbar lightbox
+## Plan: Identisk poster + riktig canvas-3D
 
-### 1. Återgenerera 6 mockup-bilder med tomma väggar
-Ersätt alla bilder i `src/assets/mockups/` så väggytan är **helt tom** (inga befintliga tavlor/ramar). Möbler behålls för skala.
+### Problem 1: Mockup matchar inte editor
+`generate-print-file` anropas i `MockupGallery` med endast `{styleId, center, zoom, size, orientation, text, textFont}`. Editorn (`MapPreview`) använder dessutom: `mapShape`, `posterBgColor`, `showLabels`, `textVisible`. Print-filen ignorerar dessa → mockup visar fel innehåll (fel bakgrund, fel form, text som inte ska synas, etc).
 
-- `poster-livingroom.jpg` — soffa nedtill, tom vägg ovan
-- `poster-bedroom.jpg` — säng nedtill, tom vägg ovan
-- `poster-office.jpg` — skrivbord nedtill, tom vägg ovan
-- `poster-wall.jpg` — närbild ren vägg med golvlist
-- `canvas-livingroom.jpg` — soffa, tom vägg, lätt vinkel för djup
-- `canvas-side.jpg` — diagonal vy mot tom vägg så wrap syns tydligt
+### Problem 2: Canvas saknar riktigt 3D
+Nuvarande `canvasWrap` ritar bara en mörk strip på höger sida + skuggad skew. Det finns ingen verklig wrap-känsla: ingen topp/botten-kant, ingen sidoyta som faktiskt visar bildens kantpixlar wrappade runt ramens djup, ingen riktig perspektiv-transform.
 
-### 2. Justera scen-koordinater
-Uppdatera `area` + `referenceWidthCm` i `src/lib/mockup-scenes.ts` så postern hamnar exakt på den tomma väggytan i rätt skala (30x40 ska se litet ut, 100x140 stort).
+### Lösning
 
-### 3. Rendera ram i compositen om vald
-Idag ritar `mockup-composite.ts` bara postern. Lägg till ram-rendering när `frameColor` är satt:
+**1. Synka print-fil med editorns fullständiga state**
+- Uppdatera anropet i `MockupGallery.tsx` så ALLA editor-fält skickas: `mapShape`, `posterBgColor`, `showLabels`, `textVisible`, plus existerande
+- Uppdatera `supabase/functions/generate-print-file/index.ts` så den faktiskt använder dessa: applicera bakgrundsfärg på hela canvasen, klippa kartan enligt `mapShape` (rect/square/circle), skicka `showLabels` till Mapbox static-URL, hoppa över text om `textVisible=false`
+- Resultat: mockup-postern är pixel-identisk med editorns preview
 
-- Acceptera `frameColor` + `frameWidthCm` som inputs
-- Rita en rektangel runt postern i vald färg (vit/svart/ek/valnöt)
-- Bredden skalas mot `referenceWidthCm` precis som postern → liten poster får tunn ram, stor får tjockare
-- Lägg lätt skugga/inner-shadow så det ser ut som riktigt trä/metall, inte platt
-- Canvas-scener får ingen ram (de wrappas redan)
+**2. Bygg om canvas-wrap till riktig 3D**
+Ersätt nuvarande "skugg-strip" med korrekt wrap-rendering i `mockup-composite.ts`:
 
-`MockupGallery.tsx` skickar in `variant`/`frameColor` från store så varje ruta visar exakt det användaren valt.
+- **Frontyta**: postern ritas rakt (ingen skew) i `area`
+- **Höger sidokant**: ett trapets med perspektiv som visar de yttersta ~3% av bildens högerkant, sträckt över djupet (`canvasDepthCm`). Detta är vad Gelato faktiskt gör — bilden wrappas fysiskt runt ramen [Gelato docs: bleed = 8mm extra bild per sida för wrap]
+- **Topp-kant**: tunn trapets ovanför som visar översta ~3% av bildens överkant, wrappad. Behövs för scener i lätt vinkel
+- **Skuggning**: subtil gradient på sidokanten (mörkare mot baksidan) — inte en svart overlay
+- **Vinkel**: använd scenens `canvasWrap.angleDeg` för att beräkna sidokantens synliga bredd via `sin(angle) * depthPx` och topp-höjd via `cos`
+- **Ingen skew på frontytan** — det förvrängde innehållet utan att lägga till djup
+- **Canvas-scener uppdateras** med större `angleDeg` (12-25°) på diagonal-vyn så wrap blir tydligt synligt
 
-### 4. Klickbar lightbox-preview
-Gör varje mockup-kort i `MockupGallery.tsx` klickbart. Vid klick öppnas en `Dialog` (shadcn) med:
+Tekniskt:
+```
+frontRect: ritas plant
+sideQuad:  4-punkts trapets (clip + drawImage med source-rect = 
+           bildens högra 3%, dest = trapets-bbox, sedan transform)
+topQuad:   samma princip för översta 3%
+```
 
-- Stor version av mockupen (max 90vw / 90vh)
-- Scen-label som titel
-- Stäng-knapp
-- Pil-navigering mellan scenerna (◀ ▶) så man kan bläddra utan att stänga
-- Mörk bakdrop, klick utanför stänger
+Eftersom canvas 2D inte har äkta 4-punkts perspektiv används approximation: clip-path som trapets + `setTransform` med skew som matchar trapetsens vinklar. Tillräckligt övertygande för mockups.
+
+**3. Bleed-medvetenhet**
+Print-filen genererar redan tryck-storleken. För canvas: säkerställ att de yttersta ~2-3% används som wrap-källa (motsvarar Gelatos 8mm bleed på t.ex. 30cm bredd ≈ 2.7%). Inget extra bleed behöver renderas — vi samplar från den befintliga bilden.
 
 ### Filer som ändras
-- `src/assets/mockups/*.jpg` (6 bilder ersätts)
-- `src/lib/mockup-scenes.ts` (nya area-koordinater)
-- `src/lib/mockup-composite.ts` (ram-rendering)
-- `src/components/editor/MockupGallery.tsx` (skicka frame-props + lightbox-dialog)
+- `supabase/functions/generate-print-file/index.ts` — stöd för `mapShape`, `posterBgColor`, `showLabels`, `textVisible`
+- `src/components/editor/MockupGallery.tsx` — skicka alla editor-fält till print-funktionen
+- `src/lib/mockup-composite.ts` — riktig wrap-rendering (front + sida + topp), ta bort skew på front
+- `src/lib/mockup-scenes.ts` — justera `angleDeg` för canvas-scener så 3D syns tydligt
 
 ### Förväntat resultat
-- Postern ser ut att hänga direkt på väggen — ingen "tavla i tavla"
-- Vald ram (vit/svart/ek/valnöt) syns runt postern i miljön
-- Storleksskillnader är trovärdiga mot möblerna
-- Klick på en ruta öppnar stor preview i dialog med bläddring
+- Mockup = exakt det editorn visar (form, bakgrund, text, etiketter, allt)
+- Canvas ser ut som en faktisk 3D-duk med synlig sida där bildens kant wrappas runt djupet — inte en platt poster med skugg-strip
+- Skillnad mellan 2cm och 4cm djup syns tydligt på sidokanten
 
