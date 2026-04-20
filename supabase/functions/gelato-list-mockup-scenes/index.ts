@@ -42,34 +42,27 @@ Deno.serve(async (req) => {
 
     const headers = { "X-API-KEY": GELATO_API_KEY, "Content-Type": "application/json" };
     const attempts: Array<{ url: string; status: number; bodyPreview: string }> = [];
+    const successes: Array<{ url: string; data: unknown }> = [];
 
-    for (const base of HOSTS) {
-      for (const path of ENDPOINTS(productUid)) {
-        const url = `${base}${path}`;
-        try {
-          const r = await fetch(url, { headers });
-          const txt = await r.text();
-          attempts.push({ url, status: r.status, bodyPreview: txt.slice(0, 1500) });
-          console.log("[list-scenes]", r.status, url);
-          if (r.ok) {
-            // Try to extract scenes / UUIDs
-            let parsed: unknown = null;
-            try { parsed = JSON.parse(txt); } catch { /* not json */ }
-            return new Response(
-              JSON.stringify({ ok: true, url, status: r.status, data: parsed ?? txt, attempts }),
-              { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-            );
-          }
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          attempts.push({ url, status: 0, bodyPreview: msg });
-          console.warn("[list-scenes] fetch failed", url, msg);
+    for (const url of buildUrls(productUid)) {
+      try {
+        const r = await fetch(url, { headers });
+        const txt = await r.text();
+        attempts.push({ url, status: r.status, bodyPreview: txt.slice(0, 1500) });
+        console.log("[list-scenes]", r.status, url);
+        if (r.ok) {
+          let parsed: unknown = txt;
+          try { parsed = JSON.parse(txt); } catch { /* keep text */ }
+          successes.push({ url, data: parsed });
         }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        attempts.push({ url, status: 0, bodyPreview: msg });
       }
     }
 
     return new Response(
-      JSON.stringify({ ok: false, error: "no endpoint returned scenes", attempts }),
+      JSON.stringify({ ok: successes.length > 0, successes, attempts }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
