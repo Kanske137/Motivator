@@ -1,6 +1,13 @@
 import { create } from "zustand";
 import type { Orientation, ProductConfig } from "@/lib/product-config";
 
+interface ApplyPlaceArgs {
+  placeName: string;
+  center: [number, number];
+  city?: string;
+  country?: string;
+}
+
 interface EditorState {
   config: ProductConfig | null;
 
@@ -14,6 +21,7 @@ interface EditorState {
   text: string;
   textFont: string;
   textVisible: boolean;
+  textIsCustom: boolean;
 
   // format
   size: string | null;
@@ -32,10 +40,19 @@ interface EditorState {
   setSize: (s: string) => void;
   setVariant: (v: string) => void;
   setOrientation: (o: Orientation) => void;
+  applyPlace: (args: ApplyPlaceArgs) => void;
 
   // computed
   currentPrice: () => number;
   currentLayout: () => ProductConfig["layouts"]["portrait"] | null;
+}
+
+function buildAutoText(args: ApplyPlaceArgs): string {
+  const [lng, lat] = args.center;
+  const cityLine = (args.city ?? args.placeName.split(",")[0] ?? "").trim().toUpperCase();
+  const countryLine = args.country?.trim() ?? "";
+  const coordLine = `${lat.toFixed(4)}°N · ${lng.toFixed(4)}°E`;
+  return [cityLine, countryLine, coordLine].filter(Boolean).join("\n");
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -45,9 +62,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   mapStyleId: "light-v11",
   placeName: "Stockholm, Sverige",
 
-  text: "STOCKHOLM\n59.3293°N · 18.0686°E",
+  text: "STOCKHOLM\nSverige\n59.3293°N · 18.0686°E",
   textFont: "Inter",
   textVisible: true,
+  textIsCustom: false,
 
   size: null,
   variant: null,
@@ -71,7 +89,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setMapZoom: (mapZoom) => set({ mapZoom }),
   setMapStyleId: (mapStyleId) => set({ mapStyleId }),
   setPlaceName: (placeName) => set({ placeName }),
-  setText: (text) => set({ text }),
+  setText: (text) => set({ text, textIsCustom: true }),
   setTextFont: (textFont) => set({ textFont }),
   setTextVisible: (textVisible) => set({ textVisible }),
   setSize: (size) => {
@@ -87,6 +105,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   setVariant: (variant) => set({ variant }),
   setOrientation: (orientation) => set({ orientation }),
+
+  applyPlace: (args) => {
+    const isCustom = get().textIsCustom;
+    set({
+      mapCenter: args.center,
+      placeName: args.placeName,
+      ...(isCustom ? {} : { text: buildAutoText(args) }),
+    });
+  },
 
   currentPrice: () => {
     const { config, size, variant } = get();

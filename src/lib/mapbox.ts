@@ -16,6 +16,8 @@ export async function getMapboxToken(): Promise<string> {
 export interface GeocodeResult {
   place_name: string;
   center: [number, number]; // [lng, lat]
+  city?: string;
+  country?: string;
 }
 
 export async function geocode(query: string): Promise<GeocodeResult[]> {
@@ -27,10 +29,21 @@ export async function geocode(query: string): Promise<GeocodeResult[]> {
   const res = await fetch(url);
   if (!res.ok) return [];
   const data = await res.json();
-  return (data.features ?? []).map((f: any) => ({
-    place_name: f.place_name,
-    center: f.center,
-  }));
+  return (data.features ?? []).map((f: any) => {
+    const ctx: any[] = f.context ?? [];
+    const country = ctx.find((c) => c.id?.startsWith("country"))?.text;
+    const place = ctx.find((c) => c.id?.startsWith("place"))?.text;
+    const city =
+      f.place_type?.includes("place") || f.place_type?.includes("locality")
+        ? f.text
+        : place ?? f.text;
+    return {
+      place_name: f.place_name,
+      center: f.center,
+      city,
+      country,
+    };
+  });
 }
 
 export function styleUrl(styleId: string): string {

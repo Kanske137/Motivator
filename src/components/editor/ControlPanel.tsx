@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -30,8 +30,7 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
     setMapZoom,
     mapStyleId,
     setMapStyleId,
-    setMapCenter,
-    setPlaceName,
+    applyPlace,
     placeName,
     text,
     setText,
@@ -45,59 +44,69 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
   const [results, setResults] = useState<GeocodeResult[]>([]);
   const [searching, setSearching] = useState(false);
 
+  // Debounced live search
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setResults([]);
+      return;
+    }
+    setSearching(true);
+    const t = setTimeout(async () => {
+      const r = await geocode(q);
+      setResults(r);
+      setSearching(false);
+    }, 300);
+    return () => {
+      clearTimeout(t);
+      setSearching(false);
+    };
+  }, [query]);
+
   if (!config) return null;
 
-  const onSearch = async () => {
-    if (!query.trim()) return;
-    setSearching(true);
-    const r = await geocode(query);
-    setResults(r);
-    setSearching(false);
-  };
-
   const onPick = (r: GeocodeResult) => {
-    setMapCenter(r.center);
-    setPlaceName(r.place_name);
+    applyPlace({
+      placeName: r.place_name,
+      center: r.center,
+      city: r.city,
+      country: r.country,
+    });
     setResults([]);
     setQuery("");
   };
 
   return (
-    <Accordion type="multiple" defaultValue={["format", "plats"]} className="w-full">
-      <AccordionItem value="format">
-        <AccordionTrigger className="text-sm font-semibold">Format</AccordionTrigger>
-        <AccordionContent className="pt-3">
-          <FormatSection configs={configs} activeHandle={activeHandle} onProductChange={onProductChange} />
-        </AccordionContent>
-      </AccordionItem>
-
+    <Accordion type="multiple" defaultValue={["plats", "format"]} className="w-full">
+      {/* 1. Plats */}
       <AccordionItem value="plats">
         <AccordionTrigger className="text-sm font-semibold">Plats</AccordionTrigger>
         <AccordionContent className="pt-3 space-y-4">
-          <div className="space-y-2">
+          <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Vald plats</Label>
             <p className="text-sm font-medium">{placeName}</p>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-2 relative">
             <Label className="text-xs text-muted-foreground">Sök adress eller stad</Label>
-            <div className="flex gap-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && onSearch()}
                 placeholder="t.ex. Drottninggatan 1, Stockholm"
+                className="pl-9 pr-9"
               />
-              <Button size="icon" variant="outline" onClick={onSearch} disabled={searching}>
-                {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-              </Button>
+              {searching && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+              )}
             </div>
             {results.length > 0 && (
-              <div className="rounded-md border bg-card divide-y max-h-56 overflow-y-auto">
+              <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border bg-popover shadow-lg divide-y max-h-64 overflow-y-auto">
                 {results.map((r, i) => (
                   <button
                     key={i}
                     onClick={() => onPick(r)}
-                    className="block w-full text-left px-3 py-2 text-sm hover:bg-accent"
+                    className="block w-full text-left px-3 py-2 text-sm hover:bg-accent transition"
                   >
                     {r.place_name}
                   </button>
@@ -118,6 +127,7 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
         </AccordionContent>
       </AccordionItem>
 
+      {/* 2. Kartstil */}
       <AccordionItem value="kartstil">
         <AccordionTrigger className="text-sm font-semibold">Kartstil</AccordionTrigger>
         <AccordionContent className="pt-3">
@@ -130,10 +140,7 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
                   s === mapStyleId ? "border-primary ring-2 ring-primary/30" : "border-border"
                 }`}
               >
-                <div
-                  className="absolute inset-0"
-                  style={{ background: stylePreviewBg(s) }}
-                />
+                <div className="absolute inset-0" style={{ background: stylePreviewBg(s) }} />
                 <span className="absolute bottom-0 left-0 right-0 bg-background/80 backdrop-blur-sm text-[10px] py-1 font-medium">
                   {MAPBOX_STYLE_LABELS[s] ?? s}
                 </span>
@@ -143,6 +150,7 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
         </AccordionContent>
       </AccordionItem>
 
+      {/* 3. Text */}
       <AccordionItem value="text">
         <AccordionTrigger className="text-sm font-semibold">Text</AccordionTrigger>
         <AccordionContent className="pt-3 space-y-4">
@@ -174,6 +182,14 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
               ))}
             </div>
           </div>
+        </AccordionContent>
+      </AccordionItem>
+
+      {/* 4. Format (sist) */}
+      <AccordionItem value="format">
+        <AccordionTrigger className="text-sm font-semibold">Format</AccordionTrigger>
+        <AccordionContent className="pt-3">
+          <FormatSection configs={configs} activeHandle={activeHandle} onProductChange={onProductChange} />
         </AccordionContent>
       </AccordionItem>
     </Accordion>

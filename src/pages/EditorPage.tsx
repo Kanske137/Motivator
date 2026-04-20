@@ -50,6 +50,12 @@ export default function EditorPage() {
 
   const borderCss = config?.product_type === "posters" ? FRAME_BORDER_CSS[variant ?? "Ingen"] : undefined;
 
+  const orientationLabel = orientation === "portrait" ? "Stående" : "Liggande";
+  const variantLabel = config?.product_type === "canvas" ? `${variant ?? ""} djup` : `${variant ?? ""} ram`;
+  const summary = [size ? `${size} cm` : null, variantLabel.trim() ? variantLabel : null, orientationLabel]
+    .filter(Boolean)
+    .join(" · ");
+
   const handleAddToCart = async () => {
     if (!config || !size || !variant) return;
     const inIframe = window.self !== window.top;
@@ -114,7 +120,7 @@ export default function EditorPage() {
       {/* Main: split on desktop, stacked on mobile */}
       <div className="flex-1 flex flex-col md:flex-row min-h-0">
         {/* Preview */}
-        <div className="flex-1 bg-muted/40 flex items-center justify-center min-h-[55vh] md:min-h-0">
+        <div className="flex-1 bg-[hsl(var(--paper))] flex items-center justify-center min-h-[55vh] md:min-h-0">
           <MapPreview borderCss={borderCss} />
         </div>
 
@@ -128,11 +134,10 @@ export default function EditorPage() {
             />
           </div>
 
-          {/* Desktop: price + buy inside panel */}
+          {/* Desktop: format summary + buy inside panel */}
           <div className="hidden md:block sticky bottom-0 border-t bg-background p-4 space-y-3">
-            <div className="flex items-baseline justify-between">
-              <span className="text-xs uppercase tracking-wider text-muted-foreground">Pris</span>
-              <span className="text-2xl font-bold">{currentPrice()} kr</span>
+            <div className="text-xs text-muted-foreground truncate">
+              {summary}
             </div>
             <Button onClick={handleAddToCart} disabled={isAdding} size="lg" className="w-full">
               {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : (
@@ -151,9 +156,9 @@ export default function EditorPage() {
 
       {/* Mobile sticky bottom bar */}
       <div className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t bg-background p-3 flex items-center gap-3">
-        <div className="flex-1">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Pris</div>
-          <div className="text-lg font-bold leading-none">{currentPrice()} kr</div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Ditt val</div>
+          <div className="text-xs font-medium leading-tight truncate">{summary}</div>
         </div>
         <Button onClick={handleAddToCart} disabled={isAdding} className="flex-1">
           {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : "Lägg i varukorg"}
