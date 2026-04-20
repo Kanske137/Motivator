@@ -14,7 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      product_configs: {
+        Row: {
+          created_at: string
+          gelato_sku_map: Json
+          id: string
+          layouts: Json
+          map_styles: Json
+          product_type: string
+          shopify_handle: string
+          sizes: Json
+          text_config: Json
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          gelato_sku_map?: Json
+          id?: string
+          layouts?: Json
+          map_styles?: Json
+          product_type: string
+          shopify_handle: string
+          sizes?: Json
+          text_config?: Json
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          gelato_sku_map?: Json
+          id?: string
+          layouts?: Json
+          map_styles?: Json
+          product_type?: string
+          shopify_handle?: string
+          sizes?: Json
+          text_config?: Json
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
