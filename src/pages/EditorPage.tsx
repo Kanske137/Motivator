@@ -49,7 +49,7 @@ export default function EditorPage() {
     setConfig(next);
   };
 
-  const borderCss = config?.product_type === "posters" ? FRAME_BORDER_CSS[variant ?? "Ingen"] : undefined;
+  const frameColor = config?.product_type === "posters" ? FRAME_COLORS[variant ?? "Ingen"] : "";
 
   const orientationLabel = orientation === "portrait" ? "Stående" : "Liggande";
   const variantLabel = config?.product_type === "canvas" ? `${variant ?? ""} djup` : `${variant ?? ""} ram`;
@@ -68,6 +68,7 @@ export default function EditorPage() {
       _map_zoom: mapZoom.toFixed(2),
       _size: size,
       _variant: variant,
+      _bg_color: posterBgColor,
     };
 
     if (inIframe) {
@@ -122,7 +123,7 @@ export default function EditorPage() {
       <div className="flex-1 flex flex-col md:flex-row min-h-0">
         {/* Preview */}
         <div className="flex-1 paper-grain flex items-center justify-center min-h-[65vh] md:min-h-[70vh]">
-          <MapPreview borderCss={borderCss} />
+          <MapPreview frameColor={frameColor} frameWidthCm={FRAME_WIDTH_CM} />
         </div>
 
         {/* Control panel */}
