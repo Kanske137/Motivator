@@ -8,6 +8,8 @@ interface ApplyPlaceArgs {
   country?: string;
 }
 
+export type MapShape = "rect" | "square" | "circle";
+
 interface EditorState {
   config: ProductConfig | null;
 
@@ -16,6 +18,10 @@ interface EditorState {
   mapZoom: number;
   mapStyleId: string;
   placeName: string;
+  city?: string;
+  country?: string;
+  showLabels: boolean;
+  mapShape: MapShape;
 
   // text
   text: string;
@@ -34,6 +40,8 @@ interface EditorState {
   setMapZoom: (z: number) => void;
   setMapStyleId: (s: string) => void;
   setPlaceName: (n: string) => void;
+  setShowLabels: (v: boolean) => void;
+  setMapShape: (s: MapShape) => void;
   setText: (t: string) => void;
   setTextFont: (f: string) => void;
   setTextVisible: (v: boolean) => void;
@@ -41,6 +49,7 @@ interface EditorState {
   setVariant: (v: string) => void;
   setOrientation: (o: Orientation) => void;
   applyPlace: (args: ApplyPlaceArgs) => void;
+  updateFromMap: (args: ApplyPlaceArgs) => void;
 
   // computed
   currentPrice: () => number;
@@ -61,6 +70,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   mapZoom: 12,
   mapStyleId: "light-v11",
   placeName: "Stockholm, Sverige",
+  city: "Stockholm",
+  country: "Sverige",
+  showLabels: false,
+  mapShape: "rect",
 
   text: "STOCKHOLM\nSverige\n59.3293°N · 18.0686°E",
   textFont: "Inter",
@@ -89,6 +102,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setMapZoom: (mapZoom) => set({ mapZoom }),
   setMapStyleId: (mapStyleId) => set({ mapStyleId }),
   setPlaceName: (placeName) => set({ placeName }),
+  setShowLabels: (showLabels) => set({ showLabels }),
+  setMapShape: (mapShape) => set({ mapShape }),
   setText: (text) => set({ text, textIsCustom: true }),
   setTextFont: (textFont) => set({ textFont }),
   setTextVisible: (textVisible) => set({ textVisible }),
@@ -111,6 +126,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({
       mapCenter: args.center,
       placeName: args.placeName,
+      city: args.city,
+      country: args.country,
+      ...(isCustom ? {} : { text: buildAutoText(args) }),
+    });
+  },
+
+  // Used when user pans/zooms map: don't move center (already moved), just refresh metadata
+  updateFromMap: (args) => {
+    const isCustom = get().textIsCustom;
+    set({
+      placeName: args.placeName,
+      city: args.city,
+      country: args.country,
       ...(isCustom ? {} : { text: buildAutoText(args) }),
     });
   },
