@@ -9,9 +9,8 @@ Deno.serve(async (req) => {
 
   try {
     const TOKEN = Deno.env.get("SHOPIFY_STOREFRONT_ACCESS_TOKEN");
-    const DOMAIN = Deno.env.get("SHOPIFY_STORE_PERMANENT_DOMAIN");
+    const DOMAIN = "canvas-poster-creator-2wh5d.myshopify.com";
     if (!TOKEN) throw new Error("SHOPIFY_STOREFRONT_ACCESS_TOKEN not configured");
-    if (!DOMAIN) throw new Error("SHOPIFY_STORE_PERMANENT_DOMAIN not configured");
 
     const { query, variables } = await req.json();
     if (!query) {
