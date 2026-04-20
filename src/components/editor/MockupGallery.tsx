@@ -128,6 +128,26 @@ export function MockupGallery() {
 
   if (!config) return null;
 
+  // Canvas → Three.js 3D preview, no scene composites
+  if (isCanvas) {
+    const [a, b] = (size ?? "30x40").split("x").map(Number);
+    const widthCm = orientation === "portrait" ? Math.min(a, b) : Math.max(a, b);
+    const heightCm = orientation === "portrait" ? Math.max(a, b) : Math.min(a, b);
+    const depthCm = variant?.match(/(\d+)/)?.[1]
+      ? parseInt(variant.match(/(\d+)/)![1], 10)
+      : 2;
+    return (
+      <Canvas3DPreview
+        printUrl={printUrl}
+        loading={printLoading}
+        error={printError}
+        widthCm={widthCm}
+        heightCm={heightCm}
+        depthCm={depthCm}
+      />
+    );
+  }
+
   const validSlots = slots.filter((s) => s.url);
   const lightboxSlot = lightboxIdx !== null ? validSlots[lightboxIdx] : null;
 
