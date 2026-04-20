@@ -85,7 +85,7 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
   return (
     <Accordion type="single" collapsible defaultValue="plats" className="w-full space-y-3">
       {/* 1. Plats */}
-      <AccordionItem value="plats" className={cn(cardClass, "border-b")}>
+      <AccordionItem value="plats" className={cn(cardClass, "border-b-0")}>
         <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
           Plats
         </AccordionTrigger>
@@ -140,7 +140,7 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
       </AccordionItem>
 
       {/* 2. Kartstil */}
-      <AccordionItem value="kartstil" className={cn(cardClass, "border-b")}>
+      <AccordionItem value="kartstil" className={cn(cardClass, "border-b-0")}>
         <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
           Kartstil
         </AccordionTrigger>
@@ -202,7 +202,7 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
       </AccordionItem>
 
       {/* 3. Text */}
-      <AccordionItem value="text" className={cn(cardClass, "border-b")}>
+      <AccordionItem value="text" className={cn(cardClass, "border-b-0")}>
         <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
           Text
         </AccordionTrigger>
@@ -240,7 +240,7 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
       </AccordionItem>
 
       {/* 4. Format */}
-      <AccordionItem value="format" className={cn(cardClass, "border-b")}>
+      <AccordionItem value="format" className={cn(cardClass, "border-b-0")}>
         <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
           Format
         </AccordionTrigger>
