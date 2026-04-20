@@ -1,152 +1,116 @@
 
 
-# Ombyggnad: Config-drivet editor-system med Mapbox, single-page UX och Shopify iframe-integration
+# Mapiful-inspirerad UX + fixar för karta, text och sök
 
-## Sammanfattning
+## 1. Fixa kartan (kritisk bugg)
 
-Bygger om editorn från steg-wizard till **Mapiful-inspirerad single-page editor**:
-- Live Mapbox-preview + kontrollpanel (sidopanel desktop / bottom sheet mobil)
-- Gelato mockup-galleri under preview
-- Config-drivet system (Supabase `product_configs`) som renderar UI dynamiskt per produkt
-- Shopify iframe-integration via postMessage + auto-injicerad Liquid-template (Admin API)
-- Admin-sida i Lovable för visuell layout-design av produktkonfigurationer
+**Problem**: `containerRef` sätts inuti en `.map()` som filtrerar layout-lager → ref:en blir inte stabil och kartan får ingen container.
 
-## Del 1 — Datamodell
+**Fix** i `MapPreview.tsx`:
+- En enda stabil `<div ref={mapContainerRef}>` renderas alltid, positionerad absolut enligt det första `map`-lagret från config (eller fyller hela ytan som fallback).
+- Init-effekten kollar `mapContainerRef.current` direkt.
+- Lägg till `map.on("load", () => map.resize())` för att garantera korrekt rendering.
+- Behåll text-overlay-loopen separat.
 
-**Ny tabell** `product_configs`:
+## 2. Auto-uppdatera text när plats väljs
 
-```sql
-CREATE TABLE public.product_configs (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  shopify_handle text UNIQUE NOT NULL,
-  title text NOT NULL,
-  product_type text NOT NULL,                -- 'posters' | 'canvas'
-  layouts jsonb NOT NULL DEFAULT '{}',       -- portrait + landscape layer-definitioner
-  map_styles jsonb NOT NULL DEFAULT '[]',    -- tillåtna Mapbox style-IDs
-  text_config jsonb NOT NULL DEFAULT '{}',   -- fonts, max chars, position
-  sizes jsonb NOT NULL DEFAULT '[]',         -- storlekar + variants + priser
-  gelato_sku_map jsonb NOT NULL DEFAULT '{}',-- size|variant → orientation → UID
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now()
-);
+**Problem**: `setPlaceName` rör inte `text`.
 
-ALTER TABLE public.product_configs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Public read configs" ON public.product_configs FOR SELECT USING (true);
-```
+**Fix** i `editorStore.ts`:
+- Ny action `applyPlace({ placeName, center })` som sätter `mapCenter`, `placeName` OCH genererar default-text:
+  ```
+  {STAD I VERSALER}
+  {Land}
+  {lat.toFixed(4)}°N · {lng.toFixed(4)}°E
+  ```
+- En flag `textIsCustom` (sätts true så fort användaren själv editerar texten) — då skriver `applyPlace` INTE över texten.
+- `ControlPanel` `onPick(r)` anropar `applyPlace` istället för separata setters.
 
-Seed: två konfigurationer (poster + canvas) baserade på nuvarande `pricing.ts` och `gelato-sku-map.json`.
+## 3. Live-sökförslag (debounce, ingen Enter)
 
-## Del 2 — Mapbox
+I `ControlPanel.tsx`:
+- `useEffect` på `query` med 300 ms debounce → kallar `geocode` automatiskt så fort man skriver ≥2 tecken.
+- Visar förslag i en dropdown direkt under inputen.
+- Ta bort sök-knappen (eller behåll som dekorativ ikon i input-fältet).
 
-Klient: `mapbox-gl` med stilar `light-v11`, `dark-v11`, `outdoors-v12`, `satellite-v9`, `streets-v12`, `navigation-night-v1`. Geocoding för platssök.
+## 4. Mapiful-likt visuellt (UX-revamp)
 
-Secrets som promptas: `MAPBOX_PUBLIC_TOKEN` (klient) + valfri `MAPBOX_SERVER_TOKEN` (edge function).
+**Färg & yta**:
+- Tona ner till en **ljus, pappersaktig bakgrund** för preview-området (`bg-[#f6f3ee]` / varm beige likt Mapiful).
+- Kontrollpanelen: ren vit, mjuka rundningar, mer luft, tunnare avgränsningslinjer.
+- Accent-färg: en dämpad mörkblå/grafit för aktiv state (inte den nuvarande primary).
+- Uppdatera `index.css` HSL-tokens: `--background`, `--card`, `--primary`, `--accent` för en lugnare palett.
 
-## Del 3 — Single-page editor
+**Vänster ikon-rail (Mapiful-stil)** *(valfritt v1, men vi lägger grunden)*:
+- Smal vertikal rail (60-72px) längst till vänster på desktop med ikoner: Plats, Stil, Text, Format. Klick byter aktiv sektion i kontrollpanelen (istället för accordion). På mobil → accordion som idag.
+- För nu: enkel tab-struktur i panelen, ikon-rail som progressive enhancement.
 
-**Desktop (≥768px)**:
-```text
-┌────────────────────────────┬──────────────────┐
-│                            │  KONTROLLPANEL   │
-│     LIVE KART-PREVIEW      │  ▸ Format        │
-│     (Mapbox + text         │    (Poster/Canvas│
-│      overlay + ram CSS)    │     Storlek      │
-│                            │     Ram/Djup     │
-│                            │     Orientering) │
-│                            │  ▸ Plats         │
-│                            │  ▸ Kartstil      │
-│                            │  ▸ Text          │
-│                            │  ─────────────   │
-│                            │  PRIS + KÖP      │
-├────────────────────────────┴──────────────────┤
-│  MOCKUP-GALLERI (Gelato, horisontell scroll)  │
-└───────────────────────────────────────────────┘
-```
+## 5. Kontrollpanelens ordning
 
-**Mobil (<768px)**: Preview överst (~50%), kontrollpanel scrollbar under, mockup-galleri nedanför, sticky bottom-bar med pris + "Lägg i varukorg".
+Ny ordning (Format längst ner enligt önskemål):
+1. **Plats** (sök + zoom)
+2. **Kartstil** (thumbnails)
+3. **Text** (input + font + visa/dölj)
+4. **Format** (Produkt → Storlek → Ram/Djup → Orientering)
 
-**Kontrollpanelens flikar/sektioner** (Accordion):
-1. **Format** — *en samlad flik*: Produkt (Poster/Canvas-toggle) → Storlek → Ram (poster) eller Djup (canvas) → Orientering. Allt här uppdaterar pris och Gelato-UID i realtid.
-2. **Plats** — adress-sök (Mapbox Geocoding), zoom-slider
-3. **Kartstil** — 6 visuella thumbnails
-4. **Text** — input + font-val + visa/dölj-toggle
+## 6. Storlek som dropdown
 
-Att växla Poster ↔ Canvas behåller karta/plats/text/stil och nollställer bara storlek/variant till första giltiga.
+I `FormatSection.tsx`:
+- Byt grid med knappar mot en `<Select>` (shadcn) för storlek.
+- Visar storleken + prisdiff från minsta storleken: `13×18 cm` / `30×40 cm  +60 kr`.
 
-**Komponenter**:
-- `MapPreview` — Mapbox canvas + HTML text-overlay + ram/border CSS
-- `ControlPanel` — accordion med 4 sektioner ovan
-- `FormatSection` — sub-komponent för den samlade Format-fliken
-- `MockupGallery` — Gelato mockups (4-6) som horisontell scroll
-- `EditorPage` — laddar config från `?handle=...`
+## 7. Ramar som bilder + prisdiff
 
-## Del 4 — Shopify iframe-integration
+**Assets**: Kopiera de fyra uppladdade bilderna till `src/assets/frames/`:
+- `frame-white.jpg` (bild 2)
+- `frame-oak.jpg` (bild 3)
+- `frame-walnut.jpg` (bild 4)
+- `frame-black.jpg` (bild 5)
+- "Ingen ram" → en enkel SVG-ikon (tom ram-kontur).
 
-**Editor-sida**: URL `/editor?handle=personlig-karta-poster`. "Lägg i varukorg" skickar `postMessage` till parent:
+**UI** i `FormatSection.tsx`:
+- Grid 3 kolumner: varje ram-val är en knapp med thumbnail (aspect-square, rundad), namn under, och prisdiff vs aktuell vald variant: `+150 kr`, `−40 kr`, `Ingen extra`.
+- Aktiv: ring + fyllt selected-state.
+- Canvas djup (2cm/4cm): liknande knappar med enkel SVG-illustration som visar djupet (2 rektanglar med olika tjocklek).
 
-```js
-window.parent.postMessage({
-  type: 'ADD_TO_CART',
-  variantId: '...',
-  properties: {
-    Orientation, Text, _gelato_uid, _print_file_url,
-    _map_style, _map_center, _map_zoom
-  }
-}, '*');
-```
+**Prisdiff-logik** (helt beräknad, inget hårdkodat):
+- `priceDiff(option) = priceForOption − priceForCurrentSelection`
+- Format `+150 kr` / `−40 kr` / `Ingen extra` (för 0).
+- Används både för storlek-dropdown och ram/djup-knappar.
 
-**Edge function `shopify-inject-editor`** (Admin API):
-1. Skapar `snippets/personlig-karta-editor.liquid` med iframe + postMessage-listener som anropar `/cart/add.js`
-2. Skapar/uppdaterar `templates/product.personlig-karta.json` som inkluderar snippet
-3. Tilldelar template till de två produkterna
+## 8. Pris-display: bara differens, ingen total i UI
 
-Körs en gång manuellt från admin-sidan.
+Plats där pris visas idag (sticky bottom på mobil + sidebar bottom på desktop):
+- Behåll en stor "Lägg i varukorg"-knapp.
+- Ovanför: visa **inte** totalsumman, utan en sammanfattning av valt format: `30×40 cm · Vit ram · Stående`.
+- Prisdiffer visas inline vid varje val (storlek-dropdown och ram-bilder).
+- Den faktiska totalsumman skickas fortfarande till cart i bakgrunden — bara dold från UI per önskemål.
 
-## Del 5 — Admin-sida `/admin/configs`
+> *Notera: om du senare vill ha totalsumman synlig nånstans (t.ex. liten i hörnet) säg till — nu döljs den helt enligt din formulering.*
 
-- Lista alla `product_configs`
-- Visuell layout-editor: drag-resize-rektanglar för placeholders (`map`, `text`, `image`) på en canvas-yta
-- Tab för portrait/landscape
-- Välj tillåtna kartstilar, fonts, storlekar/priser
-- Live preview av hur editorn kommer se ut
-- Knapp "Synka till Shopify" → triggar `shopify-inject-editor`
+## Filer som ändras
 
-Ingen auth i v1 (kan läggas till senare bakom feature flag).
+| Fil | Ändring |
+|-----|---------|
+| `src/components/editor/MapPreview.tsx` | Stabil map-container, fix för att kartan inte renderas |
+| `src/components/editor/ControlPanel.tsx` | Live-sökdebounce, ny sektionsordning, anropar `applyPlace` |
+| `src/components/editor/FormatSection.tsx` | Storlek = dropdown, ram = bild-knappar, prisdiff överallt, flyttad sist |
+| `src/stores/editorStore.ts` | `applyPlace` action, `textIsCustom` flag, auto-genererad text |
+| `src/lib/mapbox.ts` | `geocode` returnerar även land/region för text-generering |
+| `src/pages/EditorPage.tsx` | Tar bort total-pris från sticky bar, ersätter med format-sammanfattning |
+| `src/index.css` | Mjukare Mapiful-likt färgtema (warm-paper bakgrund, dämpad accent) |
+| `src/assets/frames/*.jpg` (nya) | Fyra ramthumbnails kopierade från uppladdningarna |
+| `src/components/editor/FrameOption.tsx` (ny) | Liten komponent för en ram-knapp med bild + namn + prisdiff |
 
-## Del 6 — Tryckfil-generering
+## Ordning vid implementation
 
-**Edge function `generate-print-file`**:
-- Input: map-state (center/zoom/style) + text + storlek
-- Mapbox Static Images API → högupplöst karta
-- Komposition med text via Deno-canvas
-- Upload till `print-files` bucket → returnerar public URL till `_print_file_url`
+1. **Fix karta** (highest priority — utan den fungerar inget)
+2. Auto-text vid platsval + `textIsCustom`-flag
+3. Live-sök med debounce
+4. Kopiera ram-bilder till `src/assets/frames/`
+5. Bygg om `FormatSection` (dropdown + bild-ramar + prisdiff)
+6. Flytta Format sist i panelen + ta bort total i sticky bar
+7. Färgtema-uppdatering i `index.css` för Mapiful-känsla
 
-## Filer
-
-**Nya**:
-- `src/pages/EditorPage.tsx`, `src/pages/AdminConfigs.tsx`
-- `src/components/editor/MapPreview.tsx`, `ControlPanel.tsx`, `FormatSection.tsx`, `MockupGallery.tsx`, `ConfigLayoutEditor.tsx`
-- `src/lib/mapbox.ts`, `src/lib/product-config.ts`
-- `src/stores/editorStore.ts` (omskriven, config-driven)
-- `supabase/functions/shopify-inject-editor/index.ts`
-- `supabase/functions/generate-print-file/index.ts`
-- Migration: `product_configs` tabell + seed
-
-**Ändrade**:
-- `src/App.tsx` — nya routes `/editor`, `/admin/configs`
-- `src/pages/Index.tsx` — landing/redirect
-- `package.json` — `mapbox-gl`, `@types/mapbox-gl`
-
-**Borttagna**: alla `src/components/editor/Step*.tsx` och `Editor.tsx` (ersatta).
-
-## Ordning
-
-1. Prompta `MAPBOX_PUBLIC_TOKEN` (+ valfri `MAPBOX_SERVER_TOKEN`)
-2. Migration: `product_configs` + seed för båda produkterna
-3. Mapbox preview + ControlPanel med samlad Format-flik → fungerande editor
-4. MockupGallery (Gelato)
-5. Shopify postMessage + cart-flow
-6. Edge function `shopify-inject-editor`
-7. Edge function `generate-print-file`
-8. Admin-sida `/admin/configs`
+Allt görs utan att röra config-strukturen i Supabase — den dynamiska config-renderingen från förra iterationen behålls intakt så vi kan bygga admin-sidan ovanpå senare.
 
