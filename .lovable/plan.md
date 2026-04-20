@@ -1,71 +1,31 @@
 
-Mockup-felet är nu identifierat:
 
-## Rotorsak
-`generate-print-file` fungerar redan korrekt, men `MockupGallery` får aldrig fram något `productUid`.
+# Fixa Gelato Mockup — fel API-host
 
-Det syns på två ställen:
-- klientloggarna visar upprepade gånger `productUid: undefined`
-- databasen visar att `product_configs.gelato_sku_map` är tom för både poster och canvas
+## Rotorsak (bekräftad i loggar)
+`gelato-mockup` edge function anropar `https://mockup.gelatoapis.com/v1/mockups` → DNS lookup misslyckas. Subdomänen existerar inte. Gelatos Mockup Generator ligger på samma host som deras övriga API, inte på en separat `mockup.`-subdomän.
 
-Samtidigt finns en komplett lokal mapping i `src/lib/gelato-sku-map.json`, men den används inte alls av nuvarande kod.
+## Fix
 
-## Vad som ska byggas
-1. Koppla mockup-flödet till en riktig resolver för Gelato-productUid
-2. Använd den lokala mapping-filen som fallback när databasen saknar mapping
-3. Normalisera skillnaden mellan dagens två format:
-   - databasformat: `gelato_sku_map[size][variant]`
-   - lokal fil: `gelato-sku-map.json` med nycklar som `posters -> "30x40|Valnöt" -> portrait`
-4. Göra `MockupGallery` tydlig när riktig mockup saknas, så användaren ser skillnaden mellan:
-   - riktig Gelato-mockup
-   - vanlig tryckfil-preview
+### 1. `supabase/functions/gelato-mockup/index.ts`
+- Byt `MOCKUP_BASE` från `https://mockup.gelatoapis.com/v1` till `https://order.gelatoapis.com/v1` (Gelatos officiella API-host).
+- Lägg till en kort host-fallback: om första anropet får DNS/connect-fel, prova `https://api.gelatoapis.com/v1` som sekundär.
+- Behåll: API-key header `X-API-KEY`, body `{ productUid, files: [{ type: "default", url }] }`, polling mot `/mockups/{taskId}`.
+- Lägg till logg av faktisk URL och HTTP-status så vi snabbt ser om hosten fortfarande är fel.
+- Behåll graceful fallback (200 + `fallback: true`) så klienten inte kraschar.
 
-## Konkret implementation
-### 1. Ny resolver för productUid
-Skapa en liten hjälpfunktion i frontend, t.ex. i `src/lib/gelato.ts`, som:
-- tar `productType`, `size`, `variant`, `orientation`, `config.gelato_sku_map`
-- försöker hitta UID i denna ordning:
-  1. befintlig DB-mapping i `config.gelato_sku_map[size][variant]`
-  2. lokal fallback i `src/lib/gelato-sku-map.json` via nyckeln `${size}|${variant}`
-  3. om variant saknas: första match för samma size + orientation
-- returnerar både `productUid` och `source` (`db`, `local-fallback`, `missing`)
+### 2. Inga klientändringar behövs
+`MockupGallery` och `src/lib/gelato.ts` fungerar redan — de fick rätt `productUid` (`flat_product_pf_130x180-mm_...`) och rätt print-URL. Det enda som felade var själva edge-anropet ut mot Gelato.
 
-### 2. Uppdatera `MockupGallery.tsx`
-Byt nuvarande direkta lookup mot resolvern och:
-- logga vilken källa som användes
-- bara visa “Förhandsgranskning” när riktig mockup inte gick att få fram
-- visa tydligt felmeddelande om mapping saknas helt
-- behåll print-file som fallback, men markera den visuellt som fallback så det inte ser ut som att mockupen “bara är editorn”
+### 3. Verifiering efter deploy
+- Loggarna ska visa `[gelato-mockup] create response: 200 ...` istället för DNS-fel.
+- Första thumbnailen i galleriet ska visa en riktig miljöbild från Gelato istället för tryckfilen med "Förhandsgranskning"-badge.
+- Om Gelato svarar med `taskId` ser vi `[gelato-mockup] poll status: completed` inom ~3-10 sek.
 
-### 3. Minska falska omrenderingar
-Nu triggas många print-genereringar när kartan flyttas. Lägg till:
-- request-id eller abort-guard så gamla svar inte skriver över nya
-- lite striktare debounce för mockupgenereringen
-- optional: kör bara mockup när användaren stannat på platsen en kort stund
+## Filer som ändras
+- `supabase/functions/gelato-mockup/index.ts` (endast `MOCKUP_BASE` + host-fallback + lite mer logging)
 
-### 4. Behåll edge functions nästan oförändrade
-Det ser inte ut som att felet ligger i backend-funktionerna:
-- `generate-print-file` returnerar publik URL korrekt
-- inga bevis finns för att `gelato-mockup` ens anropas i de misslyckade fallen
+## Inte med
+- Inga ändringar i `MockupGallery.tsx`, `gelato.ts`, eller `generate-print-file`.
+- Inga DB-ändringar.
 
-Därför behövs främst frontend-fix, inte större backend-omskrivning.
-
-## Filer att ändra
-- `src/components/editor/MockupGallery.tsx`
-- `src/lib/gelato-sku-map.json` (endast om någon mapping behöver kompletteras)
-- ny hjälparfil, t.ex. `src/lib/gelato.ts`
-
-## Förväntat resultat
-Efter ändringen:
-- mockup-anropet får ett riktigt `productUid`
-- första thumbnailen visar riktig Gelato-mockup när mapping finns
-- övriga thumbnails kan fortsätta visa print-preview
-- om mapping saknas helt visas ett tydligt fallback-läge istället för att det ser ut som att inget händer
-
-## Teknisk not
-Den viktigaste upptäckten är alltså inte Mapbox eller printfilen, utan att produktkonfigurationerna i databasen saknar all Gelato-mapping. Koden behöver därför antingen:
-- fylla databasen med mapping senare i adminflödet
-eller
-- redan nu använda den lokala JSON-mappingen som operativ fallback
-
-Det snabbaste och säkraste nu är att använda den lokala mapping-filen direkt som fallback.
