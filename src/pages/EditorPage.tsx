@@ -120,7 +120,7 @@ export default function EditorPage() {
       {/* Main: split on desktop, stacked on mobile */}
       <div className="flex-1 flex flex-col md:flex-row min-h-0">
         {/* Preview */}
-        <div className="flex-1 bg-[hsl(var(--paper))] flex items-center justify-center min-h-[55vh] md:min-h-0">
+        <div className="flex-1 bg-[hsl(var(--paper))] flex items-center justify-center min-h-[65vh] md:min-h-[70vh]">
           <MapPreview borderCss={borderCss} />
         </div>
 
