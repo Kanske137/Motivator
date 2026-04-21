@@ -1,24 +1,62 @@
 
 
-## Plan: Be Lovable om utökad Shopify-behörighet (write_themes)
+## Plan: Byt till Theme App Extension (Shopify 2026-flödet)
 
-### Bakgrund
-Lovable-appen är installerad i din butik som en **försäljningskanal**, inte som en admin-app. Den nuvarande OAuth-tokenen som Lovable fick vid installation saknar `write_themes`-scope, vilket krävs för att injicera vår editor-snippet och produkt-template i ditt Shopify-tema. Därför får vi `403: This action requires merchant approval for write_themes scope` när vi försöker köra `shopify-inject-editor`.
+### Varför vi byter
+Nya Shopify Dev Dashboard exponerar inte längre `shpat_`-tokens. Den moderna vägen är **Theme App Extensions** — appen levererar ett **App Block** som butiksägaren aktiverar i Theme Editor med ett klick. Inget `write_themes`-scope, inga manuella theme-edits, fungerar för all framtid.
 
-Jag (assistenten) kan inte själv lägga till nya OAuth-scopes — det är Shopifys säkerhetsmodell: utökade behörigheter måste alltid godkännas av butiksägaren via en re-auth-prompt som Lovable-plattformen genererar.
+### Två vägar — välj en
 
-### Vad jag gör nu
-Jag triggar Lovables egen **reconnect-prompt** mot Shopify-anslutningen och ber om scopet `write_themes` (utöver de befintliga). Då dyker det upp en knapp/dialog i ditt Lovable-gränssnitt där du klickar "Reconnect / Approve" → du skickas till Shopify → godkänner det nya scopet → tillbaka till Lovable. Allt utan att gå via Shopify Admin manuellt.
+**Väg A: Theme App Extension via Shopify CLI** (officiellt 2026-flöde)
+- Kräver att vi sätter upp Shopify CLI lokalt på din dator
+- Ger en App Block som du aktiverar i Theme Editor
+- Mer setup nu, noll underhåll sen
+- Fungerar med din nya Dev Dashboard-app utan token
 
-### Vad du gör
-1. Klicka på reconnect-prompten som dyker upp i chatten/sidopanelen efter denna plan godkänns.
-2. Godkänn `write_themes` i Shopifys auktoriseringsdialog.
-3. Säg till mig "klart" — då kör jag om `shopify-inject-editor` automatiskt och hela editor + webhook-flödet rullar igång på riktigt.
+**Väg B: Manuell theme-edit (en gång, 5 min)** ← rekommenderas
+- Du klistrar in ett snippet + skapar en template direkt i Theme Editor
+- Tilldelar templaten till båda produkterna i Shopify Admin
+- Vi registrerar order-webhook via Lovable-integrationens befintliga scopes
+- Ingen Custom App, ingen CLI, ingen token-jakt
 
-### Alternativ om reconnect-prompten inte funkar
-Om Lovable-plattformen inte exponerar Shopify-anslutningen via standard reconnect-flödet (Shopify hanteras delvis utanför connector-systemet), faller vi tillbaka på:
-- **Disconnect + Reconnect** av butiken via Shopify-menyn i Lovables nav-bar (ellipsis-meny → "Disconnect store" → sedan koppla på nytt via chatt). Vid den nya kopplingen begär Lovable utökade scopes inklusive `write_themes`. Inga produkter eller orderdata i din butik påverkas av disconnect.
+### Rekommendation: Väg B
 
-### Inga kodändringar behövs i denna iteration
-All kod (edge functions, migration, EditorPage-payload) är redan på plats sedan förra iterationen. Det enda som blockerar är behörigheten. När den är godkänd: jag kör inject-funktionen → snippet + template läggs in → båda produkterna får vår editor → webhook registreras → klart.
+Du har redan gjort 80% av arbetet (produkter finns, editor fungerar, edge functions deployade). Vi behöver bara koppla ihop sista biten. Manuell theme-edit tar 5 minuter och är klart.
+
+---
+
+### Steg för Väg B
+
+**1. Jag förbereder (efter godkännande):**
+- Genererar exakt Liquid-snippet-kod du ska klistra in
+- Genererar exakt template-JSON du ska klistra in
+- Skriver tydlig copy-paste-instruktion med skärmdumps-referenser
+- Uppdaterar `shopify-order-webhook` så den hanterar Shopify webhook-format korrekt
+- Tar bort den nu obsoleta `shopify-inject-editor`-funktionen (eller markerar deprecated)
+
+**2. Du gör i Shopify Admin (5 min):**
+- Online Store → Themes → ⋯ → **Edit code** på aktivt tema
+- **Snippets** → Add new snippet → `personlig-karta-editor` → klistra in koden jag ger
+- **Templates** → Add new template → JSON → product → suffix `personlig-karta` → klistra in JSON
+- Products → öppna `personlig-karta-poster` → höger sidofält **Theme template** → välj `personlig-karta`
+- Upprepa för `personlig-karta-canvas`
+- Settings → Notifications → Webhooks → **Create webhook** → Event: `Order payment` → Format: JSON → URL: `https://ptzmnusfgdwcqpjpbyco.supabase.co/functions/v1/shopify-order-webhook` → kopiera den **Webhook signing secret** som visas
+
+**3. Du ger mig webhook-secret:**
+- Jag begär secret-input för `SHOPIFY_WEBHOOK_SECRET`
+- Du klistrar in den säkert (visas inte i chat)
+
+**4. Vi testar:**
+- Du öppnar produktsidan → bekräftar att editorn renderas
+- Du lägger testorder via Shopify Bogus Gateway
+- Vi kollar `gelato_orders`-tabellen → bekräftar `status: submitted`
+
+### Vad du får
+- Editor injicerad på båda produktsidorna utan dubblerade Shopify-kontroller
+- Order-flöde som auto-skickar till Gelato vid betalning
+- HMAC-verifierad webhook (säker mot förfalskade requests)
+- Ingen beroende av Custom App eller Dev Dashboard-tokens
+
+### Om du föredrar Väg A istället
+Säg "Väg A" så ger jag CLI-instruktionerna istället. Kräver Node.js + terminalåtkomst på din dator.
 
