@@ -65,11 +65,15 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
   mapboxgl.accessToken = token;
 
   const { wCm, hCm } = parseSize(input.size, input.orientation);
-  // Render at ~3px/cm baseline = decent quality, fast. Texture/mockup will
-  // upscale via CSS/WebGL filtering. Cap to keep memory reasonable.
-  const PX_PER_CM = 24; // → A4 ≈ 720x1008, A2 ≈ 1080x1440
-  const w = Math.min(1600, Math.round(wCm * PX_PER_CM));
-  const h = Math.min(1600, Math.round(hCm * PX_PER_CM));
+  // Render at ~24px/cm baseline. Scale UNIFORMLY so longest side <= MAX_PX,
+  // preserving aspect ratio (otherwise large formats like 70x100 would become
+  // 1600x1600 and the artwork would appear stretched in the editor's frame).
+  const PX_PER_CM = 24;
+  const MAX_PX = 1600;
+  const longestPx = Math.max(wCm, hCm) * PX_PER_CM;
+  const scale = longestPx > MAX_PX ? MAX_PX / longestPx : 1;
+  const w = Math.round(wCm * PX_PER_CM * scale);
+  const h = Math.round(hCm * PX_PER_CM * scale);
 
   // Map renders in shape-aware container so square/circle aren't squished.
   const sq = Math.min(w, h);
