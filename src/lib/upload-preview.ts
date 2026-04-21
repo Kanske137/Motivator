@@ -1,6 +1,8 @@
 // Uploads the customer's editor snapshot to the public `cart-previews` bucket
 // so Shopify can show it as the line-item thumbnail. We compress to JPEG at
 // modest dimensions (~800px longest side) — keeps files <400 kB and uploads fast.
+//
+// Print files (hi-res) go to the `print-files` bucket — pass-through, no resize.
 import { supabase } from "@/integrations/supabase/client";
 
 const MAX_LONG_EDGE = 800;
@@ -51,13 +53,30 @@ export async function uploadCartPreview(dataUrl: string, designId: string): Prom
 /** Upload a hi-res print-quality JPEG dataURL to print-files (no recompression).
  *  Returns the public URL Gelato will fetch. */
 export async function uploadPrintFile(dataUrl: string, designId: string): Promise<string> {
-  // dataUrl is already a JPEG at print resolution — just convert to blob and upload.
   const res = await fetch(dataUrl);
   const blob = await res.blob();
-  const path = `${designId}.jpg`;
+  return uploadPrintFileBlob(blob, designId, "jpg");
+}
+
+/** Upload a raw Blob/File directly to print-files. Used for photo pass-through
+ *  and AI images where the source is already a binary, not a dataURL. */
+export async function uploadPrintFileBlob(
+  blob: Blob,
+  designId: string,
+  ext: "jpg" | "png" | "webp" = "jpg"
+): Promise<string> {
+  const contentType =
+    blob.type && blob.type.startsWith("image/")
+      ? blob.type
+      : ext === "png"
+      ? "image/png"
+      : ext === "webp"
+      ? "image/webp"
+      : "image/jpeg";
+  const path = `${designId}.${ext}`;
   const { error } = await supabase.storage
     .from("print-files")
-    .upload(path, blob, { contentType: "image/jpeg", upsert: true });
+    .upload(path, blob, { contentType, upsert: true });
   if (error) throw error;
   const { data } = supabase.storage.from("print-files").getPublicUrl(path);
   return data.publicUrl;

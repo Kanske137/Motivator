@@ -1,5 +1,12 @@
-// Edge function: applicera AI-stil på bild via Replicate Flux Kontext Pro
-import { corsHeaders } from "https://esm.sh/@supabase/supabase-js@2.95.0/cors";
+// Edge function: applicera AI-stil på bild via Replicate Flux Kontext Pro.
+// Output laddas upp till `print-files` bucket DIREKT så att klienten har en
+// färdig print-URL att skicka in i Shopify cart properties (single pipeline).
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -8,7 +15,7 @@ Deno.serve(async (req) => {
     const REPLICATE_API_TOKEN = Deno.env.get("REPLICATE_API_TOKEN");
     if (!REPLICATE_API_TOKEN) throw new Error("REPLICATE_API_TOKEN not configured");
 
-    const { imageUrl, prompt } = await req.json();
+    const { imageUrl, prompt, designId } = await req.json();
     if (!imageUrl || !prompt) {
       return new Response(JSON.stringify({ error: "imageUrl and prompt required" }), {
         status: 400,
@@ -61,9 +68,34 @@ Deno.serve(async (req) => {
     }
 
     const output = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
-    return new Response(JSON.stringify({ output }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    if (!output) throw new Error("Replicate succeeded but produced no output URL");
+
+    // Pass-through to print-files bucket so the client can use the public URL
+    // directly as `_print_file_url` in the Shopify cart.
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    const id = (designId && typeof designId === "string" ? designId : crypto.randomUUID());
+    const path = `${id}.jpg`;
+
+    const imgRes = await fetch(output);
+    if (!imgRes.ok) throw new Error(`Replicate image fetch failed ${imgRes.status}`);
+    const imgBlob = await imgRes.blob();
+
+    const { error: upErr } = await supabase.storage
+      .from("print-files")
+      .upload(path, imgBlob, { contentType: "image/jpeg", upsert: true });
+    if (upErr) throw new Error(`Print upload failed: ${upErr.message}`);
+
+    const { data: pub } = supabase.storage.from("print-files").getPublicUrl(path);
+    const printFileUrl = pub.publicUrl;
+
+    return new Response(
+      JSON.stringify({ output, previewUrl: output, printFileUrl }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Unknown error";
     console.error("replicate-style error:", msg);

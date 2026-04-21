@@ -10,7 +10,8 @@ import { MockupGallery } from "@/components/editor/MockupGallery";
 import { useCartStore } from "@/stores/cartStore";
 import { CartDrawer } from "@/components/CartDrawer";
 import { renderArtworkSnapshot } from "@/lib/editor-snapshot";
-import { uploadCartPreview, uploadPrintFile } from "@/lib/upload-preview";
+import { uploadCartPreview } from "@/lib/upload-preview";
+import { getPrintFileUrl } from "@/lib/print-pipeline";
 import { toast } from "sonner";
 
 const FRAME_COLORS: Record<string, string> = {
@@ -28,7 +29,7 @@ export default function EditorPage() {
   const [configs, setConfigs] = useState<ProductConfig[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const { config, setConfig, currentPrice, currentLayout, mapStyleId, mapCenter, mapZoom, text, textFont, textVisible, showLabels, mapShape, orientation, size, variant, posterBgColor } =
+  const { config, setConfig, currentPrice, currentLayout, mapStyleId, mapCenter, mapZoom, text, textFont, textVisible, showLabels, mapShape, orientation, size, variant, posterBgColor, designSource, photoFile, aiPrintFileUrl } =
     useEditorStore();
   const addItem = useCartStore((s) => s.addItem);
   const isAdding = useCartStore((s) => s.isLoading);
@@ -69,43 +70,47 @@ export default function EditorPage() {
     const inIframe = window.self !== window.top;
     const designId = (crypto as any)?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
+    const baseInput = {
+      mapStyleId,
+      mapCenter,
+      mapZoom,
+      showLabels,
+      mapShape,
+      posterBgColor,
+      text,
+      textFont,
+      textVisible,
+      size,
+      orientation,
+      layout: currentLayout(),
+      frameColor: !isCanvas ? frameColor : "",
+      frameWidthCm: !isCanvas ? FRAME_WIDTH_CM : 0,
+      canvasWrap: isCanvas,
+    };
+
     setIsPreparing(true);
     let previewUrl = "";
     let printFileUrl = "";
     try {
-      const baseInput = {
-        mapStyleId,
-        mapCenter,
-        mapZoom,
-        showLabels,
-        mapShape,
-        posterBgColor,
-        text,
-        textFont,
-        textVisible,
-        size,
-        orientation,
-        layout: currentLayout(),
-        frameColor: !isCanvas ? frameColor : "",
-        frameWidthCm: !isCanvas ? FRAME_WIDTH_CM : 0,
-        canvasWrap: isCanvas,
-      };
+      // 1) Print file via dispatcher (map / photo / ai). Hard-fail if missing.
+      printFileUrl = await getPrintFileUrl({
+        source: designSource,
+        designId,
+        mapInput: baseInput,
+        photoFile: photoFile ?? undefined,
+        aiPrintFileUrl: aiPrintFileUrl ?? undefined,
+      });
 
-      // Render thumbnail (low-res, fast) and print file (hi-res) in parallel.
-      const [thumbDataUrl, printDataUrl] = await Promise.all([
-        renderArtworkSnapshot(baseInput),
-        renderArtworkSnapshot({ ...baseInput, hires: true }),
-      ]);
-
-      const [pUrl, fUrl] = await Promise.all([
-        uploadCartPreview(thumbDataUrl, designId),
-        uploadPrintFile(printDataUrl, designId),
-      ]);
-      previewUrl = pUrl;
-      printFileUrl = fUrl;
+      // 2) Thumbnail for cart display — always derived from the editor's
+      //    composited view so the preview matches what the customer designed.
+      const thumbDataUrl = await renderArtworkSnapshot(baseInput);
+      previewUrl = await uploadCartPreview(thumbDataUrl, designId);
     } catch (err) {
-      console.error("[cart] preview snapshot/upload failed", err);
-      // Non-fatal — proceed without the preview image.
+      console.error("[print-pipeline] failed", err);
+      const msg = err instanceof Error ? err.message : "Okänt fel";
+      toast.error("Kunde inte förbereda tryckfil", { description: msg });
+      setIsPreparing(false);
+      return; // ABORT — do NOT add a broken item to the cart.
     } finally {
       setIsPreparing(false);
     }
@@ -126,9 +131,10 @@ export default function EditorPage() {
       _show_labels: showLabels ? "true" : "false",
       _text_visible: textVisible ? "true" : "false",
       _text_font: textFont,
+      _design_source: designSource,
+      _preview_image: previewUrl,
+      _print_file_url: printFileUrl,
     };
-    if (previewUrl) properties._preview_image = previewUrl;
-    if (printFileUrl) properties._print_file_url = printFileUrl;
 
     if (inIframe) {
       window.parent.postMessage(

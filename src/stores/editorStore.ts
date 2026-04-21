@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { Orientation, ProductConfig } from "@/lib/product-config";
+import type { DesignSource } from "@/lib/print-pipeline";
 
 interface ApplyPlaceArgs {
   placeName: string;
@@ -35,6 +36,12 @@ interface EditorState {
   variant: string | null;
   orientation: Orientation;
 
+  // print-pipeline source
+  designSource: DesignSource;
+  photoFile: File | null;
+  photoPreviewUrl: string | null;
+  aiPrintFileUrl: string | null;
+
   // setters
   setConfig: (c: ProductConfig) => void;
   setMapCenter: (c: [number, number]) => void;
@@ -50,6 +57,9 @@ interface EditorState {
   setSize: (s: string) => void;
   setVariant: (v: string) => void;
   setOrientation: (o: Orientation) => void;
+  setPhotoSource: (file: File | null, previewUrl: string | null) => void;
+  setAiPrintFileUrl: (url: string | null) => void;
+  resetDesignSource: () => void;
   applyPlace: (args: ApplyPlaceArgs) => void;
   updateFromMap: (args: ApplyPlaceArgs) => void;
 
@@ -86,6 +96,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   size: null,
   variant: null,
   orientation: "portrait",
+
+  designSource: "map",
+  photoFile: null,
+  photoPreviewUrl: null,
+  aiPrintFileUrl: null,
 
   setConfig: (config) => {
     // Preserve all design state across product switches (poster <-> canvas).
@@ -148,6 +163,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   setVariant: (variant) => set({ variant }),
   setOrientation: (orientation) => set({ orientation }),
+
+  setPhotoSource: (file, previewUrl) => {
+    set({
+      photoFile: file,
+      photoPreviewUrl: previewUrl,
+      designSource: file ? "photo" : "map",
+      aiPrintFileUrl: file ? null : get().aiPrintFileUrl,
+    });
+  },
+  setAiPrintFileUrl: (url) => {
+    set({ aiPrintFileUrl: url, designSource: url ? "ai" : "map" });
+  },
+  resetDesignSource: () =>
+    set({ designSource: "map", photoFile: null, photoPreviewUrl: null, aiPrintFileUrl: null }),
 
   applyPlace: (args) => {
     const isCustom = get().textIsCustom;

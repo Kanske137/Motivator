@@ -33,8 +33,28 @@ export interface SnapshotInput {
   frameWidthCm?: number;
   /** When true, render a canvas wrap shadow on the sides instead of a flat frame. */
   canvasWrap?: boolean;
-  /** When true, render at print resolution (~3000+px longest side, JPEG q=0.95). */
+  /** When true, render at print resolution. Resolution is adaptive based on
+   *  device capability (mobile=2000px, desktop=3000px, hi-DPI desktop=3600px). */
   hires?: boolean;
+  /** Override max longest side (px). Used by retry-on-WebGL-fail logic. */
+  maxPxOverride?: number;
+}
+
+export interface SnapshotResult {
+  dataUrl: string;
+  widthPx: number;
+  heightPx: number;
+  sizeBytes: number;
+}
+
+/** GPU-aware max pixel budget for hi-res print snapshots. */
+function pickHiresMaxPx(): number {
+  const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(ua);
+  if (isMobile) return 2000;          // ~167 DPI on 30 cm — Gelato-approved
+  if (dpr >= 2) return 3600;
+  return 3000;
 }
 
 function parseSize(size: string, orientation: "portrait" | "landscape") {
@@ -87,9 +107,10 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
   const hCm = frontHcm + 2 * extraCm;
 
   // Render at ~24px/cm baseline. Scale UNIFORMLY so longest side <= MAX_PX,
-  // preserving aspect ratio. In hires mode (print files), bump both.
+  // preserving aspect ratio. In hires mode (print files), bump both — but
+  // adaptively based on device capability to avoid GPU context loss on mobile.
   const PX_PER_CM = input.hires ? 32 : 24;
-  const MAX_PX = input.hires ? 3600 : 1800;
+  const MAX_PX = input.maxPxOverride ?? (input.hires ? pickHiresMaxPx() : 1800);
   const longestPx = Math.max(wCm, hCm) * PX_PER_CM;
   const scale = longestPx > MAX_PX ? MAX_PX / longestPx : 1;
   const w = Math.round(wCm * PX_PER_CM * scale);
@@ -292,7 +313,11 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
       ctx.restore();
     }
 
-    return out.toDataURL("image/jpeg", input.hires ? 0.95 : 0.92);
+    const dataUrl = out.toDataURL("image/jpeg", 0.92);
+    if (!dataUrl || dataUrl.length < 1000) {
+      throw new Error("Empty snapshot — canvas.toDataURL returned no data");
+    }
+    return dataUrl;
   } finally {
     try {
       map?.remove();
@@ -301,4 +326,40 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
     }
     if (container.parentNode) container.parentNode.removeChild(container);
   }
+}
+
+/**
+ * Hires snapshot with one retry at 70 % size if the first attempt fails
+ * (typically WebGL context loss on weaker GPUs / very large posters).
+ * Throws on final failure — caller MUST handle and abort the user action.
+ */
+export async function renderHiresSnapshotSafe(input: SnapshotInput): Promise<SnapshotResult> {
+  const t0 = performance.now();
+  let lastErr: unknown = null;
+  const initialMax = pickHiresMaxPx();
+  const attempts = [initialMax, Math.round(initialMax * 0.7)];
+  for (const maxPx of attempts) {
+    try {
+      const dataUrl = await renderArtworkSnapshot({ ...input, hires: true, maxPxOverride: maxPx });
+      const base64 = dataUrl.split(",")[1] ?? "";
+      const sizeBytes = Math.round((base64.length * 3) / 4);
+      const dims = await new Promise<{ w: number; h: number }>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve({ w: img.width, h: img.height });
+        img.onerror = () => reject(new Error("dim probe failed"));
+        img.src = dataUrl;
+      });
+      const ms = Math.round(performance.now() - t0);
+      console.info(
+        `[print-pipeline] map snapshot ok: ${dims.w}×${dims.h}px, ${(sizeBytes / 1024 / 1024).toFixed(2)}MB, ${ms}ms (maxPx=${maxPx})`
+      );
+      return { dataUrl, widthPx: dims.w, heightPx: dims.h, sizeBytes };
+    } catch (e) {
+      console.warn(`[print-pipeline] snapshot failed at maxPx=${maxPx}, retrying smaller…`, e);
+      lastErr = e;
+    }
+  }
+  throw new Error(
+    `Hi-res snapshot failed after retries: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`
+  );
 }

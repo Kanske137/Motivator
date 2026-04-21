@@ -126,9 +126,45 @@ För **varje** produkt (`personlig-karta-poster` och `personlig-karta-canvas`):
 
 ---
 
+## Steg 6 — Cart-thumbnail visar designens preview (KRÄVS)
+
+Shopifys `/cart/add.js` kan inte sätta line-item bild, så cart visar produktbilden som default. Vi läser istället `_preview_image`-property som editorn skickar med.
+
+1. **Online Store → Themes → ⋯ → Edit code**
+2. Hitta filen som renderar cart-rader. Vanliga namn:
+   - `sections/main-cart-items.liquid`
+   - `snippets/cart-item.liquid`
+   - `sections/cart-template.liquid`
+   - (Dawn / Sense): `sections/main-cart-items.liquid`
+3. Hitta raden där `item.image` eller `line_item.image` används i en `<img>`-tag, t.ex.:
+   ```liquid
+   <img src="{{ item.image | image_url: width: 300 }}" ...>
+   ```
+4. Ersätt `item.image | image_url: width: 300` med:
+   ```liquid
+   {%- if item.properties._preview_image != blank -%}
+     {{ item.properties._preview_image }}
+   {%- else -%}
+     {{ item.image | image_url: width: 300 }}
+   {%- endif -%}
+   ```
+   Spara.
+5. (Valfritt) Dölj de interna `_`-prefixerade properties från cart-listan så kunden inte ser tekniska URLs. Hitta loopen som listar properties:
+   ```liquid
+   {% for p in item.properties %}
+     {%- assign first_char = p.first | slice: 0 -%}
+     {%- unless first_char == '_' -%}
+       <p>{{ p.first }}: {{ p.last }}</p>
+     {%- endunless -%}
+   {% endfor %}
+   ```
+
+---
+
 ## Felsökning
 
 - **Editor visas inte / ser ut som vanlig produktsida** → template inte tilldelad. Gå tillbaka till Steg 3.
 - **Editor laddar men "Lägg i varukorg" gör inget** → öppna browser DevTools → Console → leta efter fel. Skicka skärmdump.
-- **Order betalas men inget händer** → webhook eller secret saknas. Kolla Settings → Notifications → Webhooks att din URL listas under "Order payment".
+- **Order betalas men Gelato får inget** → öppna edge function-loggar för `shopify-order-webhook`. Om du ser `missing_print_file_url` betyder det att klienten inte hann skicka med tryckfilen — be kunden göra om designen och testa igen. Om problemet kvarstår systematiskt: skicka logg-utdraget i chatten.
+- **Cart-thumbnail visar fortfarande produktbilden** → Steg 6 är inte klart, eller fel template-fil. Sök i temat efter `item.image` och tillämpa snippet på alla cart-rendering-platser.
 ```
