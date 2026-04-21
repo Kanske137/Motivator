@@ -20,6 +20,12 @@ export interface SnapshotInput {
   size: string;            // "30x40"
   orientation: "portrait" | "landscape";
   layout: LayoutDef | null; // for text x/y placement (matches editor)
+  /** Canvas wrap depth in cm. When > 0, output texture is extended with wrap+bleed
+   *  zones around the visible front, so 3D preview can sample wrap-around faces
+   *  exactly like Gelato's print file. */
+  wrapCm?: number;
+  /** Bleed in cm added outside the wrap zone (Gelato canvas = 0.3 cm). */
+  bleedCm?: number;
 }
 
 function parseSize(size: string, orientation: "portrait" | "landscape") {
@@ -64,24 +70,35 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
   if (!token) throw new Error("Mapbox token missing");
   mapboxgl.accessToken = token;
 
-  const { wCm, hCm } = parseSize(input.size, input.orientation);
+  const { wCm: frontWcm, hCm: frontHcm } = parseSize(input.size, input.orientation);
+  const wrapCm = Math.max(0, input.wrapCm ?? 0);
+  const bleedCm = Math.max(0, input.bleedCm ?? 0);
+  const extraCm = wrapCm + bleedCm; // per side
+  const wCm = frontWcm + 2 * extraCm;
+  const hCm = frontHcm + 2 * extraCm;
+
   // Render at ~24px/cm baseline. Scale UNIFORMLY so longest side <= MAX_PX,
-  // preserving aspect ratio (otherwise large formats like 70x100 would become
-  // 1600x1600 and the artwork would appear stretched in the editor's frame).
+  // preserving aspect ratio.
   const PX_PER_CM = 24;
-  const MAX_PX = 1600;
+  const MAX_PX = 1800;
   const longestPx = Math.max(wCm, hCm) * PX_PER_CM;
   const scale = longestPx > MAX_PX ? MAX_PX / longestPx : 1;
   const w = Math.round(wCm * PX_PER_CM * scale);
   const h = Math.round(hCm * PX_PER_CM * scale);
+  // Pixel offsets of the inner FRONT zone (where motif clip + text live)
+  const frontPxX = Math.round(extraCm * PX_PER_CM * scale);
+  const frontPxY = Math.round(extraCm * PX_PER_CM * scale);
+  const frontPxW = Math.round(frontWcm * PX_PER_CM * scale);
+  const frontPxH = Math.round(frontHcm * PX_PER_CM * scale);
 
-  // Map renders in shape-aware container so square/circle aren't squished.
-  const sq = Math.min(w, h);
-  const mapW = input.mapShape === "rect" ? w : sq;
-  const mapH = input.mapShape === "rect" ? h : sq;
+  // Map renders in shape-aware container. With wrap, the map ALWAYS covers the
+  // full extended canvas as a rect (wrap continues the map outside the front).
+  const useShapeClip = extraCm === 0 && input.mapShape !== "rect";
+  const sq = Math.min(frontPxW, frontPxH);
+  const mapW = useShapeClip ? Math.min(w, h) : w;
+  const mapH = useShapeClip ? Math.min(w, h) : h;
 
   const container = createOffscreenContainer(Math.max(w, mapW), Math.max(h, mapH));
-  // Inner div for THIS map render (so concurrent renders don't collide)
   const mapDiv = document.createElement("div");
   mapDiv.style.width = `${mapW}px`;
   mapDiv.style.height = `${mapH}px`;
@@ -146,46 +163,55 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
     const ctx = out.getContext("2d");
     if (!ctx) throw new Error("2D ctx unavailable");
 
-    // Background
+    // Background fills the entire extended print area (wrap+bleed inherit bg)
     ctx.fillStyle = input.posterBgColor || "#ffffff";
     ctx.fillRect(0, 0, w, h);
 
-    // Map (with shape clip) — source canvas is already correctly sized per shape
-    ctx.save();
-    if (input.mapShape === "circle") {
-      const r = sq / 2;
-      ctx.beginPath();
-      ctx.arc(w / 2, h / 2, r, 0, Math.PI * 2);
-      ctx.clip();
-    } else if (input.mapShape === "square") {
-      const sx = (w - sq) / 2;
-      const sy = (h - sq) / 2;
-      ctx.beginPath();
-      ctx.rect(sx, sy, sq, sq);
-      ctx.clip();
-    }
-    if (input.mapShape === "rect") {
+    if (extraCm > 0) {
+      // WRAP MODE (canvas): map covers full extended area; shape clip applies
+      // only inside the front zone (so wrap zone keeps the map continuation).
       ctx.drawImage(mapCanvas, 0, 0, w, h);
+      // Note: for canvas we always use rect shape, but be safe — if a non-rect
+      // shape ever reaches here we still leave the wrap zone fully filled with
+      // map (matches reality: edges wrap regardless of front decoration).
     } else {
-      const dx = (w - sq) / 2;
-      const dy = (h - sq) / 2;
-      ctx.drawImage(mapCanvas, dx, dy, sq, sq);
+      // POSTER MODE (no wrap): existing shape-aware clipping
+      ctx.save();
+      if (input.mapShape === "circle") {
+        const r = sq / 2;
+        ctx.beginPath();
+        ctx.arc(w / 2, h / 2, r, 0, Math.PI * 2);
+        ctx.clip();
+      } else if (input.mapShape === "square") {
+        const sx = (w - sq) / 2;
+        const sy = (h - sq) / 2;
+        ctx.beginPath();
+        ctx.rect(sx, sy, sq, sq);
+        ctx.clip();
+      }
+      if (input.mapShape === "rect") {
+        ctx.drawImage(mapCanvas, 0, 0, w, h);
+      } else {
+        const dx = (w - sq) / 2;
+        const dy = (h - sq) / 2;
+        ctx.drawImage(mapCanvas, dx, dy, sq, sq);
+      }
+      ctx.restore();
     }
-    ctx.restore();
 
-    // Text overlay (matches editor's PosterArtwork text layer)
+    // Text overlay — always positioned within the FRONT zone so the visible
+    // front matches the editor exactly (wrap mode just offsets the front).
     if (input.textVisible && input.text.trim()) {
       const lines = input.text.split("\n");
       const layer = input.layout?.layers?.find((l) => l.type === "text");
-      const tx = w * parsePct(layer?.x, 0.5);
+      const tx = frontPxX + frontPxW * parsePct(layer?.x, 0.5);
       const yFrac = parsePct(layer?.y, 0.86);
 
-      // Match editor: text-sm/base/lg (~16px on ~570px preview) ≈ 2.8% of width
-      const fontSize = Math.round(w * 0.028);
+      // Match editor: ~2.8% of FRONT width
+      const fontSize = Math.round(frontPxW * 0.028);
       const lineHeight = Math.round(fontSize * 1.15);
       const totalH = lineHeight * lines.length;
-      // Center the block around h * yFrac (editor uses translate(-50%,-50%))
-      const centerY = h * yFrac;
+      const centerY = frontPxY + frontPxH * yFrac;
       const firstLineCenter = centerY - totalH / 2 + lineHeight / 2;
 
       ctx.save();

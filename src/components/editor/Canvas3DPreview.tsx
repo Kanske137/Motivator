@@ -8,10 +8,13 @@ interface Canvas3DPreviewProps {
   printUrl: string | null;
   loading: boolean;
   error?: string;
-  /** Aspect ratio of the print: width/height in cm */
+  /** Visible front dimensions in cm (what customer ordered). */
   widthCm: number;
   heightCm: number;
+  /** Canvas depth in cm (wrap zone width per side). */
   depthCm: number;
+  /** Bleed in cm per side outside the wrap zone (Gelato canvas = 0.3). */
+  bleedCm?: number;
 }
 
 /** Shared cache so each thumbnail doesn't re-download the same texture. */
@@ -34,59 +37,32 @@ function useTexture(url: string | null) {
 }
 
 /**
- * Canvas mesh: BoxGeometry with per-face materials.
- * Front uses the print texture with default UVs.
- * Side/top/bottom faces sample the outermost edge of the print to simulate wrap.
- * Bleed width is proportional to canvas depth so the wrap continues seamlessly
- * from the front edges around the sides/top/bottom.
+ * Canvas mesh with Gelato-accurate wrap.
+ *
+ * The input texture is the FULL print file produced by `renderArtworkSnapshot`
+ * with `wrapCm` + `bleedCm`, laid out as:
+ *
+ *   [ bleed | wrap | FRONT (visible motif) | wrap | bleed ]   (per axis)
+ *
+ * Each face of the box samples its own UV-rect of that single texture so the
+ * front shows only the motif, sides show the wrap continuation, and corners
+ * are seamless because they share pixel boundaries with the front.
  */
 function CanvasMesh({
-  texture, widthCm, heightCm, depthCm, autoRotate,
+  texture, widthCm, heightCm, depthCm, bleedCm, autoRotate,
 }: {
-  texture: THREE.Texture; widthCm: number; heightCm: number; depthCm: number; autoRotate: boolean;
+  texture: THREE.Texture;
+  widthCm: number; heightCm: number; depthCm: number; bleedCm: number;
+  autoRotate: boolean;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
 
-  // Normalize size so the largest dimension = 2 units
+  // Normalize box size so the largest visible-front dimension = 2 units.
+  // Depth is independent so 2cm vs 4cm look visually different.
   const maxCm = Math.max(widthCm, heightCm);
   const w = (widthCm / maxCm) * 2;
   const h = (heightCm / maxCm) * 2;
   const d = (depthCm / maxCm) * 2;
-
-  // Build edge textures by cropping the print texture via canvas. Bleed width
-  // is sized to actual canvas depth so the wrap content fully covers the side
-  // (otherwise top/bottom looked empty/stretched).
-  const edgeTextures = useMemo(() => {
-    if (!texture.image) return null;
-    const img = texture.image as HTMLImageElement | HTMLCanvasElement;
-    const iw = (img as HTMLImageElement).naturalWidth || (img as HTMLCanvasElement).width;
-    const ih = (img as HTMLImageElement).naturalHeight || (img as HTMLCanvasElement).height;
-    if (!iw || !ih) return null;
-
-    const bleedX = Math.min(0.25, depthCm / widthCm);  // for left/right strips
-    const bleedY = Math.min(0.25, depthCm / heightCm); // for top/bottom strips
-
-    const make = (sx: number, sy: number, sw: number, sh: number) => {
-      const c = document.createElement("canvas");
-      c.width = Math.max(64, Math.round(sw));
-      c.height = Math.max(64, Math.round(sh));
-      const ctx = c.getContext("2d")!;
-      ctx.drawImage(img as CanvasImageSource, sx, sy, sw, sh, 0, 0, c.width, c.height);
-      const t = new THREE.CanvasTexture(c);
-      t.colorSpace = THREE.SRGBColorSpace;
-      t.wrapS = THREE.ClampToEdgeWrapping;
-      t.wrapT = THREE.ClampToEdgeWrapping;
-      t.anisotropy = 8;
-      return t;
-    };
-
-    return {
-      right: make(iw * (1 - bleedX), 0, iw * bleedX, ih),
-      left: make(0, 0, iw * bleedX, ih),
-      top: make(0, 0, iw, ih * bleedY),
-      bottom: make(0, ih * (1 - bleedY), iw, ih * bleedY),
-    };
-  }, [texture, widthCm, heightCm, depthCm]);
 
   useFrame((_, dt) => {
     if (autoRotate && meshRef.current) {
@@ -94,47 +70,96 @@ function CanvasMesh({
     }
   });
 
-  // BoxGeometry material order: [+X, -X, +Y, -Y, +Z, -Z] = right, left, top, bottom, front, back
+  // BoxGeometry material order: [+X, -X, +Y, -Y, +Z, -Z]
+  // = right, left, top, bottom, front, back
   const materials = useMemo(() => {
-    const front = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.85, metalness: 0 });
+    // Texture-fraction layout (Gelato print file)
+    const totalW = widthCm + 2 * depthCm + 2 * bleedCm;
+    const totalH = heightCm + 2 * depthCm + 2 * bleedCm;
+    const fFrontX = widthCm / totalW;
+    const fFrontY = heightCm / totalH;
+    const fWrapX  = depthCm / totalW;
+    const fWrapY  = depthCm / totalH;
+    const fBleedX = bleedCm / totalW;
+    const fBleedY = bleedCm / totalH;
+
+    // Helper: clone texture and apply UV offset/repeat (and optional flip).
+    // Three.js UV origin: (0,0) = bottom-left of texture, (1,1) = top-right.
+    // Our snapshot is drawn with canvas 2D origin top-left → in UV space the
+    // top of the print is V=1, bottom is V=0.
+    const make = (
+      offsetX: number, offsetY: number,
+      repeatX: number, repeatY: number,
+      flipX = false, flipY = false,
+    ) => {
+      const t = texture.clone();
+      t.needsUpdate = true;
+      t.wrapS = THREE.ClampToEdgeWrapping;
+      t.wrapT = THREE.ClampToEdgeWrapping;
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 8;
+      // Convert top-left-origin coordinates to UV (flip Y for the offset).
+      // We provide offsets in "from top-left" convention for clarity, then
+      // convert here: UV.offset.y = 1 - (offsetY_from_top + repeatY).
+      t.offset.set(offsetX, 1 - (offsetY + repeatY));
+      t.repeat.set(repeatX * (flipX ? -1 : 1), repeatY * (flipY ? -1 : 1));
+      if (flipX || flipY) {
+        // Re-center so flip pivots around the strip
+        t.center.set(0.5, 0.5);
+      }
+      return new THREE.MeshStandardMaterial({ map: t, roughness: 0.85, metalness: 0 });
+    };
+
+    // FRONT (+Z): inner motif zone, no wrap, no bleed.
+    const front = make(
+      fBleedX + fWrapX, fBleedY + fWrapY,
+      fFrontX, fFrontY,
+    );
+
+    // RIGHT (+X): wrap strip immediately to the right of the front.
+    // Box-face UVs run U along Z (depth) and V along Y (height).
+    // We need the strip's pixel column nearest the front to land at U=1
+    // (the edge that meets the front face). Texture column nearest front is
+    // its leftmost pixel → no flip needed if we map width=fWrapX directly,
+    // because default Box UV gives U=0 at back-of-box, U=1 at front-of-box.
+    const right = make(
+      fBleedX + fWrapX + fFrontX, fBleedY + fWrapY,
+      fWrapX, fFrontY,
+    );
+
+    // LEFT (-X): wrap strip immediately to the left of the front.
+    // Default Box UV for -X: U=0 at front, U=1 at back → texture's rightmost
+    // pixel (closest to front) must sit at U=0 → flip X.
+    const left = make(
+      fBleedX, fBleedY + fWrapY,
+      fWrapX, fFrontY,
+      true, false,
+    );
+
+    // TOP (+Y): wrap strip immediately above the front.
+    // Box-face UVs: U along X (width), V along Z (depth).
+    // Default +Y: V=0 at back, V=1 at front. Texture strip's bottom row
+    // (closest to front in the print file) must land at V=1 → flip Y.
+    const top = make(
+      fBleedX + fWrapX, fBleedY,
+      fFrontX, fWrapY,
+      false, true,
+    );
+
+    // BOTTOM (-Y): wrap strip immediately below the front.
+    // Default -Y: V=0 at front, V=1 at back. Texture strip's top row
+    // (closest to front in print file) must sit at V=0 → flip Y.
+    const bottom = make(
+      fBleedX + fWrapX, fBleedY + fWrapY + fFrontY,
+      fFrontX, fWrapY,
+      false, true,
+    );
+
+    // BACK (-Z): canvas back is plain stretched fabric. Solid neutral.
     const back = new THREE.MeshStandardMaterial({ color: "#e8e4dc", roughness: 0.95 });
-    if (!edgeTextures) {
-      const side = new THREE.MeshStandardMaterial({ color: "#d8d4cc", roughness: 0.9 });
-      return [side, side, side, side, front, back];
-    }
 
-    // Top face (+Y): default UV runs (printWidth → X box-axis, depth → Z box-axis).
-    // We want the strip's edge nearest the front to be the bottom row of pixels
-    // in our top-strip (which is the row closest to the print's top edge).
-    // Default UV V=0 maps to back of box, V=1 to front. Our strip's V=0 is the
-    // top-most pixel of the print. Flip V so V=1 (front) corresponds to the
-    // pixel row touching the front face.
-    const topMap = edgeTextures.top.clone();
-    topMap.needsUpdate = true;
-    topMap.wrapS = THREE.ClampToEdgeWrapping;
-    topMap.wrapT = THREE.ClampToEdgeWrapping;
-    topMap.center.set(0.5, 0.5);
-    topMap.repeat.set(1, -1);
-
-    // Bottom face (-Y): default UV V=0 maps to front, V=1 to back. Our strip's
-    // V=1 is the bottom-most pixel of the print (the row touching the front
-    // bottom edge). Flip V so the front-edge pixel is at the front of the box.
-    const bottomMap = edgeTextures.bottom.clone();
-    bottomMap.needsUpdate = true;
-    bottomMap.wrapS = THREE.ClampToEdgeWrapping;
-    bottomMap.wrapT = THREE.ClampToEdgeWrapping;
-    bottomMap.center.set(0.5, 0.5);
-    bottomMap.repeat.set(1, -1);
-
-    return [
-      new THREE.MeshStandardMaterial({ map: edgeTextures.right, roughness: 0.85 }),
-      new THREE.MeshStandardMaterial({ map: edgeTextures.left, roughness: 0.85 }),
-      new THREE.MeshStandardMaterial({ map: topMap, roughness: 0.85 }),
-      new THREE.MeshStandardMaterial({ map: bottomMap, roughness: 0.85 }),
-      front,
-      back,
-    ];
-  }, [texture, edgeTextures]);
+    return [right, left, top, bottom, front, back];
+  }, [texture, widthCm, heightCm, depthCm, bleedCm]);
 
   return (
     <mesh ref={meshRef} castShadow receiveShadow material={materials}>
@@ -144,10 +169,10 @@ function CanvasMesh({
 }
 
 function Scene({
-  printUrl, widthCm, heightCm, depthCm,
+  printUrl, widthCm, heightCm, depthCm, bleedCm,
 }: {
   printUrl: string;
-  widthCm: number; heightCm: number; depthCm: number;
+  widthCm: number; heightCm: number; depthCm: number; bleedCm: number;
 }) {
   const tex = useTexture(printUrl);
   return (
@@ -167,6 +192,7 @@ function Scene({
           widthCm={widthCm}
           heightCm={heightCm}
           depthCm={depthCm}
+          bleedCm={bleedCm}
           autoRotate={false}
         />
       )}
@@ -184,7 +210,7 @@ function Scene({
 }
 
 export function Canvas3DPreview({
-  printUrl, loading, error, widthCm, heightCm, depthCm,
+  printUrl, loading, error, widthCm, heightCm, depthCm, bleedCm = 0.3,
 }: Canvas3DPreviewProps) {
   return (
     <div className="border-t bg-[hsl(var(--paper))]">
@@ -221,6 +247,7 @@ export function Canvas3DPreview({
                   widthCm={widthCm}
                   heightCm={heightCm}
                   depthCm={depthCm}
+                  bleedCm={bleedCm}
                 />
               </Suspense>
             </Canvas>

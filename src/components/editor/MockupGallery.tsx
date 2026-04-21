@@ -34,6 +34,13 @@ export function MockupGallery() {
 
   const isCanvas = config?.product_type === "canvas";
 
+  // Compute canvas wrap depth from variant (e.g. "2 cm" → 2). Used both for
+  // the snapshot (extends print area with wrap+bleed) AND the 3D preview UVs.
+  const canvasDepthCm = isCanvas
+    ? (variant?.match(/(\d+)/)?.[1] ? parseInt(variant!.match(/(\d+)/)![1], 10) : 2)
+    : 0;
+  const BLEED_CM = 0.3; // Gelato canvas bleed per side
+
   useEffect(() => {
     if (!config || !size) return;
     // Invalidate any in-flight render synchronously so stale results never overwrite.
@@ -48,11 +55,15 @@ export function MockupGallery() {
       const myReq = ++reqIdRef.current;
       try {
         // Single source of truth: snapshot the editor artwork directly.
+        // For canvas, render the FULL print area (front + wrap + bleed) so the
+        // 3D preview can sample sides exactly like Gelato's print file.
         const newSnapshot = await renderArtworkSnapshot({
           mapStyleId, mapCenter, mapZoom,
           showLabels, mapShape, posterBgColor,
           text, textFont, textVisible,
           size, orientation, layout,
+          wrapCm: isCanvas ? canvasDepthCm : 0,
+          bleedCm: isCanvas ? BLEED_CM : 0,
         });
         if (myReq !== reqIdRef.current) return;
 
@@ -61,7 +72,7 @@ export function MockupGallery() {
 
         if (isCanvas) return; // canvas uses 3D — no scene compositing needed
 
-        const canvasDepthCm = 2;
+        const sceneCanvasDepthCm = 2;
         const frameColor = frameColorFromVariant(variant);
 
         const results = await Promise.all(
@@ -73,7 +84,7 @@ export function MockupGallery() {
                 size,
                 orientation,
                 productType: config.product_type,
-                canvasDepthCm,
+                canvasDepthCm: sceneCanvasDepthCm,
                 frameColor,
               });
               return { scene, url, error: undefined as string | undefined };
@@ -120,9 +131,6 @@ export function MockupGallery() {
     const [a, b] = (size ?? "30x40").split("x").map(Number);
     const widthCm = orientation === "portrait" ? Math.min(a, b) : Math.max(a, b);
     const heightCm = orientation === "portrait" ? Math.max(a, b) : Math.min(a, b);
-    const depthCm = variant?.match(/(\d+)/)?.[1]
-      ? parseInt(variant.match(/(\d+)/)![1], 10)
-      : 2;
     return (
       <Canvas3DPreview
         printUrl={snapshotUrl}
@@ -130,7 +138,8 @@ export function MockupGallery() {
         error={snapshotError}
         widthCm={widthCm}
         heightCm={heightCm}
-        depthCm={depthCm}
+        depthCm={canvasDepthCm}
+        bleedCm={BLEED_CM}
       />
     );
   }
