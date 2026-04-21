@@ -75,7 +75,8 @@ export function CartDrawer() {
                   </div>
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
         {items.length > 0 && (
