@@ -6,7 +6,7 @@
 //   2. Rasterize SVG to PNG via @resvg/resvg-wasm (Gelato accepts PNG @300 DPI)
 //   3. Upload PNG to print-files bucket and return public URL
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { Resvg, initWasm } from "https://esm.sh/@resvg/[email protected]";
+import { Resvg, initWasm } from "npm:@resvg/[email protected]";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,7 +51,7 @@ let wasmReady: Promise<void> | null = null;
 async function ensureResvg(): Promise<void> {
   if (!wasmReady) {
     wasmReady = (async () => {
-      const wasmRes = await fetch("https://esm.sh/@resvg/[email protected]/index_bg.wasm");
+      const wasmRes = await fetch("https://unpkg.com/@resvg/[email protected]/index_bg.wasm");
       const wasmBuf = await wasmRes.arrayBuffer();
       await initWasm(wasmBuf);
     })();
