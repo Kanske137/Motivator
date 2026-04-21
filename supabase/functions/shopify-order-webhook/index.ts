@@ -269,20 +269,33 @@ async function processOrder(supabase: any, order: any) {
     const styleId = getProp(props, "_map_style");
     const centerStr = getProp(props, "_map_center");
     const zoomStr = getProp(props, "_map_zoom");
+    const artworkUrl = getProp(props, "_artwork_url"); // future: photo / AI image
     const size = getProp(props, "_size");
     const variant = getProp(props, "_variant");
     const bgColor = getProp(props, "_bg_color") ?? "#FFFFFF";
+    const mapShape = (getProp(props, "_map_shape") ?? "rect") as "rect" | "square" | "circle";
+    const textFont = getProp(props, "_text_font") ?? "Inter";
     const orientation = (getProp(props, "_orientation") ?? "portrait") as "portrait" | "landscape";
     const handle = getProp(props, "_product_handle") ?? li.product_handle ?? "";
     const text = getProp(props, "Text") ?? "";
 
-    if (!styleId || !centerStr || !zoomStr || !size) {
-      continue; // not an editor item
+    // Build artwork: image source takes precedence; otherwise fall back to map params.
+    let artwork: any = null;
+    if (artworkUrl) {
+      artwork = { kind: "image", sourceUrl: artworkUrl };
+    } else if (styleId && centerStr && zoomStr) {
+      const [latStr, lngStr] = centerStr.split(",");
+      artwork = {
+        kind: "map",
+        styleId,
+        center: [parseFloat(lngStr), parseFloat(latStr)],
+        zoom: parseFloat(zoomStr),
+      };
     }
 
-    const [latStr, lngStr] = centerStr.split(",");
-    const center: [number, number] = [parseFloat(lngStr), parseFloat(latStr)];
-    const zoom = parseFloat(zoomStr);
+    if (!artwork || !size) {
+      continue; // not an editor item
+    }
 
     // 1) Generate print file (PNG)
     let printUrl: string | null = null;
@@ -291,8 +304,10 @@ async function processOrder(supabase: any, order: any) {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}`, apikey: serviceKey },
         body: JSON.stringify({
-          styleId, center, zoom, size, orientation,
-          text, textVisible: !!text,
+          artwork,
+          size, orientation,
+          text, textVisible: !!text, textFont,
+          mapShape,
           posterBgColor: bgColor,
         }),
       });

@@ -1,10 +1,17 @@
-// Generates a high-resolution PNG print file from a map state + text and uploads
-// it to the print-files Supabase storage bucket.
+// Generates a high-resolution PNG print file from an artwork source + text and
+// uploads it to the print-files Supabase storage bucket.
 //
-// Pipeline:
-//   1. Build SVG composition (bg + clipped Mapbox raster + text overlay)
-//   2. Rasterize SVG to PNG via @resvg/resvg-wasm (Gelato accepts PNG @300 DPI)
-//   3. Upload PNG to print-files bucket and return public URL
+// Design principle: "Compose, don't rasterize."
+// We let the source image (Mapbox tile or uploaded photo / AI-generated image)
+// define the final canvas pixel dimensions. The SVG references the image 1:1
+// — no upscaling — so resvg only has to rasterize the text + clip overlay.
+// This keeps CPU well under the edge-runtime budget for any artwork type.
+//
+// Pipeline (identical for map / image):
+//   1. Fetch source PNG → know its native (w, h)
+//   2. Build SVG at exactly (w, h) with bg + <image> 1:1 + clip + text
+//   3. resvg → PNG
+//   4. Upload to print-files bucket → return public URL + dimensions
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { render as renderSvgToPng } from "https://deno.land/x/resvg_wasm/mod.ts";
 
@@ -15,30 +22,53 @@ const corsHeaders = {
 
 type MapShape = "rect" | "square" | "circle";
 
+type Artwork =
+  | {
+      kind: "map";
+      styleId: string;
+      center: [number, number];
+      zoom: number;
+      showLabels?: boolean;
+    }
+  | {
+      kind: "image";
+      sourceUrl: string;
+    };
+
 interface PrintBody {
-  styleId: string;
-  center: [number, number];
-  zoom: number;
+  // New shape
+  artwork?: Artwork;
+  // Legacy shape (still accepted) — treated as { kind: "map", ... }
+  styleId?: string;
+  center?: [number, number];
+  zoom?: number;
+  showLabels?: boolean;
+
+  // Common
   size: string;
   orientation: "portrait" | "landscape";
   text?: string;
   textFont?: string;
   textVisible?: boolean;
-  showLabels?: boolean;
   mapShape?: MapShape;
   posterBgColor?: string;
 }
 
-// Returns target print-file pixel dimensions at ~300 DPI.
-// Mapbox static API caps at 1280px @2x — so the tile we fetch is smaller
-// than the final PNG and is upscaled inside the SVG.
-function pxFromSize(sizeCm: string, orientation: "portrait" | "landscape"): { w: number; h: number } {
+// Cap on the longest pixel side. 2560 matches Mapbox @2x max (1280×2 = 2560)
+// and is a comfortable upper bound for AI / photo sources too.
+const MAX_LONG_SIDE = 2560;
+
+// Returns target render-aspect dimensions (width, height) for the requested
+// poster size + orientation. Used only to derive the aspect ratio the source
+// image should match — the actual final pixel count comes from the source.
+function aspectFromSize(
+  sizeCm: string,
+  orientation: "portrait" | "landscape"
+): { wCm: number; hCm: number; aspect: number } {
   const [a, b] = sizeCm.split("x").map(Number);
   const wCm = orientation === "portrait" ? Math.min(a, b) : Math.max(a, b);
   const hCm = orientation === "portrait" ? Math.max(a, b) : Math.min(a, b);
-  // Cap final PNG side to 4500px to keep memory/runtime sane (still > 300DPI for 30x40)
-  const dpiPx = (cm: number) => Math.min(4500, Math.round((cm / 2.54) * 300));
-  return { w: dpiPx(wCm), h: dpiPx(hCm) };
+  return { wCm, hCm, aspect: wCm / hCm };
 }
 
 function escapeXml(s: string): string {
@@ -47,60 +77,158 @@ function escapeXml(s: string): string {
   );
 }
 
+function bufferToBase64(buf: Uint8Array): string {
+  let binary = "";
+  const CHUNK = 8192;
+  for (let i = 0; i < buf.length; i += CHUNK) {
+    binary += String.fromCharCode.apply(
+      null,
+      Array.from(buf.subarray(i, Math.min(i + CHUNK, buf.length))),
+    );
+  }
+  return btoa(binary);
+}
+
+// Read PNG width/height from IHDR chunk (bytes 16..23).
+function readPngDimensions(buf: Uint8Array): { w: number; h: number } | null {
+  if (buf.length < 24) return null;
+  // PNG signature 89 50 4E 47 0D 0A 1A 0A
+  if (buf[0] !== 0x89 || buf[1] !== 0x50 || buf[2] !== 0x4e || buf[3] !== 0x47) return null;
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const w = dv.getUint32(16);
+  const h = dv.getUint32(20);
+  return { w, h };
+}
+
+// Read JPEG width/height by walking SOF markers.
+function readJpegDimensions(buf: Uint8Array): { w: number; h: number } | null {
+  if (buf.length < 4 || buf[0] !== 0xff || buf[1] !== 0xd8) return null;
+  let i = 2;
+  while (i < buf.length) {
+    if (buf[i] !== 0xff) return null;
+    const marker = buf[i + 1];
+    i += 2;
+    // SOF0..SOF15 except DHT(0xC4), DAC(0xCC), DNL(0xDC)
+    if (
+      marker >= 0xc0 && marker <= 0xcf &&
+      marker !== 0xc4 && marker !== 0xcc && marker !== 0xc8
+    ) {
+      const h = (buf[i + 3] << 8) | buf[i + 4];
+      const w = (buf[i + 5] << 8) | buf[i + 6];
+      return { w, h };
+    }
+    const segLen = (buf[i] << 8) | buf[i + 1];
+    if (segLen < 2) return null;
+    i += segLen;
+  }
+  return null;
+}
+
+function readImageDimensions(buf: Uint8Array, mime: string): { w: number; h: number } | null {
+  if (mime.includes("png")) return readPngDimensions(buf);
+  if (mime.includes("jpeg") || mime.includes("jpg")) return readJpegDimensions(buf);
+  // Try PNG first then JPEG
+  return readPngDimensions(buf) ?? readJpegDimensions(buf);
+}
+
+// Fetch the artwork source as raw bytes + mime type.
+async function fetchArtworkSource(
+  artwork: Artwork,
+  aspect: number,
+  mapboxToken: string
+): Promise<{ buf: Uint8Array; mime: string; w: number; h: number }> {
+  if (artwork.kind === "map") {
+    // Largest tile that fits the aspect, capped at Mapbox @2x max (1280 per side).
+    const TILE_MAX = 1280;
+    const tileW = aspect >= 1 ? TILE_MAX : Math.round(TILE_MAX * aspect);
+    const tileH = aspect >= 1 ? Math.round(TILE_MAX / aspect) : TILE_MAX;
+    const url = `https://api.mapbox.com/styles/v1/mapbox/${artwork.styleId}/static/${artwork.center[0]},${artwork.center[1]},${artwork.zoom},0,0/${tileW}x${tileH}@2x?access_token=${mapboxToken}&attribution=false&logo=false`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(`Mapbox static failed ${res.status}: ${t.slice(0, 300)}`);
+    }
+    const buf = new Uint8Array(await res.arrayBuffer());
+    const dims = readPngDimensions(buf) ?? { w: tileW * 2, h: tileH * 2 };
+    return { buf, mime: "image/png", w: dims.w, h: dims.h };
+  }
+
+  // kind === "image"
+  const res = await fetch(artwork.sourceUrl);
+  if (!res.ok) {
+    throw new Error(`Image source fetch failed ${res.status}: ${artwork.sourceUrl}`);
+  }
+  const mime = res.headers.get("content-type") ?? "image/png";
+  const buf = new Uint8Array(await res.arrayBuffer());
+  const dims = readImageDimensions(buf, mime);
+  if (!dims) throw new Error(`Could not read image dimensions (mime=${mime})`);
+  return { buf, mime, w: dims.w, h: dims.h };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const t0 = Date.now();
 
   try {
-    const token = Deno.env.get("MAPBOX_PUBLIC_TOKEN");
-    if (!token) throw new Error("MAPBOX_PUBLIC_TOKEN missing");
-
     const body = (await req.json()) as PrintBody;
+
+    // Normalize to Artwork (legacy → map)
+    const artwork: Artwork = body.artwork
+      ? body.artwork
+      : {
+          kind: "map",
+          styleId: body.styleId!,
+          center: body.center!,
+          zoom: body.zoom!,
+          showLabels: body.showLabels,
+        };
+
+    if (artwork.kind === "map" && (!artwork.styleId || !artwork.center || artwork.zoom == null)) {
+      throw new Error("artwork.kind=map requires styleId, center, zoom");
+    }
+    if (artwork.kind === "image" && !artwork.sourceUrl) {
+      throw new Error("artwork.kind=image requires sourceUrl");
+    }
+
     const {
-      styleId,
-      center,
-      zoom,
       size,
       orientation,
       text = "",
       textFont = "Inter",
       textVisible = true,
-      showLabels: _showLabels = false,
       mapShape = "rect",
       posterBgColor = "#FFFFFF",
     } = body;
 
-    const { w, h } = pxFromSize(size, orientation);
+    const mapboxToken = Deno.env.get("MAPBOX_PUBLIC_TOKEN") ?? "";
+    if (artwork.kind === "map" && !mapboxToken) throw new Error("MAPBOX_PUBLIC_TOKEN missing");
 
-    // Mapbox static tile — capped @2x at 1280px per side. We fetch at the
-    // largest tile size that fits the poster aspect, then upscale in SVG.
-    const TILE_MAX = 1280;
-    const aspect = w / h;
-    const tileW = aspect >= 1 ? TILE_MAX : Math.round(TILE_MAX * aspect);
-    const tileH = aspect >= 1 ? Math.round(TILE_MAX / aspect) : TILE_MAX;
-    const mapUrl = `https://api.mapbox.com/styles/v1/mapbox/${styleId}/static/${center[0]},${center[1]},${zoom},0,0/${tileW}x${tileH}@2x?access_token=${token}&attribution=false&logo=false`;
+    const { aspect } = aspectFromSize(size, orientation);
 
     console.log(
-      `[generate-print-file] ${size} ${orientation} target=${w}x${h} tile=${tileW}x${tileH} shape=${mapShape} bg=${posterBgColor} text=${textVisible}`
+      `[generate-print-file] start kind=${artwork.kind} size=${size} ${orientation} aspect=${aspect.toFixed(3)} shape=${mapShape}`
     );
 
-    const mapRes = await fetch(mapUrl);
-    if (!mapRes.ok) {
-      const t = await mapRes.text();
-      console.error(`[generate-print-file] Mapbox failed ${mapRes.status}: ${t.slice(0, 300)}`);
-      throw new Error(`Mapbox static failed: ${mapRes.status}`);
-    }
-    const mapBuf = new Uint8Array(await mapRes.arrayBuffer());
-    let binary = "";
-    const CHUNK = 8192;
-    for (let i = 0; i < mapBuf.length; i += CHUNK) {
-      binary += String.fromCharCode.apply(
-        null,
-        Array.from(mapBuf.subarray(i, Math.min(i + CHUNK, mapBuf.length))),
-      );
-    }
-    const mapDataUrl = `data:image/png;base64,${btoa(binary)}`;
+    // 1) Fetch source
+    const src = await fetchArtworkSource(artwork, aspect, mapboxToken);
+    console.log(
+      `[generate-print-file] source fetched: ${src.w}x${src.h} (${src.buf.byteLength} bytes, ${src.mime})`
+    );
 
-    // Shape clip (centered on poster rect, hugging shorter side)
+    // 2) Use source pixels as the canvas. Optionally downscale if absurdly large.
+    let w = src.w;
+    let h = src.h;
+    const longest = Math.max(w, h);
+    if (longest > MAX_LONG_SIDE) {
+      const scale = MAX_LONG_SIDE / longest;
+      w = Math.round(w * scale);
+      h = Math.round(h * scale);
+      console.log(`[generate-print-file] capped canvas to ${w}x${h} (was ${src.w}x${src.h})`);
+    }
+
+    const dataUrl = `data:${src.mime};base64,${bufferToBase64(src.buf)}`;
+
+    // 3) Shape clip (centered, hugs shorter side)
     let clipDef = "";
     let clipAttr = "";
     if (mapShape === "circle") {
@@ -115,7 +243,7 @@ Deno.serve(async (req) => {
       clipAttr = ` clip-path="url(#mc)"`;
     }
 
-    // Text overlay
+    // 4) Text overlay
     let textSvg = "";
     if (textVisible && text.trim()) {
       const lines = text.split("\n");
@@ -132,19 +260,23 @@ Deno.serve(async (req) => {
       textSvg = `<text text-anchor="middle" font-family="${escapeXml(textFont)}, Inter, sans-serif" font-size="${fontSize}" font-weight="400" fill="#1a1a1a" letter-spacing="${(fontSize * 0.05).toFixed(2)}">${tspans}</text>`;
     }
 
+    // 5) SVG at source-native dimensions — image is 1:1, no upscaling.
     const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
   <defs>${clipDef}</defs>
   <rect width="${w}" height="${h}" fill="${posterBgColor}"/>
-  <image href="${mapDataUrl}" x="0" y="0" width="${w}" height="${h}"${clipAttr} preserveAspectRatio="xMidYMid slice"/>
+  <image href="${dataUrl}" x="0" y="0" width="${w}" height="${h}"${clipAttr} preserveAspectRatio="xMidYMid slice"/>
   ${textSvg}
 </svg>`;
 
-    // Rasterize SVG → PNG via deno.land/x/resvg_wasm
+    const tRender0 = Date.now();
     const pngData = await renderSvgToPng(svg);
-    console.log(`[generate-print-file] PNG rasterized: ${pngData.byteLength} bytes`);
+    const tRender = Date.now() - tRender0;
+    console.log(
+      `[generate-print-file] PNG rasterized: ${pngData.byteLength} bytes in ${tRender}ms (canvas ${w}x${h})`
+    );
 
-    // Upload PNG
+    // 6) Upload
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -167,7 +299,10 @@ Deno.serve(async (req) => {
     await upload(1);
 
     const { data: pub } = supabase.storage.from("print-files").getPublicUrl(filename);
-    console.log(`[generate-print-file] public URL: ${pub.publicUrl}`);
+    const tTotal = Date.now() - t0;
+    console.log(
+      `[generate-print-file] DONE in ${tTotal}ms → ${pub.publicUrl}`
+    );
 
     return new Response(JSON.stringify({ url: pub.publicUrl, width: w, height: h }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
