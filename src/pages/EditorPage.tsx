@@ -73,6 +73,9 @@ export default function EditorPage() {
       _size: size,
       _variant: variant,
       _bg_color: posterBgColor,
+      _orientation: orientation,
+      _product_handle: config.shopify_handle,
+      _design_id: (crypto as any)?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
     };
 
     if (inIframe) {
