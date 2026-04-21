@@ -57,7 +57,9 @@ async function processOrder(supabase: any, order: any) {
   const projectUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const gelatoKey = Deno.env.get("GELATO_API_KEY");
-  const shopifyDomain = Deno.env.get("SHOPIFY_STORE_PERMANENT_DOMAIN") ?? Deno.env.get("SHOPIFY_STORE_DOMAIN");
+  const shopifyDomain = Deno.env.get("SHOPIFY_STORE_PERMANENT_DOMAIN")
+    ?? Deno.env.get("SHOPIFY_STORE_DOMAIN")
+    ?? "canvas-poster-creator-2wh5d.myshopify.com";
   const shopifyToken = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
 
   if (!gelatoKey) {
