@@ -6,7 +6,7 @@
 //   2. Rasterize SVG to PNG via @resvg/resvg-wasm (Gelato accepts PNG @300 DPI)
 //   3. Upload PNG to print-files bucket and return public URL
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { Resvg, initWasm } from "npm:@resvg/[email protected]";
+import { render as renderSvgToPng } from "https://deno.land/x/resvg_wasm/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -45,18 +45,6 @@ function escapeXml(s: string): string {
   return s.replace(/[<>&"']/g, (c) =>
     c === "<" ? "&lt;" : c === ">" ? "&gt;" : c === "&" ? "&amp;" : c === '"' ? "&quot;" : "&apos;"
   );
-}
-
-let wasmReady: Promise<void> | null = null;
-async function ensureResvg(): Promise<void> {
-  if (!wasmReady) {
-    wasmReady = (async () => {
-      const wasmRes = await fetch("https://unpkg.com/@resvg/[email protected]/index_bg.wasm");
-      const wasmBuf = await wasmRes.arrayBuffer();
-      await initWasm(wasmBuf);
-    })();
-  }
-  return wasmReady;
 }
 
 Deno.serve(async (req) => {
@@ -152,14 +140,8 @@ Deno.serve(async (req) => {
   ${textSvg}
 </svg>`;
 
-    // Rasterize SVG → PNG via resvg-wasm
-    await ensureResvg();
-    const resvg = new Resvg(svg, {
-      fitTo: { mode: "width", value: w },
-      background: posterBgColor,
-      font: { loadSystemFonts: false, defaultFontFamily: "Inter" },
-    });
-    const pngData = resvg.render().asPng();
+    // Rasterize SVG → PNG via deno.land/x/resvg_wasm
+    const pngData = await renderSvgToPng(svg);
     console.log(`[generate-print-file] PNG rasterized: ${pngData.byteLength} bytes`);
 
     // Upload PNG
