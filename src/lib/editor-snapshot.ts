@@ -168,12 +168,30 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
     ctx.fillRect(0, 0, w, h);
 
     if (extraCm > 0) {
-      // WRAP MODE (canvas): map covers full extended area; shape clip applies
-      // only inside the front zone (so wrap zone keeps the map continuation).
+      // WRAP MODE (canvas): map fills entire extended area for wrap continuity.
       ctx.drawImage(mapCanvas, 0, 0, w, h);
-      // Note: for canvas we always use rect shape, but be safe — if a non-rect
-      // shape ever reaches here we still leave the wrap zone fully filled with
-      // map (matches reality: edges wrap regardless of front decoration).
+
+      // If front uses non-rect shape, repaint front zone with bg then re-draw
+      // the map only within the shape clip — so the visible front matches editor.
+      if (input.mapShape !== "rect") {
+        ctx.save();
+        ctx.fillStyle = input.posterBgColor || "#ffffff";
+        ctx.fillRect(frontPxX, frontPxY, frontPxW, frontPxH);
+        const fsq = Math.min(frontPxW, frontPxH);
+        const fcx = frontPxX + frontPxW / 2;
+        const fcy = frontPxY + frontPxH / 2;
+        ctx.beginPath();
+        if (input.mapShape === "circle") {
+          ctx.arc(fcx, fcy, fsq / 2, 0, Math.PI * 2);
+        } else {
+          ctx.rect(fcx - fsq / 2, fcy - fsq / 2, fsq, fsq);
+        }
+        ctx.clip();
+        // Draw map aligned to full extended area (same as wrap) so the visible
+        // shape contains the same pixels as the wrap continuation around it.
+        ctx.drawImage(mapCanvas, 0, 0, w, h);
+        ctx.restore();
+      }
     } else {
       // POSTER MODE (no wrap): existing shape-aware clipping
       ctx.save();
