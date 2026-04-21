@@ -292,7 +292,7 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
       ctx.restore();
     }
 
-    return out.toDataURL("image/jpeg", 0.92);
+    return out.toDataURL("image/jpeg", input.hires ? 0.95 : 0.92);
   } finally {
     try {
       map?.remove();
