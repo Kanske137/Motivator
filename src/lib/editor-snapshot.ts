@@ -163,46 +163,55 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
     const ctx = out.getContext("2d");
     if (!ctx) throw new Error("2D ctx unavailable");
 
-    // Background
+    // Background fills the entire extended print area (wrap+bleed inherit bg)
     ctx.fillStyle = input.posterBgColor || "#ffffff";
     ctx.fillRect(0, 0, w, h);
 
-    // Map (with shape clip) — source canvas is already correctly sized per shape
-    ctx.save();
-    if (input.mapShape === "circle") {
-      const r = sq / 2;
-      ctx.beginPath();
-      ctx.arc(w / 2, h / 2, r, 0, Math.PI * 2);
-      ctx.clip();
-    } else if (input.mapShape === "square") {
-      const sx = (w - sq) / 2;
-      const sy = (h - sq) / 2;
-      ctx.beginPath();
-      ctx.rect(sx, sy, sq, sq);
-      ctx.clip();
-    }
-    if (input.mapShape === "rect") {
+    if (extraCm > 0) {
+      // WRAP MODE (canvas): map covers full extended area; shape clip applies
+      // only inside the front zone (so wrap zone keeps the map continuation).
       ctx.drawImage(mapCanvas, 0, 0, w, h);
+      // Note: for canvas we always use rect shape, but be safe — if a non-rect
+      // shape ever reaches here we still leave the wrap zone fully filled with
+      // map (matches reality: edges wrap regardless of front decoration).
     } else {
-      const dx = (w - sq) / 2;
-      const dy = (h - sq) / 2;
-      ctx.drawImage(mapCanvas, dx, dy, sq, sq);
+      // POSTER MODE (no wrap): existing shape-aware clipping
+      ctx.save();
+      if (input.mapShape === "circle") {
+        const r = sq / 2;
+        ctx.beginPath();
+        ctx.arc(w / 2, h / 2, r, 0, Math.PI * 2);
+        ctx.clip();
+      } else if (input.mapShape === "square") {
+        const sx = (w - sq) / 2;
+        const sy = (h - sq) / 2;
+        ctx.beginPath();
+        ctx.rect(sx, sy, sq, sq);
+        ctx.clip();
+      }
+      if (input.mapShape === "rect") {
+        ctx.drawImage(mapCanvas, 0, 0, w, h);
+      } else {
+        const dx = (w - sq) / 2;
+        const dy = (h - sq) / 2;
+        ctx.drawImage(mapCanvas, dx, dy, sq, sq);
+      }
+      ctx.restore();
     }
-    ctx.restore();
 
-    // Text overlay (matches editor's PosterArtwork text layer)
+    // Text overlay — always positioned within the FRONT zone so the visible
+    // front matches the editor exactly (wrap mode just offsets the front).
     if (input.textVisible && input.text.trim()) {
       const lines = input.text.split("\n");
       const layer = input.layout?.layers?.find((l) => l.type === "text");
-      const tx = w * parsePct(layer?.x, 0.5);
+      const tx = frontPxX + frontPxW * parsePct(layer?.x, 0.5);
       const yFrac = parsePct(layer?.y, 0.86);
 
-      // Match editor: text-sm/base/lg (~16px on ~570px preview) ≈ 2.8% of width
-      const fontSize = Math.round(w * 0.028);
+      // Match editor: ~2.8% of FRONT width
+      const fontSize = Math.round(frontPxW * 0.028);
       const lineHeight = Math.round(fontSize * 1.15);
       const totalH = lineHeight * lines.length;
-      // Center the block around h * yFrac (editor uses translate(-50%,-50%))
-      const centerY = h * yFrac;
+      const centerY = frontPxY + frontPxH * yFrac;
       const firstLineCenter = centerY - totalH / 2 + lineHeight / 2;
 
       ctx.save();
