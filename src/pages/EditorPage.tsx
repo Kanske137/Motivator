@@ -110,6 +110,10 @@ export default function EditorPage() {
       _orientation: orientation,
       _product_handle: config.shopify_handle,
       _design_id: designId,
+      _map_shape: mapShape,
+      _show_labels: showLabels ? "true" : "false",
+      _text_visible: textVisible ? "true" : "false",
+      _text_font: textFont,
     };
     if (previewUrl) properties._preview_image = previewUrl;
 

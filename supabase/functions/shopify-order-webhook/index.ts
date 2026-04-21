@@ -275,6 +275,9 @@ async function processOrder(supabase: any, order: any) {
     const bgColor = getProp(props, "_bg_color") ?? "#FFFFFF";
     const mapShape = (getProp(props, "_map_shape") ?? "rect") as "rect" | "square" | "circle";
     const textFont = getProp(props, "_text_font") ?? "Inter";
+    const textVisibleStr = getProp(props, "_text_visible");
+    const showLabelsStr = getProp(props, "_show_labels");
+    const showLabels = showLabelsStr === "true";
     const orientation = (getProp(props, "_orientation") ?? "portrait") as "portrait" | "landscape";
     const handle = getProp(props, "_product_handle") ?? li.product_handle ?? "";
     const text = getProp(props, "Text") ?? "";
@@ -290,6 +293,7 @@ async function processOrder(supabase: any, order: any) {
         styleId,
         center: [parseFloat(lngStr), parseFloat(latStr)],
         zoom: parseFloat(zoomStr),
+        showLabels,
       };
     }
 
@@ -306,7 +310,9 @@ async function processOrder(supabase: any, order: any) {
         body: JSON.stringify({
           artwork,
           size, orientation,
-          text, textVisible: !!text, textFont,
+          text,
+          textVisible: textVisibleStr === null ? !!text : textVisibleStr === "true",
+          textFont,
           mapShape,
           posterBgColor: bgColor,
         }),
