@@ -1,94 +1,113 @@
 
 
-## Plan: Synka printfil med editor-val (etiketter + form)
+## Plan: Skalbar print-fil-pipeline för stora bilder (upp till 10 MB)
 
-### Problem
-1. **Områdestexter (map labels) syns på printfilen** trots `showLabels=false` i editorn. Mapbox Static API ignorerar vår klient-side `setLayoutProperty(visibility: none)` — den tillämpas bara på live-mapen i browsern, inte på den statiska bilden vi hämtar i edge function.
-2. **Kartform (cirkel/kvadrat) ignoreras**. Loggarna visar `shape=rect` även när användaren valt cirkel — `mapShape` skickas inte med från `shopify-order-webhook` till `generate-print-file`.
+### Problemet du pekar på
 
-### Rotorsaker
+Resvg-WASM i edge function kraschar redan på 4.6 MP Mapbox-tile (437 KB källa). Med framtida foto/AI-bilder på 10 MB / 20+ MP är pipelinen helt körd. Vi måste byta arkitektur **innan** bild-stödet byggs, inte efter.
 
-**Labels:** I `generate-print-file/index.ts` byggs Mapbox URL utan `?fresh` style-overrides. Mapbox Static API stödjer inte runtime layer-toggle via URL för standard-stilar. Två sätt att lösa:
-- **A)** Använd en Mapbox-stil där labels redan är dolda (kräver custom style ID per användarval — komplext).
-- **B (vald)**: Ladda stilen via `/styles/v1/{user}/{style}` med `addlayer`/`setfilter` URL-params. Mapbox Static Images API stödjer faktiskt `setfilter` och `addlayer` query-params för att modifiera stilen on-the-fly. Vi kan skicka `setfilter=["==",["get","class"],"__hidden__"]` på alla symbol-layers, men det kräver att vi vet layer-IDs.
+Rotorsaken är inte filstorleken i bytes — det är **pixelantalet resvg måste rastrera** + att hela operationen sker i en CPU-begränsad edge function (~3s budget, ingen SIMD).
 
-Enklare och mer robust: använd Mapbox **`/styles/v1/{username}/{style_id}/static`** med en **style override** i form av en JSON-payload (`POST` style + `GET` static räcker inte).
+### Ny arkitektur: "Pass-through när möjligt, komponera när nödvändigt"
 
-**Verkligen enklast**: Map Static API stödjer `before_layer` och layer-overrides via en **temporär style** — men vi kan undvika hela problemet genom att hämta Mapbox-tilen UTAN labels via en egen `no-labels`-variant av stilen. Mapbox tillhandahåller redan `mapbox/streets-v12` som har labels — vi behöver en label-fri motsvarighet.
+Insikt: I 80% av fallen behöver vi inte rastrera om källbilden alls. Vi behöver bara:
+1. Lägga text-overlay (litet område)
+2. Eventuellt clippa till cirkel/kvadrat (mask)
+3. Skicka URL till Gelato
 
-**Praktisk lösning**: Använd Mapbox Static Tiles API med parameter `&attribution=false&logo=false` + lägg till en **POST-baserad style temporary override**. Detta är komplext.
+Gelato accepterar PNG/JPEG print-filer direkt. Vi behöver inte bygga en ny pixelmatris — vi kan **leverera källbilden + en separat overlay**, eller komponera smartare.
 
-**Realistisk lösning (vald)**: Lägg labels som **SVG text overlay i vår egen pipeline** istället för att förlita oss på Mapbox-renderade labels. För `showLabels=false` skickar vi en ren label-fri Mapbox-tile genom att använda Mapbox-stilarnas `-no-labels`-variant där det finns, ELLER vi accepterar Mapbox-labels men lägger en vit/transparent overlay-mask. 
+### Tre-lagers strategi
 
-Bästa pragmatiska väg: **använd Mapbox `static` med `addlayer`-parameter för att lägga ett tomt fill ovanpå alla symbol-layers**. Mapbox Static API stöder `&addlayer={...}&before_layer={layer_id}`. Men eftersom det krävs att vi känner till alla symbol-layer IDs i varje stil, är det fortfarande klent.
+**Lager 1 — Pass-through (0 CPU, gratis)**
+När: `kind:"image"` + `mapShape="rect"` + ingen text
+→ Använd källbildens URL direkt som print-fil. Ingen rastrering. Hanterar 10 MB / 50 MP utan problem.
 
-**Slutgiltigt val: dubbla style-IDs.**
-Mappa varje stil till en `-no-labels`-variant när `showLabels=false`:
-- `mapbox/streets-v12` → använd Mapbox `mapbox/light-v11` eller en custom style. Tyvärr har inte alla Mapbox-stilar en label-fri variant.
+**Lager 2 — Lättviktskomposition (låg CPU)**
+När: text behövs OCH/ELLER shape-clip behövs
+→ Byt från resvg-WASM till **`@napi-rs/canvas` via Deno** ELLER **ImageScript** (ren TS, snabb, ingen WASM-rastrerings-overhead).
+→ ImageScript kan ladda en JPEG/PNG som buffer, rita text + mask ovanpå, exportera. CPU-tid skalar med **overlay-area**, inte hela bilden.
+→ För 20 MP-bild med 5% text-area = ~1 MP faktisk rastreringskostnad, oavsett källans storlek.
 
-→ **Renaste lösningen: skapa custom Mapbox-stilar (en med, en utan labels) per design** ELLER **fetcha tile-bilden och kör en post-process som maskar text-områden** (komplext).
+**Lager 3 — Async background job (för värsta fallet)**
+När: extremt stora bilder (>30 MP) eller komplexa kompositioner som ändå tippar CPU
+→ Edge function returnerar omedelbart `status:"processing"`, lägger jobb på en `print_jobs`-tabell
+→ Andra edge function (eller pg_cron) plockar upp och bearbetar med längre timeout via Supabase background tasks (`EdgeRuntime.waitUntil`)
+→ När klart: uppdatera `gelato_orders.print_file_url` + skicka till Gelato
 
-→ **Pragmatisk MVP-lösning: använd Mapbox `static` API med `addlayer` som lägger ett genomskinligt fill över hela bilden + kör samma `applyLabelVisibility`-logik** — fungerar inte på static API.
+### Konkret implementering — fas 1 (nu, för stabil map-pipeline)
 
-### Den faktiska, fungerande lösningen
+Innan vi bygger bild-stödet: **byt rastrerings-bibliotek** för att få headroom även för kartor med cirkel-clip.
 
-Mapbox Static Images API **stöder query-parameter `&addlayer=` + `before_layer=`** för att modifiera stilen on-the-fly. Vi kan dock INTE dölja existerande layers via URL-params.
+**Byt resvg-WASM → ImageScript** i `generate-print-file`:
+- ImageScript är pure-TS, har inbyggd PNG/JPEG decode/encode, text rendering, mask, composite
+- ~3-5× snabbare än resvg-WASM på samma operation eftersom den inte måste först parsa SVG
+- Direkt buffer-manipulation: `image.composite(overlay, x, y)` istället för SVG→raster
 
-**Den enda realistiska vägen för MVP:**
-1. För varje Mapbox-stil i `gelato-uids.json` / style-listan, definiera ett `noLabelsStyleId`-mappning i en ny konstant i edge function. Standard Mapbox-stilar utan labels:
-   - `mapbox/streets-v12` → ingen direkt motsvarighet, fallback till samma
-   - `mapbox/light-v11` → `mapbox/light-v11` (har minimala labels)
-   - `mapbox/dark-v11` → `mapbox/dark-v11`
-   - `mapbox/outdoors-v12` → fallback
-2. Acceptera att vissa stilar inte har label-fri variant och kommunicera detta till användaren (eller skapa custom-stilar i Mapbox Studio senare).
+Pipeline blir:
+1. Fetch Mapbox-tile som PNG-buffer → `Image.decode(buf)`
+2. Om shape ≠ rect: skapa mask-image, `image.mask(maskImage)`
+3. Om text: `image.drawText(font, text, x, y, color)`
+4. `image.encode()` → PNG-buffer → upload
 
-**ELLER — bättre på sikt: skapa custom Mapbox-stilar i Mapbox Studio** (en label-fri variant per stil) och lagra mappningen. Detta är ett separat task.
+Inga SVG, ingen pixel-upscaling, CPU-tid ~500ms istället för 2600ms.
 
-**För denna iteration: implementera shape-clipping (lätt fix) + använd `applyLabelVisibility`-equivalent via Mapbox Static API:s `setfilter`-parameter där möjligt, annars dokumentera limitation.**
+### Konkret implementering — fas 2 (när bild-stöd byggs)
 
-### Vad jag faktiskt ändrar nu
+När `kind:"image"` läggs till:
 
-**Fix 1 — Shape clipping (riktig fix):**
-- `shopify-order-webhook/index.ts`: läs `_mapShape` från cart properties och skicka `mapShape` i payload till `generate-print-file`. Idag skickas det inte alls → defaultar till `"rect"` i edge function.
-- `generate-print-file/index.ts`: shape-clipping-koden finns redan (`clipDef` + `clipAttr`). Bekräfta att den används korrekt + att canvas-bakgrund (`posterBgColor`) syns runt cirkel/kvadrat.
+**Klient-sida (editor) — komprimera FÖRE upload:**
+- Foto-upload genom `<input type=file>` → använd Canvas API i browsern för att resampla till **max 3000 px längsta sida + JPEG quality 0.9**
+- 3000 px på 30 cm = 254 DPI = print-kvalitet
+- Resulterar i ~1.5–3 MB filer istället för 10 MB
+- Ladda upp till ny `artwork-sources` storage bucket
+- Skicka URL i cart properties
 
-**Fix 2 — Labels (pragmatisk fix):**
-- `shopify-order-webhook/index.ts`: läs `_showLabels` från cart properties och skicka i payload.
-- `generate-print-file/index.ts`: implementera **Mapbox Static API addlayer-trick** — lägg till `&addlayer=` med ett tomt symbol-layer som overrides text-paint till transparent. Detta fungerar för layers vi själva lägger till, INTE för befintliga. 
-- **Realistisk MVP**: När `showLabels=false`, byt `styleId` till en label-free variant via en mapping i edge function. Lista:
-  ```ts
-  const NO_LABEL_STYLE: Record<string,string> = {
-    "mapbox/streets-v12": "mapbox/light-v11",  // fallback
-    "mapbox/light-v11": "mapbox/light-v11",
-    "mapbox/dark-v11": "mapbox/dark-v11",
-    // custom user styles → samma (kräver custom no-label style i Mapbox Studio)
-  }
-  ```
-- Detta är inte perfekt men matchar editor-beteendet "bättre" än idag. Långsiktig fix: skapa custom no-label styles i Mapbox Studio (separat task).
+**Server-sida — pass-through eller ImageScript:**
+- Om rect + ingen text: pass-through (Lager 1)
+- Annars: ImageScript-komposition (Lager 2)
+- Om bild >5000 px och komplex komposition: background job (Lager 3, framtida)
 
-**Fix 3 — Cart properties end-to-end:**
-- Verifiera att editor faktiskt skriver `_mapShape` och `_showLabels` till Shopify cart line item properties. Om inte → fix i `cartStore.ts` / `useCartSync.ts` så att alla relevanta editor-state (mapShape, showLabels, posterBgColor, textVisible, textFont) följer med ordern.
+### Vad ändras i denna PR
 
-### Filer som ändras
+**Filer (fas 1 — nu):**
+1. **`supabase/functions/generate-print-file/index.ts`** — byt ut resvg-WASM mot **ImageScript** (`https://deno.land/x/[email protected]`):
+   - Decode källa direkt till `Image`-buffer (ingen SVG-mellanlanding)
+   - Implementera shape-clip via `Image.mask()` med genererad cirkel/kvadrat-mask
+   - Implementera text via `Image.renderText()` med inbyggd font (Inter ttf laddas en gång)
+   - Encode → PNG buffer → upload som idag
+   - Behåll `Artwork`-input-kontraktet (map/image agnostisk)
+   - Lägg till pass-through-gren: om `kind:"image"` + rect + ingen text → fetch source, upload utan modifiering, returnera URL
 
-- `src/hooks/useCartSync.ts` eller `src/stores/cartStore.ts` — lägg till `_mapShape`, `_showLabels`, `_textVisible`, `_textFont`, `_posterBgColor` i cart line item properties (om saknas).
-- `supabase/functions/shopify-order-webhook/index.ts` — läs nya cart properties + skicka i payload till `generate-print-file`.
-- `supabase/functions/generate-print-file/index.ts` — tillämpa `noLabelStyleId`-mappning när `showLabels=false`. Bekräfta shape-clip-logik.
+2. **`src/pages/EditorPage.tsx`** — ingen ändring nu (bild-upload kommer i fas 2)
 
-### Förberedelse för framtida bilder (kind: "image")
+3. **`supabase/functions/shopify-order-webhook/index.ts`** — ingen ändring (`artwork`-objektet skickas redan korrekt)
 
-- Shape-clip-koden i `generate-print-file` är redan motiv-agnostisk → fungerar identiskt för `kind:"image"` (foto/AI). Inget extra behövs.
-- Labels-frågan gäller bara `kind:"map"` — för bilder finns inga inbäddade labels att dölja.
-- Text-overlay-koden är redan villkorad på `textVisible` → fungerar för båda.
+**Filer (fas 2 — separat task när bild-funktionen byggs):**
+- Editor: bild-upload med klient-sida resize + komprimering
+- Ny `artwork-sources` storage bucket + RLS
+- Eventuellt `print_jobs`-tabell för Lager 3 om vi ser att det behövs
+
+### Förväntat resultat efter fas 1
+
+| Scenario | Idag | Efter |
+|----------|------|-------|
+| Map rect, text | ✅ 1.5s | ✅ 0.4s |
+| Map cirkel, text | ❌ timeout | ✅ 0.6s |
+| Map cirkel, ingen text | ❌ timeout | ✅ 0.5s |
+| Image 5 MB rect, ingen text (framtid) | n/a | ✅ <0.1s (pass-through) |
+| Image 10 MB cirkel + text (framtid) | n/a | ✅ ~1.5s (ImageScript) |
 
 ### Verifiering
 
-1. Gå in i editorn, välj cirkel-form + stäng av labels + lägg till text.
-2. Lägg testorder via Bogus Gateway.
-3. Öppna print-fil-URL från `gelato_orders` → ska visa cirkulär karta med vit bakgrund runt + ingen text-overlay för områdesnamn + din text-rad nedtill.
-4. Gelato dashboard visar ordern.
+1. Du lägger ny testorder med **cirkel + labels off + text**
+2. `gelato_orders` → `submitted` på första försöket
+3. Print-fil visar cirkulär karta med vit bg + text-rad
+4. Edge function-logg visar render-tid <1s
 
-### Limitations som dokumenteras
+### Begränsningar / framtida
 
-- Label-fri variant för custom Mapbox-stilar kräver att du skapar en parallel "no-labels"-stil i Mapbox Studio och lägger till mappningen i edge function. Görs som separat task vid behov.
+- ImageScript saknar custom font loading lika smidigt som SVG — vi kommer behöva embedda Inter.ttf (eller liknande) som binär i edge function. Hanterbart, ~150 KB extra deploy-storlek.
+- Pass-through-grenen kräver att Gelato accepterar exakt formatet på källbilden (PNG/JPEG/dim). Verifieras vid fas 2.
+- Lager 3 (async jobs) byggs först när vi ser konkret behov — börjar inte över-engineera.
 
