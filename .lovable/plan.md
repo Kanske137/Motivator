@@ -1,43 +1,42 @@
 
 
-## Plan: Snapshot ska rendera identiskt med editorn
+## Plan: Synka editorns aspect ratio med vald storlek + fixa form-uppdatering
 
 ### Grundorsak
 
-`editor-snapshot.ts` skiljer sig från `MapPreview` på tre punkter som tillsammans ger förvrängd form, fel kartinnehåll och för stor text i förhandsvisningen:
+**1. Editorns aspect ratio ändras inte med storleksval**
+`MapPreview` beräknar `posterAspect` korrekt från `size` + `orientation`, men `frameStyle` har `maxWidth: "min(100%, 70vh)"` OCH `maxHeight: "78vh"` samtidigt. Kombinationen gör att postern alltid fyller samma visuella box oavsett ratio — browsern väljer den dimension som "passar först" och då dominerar viewport-cappen, inte `aspectRatio`. Resultatet: editorn ser nästan likadan ut för 30×40 (0.75) och 50×70 (0.714), och cirkel/kvadrat-clipen hamnar mot fel referensram.
 
-1. **Mapbox renderas i fel container-form**
-   Editorn lägger kartan i en 1:1 wrapper när formen är `square`/`circle`. Snapshoten renderar alltid Mapbox i hela poster-rektangeln (t.ex. 720×1008 stående) och ritar sedan in den portrait-canvas i en kvadratisk clip. Resultat: kartinnehållet squishas vertikalt → cirkeln ser stretchad ut, kvadraten visar fel utsnitt.
+**2. Cirkel/kvadrat ser stretchad ut i förhandsvisningen**
+Snapshoten (`editor-snapshot.ts`) beräknar `posterAspect` från `size` korrekt och renderar en sann kvadratisk Mapbox-canvas för `square`/`circle`. MEN editorns visuella ram följer inte samma aspect (pga problem 1), så användaren upplever förhandsvisning ≠ editor. När editorns aspect synkas korrekt försvinner den upplevda mismatchen.
 
-2. **Texten är ~30% för stor och felplacerad**
-   Snapshoten använder `w * 0.04` med `+ fontSize * 0.85` Y-offset. Editorn använder Tailwinds `text-sm md:text-base lg:text-lg` (~2.8% av previewbredden) centrerad via `translate(-50%,-50%)`.
-
-3. **Ingen letter-spacing/leading-paritet**
-   Editorn har `tracking-wide` (~0.05em) och `leading-tight` (~1.15). Snapshoten kör 1.2 utan tracking.
+**3. Form uppdateras inte direkt**
+`MockupGallery` debouncar snapshot-rendern men sätter inte `reqIdRef` synkront vid `mapShape`-ändring → en pågående render från föregående form kan skriva över den nya.
 
 ### Lösning
 
-**`src/lib/editor-snapshot.ts`:**
+**A. `src/components/editor/MapPreview.tsx` — låt aspect styra layouten**
+- Ta bort `maxWidth: "min(100%, 70vh)"`. Behåll bara `maxHeight: 78vh` som säkerhet mot att postern blir högre än viewporten.
+- Sätt `width: "auto"` när `posterAspect < 1` (portrait) så att höjden (begränsad av `maxHeight`) styr och bredden följer aspect.
+- Sätt `height: "auto"` + `width: "min(100%, 70vh)"` när `posterAspect >= 1` (landscape).
+- Behåll `aspectRatio: ${posterAspect}` så browsern räknar rätt.
 
-- **Map-container per form:**
-  - `rect` → Mapbox renderas i `w × h` (oförändrat).
-  - `square`/`circle` → Mapbox renderas i `sq × sq` där `sq = min(w, h)`. Inget squishas eftersom källcanvasen redan är kvadratisk.
-- **Kompositering:**
-  - `rect` → `drawImage(map, 0, 0, w, h)`.
-  - `square`/`circle` → `drawImage(map, (w-sq)/2, (h-sq)/2, sq, sq)`. Cirkel-clip blir sann cirkel runt sant kvadratiskt innehåll.
-- **Text:**
-  - `fontSize = round(w * 0.028)`
-  - `lineHeight = round(fontSize * 1.15)`
-  - `ctx.textBaseline = "middle"`, centrera blocket kring `h * yFrac` (ta bort `+ fontSize * 0.85`).
-  - `ctx.font = '500 ${fontSize}px ${textFont}'` (matchar `font-medium`).
-  - Approximera `tracking-wide` genom att rita tecken för tecken med `~fontSize*0.05` extra spacing per tecken (eller acceptera utan om visuellt OK; testa först utan).
+Resultat: editorns ram ändrar form direkt när användaren byter storlek (30×40 vs 50×70 vs 70×100 ger synligt olika ratio), och förhandsvisningens snapshot matchar exakt eftersom båda läser samma `size`/`orientation`.
+
+**B. `src/lib/editor-snapshot.ts` — säkerställ stabil render per anrop**
+- Slopa den delade `snapshotContainer`-diven. Skapa ny wrapper + `mapDiv` per anrop, ta bort i `finally`.
+- Vänta på två `idle`-events efter `setLayoutProperty` (label-toggle) för att garantera att tiles är ritade innan `getCanvas()` läses.
+
+**C. `src/components/editor/MockupGallery.tsx` — invalidera direkt vid form-byte**
+- Bumpa `reqIdRef` synkront i början av `useEffect` som lyssnar på `mapShape`, så stale render från tidigare form aldrig kan sätta resultat efter att användaren bytt.
 
 ### Filer som ändras
-- `src/lib/editor-snapshot.ts` — map-container per form, ren centrering, ny font-skala/baseline.
+- `src/components/editor/MapPreview.tsx` — ny `frameStyle`-logik baserat på `posterAspect`.
+- `src/lib/editor-snapshot.ts` — unik container per render, dubbel `idle`-väntan.
+- `src/components/editor/MockupGallery.tsx` — synkron `reqIdRef`-bump på `mapShape`-byte.
 
 ### Förväntat resultat
-- Cirkel = sann cirkel, inget vertikalt squish.
-- Kvadrat = sann kvadrat med rätt kartutsnitt.
-- Text matchar editorns storlek och position.
-- Canvas 3D ärver fixarna automatiskt eftersom den använder samma snapshot.
+- Editorns ram ändrar aspect ratio direkt vid storleksval (synlig skillnad mellan 30×40, 50×70, 70×100, kvadratiska format).
+- Förhandsvisningens form matchar editorns exakt — ingen upplevd "stretchad cirkel" eftersom båda har samma ratio-källa.
+- Form-byte (rect/square/circle) uppdaterar förhandsvisningen omedelbart utan stale render.
 
