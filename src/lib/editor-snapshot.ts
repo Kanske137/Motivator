@@ -33,6 +33,8 @@ export interface SnapshotInput {
   frameWidthCm?: number;
   /** When true, render a canvas wrap shadow on the sides instead of a flat frame. */
   canvasWrap?: boolean;
+  /** When true, render at print resolution (~3000+px longest side, JPEG q=0.95). */
+  hires?: boolean;
 }
 
 function parseSize(size: string, orientation: "portrait" | "landscape") {
@@ -85,9 +87,9 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
   const hCm = frontHcm + 2 * extraCm;
 
   // Render at ~24px/cm baseline. Scale UNIFORMLY so longest side <= MAX_PX,
-  // preserving aspect ratio.
-  const PX_PER_CM = 24;
-  const MAX_PX = 1800;
+  // preserving aspect ratio. In hires mode (print files), bump both.
+  const PX_PER_CM = input.hires ? 32 : 24;
+  const MAX_PX = input.hires ? 3600 : 1800;
   const longestPx = Math.max(wCm, hCm) * PX_PER_CM;
   const scale = longestPx > MAX_PX ? MAX_PX / longestPx : 1;
   const w = Math.round(wCm * PX_PER_CM * scale);
@@ -290,7 +292,7 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
       ctx.restore();
     }
 
-    return out.toDataURL("image/jpeg", 0.92);
+    return out.toDataURL("image/jpeg", input.hires ? 0.95 : 0.92);
   } finally {
     try {
       map?.remove();
