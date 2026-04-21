@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      gelato_orders: {
+        Row: {
+          created_at: string
+          error: string | null
+          gelato_order_id: string | null
+          id: string
+          payload: Json | null
+          shopify_order_id: string
+          shopify_order_name: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          gelato_order_id?: string | null
+          id?: string
+          payload?: Json | null
+          shopify_order_id: string
+          shopify_order_name?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          gelato_order_id?: string | null
+          id?: string
+          payload?: Json | null
+          shopify_order_id?: string
+          shopify_order_name?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       product_configs: {
         Row: {
           created_at: string
