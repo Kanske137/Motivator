@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { Orientation, ProductConfig } from "@/lib/product-config";
+import type { DesignSource } from "@/lib/print-pipeline";
 
 interface ApplyPlaceArgs {
   placeName: string;
