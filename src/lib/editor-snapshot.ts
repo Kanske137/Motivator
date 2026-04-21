@@ -70,24 +70,35 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
   if (!token) throw new Error("Mapbox token missing");
   mapboxgl.accessToken = token;
 
-  const { wCm, hCm } = parseSize(input.size, input.orientation);
+  const { wCm: frontWcm, hCm: frontHcm } = parseSize(input.size, input.orientation);
+  const wrapCm = Math.max(0, input.wrapCm ?? 0);
+  const bleedCm = Math.max(0, input.bleedCm ?? 0);
+  const extraCm = wrapCm + bleedCm; // per side
+  const wCm = frontWcm + 2 * extraCm;
+  const hCm = frontHcm + 2 * extraCm;
+
   // Render at ~24px/cm baseline. Scale UNIFORMLY so longest side <= MAX_PX,
-  // preserving aspect ratio (otherwise large formats like 70x100 would become
-  // 1600x1600 and the artwork would appear stretched in the editor's frame).
+  // preserving aspect ratio.
   const PX_PER_CM = 24;
-  const MAX_PX = 1600;
+  const MAX_PX = 1800;
   const longestPx = Math.max(wCm, hCm) * PX_PER_CM;
   const scale = longestPx > MAX_PX ? MAX_PX / longestPx : 1;
   const w = Math.round(wCm * PX_PER_CM * scale);
   const h = Math.round(hCm * PX_PER_CM * scale);
+  // Pixel offsets of the inner FRONT zone (where motif clip + text live)
+  const frontPxX = Math.round(extraCm * PX_PER_CM * scale);
+  const frontPxY = Math.round(extraCm * PX_PER_CM * scale);
+  const frontPxW = Math.round(frontWcm * PX_PER_CM * scale);
+  const frontPxH = Math.round(frontHcm * PX_PER_CM * scale);
 
-  // Map renders in shape-aware container so square/circle aren't squished.
-  const sq = Math.min(w, h);
-  const mapW = input.mapShape === "rect" ? w : sq;
-  const mapH = input.mapShape === "rect" ? h : sq;
+  // Map renders in shape-aware container. With wrap, the map ALWAYS covers the
+  // full extended canvas as a rect (wrap continues the map outside the front).
+  const useShapeClip = extraCm === 0 && input.mapShape !== "rect";
+  const sq = Math.min(frontPxW, frontPxH);
+  const mapW = useShapeClip ? Math.min(w, h) : w;
+  const mapH = useShapeClip ? Math.min(w, h) : h;
 
   const container = createOffscreenContainer(Math.max(w, mapW), Math.max(h, mapH));
-  // Inner div for THIS map render (so concurrent renders don't collide)
   const mapDiv = document.createElement("div");
   mapDiv.style.width = `${mapW}px`;
   mapDiv.style.height = `${mapH}px`;
