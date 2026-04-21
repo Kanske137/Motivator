@@ -47,18 +47,6 @@ function escapeXml(s: string): string {
   );
 }
 
-let wasmReady: Promise<void> | null = null;
-async function ensureResvg(): Promise<void> {
-  if (!wasmReady) {
-    wasmReady = (async () => {
-      const wasmRes = await fetch("https://unpkg.com/@resvg/[email protected]/index_bg.wasm");
-      const wasmBuf = await wasmRes.arrayBuffer();
-      await initWasm(wasmBuf);
-    })();
-  }
-  return wasmReady;
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -152,14 +140,8 @@ Deno.serve(async (req) => {
   ${textSvg}
 </svg>`;
 
-    // Rasterize SVG → PNG via resvg-wasm
-    await ensureResvg();
-    const resvg = new Resvg(svg, {
-      fitTo: { mode: "width", value: w },
-      background: posterBgColor,
-      font: { loadSystemFonts: false, defaultFontFamily: "Inter" },
-    });
-    const pngData = resvg.render().asPng();
+    // Rasterize SVG → PNG via deno.land/x/resvg_wasm
+    const pngData = await renderSvgToPng(svg);
     console.log(`[generate-print-file] PNG rasterized: ${pngData.byteLength} bytes`);
 
     // Upload PNG
