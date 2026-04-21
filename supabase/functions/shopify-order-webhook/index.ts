@@ -328,13 +328,15 @@ async function processOrder(supabase: any, order: any) {
   }
 
   if (items.length === 0) {
-    const status = printErrors.length ? "print_failed"
+    const status = printErrors.length ? "pending_manual"
       : skuErrors.length ? "sku_not_found"
       : "skipped";
-    await supabase.from("gelato_orders").update({
-      status,
-      error: [...printErrors, ...skuErrors].join(" | ") || "no editor items in order",
-    }).eq("shopify_order_id", shopifyOrderId);
+    const error = printErrors.length
+      ? `missing_print_file_url — ${printErrors.join(" | ")}`
+      : [...skuErrors].join(" | ") || "no editor items in order";
+    console.warn(`[shopify-webhook] order ${shopifyOrderId} → ${status}: ${error}`);
+    await supabase.from("gelato_orders").update({ status, error })
+      .eq("shopify_order_id", shopifyOrderId);
     return;
   }
 
