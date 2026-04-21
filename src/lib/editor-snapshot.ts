@@ -277,7 +277,7 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
     // Only applies in poster (no wrap) mode; canvas wrap mode already extends the
     // texture and the 3D preview handles the depth, so we add a soft side shadow.
     const hasFrame = !!input.frameColor && input.frameColor.trim() !== "";
-    if (extraCm === 0 && hasFrame && (input.frameWidthCm ?? 0) > 0) {
+    if (!input.hires && extraCm === 0 && hasFrame && (input.frameWidthCm ?? 0) > 0) {
       const fw = Math.max(1, Math.round((input.frameWidthCm ?? 1.2) * PX_PER_CM * scale));
       ctx.save();
       ctx.fillStyle = input.frameColor!;
@@ -291,7 +291,7 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
       ctx.lineWidth = Math.max(1, Math.round(fw * 0.06));
       ctx.strokeRect(fw, fw, w - 2 * fw, h - 2 * fw);
       ctx.restore();
-    } else if (input.canvasWrap && extraCm === 0) {
+    } else if (!input.hires && input.canvasWrap && extraCm === 0) {
       // Canvas wrap (no extended texture): paint a soft inner shadow on edges so
       // the cart thumbnail reads as a stretched canvas, not a flat poster.
       const edge = Math.max(2, Math.round(0.25 * PX_PER_CM * scale));
