@@ -327,3 +327,39 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
     if (container.parentNode) container.parentNode.removeChild(container);
   }
 }
+
+/**
+ * Hires snapshot with one retry at 70 % size if the first attempt fails
+ * (typically WebGL context loss on weaker GPUs / very large posters).
+ * Throws on final failure — caller MUST handle and abort the user action.
+ */
+export async function renderHiresSnapshotSafe(input: SnapshotInput): Promise<SnapshotResult> {
+  const t0 = performance.now();
+  let lastErr: unknown = null;
+  const initialMax = pickHiresMaxPx();
+  const attempts = [initialMax, Math.round(initialMax * 0.7)];
+  for (const maxPx of attempts) {
+    try {
+      const dataUrl = await renderArtworkSnapshot({ ...input, hires: true, maxPxOverride: maxPx });
+      const base64 = dataUrl.split(",")[1] ?? "";
+      const sizeBytes = Math.round((base64.length * 3) / 4);
+      const dims = await new Promise<{ w: number; h: number }>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve({ w: img.width, h: img.height });
+        img.onerror = () => reject(new Error("dim probe failed"));
+        img.src = dataUrl;
+      });
+      const ms = Math.round(performance.now() - t0);
+      console.info(
+        `[print-pipeline] map snapshot ok: ${dims.w}×${dims.h}px, ${(sizeBytes / 1024 / 1024).toFixed(2)}MB, ${ms}ms (maxPx=${maxPx})`
+      );
+      return { dataUrl, widthPx: dims.w, heightPx: dims.h, sizeBytes };
+    } catch (e) {
+      console.warn(`[print-pipeline] snapshot failed at maxPx=${maxPx}, retrying smaller…`, e);
+      lastErr = e;
+    }
+  }
+  throw new Error(
+    `Hi-res snapshot failed after retries: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`
+  );
+}
