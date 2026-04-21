@@ -26,6 +26,13 @@ export interface SnapshotInput {
   wrapCm?: number;
   /** Bleed in cm added outside the wrap zone (Gelato canvas = 0.3 cm). */
   bleedCm?: number;
+  /** Frame color (CSS string). Empty = no frame. Drawn ON TOP of the artwork
+   *  so the cart thumbnail matches the editor preview. */
+  frameColor?: string;
+  /** Frame width in cm (poster only). */
+  frameWidthCm?: number;
+  /** When true, render a canvas wrap shadow on the sides instead of a flat frame. */
+  canvasWrap?: boolean;
 }
 
 function parseSize(size: string, orientation: "portrait" | "landscape") {
