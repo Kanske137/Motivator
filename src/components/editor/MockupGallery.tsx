@@ -84,7 +84,7 @@ export function MockupGallery() {
                 size,
                 orientation,
                 productType: config.product_type,
-                canvasDepthCm,
+                canvasDepthCm: sceneCanvasDepthCm,
                 frameColor,
               });
               return { scene, url, error: undefined as string | undefined };
@@ -131,9 +131,6 @@ export function MockupGallery() {
     const [a, b] = (size ?? "30x40").split("x").map(Number);
     const widthCm = orientation === "portrait" ? Math.min(a, b) : Math.max(a, b);
     const heightCm = orientation === "portrait" ? Math.max(a, b) : Math.min(a, b);
-    const depthCm = variant?.match(/(\d+)/)?.[1]
-      ? parseInt(variant.match(/(\d+)/)![1], 10)
-      : 2;
     return (
       <Canvas3DPreview
         printUrl={snapshotUrl}
@@ -141,7 +138,8 @@ export function MockupGallery() {
         error={snapshotError}
         widthCm={widthCm}
         heightCm={heightCm}
-        depthCm={depthCm}
+        depthCm={canvasDepthCm}
+        bleedCm={BLEED_CM}
       />
     );
   }
