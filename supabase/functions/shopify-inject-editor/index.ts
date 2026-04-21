@@ -108,7 +108,9 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const domain = Deno.env.get("SHOPIFY_STORE_PERMANENT_DOMAIN") ?? Deno.env.get("SHOPIFY_STORE_DOMAIN");
+    const domain = Deno.env.get("SHOPIFY_STORE_PERMANENT_DOMAIN")
+      ?? Deno.env.get("SHOPIFY_STORE_DOMAIN")
+      ?? "canvas-poster-creator-2wh5d.myshopify.com";
     const token = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
     if (!domain || !token) {
       return new Response(JSON.stringify({ error: "Shopify credentials missing" }), {
