@@ -88,17 +88,41 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   orientation: "portrait",
 
   setConfig: (config) => {
-    const firstSize = config.sizes[0];
-    const firstVariant = firstSize?.variants[0];
+    // Preserve all design state across product switches (poster <-> canvas).
+    // Only update fields that are no longer valid for the new product.
+    const state = get();
+    const prevSize = state.size;
+    const prevVariant = state.variant;
+    const prevStyle = state.mapStyleId;
+    const prevFont = state.textFont;
+
+    // Size: keep if still available, else first size of new product
+    const sizeStillValid = prevSize && config.sizes.find((s) => s.size === prevSize);
+    const nextSize = sizeStillValid ? prevSize : config.sizes[0]?.size ?? null;
+    const nextSizeDef = config.sizes.find((s) => s.size === nextSize);
+
+    // Variant: keep if still available within the chosen size, else first variant
+    const variantStillValid =
+      prevVariant && nextSizeDef?.variants.find((v) => v.name === prevVariant);
+    const nextVariant = variantStillValid ? prevVariant : nextSizeDef?.variants[0]?.name ?? null;
+
+    // Map style: keep if supported by the new product, else fallback
+    const styleStillValid = config.map_styles.includes(prevStyle);
+    const nextStyle = styleStillValid ? prevStyle : config.map_styles[0] ?? prevStyle;
+
+    // Font: keep if supported, else use new product's default
+    const fontStillValid = config.text_config.fonts?.includes(prevFont);
+    const nextFont = fontStillValid ? prevFont : config.text_config.defaultFont ?? prevFont;
+
     set({
       config,
-      mapStyleId: config.map_styles[0] ?? "light-v11",
-      textFont: config.text_config.defaultFont ?? "Inter",
-      size: get().size && config.sizes.find((s) => s.size === get().size) ? get().size : firstSize?.size ?? null,
-      variant:
-        get().variant && firstSize?.variants.find((v) => v.name === get().variant)
-          ? get().variant
-          : firstVariant?.name ?? null,
+      size: nextSize,
+      variant: nextVariant,
+      mapStyleId: nextStyle,
+      textFont: nextFont,
+      // Everything else (mapCenter, mapZoom, text, textVisible, posterBgColor,
+      // mapShape, showLabels, placeName, city, country, orientation,
+      // textIsCustom) is intentionally preserved.
     });
   },
   setMapCenter: (mapCenter) => set({ mapCenter }),
