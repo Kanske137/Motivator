@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { useEditorStore } from "@/stores/editorStore";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
