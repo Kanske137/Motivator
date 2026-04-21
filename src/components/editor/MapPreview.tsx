@@ -8,6 +8,8 @@ interface Props {
   frameColor?: string; // CSS color for border. Empty/undefined = no border.
   frameWidthCm?: number; // physical frame width in cm (default 2)
   innerPadding?: string;
+  /** Canvas wrap depth in cm (>0 → editor area is extended to include wrap zone). */
+  wrapCm?: number;
 }
 
 function parseCm(size: string | null): { w: number; h: number } | null {
@@ -38,7 +40,7 @@ function applyLabelVisibility(map: mapboxgl.Map, show: boolean) {
   else map.once("idle", apply);
 }
 
-export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding }: Props) {
+export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm = 0 }: Props) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const [borderPx, setBorderPx] = useState(0);
@@ -175,13 +177,17 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding }: Props
     setTimeout(() => mapRef.current?.resize(), 320);
   }, [orientation, size, mapShape]);
 
-  // Outer poster frame: ALWAYS uses poster aspect (independent of mapShape)
+  // Outer poster/canvas frame. For canvas (wrapCm>0) the editor renders the
+  // FULL print area (front + wrap on all sides) so users see what wraps onto
+  // the sides of the physical canvas.
   const sizeCm = parseCm(size);
-  const posterAspect = sizeCm
-    ? (orientation === "portrait"
-        ? Math.min(sizeCm.w, sizeCm.h) / Math.max(sizeCm.w, sizeCm.h)
-        : Math.max(sizeCm.w, sizeCm.h) / Math.min(sizeCm.w, sizeCm.h))
-    : (orientation === "portrait" ? 3 / 4 : 4 / 3);
+  const frontW = sizeCm ? (orientation === "portrait" ? Math.min(sizeCm.w, sizeCm.h) : Math.max(sizeCm.w, sizeCm.h)) : 30;
+  const frontH = sizeCm ? (orientation === "portrait" ? Math.max(sizeCm.w, sizeCm.h) : Math.min(sizeCm.w, sizeCm.h)) : 40;
+  const editorW = frontW + 2 * wrapCm;
+  const editorH = frontH + 2 * wrapCm;
+  const posterAspect = editorW / editorH;
+  const frontInsetX = wrapCm > 0 ? wrapCm / editorW : 0;
+  const frontInsetY = wrapCm > 0 ? wrapCm / editorH : 0;
 
   // Compute frame border in pixels relative to physical short side (Gelato ~2cm)
   useEffect(() => {
@@ -221,9 +227,15 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding }: Props
 
   // Inner map wrapper kept ALWAYS within the poster frame.
   // Square/circle: fit a centered square that hugs the poster's shorter side.
+  // For canvas (wrapCm>0) the shape applies only to the FRONT zone — the wrap
+  // strip around it always shows the rectangular map continuation.
   const isShaped = mapShape === "square" || mapShape === "circle";
   const isPortraitFrame = posterAspect <= 1;
-  const mapWrapperStyle: React.CSSProperties = isShaped
+  const isWrap = wrapCm > 0;
+
+  // Map ALWAYS covers the full editor area (rect) when in wrap mode so the
+  // wrap zone shows continuous map. Shape clip is applied as a separate overlay.
+  const mapWrapperStyle: React.CSSProperties = isShaped && !isWrap
     ? {
         position: "absolute",
         left: "50%",
@@ -236,6 +248,16 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding }: Props
         overflow: "hidden",
       }
     : { position: "absolute", inset: 0, overflow: "hidden" };
+
+  // Front zone (where the visible front lives in canvas mode). For posters
+  // this equals the whole editor.
+  const frontZoneStyle: React.CSSProperties = {
+    position: "absolute",
+    left: `${frontInsetX * 100}%`,
+    top: `${frontInsetY * 100}%`,
+    right: `${frontInsetX * 100}%`,
+    bottom: `${frontInsetY * 100}%`,
+  };
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-4 gap-2">
@@ -252,25 +274,75 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding }: Props
           <div ref={mapContainerRef} className="absolute inset-0" />
         </div>
 
+        {/* Canvas wrap mode: shape clip via SVG mask within front zone only */}
+        {isWrap && isShaped && (
+          <div
+            className="absolute pointer-events-none"
+            style={{
+              ...frontZoneStyle,
+              background: posterBgColor,
+              WebkitMaskImage:
+                mapShape === "circle"
+                  ? "radial-gradient(circle at 50% 50%, transparent 0, transparent 49.5%, #000 50%)"
+                  : "linear-gradient(#000,#000)",
+              WebkitMaskSize:
+                mapShape === "square"
+                  ? `${Math.min(100, (Math.min(frontW, frontH) / Math.max(frontW, frontH)) * 100)}% ${Math.min(100, (Math.min(frontW, frontH) / Math.max(frontW, frontH)) * 100)}%`
+                  : "100% 100%",
+              WebkitMaskPosition: "center",
+              WebkitMaskRepeat: "no-repeat",
+              maskImage:
+                mapShape === "circle"
+                  ? "radial-gradient(circle at 50% 50%, transparent 0, transparent 49.5%, #000 50%)"
+                  : "linear-gradient(#000,#000)",
+              maskSize:
+                mapShape === "square"
+                  ? `${Math.min(100, (Math.min(frontW, frontH) / Math.max(frontW, frontH)) * 100)}% ${Math.min(100, (Math.min(frontW, frontH) / Math.max(frontW, frontH)) * 100)}%`
+                  : "100% 100%",
+              maskPosition: "center",
+              maskRepeat: "no-repeat",
+            }}
+          />
+        )}
+
+        {/* Visible front indicator (canvas wrap mode only) */}
+        {isWrap && (
+          <div
+            className="absolute pointer-events-none border-2 border-dashed border-foreground/40"
+            style={frontZoneStyle}
+          >
+            <span className="absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full bg-background/90 backdrop-blur-sm px-2 py-0.5 text-[10px] uppercase tracking-wider rounded text-foreground/70 whitespace-nowrap">
+              Synlig framsida · kanterna wrappas
+            </span>
+          </div>
+        )}
+
         {textVisible &&
           layout?.layers
             .filter((l) => l.type === "text")
-            .map((l, i) => (
-              <div
-                key={`text-${i}`}
-                className="absolute -translate-x-1/2 -translate-y-1/2 text-center px-2 text-foreground pointer-events-none"
-                style={{
-                  left: l.x,
-                  top: l.y,
-                  fontFamily: textFont,
-                  width: "90%",
-                }}
-              >
-                <div className="whitespace-pre-line text-sm md:text-base lg:text-lg font-medium tracking-wide leading-tight">
-                  {text || "Lägg till text…"}
+            .map((l, i) => {
+              // Parse l.x/l.y as % within FRONT zone, then map to editor coords
+              const xPct = parseFloat(String(l.x)) / 100;
+              const yPct = parseFloat(String(l.y)) / 100;
+              const leftPct = (frontInsetX + xPct * (1 - 2 * frontInsetX)) * 100;
+              const topPct = (frontInsetY + yPct * (1 - 2 * frontInsetY)) * 100;
+              return (
+                <div
+                  key={`text-${i}`}
+                  className="absolute -translate-x-1/2 -translate-y-1/2 text-center px-2 text-foreground pointer-events-none"
+                  style={{
+                    left: `${leftPct}%`,
+                    top: `${topPct}%`,
+                    fontFamily: textFont,
+                    width: `${(1 - 2 * frontInsetX) * 90}%`,
+                  }}
+                >
+                  <div className="whitespace-pre-line text-sm md:text-base lg:text-lg font-medium tracking-wide leading-tight">
+                    {text || "Lägg till text…"}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
       </div>
       <p className="text-[10px] text-muted-foreground">© Mapbox · © OpenStreetMap</p>
     </div>

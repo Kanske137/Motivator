@@ -168,28 +168,30 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
     ctx.fillRect(0, 0, w, h);
 
     if (extraCm > 0) {
-      // WRAP MODE (canvas): map fills entire extended area for wrap continuity.
+      // WRAP MODE (canvas): editor area = full print area (front + wrap).
+      // The map fills the entire extended canvas so wrap+bleed continue
+      // naturally outside the visible front.
       ctx.drawImage(mapCanvas, 0, 0, w, h);
 
-      // If front uses non-rect shape, repaint front zone with bg then re-draw
-      // the map only within the shape clip — so the visible front matches editor.
+      // If front uses non-rect shape, paint bg in the front zone OUTSIDE the
+      // shape (clip-invert via even-odd fill rule) — wrap zone untouched.
       if (input.mapShape !== "rect") {
         ctx.save();
         ctx.fillStyle = input.posterBgColor || "#ffffff";
-        ctx.fillRect(frontPxX, frontPxY, frontPxW, frontPxH);
         const fsq = Math.min(frontPxW, frontPxH);
         const fcx = frontPxX + frontPxW / 2;
         const fcy = frontPxY + frontPxH / 2;
         ctx.beginPath();
+        // Outer: full front rect
+        ctx.rect(frontPxX, frontPxY, frontPxW, frontPxH);
+        // Inner: shape (reverse winding via even-odd)
         if (input.mapShape === "circle") {
+          ctx.moveTo(fcx + fsq / 2, fcy);
           ctx.arc(fcx, fcy, fsq / 2, 0, Math.PI * 2);
         } else {
           ctx.rect(fcx - fsq / 2, fcy - fsq / 2, fsq, fsq);
         }
-        ctx.clip();
-        // Draw map aligned to full extended area (same as wrap) so the visible
-        // shape contains the same pixels as the wrap continuation around it.
-        ctx.drawImage(mapCanvas, 0, 0, w, h);
+        ctx.fill("evenodd");
         ctx.restore();
       }
     } else {
