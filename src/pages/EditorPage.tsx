@@ -71,9 +71,9 @@ export default function EditorPage() {
 
     setIsPreparing(true);
     let previewUrl = "";
+    let printFileUrl = "";
     try {
-      // Render the FRONT (no wrap) — matches what the customer sees in the editor preview.
-      const dataUrl = await renderArtworkSnapshot({
+      const baseInput = {
         mapStyleId,
         mapCenter,
         mapZoom,
@@ -89,8 +89,20 @@ export default function EditorPage() {
         frameColor: !isCanvas ? frameColor : "",
         frameWidthCm: !isCanvas ? FRAME_WIDTH_CM : 0,
         canvasWrap: isCanvas,
-      });
-      previewUrl = await uploadCartPreview(dataUrl, designId);
+      };
+
+      // Render thumbnail (low-res, fast) and print file (hi-res) in parallel.
+      const [thumbDataUrl, printDataUrl] = await Promise.all([
+        renderArtworkSnapshot(baseInput),
+        renderArtworkSnapshot({ ...baseInput, hires: true }),
+      ]);
+
+      const [pUrl, fUrl] = await Promise.all([
+        uploadCartPreview(thumbDataUrl, designId),
+        uploadPrintFile(printDataUrl, designId),
+      ]);
+      previewUrl = pUrl;
+      printFileUrl = fUrl;
     } catch (err) {
       console.error("[cart] preview snapshot/upload failed", err);
       // Non-fatal — proceed without the preview image.
