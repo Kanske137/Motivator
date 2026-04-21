@@ -1,107 +1,149 @@
 
 
-## Plan: Använd browser-snapshot för print-fil (single source of truth)
+## Plan: En enda print-pipeline som klarar kartor, foto OCH AI-bilder upp till 10 MB
 
-### Problemet i en mening
+### Princip
 
-Vi har **två olika renderings-pipelines** för samma artwork:
-1. **Browser** (`renderArtworkSnapshot`) — Mapbox GL JS, perfekta labels, perfekt text, perfekta former. Används för thumbnails.
-2. **Edge function** (`generate-print-file`) — Mapbox Static API + ImageScript, **kan inte stänga av labels** (Static API saknar URL-parameter), **kan inte rendera text korrekt** (ImageScript v1.2.17 + fontsource TTF → "no glyph"-rektanglar).
-
-Detta är roten till båda problemen i din senaste testorder. Att fortsätta lappa edge-pipelinen leder till en lång svans av småfix utan slut. Vi måste konsolidera till **en pipeline**.
-
-### Lösning: Print-fil = uppskalad browser-snapshot
-
-**Insikt**: `renderArtworkSnapshot()` producerar redan exakt samma bild som editorn visar. Den skalas idag till max 1800 px (för thumbnails). Genom att höja upplösningen till **print-kvalitet (~3000–3600 px på längsta sidan = 250+ DPI för upp till 30 cm)** och låta browsern rendera och ladda upp resultatet, försvinner alla server-side-problem.
-
-Tradeoff: Browsern gör tyngre arbete vid "Lägg i varukorgen", men:
-- Det är en engångskostnad per design (~3–5 sekunder)
-- Mapbox GL JS är hårdvaruaccelererad (WebGL), så det skalar bra
-- Användaren får omedelbar visuell feedback istället för att vänta på edge function efter checkout
-- Edge function blir trivial: "ta emot URL → skicka till Gelato"
-
-### Konkret arkitektur
+**Källan bestämmer pipelinen — inte tvärtom.** Vi bygger tre tydliga vägar in, alla med samma utgång (`_print_file_url` på cart). Inga tysta fallbacks, inga server-side text-renderingar, inga Mapbox Static API-anrop.
 
 ```text
-EDITOR
-  ↓
-[Lägg i varukorg]
-  ↓
-renderArtworkSnapshot(input, { hires: true })
-  → returnerar JPEG dataURL @ ~3000px längsta sida
-  ↓
-uploadCartPreview(dataURL, designId)        ← thumbnail @ 800px
-uploadPrintFile(hiResDataURL, designId)     ← NEW: print @ 3000px
-  ↓
-cart properties:
-  _print_file_url: <bucket-url till print-jpeg>
-  _preview_url: <thumbnail-url>
-  ↓
-[Checkout → Shopify webhook]
-  ↓
-shopify-order-webhook → Gelato (skickar _print_file_url direkt)
+                       ┌─────────────────────────┐
+KARTA-design  ───────► │ Browser snapshot (WebGL)│ ─┐
+                       └─────────────────────────┘  │
+                       ┌─────────────────────────┐  │   uploadPrintFile()
+FOTO-uppladdning ────► │ Pass-through (originalfil) ─┼─► print-files bucket
+                       └─────────────────────────┘  │         │
+                       ┌─────────────────────────┐  │         ▼
+AI-genererad bild ───► │ Pass-through (Replicate URL) ─┘  _print_file_url
+                       └─────────────────────────┘             │
+                                                                ▼
+                                                    Shopify webhook → Gelato
 ```
 
-`generate-print-file` edge function behövs **inte längre** för det normala flödet.
+### Del A — Karta-vägen (browser-snapshot, GPU-säker)
+
+**`src/lib/editor-snapshot.ts`** — adaptiv upplösning baserat på enhet:
+
+```ts
+function pickHiresMaxPx(): number {
+  // Heuristik: mobile/svag GPU → 2000, desktop → 3000, hög-DPI desktop → 3600
+  const dpr = window.devicePixelRatio || 1;
+  const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+  if (isMobile) return 2000;          // ~167 DPI på 30 cm — Gelato-godkänt
+  if (dpr >= 2) return 3600;
+  return 3000;
+}
+```
+
+- Försök rendera med vald MAX_PX. **Om Mapbox kastar `WebGL context lost` eller canvas.toDataURL ger tom bild → retry en gång på 70 % av storleken.** Om även retry failar → throw.
+- JPEG quality 0.92 (0.95 ger ~30 % större filer utan synlig vinst i print).
+- Returnera `{ dataUrl, widthPx, heightPx, sizeBytes }` så vi kan logga i konsol.
+
+### Del B — Foto-uppladdning (pass-through, ingen re-encoding)
+
+**Ny `src/lib/photo-source.ts`**:
+- När användare laddar upp foto i editorn (befintlig flow utökas), behåll **originalfilen** som `File`-objekt i editor-store (parallellt med thumbnail som visas i editor).
+- Vid "Lägg i varukorg" → om `photoSource` finns: hoppa över snapshot helt, ladda upp originalfilen direkt till `print-files` bucket via `uploadPrintFileBlob(file, designId)`.
+- Validering klient-sida: max 10 MB, format JPEG/PNG/WebP, min 1500 px på kortaste sida (annars toast: "Bilden är för liten för print").
+- **Editor-preview** använder en nedskalad version (max 1500 px) för att inte slöa ned UI.
+
+### Del C — AI-genererad bild (pass-through från Replicate)
+
+**`supabase/functions/replicate-style/index.ts`** — utöka:
+- Ladda ner Replicate-output i edge function, ladda upp direkt till `print-files` bucket (inte bara returnera URL till klient).
+- Returnera `{ previewUrl, printFileUrl }` till klienten.
+- Editor visar `previewUrl` (Replicate ger redan ~1024–2048 px output, räcker för editor); `printFileUrl` lagras på `editorStore.aiPrintFileUrl`.
+- Vid "Lägg i varukorg" → om `aiPrintFileUrl` finns: använd direkt som `_print_file_url`, ingen ny snapshot/upload.
+
+### Del D — Storage bucket: hantera 10 MB-filer
+
+**Migration**:
+- Säkerställ `print-files` bucket finns, **public read**, **authenticated write**.
+- Sätt `file_size_limit = 15 MB` (10 MB foto + headroom).
+- Tillåt MIME types: `image/jpeg, image/png, image/webp`.
+- RLS: alla får läsa (Gelato hämtar via URL); skrivning kräver auth.
+
+**Cleanup-trigger** (skjuts upp men nämns i plan): cron-job som rensar print-files äldre än 90 dagar utan match i `gelato_orders`.
+
+### Del E — Editor "Lägg i varukorg"-flöde, hård felhantering
+
+**`src/pages/EditorPage.tsx`**:
+
+```ts
+// Pseudokod
+const printFileUrl = await getPrintFileUrl({
+  source: editorStore.designSource,  // "map" | "photo" | "ai"
+  designId,
+});
+if (!printFileUrl) {
+  toast.error("Kunde inte förbereda tryckfil — försök igen");
+  return; // ABORT
+}
+// → endast nu lägg i cart
+```
+
+`getPrintFileUrl()` är dispatcher-funktion som väljer pipeline baserat på `designSource`. Inga silent catches.
+
+Konsol-loggar (alltid):
+```
+[print-pipeline] source=map, hires=3000px, render=1820ms, size=1.4MB
+[print-pipeline] uploaded → https://…/print-files/<id>.jpg
+```
+
+### Del F — Webhook: läs property, ingen legacy-fallback
+
+**`supabase/functions/shopify-order-webhook/index.ts`**:
+- Logga **alla** properties per line item (key + värdes-längd).
+- Hämta `_print_file_url` från properties.
+- **Om saknas**: spara order som `pending_manual` med error `"missing_print_file_url"`. Skicka **inte** till Gelato. Lägg notis i log för manuell hantering.
+- **Ingen fallback till legacy `generate-print-file`**. Den är nu avstängd för normalflöde.
+
+### Del G — Cart-thumbnail visar designens preview
+
+Shopify `/cart/add.js` kan inte sätta line item image. Två komplementära åtgärder:
+
+1. **Tematisk fix (dokumenterad)**: uppdatera `SHOPIFY_SETUP.md` med Liquid-snippet för cart-template som läser `line_item.properties._preview_image`.
+2. **Fallback i appens egna CartDrawer (`src/components/CartDrawer.tsx`)**: läs `_preview_image` från attributes och visa istället för `imageUrl` när vi renderar cart i appen själv.
 
 ### Filer som ändras
 
-**1. `src/lib/editor-snapshot.ts`** — lägg till `hires`-läge
-- Ny optional input-parameter `hires?: boolean`
-- När `hires: true`: höj `MAX_PX` från 1800 → 3600, höj `PX_PER_CM` från 24 → 32
-- 30 cm × 32 = 960 px/sida → uppskalat med Mapbox @2x = ~3500 px för stor poster
-- Returnera JPEG quality 0.95 istället för 0.92
-- Ingen annan logik ändras → garanterad pixel-paritet med thumbnail
+| Fil | Ändring |
+|-----|---------|
+| `src/lib/editor-snapshot.ts` | Adaptiv MAX_PX, retry-på-mindre-vid-fel, returnera storleksinfo |
+| `src/lib/photo-source.ts` (ny) | Hantera foto-upload, validering, original-File-objekt |
+| `src/lib/print-pipeline.ts` (ny) | `getPrintFileUrl()` dispatcher för map/photo/ai |
+| `src/lib/upload-preview.ts` | `uploadPrintFileBlob()` för rå Blob/File (ej bara dataURL) |
+| `src/stores/editorStore.ts` | Fält: `designSource`, `photoFile`, `aiPrintFileUrl` |
+| `src/pages/EditorPage.tsx` | Använd `getPrintFileUrl()`, hård fail, ta bort silent catch |
+| `src/components/CartDrawer.tsx` | Läs `_preview_image` från attributes |
+| `supabase/functions/replicate-style/index.ts` | Ladda upp output till `print-files`, returnera båda URLs |
+| `supabase/functions/shopify-order-webhook/index.ts` | Logga properties, `pending_manual` om URL saknas, **ingen legacy fallback** |
+| `supabase/migrations/<ts>_print_files_bucket.sql` | Bucket-config: 15 MB limit, MIME-allowlist, RLS |
+| `SHOPIFY_SETUP.md` | Steg 6: Liquid-snippet för cart preview |
 
-**2. `src/lib/upload-preview.ts`** — lägg till `uploadPrintFile()`
-- Kopia av `uploadCartPreview()` men:
-  - Inget komprimerings-steg (browsern har redan rätt upplösning)
-  - Bucket: ny `print-files` (eller återanvänd existerande)
-  - Ingen skalning
-- Returnerar public URL
-
-**3. `src/pages/EditorPage.tsx`** (eller där "Lägg i varukorg" hanteras)
-- Anropa `renderArtworkSnapshot(input, { hires: true })` parallellt med thumbnail-snapshot
-- Ladda upp via `uploadPrintFile`
-- Lägg till `_print_file_url` i cart properties (redan etablerat mönster för `_preview_url`)
-
-**4. `supabase/functions/shopify-order-webhook/index.ts`** — använd cart-property direkt
-- Om line item har `_print_file_url` → skicka URL direkt till Gelato, **hoppa över** `generate-print-file`-anropet
-- Behåll fallback-grenen (anropa edge function) för bakåtkompatibilitet med ev. existerande carts utan print-URL
-
-**5. `supabase/functions/generate-print-file/index.ts`** — lämnas orörd som fallback
-- Används inte i normalflödet längre, men finns kvar om något skulle gå fel klient-sida
-- Kan rensas bort i framtida task
-
-### Storage bucket
-
-Behöver skapa eller återanvända en publik bucket för print-filer:
-- Återanvänd existerande `print-files` bucket (skapas redan av nuvarande edge function)
-- Public read, authenticated write
-- Cleanup-policy senare (t.ex. radera filer äldre än 90 dagar utan order)
+`supabase/functions/generate-print-file/index.ts` — **avstängd** (vi tar bort den från normalflödet helt; lämnas i repo som kommenterad referens, kan raderas i städ-commit senare).
 
 ### Förväntat resultat
 
-| Aspekt | Idag | Efter |
-|--------|------|-------|
-| Labels off | ❌ syns ändå | ✅ exakt som editor |
-| Text rendering | ❌ "streckkod" | ✅ riktig font, ÅÄÖ funkar |
-| Cirkel/kvadrat | ✅ funkar | ✅ funkar (oförändrad) |
-| Tid för cart-add | ~1s | ~3–5s (acceptabelt) |
-| Edge function-tid | ~2s + fail risk | hoppas över i 99% av fall |
-| Pixel-paritet preview ↔ print | ❌ olika pipelines | ✅ samma kod |
-| Framtida foto/AI-bilder | osäkert | trivialt — samma snapshot |
-
-### Begränsningar / framtida
-
-- **Mobile performance**: 3600px Mapbox-render använder ~50 MB GPU-minne kortvarigt. Testar på iPhone SE-klass under verifiering. Kan behöva sänkas till 2800 px om problem.
-- **Print-DPI vs storlek**: 3000 px på 30 cm = 254 DPI (Gelato kräver ≥150 DPI, rekommenderar 300). Räcker för posters upp till ~50 cm. Större format kräver `MAX_PX = 4500` — bedöms vid behov.
-- **Edge function `generate-print-file` blir vilande**: lämnas i koden för fallback, ingen löpande underhållskostnad.
+| Scenario | Idag | Efter |
+|----------|------|-------|
+| Karta + svensk text + labels off | ❌ barcode+labels | ✅ pixel-identiskt med editor |
+| Foto 8 MB JPEG | ❌ pipelinen går sönder | ✅ original passas igenom till Gelato |
+| AI-bild från Replicate | ❌ inte stödd | ✅ direkt URL från Replicate → Gelato |
+| Mobile (svag GPU) 30 cm karta | ❌ kan krascha tyst | ✅ adaptiv 2000 px + retry |
+| `_print_file_url` saknas i webhook | ❌ tyst legacy-fallback med trasig output | ✅ `pending_manual` + larm |
+| Cart-thumbnail | ❌ produktbild | ✅ designens preview (i app + Shopify-tema) |
 
 ### Verifiering
 
-1. Lägg ny order: cirkel-form + labels OFF + text "STOCKHOLM\nSverige\n…"
-2. Inspektera `_print_file_url` i Shopify cart → ska visa identisk artwork som editorn
-3. `gelato_orders` → `submitted` på första försöket
-4. Gelato dashboard visar ordern, print-fil är ~3000 px, text är skarp och utan "streckkod"
+1. **Karta**: cirkel + labels OFF + svensk text → konsol visar `[print-pipeline] source=map`. Print-URL = editor-bild.
+2. **Foto**: ladda upp 7 MB JPEG → konsol `source=photo, passthrough, 7.2MB`. Print-URL = exakt originalfilen.
+3. **AI**: applicera stil → konsol `source=ai`. Replicate-output finns i `print-files` bucket.
+4. **Mobil-test** (Lovable preview i mobile-läge): rendering klarar 30×40 poster utan krasch.
+5. **Webhook-logg**: `using client print file <url>`. Om manuellt manipulerad cart utan URL → `pending_manual`, ingen Gelato-skick.
+
+### Vad vi medvetet INTE bygger nu
+
+- **Cleanup-cron för gamla print-files** — bucket växer max ~50 GB/år vid 5000 orders, läggs till om ekonomiskt motiverat.
+- **PDF-output istället för JPEG** — Gelato rekommenderar JPEG/PNG för foton, PDF endast för vector. Ej relevant för våra produkter.
 
