@@ -168,32 +168,30 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
     ctx.fillRect(0, 0, w, h);
 
     if (extraCm > 0) {
-      // WRAP MODE (canvas): editor area = full print area (front + wrap).
-      // The map fills the entire extended canvas so wrap+bleed continue
-      // naturally outside the visible front.
-      ctx.drawImage(mapCanvas, 0, 0, w, h);
-
-      // If front uses non-rect shape, paint bg in the front zone OUTSIDE the
-      // shape (clip-invert via even-odd fill rule) — wrap zone untouched.
-      if (input.mapShape !== "rect") {
-        ctx.save();
-        ctx.fillStyle = input.posterBgColor || "#ffffff";
-        const fsq = Math.min(frontPxW, frontPxH);
-        const fcx = frontPxX + frontPxW / 2;
-        const fcy = frontPxY + frontPxH / 2;
+      // WRAP MODE (canvas): map is drawn ONLY in the front zone. Wrap + bleed
+      // zones keep the bg color so the 3D preview's sides show bg, exactly
+      // matching the editor.
+      ctx.save();
+      const fsq = Math.min(frontPxW, frontPxH);
+      const fcx = frontPxX + frontPxW / 2;
+      const fcy = frontPxY + frontPxH / 2;
+      if (input.mapShape === "circle") {
         ctx.beginPath();
-        // Outer: full front rect
+        ctx.arc(fcx, fcy, fsq / 2, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(mapCanvas, fcx - fsq / 2, fcy - fsq / 2, fsq, fsq);
+      } else if (input.mapShape === "square") {
+        ctx.beginPath();
+        ctx.rect(fcx - fsq / 2, fcy - fsq / 2, fsq, fsq);
+        ctx.clip();
+        ctx.drawImage(mapCanvas, fcx - fsq / 2, fcy - fsq / 2, fsq, fsq);
+      } else {
+        ctx.beginPath();
         ctx.rect(frontPxX, frontPxY, frontPxW, frontPxH);
-        // Inner: shape (reverse winding via even-odd)
-        if (input.mapShape === "circle") {
-          ctx.moveTo(fcx + fsq / 2, fcy);
-          ctx.arc(fcx, fcy, fsq / 2, 0, Math.PI * 2);
-        } else {
-          ctx.rect(fcx - fsq / 2, fcy - fsq / 2, fsq, fsq);
-        }
-        ctx.fill("evenodd");
-        ctx.restore();
+        ctx.clip();
+        ctx.drawImage(mapCanvas, frontPxX, frontPxY, frontPxW, frontPxH);
       }
+      ctx.restore();
     } else {
       // POSTER MODE (no wrap): existing shape-aware clipping
       ctx.save();
