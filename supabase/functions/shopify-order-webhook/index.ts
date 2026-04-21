@@ -281,6 +281,7 @@ async function processOrder(supabase: any, order: any) {
     const orientation = (getProp(props, "_orientation") ?? "portrait") as "portrait" | "landscape";
     const handle = getProp(props, "_product_handle") ?? li.product_handle ?? "";
     const text = getProp(props, "Text") ?? "";
+    const clientPrintFileUrl = getProp(props, "_print_file_url");
 
     // Build artwork: image source takes precedence; otherwise fall back to map params.
     let artwork: any = null;
@@ -297,33 +298,39 @@ async function processOrder(supabase: any, order: any) {
       };
     }
 
-    if (!artwork || !size) {
+    if ((!artwork && !clientPrintFileUrl) || !size) {
       continue; // not an editor item
     }
 
-    // 1) Generate print file (PNG)
+    // 1) Print file: prefer client-rendered hi-res snapshot (single source of truth
+    //    with the editor preview). Fall back to legacy server-side generation.
     let printUrl: string | null = null;
-    try {
-      const res = await fetch(`${projectUrl}/functions/v1/generate-print-file`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}`, apikey: serviceKey },
-        body: JSON.stringify({
-          artwork,
-          size, orientation,
-          text,
-          textVisible: textVisibleStr === null ? !!text : textVisibleStr === "true",
-          textFont,
-          mapShape,
-          posterBgColor: bgColor,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(`generate-print-file ${res.status}: ${JSON.stringify(json)}`);
-      printUrl = json.url ?? json.publicUrl ?? json.printUrl ?? null;
-      if (!printUrl) throw new Error("no print URL returned");
-    } catch (e) {
-      printErrors.push(`line ${li.id}: print ${String(e)}`);
-      continue;
+    if (clientPrintFileUrl) {
+      printUrl = clientPrintFileUrl;
+      console.log(`[shopify-webhook] line ${li.id}: using client print file ${printUrl}`);
+    } else {
+      try {
+        const res = await fetch(`${projectUrl}/functions/v1/generate-print-file`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}`, apikey: serviceKey },
+          body: JSON.stringify({
+            artwork,
+            size, orientation,
+            text,
+            textVisible: textVisibleStr === null ? !!text : textVisibleStr === "true",
+            textFont,
+            mapShape,
+            posterBgColor: bgColor,
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(`generate-print-file ${res.status}: ${JSON.stringify(json)}`);
+        printUrl = json.url ?? json.publicUrl ?? json.printUrl ?? null;
+        if (!printUrl) throw new Error("no print URL returned");
+      } catch (e) {
+        printErrors.push(`line ${li.id}: print ${String(e)}`);
+        continue;
+      }
     }
 
     // 2) Resolve productUid
