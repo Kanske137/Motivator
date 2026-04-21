@@ -33,6 +33,8 @@ export interface SnapshotInput {
   frameWidthCm?: number;
   /** When true, render a canvas wrap shadow on the sides instead of a flat frame. */
   canvasWrap?: boolean;
+  /** When true, render at print resolution (~3000+px longest side, JPEG q=0.95). */
+  hires?: boolean;
 }
 
 function parseSize(size: string, orientation: "portrait" | "landscape") {
