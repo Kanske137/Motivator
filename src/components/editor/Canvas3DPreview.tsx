@@ -1,10 +1,8 @@
 import { Suspense, useMemo, useRef, useState, useEffect } from "react";
-import { Canvas, useLoader, useFrame } from "@react-three/fiber";
-import { OrbitControls, ContactShadows, Environment } from "@react-three/drei";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { OrbitControls, ContactShadows } from "@react-three/drei";
 import * as THREE from "three";
-import { Loader2, ChevronLeft, ChevronRight, Maximize2, AlertCircle } from "lucide-react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Loader2, AlertCircle } from "lucide-react";
 
 interface Canvas3DPreviewProps {
   printUrl: string | null;
@@ -15,20 +13,6 @@ interface Canvas3DPreviewProps {
   heightCm: number;
   depthCm: number;
 }
-
-interface CameraPreset {
-  id: string;
-  label: string;
-  position: [number, number, number];
-  target: [number, number, number];
-}
-
-const PRESETS: CameraPreset[] = [
-  { id: "front", label: "Framifrån", position: [0, 0, 3.2], target: [0, 0, 0] },
-  { id: "left", label: "Vänster", position: [-1.6, 0.3, 2.8], target: [0, 0, 0] },
-  { id: "right", label: "Höger", position: [1.6, 0.3, 2.8], target: [0, 0, 0] },
-  { id: "closeup", label: "Närbild", position: [0.9, -0.3, 2.0], target: [0, 0, 0] },
-];
 
 /** Shared cache so each thumbnail doesn't re-download the same texture. */
 function useTexture(url: string | null) {
@@ -52,7 +36,9 @@ function useTexture(url: string | null) {
 /**
  * Canvas mesh: BoxGeometry with per-face materials.
  * Front uses the print texture with default UVs.
- * Side/top/bottom faces sample the outermost ~3% of the print to simulate wrap.
+ * Side/top/bottom faces sample the outermost edge of the print to simulate wrap.
+ * Bleed width is proportional to canvas depth so the wrap continues seamlessly
+ * from the front edges around the sides/top/bottom.
  */
 function CanvasMesh({
   texture, widthCm, heightCm, depthCm, autoRotate,
@@ -67,35 +53,40 @@ function CanvasMesh({
   const h = (heightCm / maxCm) * 2;
   const d = (depthCm / maxCm) * 2;
 
-  // Build edge textures by cropping the print texture via canvas
+  // Build edge textures by cropping the print texture via canvas. Bleed width
+  // is sized to actual canvas depth so the wrap content fully covers the side
+  // (otherwise top/bottom looked empty/stretched).
   const edgeTextures = useMemo(() => {
     if (!texture.image) return null;
     const img = texture.image as HTMLImageElement | HTMLCanvasElement;
     const iw = (img as HTMLImageElement).naturalWidth || (img as HTMLCanvasElement).width;
     const ih = (img as HTMLImageElement).naturalHeight || (img as HTMLCanvasElement).height;
     if (!iw || !ih) return null;
-    const bleed = 0.03;
-    const make = (sx: number, sy: number, sw: number, sh: number, rotate = 0) => {
+
+    const bleedX = Math.min(0.25, depthCm / widthCm);  // for left/right strips
+    const bleedY = Math.min(0.25, depthCm / heightCm); // for top/bottom strips
+
+    const make = (sx: number, sy: number, sw: number, sh: number) => {
       const c = document.createElement("canvas");
-      const targetW = Math.max(64, Math.round(sw));
-      const targetH = Math.max(64, Math.round(sh));
-      c.width = rotate % 180 === 0 ? targetW : targetH;
-      c.height = rotate % 180 === 0 ? targetH : targetW;
+      c.width = Math.max(64, Math.round(sw));
+      c.height = Math.max(64, Math.round(sh));
       const ctx = c.getContext("2d")!;
-      ctx.translate(c.width / 2, c.height / 2);
-      ctx.rotate((rotate * Math.PI) / 180);
-      ctx.drawImage(img as CanvasImageSource, sx, sy, sw, sh, -targetW / 2, -targetH / 2, targetW, targetH);
+      ctx.drawImage(img as CanvasImageSource, sx, sy, sw, sh, 0, 0, c.width, c.height);
       const t = new THREE.CanvasTexture(c);
       t.colorSpace = THREE.SRGBColorSpace;
+      t.wrapS = THREE.ClampToEdgeWrapping;
+      t.wrapT = THREE.ClampToEdgeWrapping;
+      t.anisotropy = 8;
       return t;
     };
+
     return {
-      right: make(iw * (1 - bleed), 0, iw * bleed, ih),
-      left: make(0, 0, iw * bleed, ih),
-      top: make(0, 0, iw, ih * bleed),
-      bottom: make(0, ih * (1 - bleed), iw, ih * bleed),
+      right: make(iw * (1 - bleedX), 0, iw * bleedX, ih),
+      left: make(0, 0, iw * bleedX, ih),
+      top: make(0, 0, iw, ih * bleedY),
+      bottom: make(0, ih * (1 - bleedY), iw, ih * bleedY),
     };
-  }, [texture]);
+  }, [texture, widthCm, heightCm, depthCm]);
 
   useFrame((_, dt) => {
     if (autoRotate && meshRef.current) {
@@ -111,11 +102,35 @@ function CanvasMesh({
       const side = new THREE.MeshStandardMaterial({ color: "#d8d4cc", roughness: 0.9 });
       return [side, side, side, side, front, back];
     }
+
+    // Top face (+Y): default UV runs (printWidth → X box-axis, depth → Z box-axis).
+    // We want the strip's edge nearest the front to be the bottom row of pixels
+    // in our top-strip (which is the row closest to the print's top edge).
+    // Default UV V=0 maps to back of box, V=1 to front. Our strip's V=0 is the
+    // top-most pixel of the print. Flip V so V=1 (front) corresponds to the
+    // pixel row touching the front face.
+    const topMap = edgeTextures.top.clone();
+    topMap.needsUpdate = true;
+    topMap.wrapS = THREE.ClampToEdgeWrapping;
+    topMap.wrapT = THREE.ClampToEdgeWrapping;
+    topMap.center.set(0.5, 0.5);
+    topMap.repeat.set(1, -1);
+
+    // Bottom face (-Y): default UV V=0 maps to front, V=1 to back. Our strip's
+    // V=1 is the bottom-most pixel of the print (the row touching the front
+    // bottom edge). Flip V so the front-edge pixel is at the front of the box.
+    const bottomMap = edgeTextures.bottom.clone();
+    bottomMap.needsUpdate = true;
+    bottomMap.wrapS = THREE.ClampToEdgeWrapping;
+    bottomMap.wrapT = THREE.ClampToEdgeWrapping;
+    bottomMap.center.set(0.5, 0.5);
+    bottomMap.repeat.set(1, -1);
+
     return [
       new THREE.MeshStandardMaterial({ map: edgeTextures.right, roughness: 0.85 }),
       new THREE.MeshStandardMaterial({ map: edgeTextures.left, roughness: 0.85 }),
-      new THREE.MeshStandardMaterial({ map: edgeTextures.top, roughness: 0.85 }),
-      new THREE.MeshStandardMaterial({ map: edgeTextures.bottom, roughness: 0.85 }),
+      new THREE.MeshStandardMaterial({ map: topMap, roughness: 0.85 }),
+      new THREE.MeshStandardMaterial({ map: bottomMap, roughness: 0.85 }),
       front,
       back,
     ];
@@ -129,13 +144,10 @@ function CanvasMesh({
 }
 
 function Scene({
-  printUrl, widthCm, heightCm, depthCm, preset, allowControls, autoRotate,
+  printUrl, widthCm, heightCm, depthCm,
 }: {
   printUrl: string;
   widthCm: number; heightCm: number; depthCm: number;
-  preset: CameraPreset;
-  allowControls: boolean;
-  autoRotate: boolean;
 }) {
   const tex = useTexture(printUrl);
   return (
@@ -155,168 +167,69 @@ function Scene({
           widthCm={widthCm}
           heightCm={heightCm}
           depthCm={depthCm}
-          autoRotate={autoRotate && !allowControls}
+          autoRotate={false}
         />
       )}
       <ContactShadows position={[0, -1.4, 0]} opacity={0.35} scale={6} blur={2.4} far={2} />
-      {allowControls && (
-        <OrbitControls
-          enablePan={false}
-          enableZoom={true}
-          minDistance={1.8}
-          maxDistance={5}
-          minPolarAngle={Math.PI / 2 - 0.4}
-          maxPolarAngle={Math.PI / 2 + 0.3}
-          target={preset.target}
-        />
-      )}
+      <OrbitControls
+        enablePan={false}
+        enableZoom={false}
+        minPolarAngle={Math.PI / 2 - Math.PI / 4}
+        maxPolarAngle={Math.PI / 2 + Math.PI / 4}
+        minAzimuthAngle={-Math.PI / 4}
+        maxAzimuthAngle={Math.PI / 4}
+      />
     </>
-  );
-}
-
-function ThumbCanvas({
-  printUrl, widthCm, heightCm, depthCm, preset,
-}: {
-  printUrl: string; widthCm: number; heightCm: number; depthCm: number; preset: CameraPreset;
-}) {
-  return (
-    <Canvas
-      shadows
-      dpr={[1, 2]}
-      camera={{ position: preset.position, fov: 35 }}
-      gl={{ preserveDrawingBuffer: false, antialias: true }}
-    >
-      <color attach="background" args={["#f5f2ec"]} />
-      <Suspense fallback={null}>
-        <Scene
-          printUrl={printUrl}
-          widthCm={widthCm}
-          heightCm={heightCm}
-          depthCm={depthCm}
-          preset={preset}
-          allowControls={false}
-          autoRotate={false}
-        />
-      </Suspense>
-    </Canvas>
   );
 }
 
 export function Canvas3DPreview({
   printUrl, loading, error, widthCm, heightCm, depthCm,
 }: Canvas3DPreviewProps) {
-  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
-  const lightboxPreset = lightboxIdx !== null ? PRESETS[lightboxIdx] : null;
-
-  const goPrev = () =>
-    setLightboxIdx((i) => (i === null ? null : (i - 1 + PRESETS.length) % PRESETS.length));
-  const goNext = () =>
-    setLightboxIdx((i) => (i === null ? null : (i + 1) % PRESETS.length));
-
   return (
-    <>
-      <div className="border-t bg-[hsl(var(--paper))]">
-        <div className="px-4 py-3">
-          <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-3">
-            3D-förhandsgranska canvas
-          </h3>
-          <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
-            {PRESETS.map((preset, i) => (
-              <button
-                type="button"
-                key={preset.id}
-                disabled={!printUrl}
-                onClick={() => printUrl && setLightboxIdx(i)}
-                className="group flex-shrink-0 w-32 h-32 md:w-40 md:h-40 rounded-2xl overflow-hidden bg-card border snap-start relative disabled:cursor-default cursor-zoom-in"
-                aria-label={`Förstora ${preset.label}`}
-              >
-                {loading || !printUrl ? (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/40 animate-pulse">
-                    {error ? (
-                      <div className="flex flex-col items-center text-destructive text-[10px] p-2 text-center gap-1">
-                        <AlertCircle className="h-4 w-4" />
-                        <span className="line-clamp-3">{error}</span>
-                      </div>
-                    ) : (
-                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                    )}
-                  </div>
-                ) : (
-                  <>
-                    <ThumbCanvas
-                      printUrl={printUrl}
-                      widthCm={widthCm}
-                      heightCm={heightCm}
-                      depthCm={depthCm}
-                      preset={preset}
-                    />
-                    <span className="absolute top-1.5 right-1.5 inline-flex items-center justify-center h-6 w-6 rounded-full bg-background/85 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition">
-                      <Maximize2 className="h-3.5 w-3.5" />
-                    </span>
-                  </>
-                )}
-                <div className="absolute bottom-0 inset-x-0 bg-background/85 backdrop-blur-sm text-[11px] py-1 text-center font-medium pointer-events-none">
-                  {preset.label}
+    <div className="border-t bg-[hsl(var(--paper))]">
+      <div className="px-4 py-3">
+        <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-3">
+          3D-förhandsvisning
+        </h3>
+        <div
+          className="w-full rounded-2xl overflow-hidden bg-card border relative"
+          style={{ height: "min(60vh, 520px)" }}
+        >
+          {loading || !printUrl ? (
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/40 animate-pulse">
+              {error ? (
+                <div className="flex flex-col items-center text-destructive text-xs p-4 text-center gap-2">
+                  <AlertCircle className="h-5 w-5" />
+                  <span className="line-clamp-3">{error}</span>
                 </div>
-              </button>
-            ))}
+              ) : (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              )}
+            </div>
+          ) : (
+            <Canvas
+              shadows
+              dpr={[1, 2]}
+              camera={{ position: [0, 0, 3.6], fov: 35 }}
+              gl={{ preserveDrawingBuffer: false, antialias: true }}
+            >
+              <color attach="background" args={["#f5f2ec"]} />
+              <Suspense fallback={null}>
+                <Scene
+                  printUrl={printUrl}
+                  widthCm={widthCm}
+                  heightCm={heightCm}
+                  depthCm={depthCm}
+                />
+              </Suspense>
+            </Canvas>
+          )}
+          <div className="absolute bottom-2 right-3 text-[11px] text-muted-foreground bg-background/80 backdrop-blur-sm px-2 py-1 rounded-full pointer-events-none">
+            dra för att rotera
           </div>
         </div>
       </div>
-
-      <Dialog open={lightboxIdx !== null} onOpenChange={(o) => !o && setLightboxIdx(null)}>
-        <DialogContent className="max-w-[95vw] md:max-w-4xl p-0 bg-background border-0 overflow-hidden">
-          <DialogTitle className="sr-only">{lightboxPreset?.label ?? "Canvas 3D"}</DialogTitle>
-          {lightboxPreset && printUrl && (
-            <div className="relative bg-[#f5f2ec]" style={{ height: "min(85vh, 700px)" }}>
-              <Canvas
-                shadows
-                dpr={[1, 2]}
-                camera={{ position: lightboxPreset.position, fov: 35 }}
-              >
-                <color attach="background" args={["#f5f2ec"]} />
-                <Suspense fallback={null}>
-                  <Scene
-                    printUrl={printUrl}
-                    widthCm={widthCm}
-                    heightCm={heightCm}
-                    depthCm={depthCm}
-                    preset={lightboxPreset}
-                    allowControls={true}
-                    autoRotate={false}
-                  />
-                </Suspense>
-              </Canvas>
-              <Button
-                type="button"
-                variant="secondary"
-                size="icon"
-                onClick={goPrev}
-                className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full shadow-lg bg-background/90 hover:bg-background"
-                aria-label="Föregående"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                size="icon"
-                onClick={goNext}
-                className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full shadow-lg bg-background/90 hover:bg-background"
-                aria-label="Nästa"
-              >
-                <ChevronRight className="h-5 w-5" />
-              </Button>
-              <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/60 to-transparent text-background px-4 py-3 text-sm font-medium pointer-events-none">
-                {lightboxPreset.label}
-                <span className="ml-2 opacity-70">
-                  {(lightboxIdx ?? 0) + 1} / {PRESETS.length} · dra för att rotera
-                </span>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </>
+    </div>
   );
 }
