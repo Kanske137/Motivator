@@ -41,20 +41,17 @@ function parsePct(v: string | undefined, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-let snapshotContainer: HTMLDivElement | null = null;
-function getOffscreenContainer(w: number, h: number): HTMLDivElement {
-  if (!snapshotContainer) {
-    snapshotContainer = document.createElement("div");
-    snapshotContainer.style.position = "fixed";
-    snapshotContainer.style.left = "-99999px";
-    snapshotContainer.style.top = "0";
-    snapshotContainer.style.pointerEvents = "none";
-    snapshotContainer.setAttribute("aria-hidden", "true");
-    document.body.appendChild(snapshotContainer);
-  }
-  snapshotContainer.style.width = `${w}px`;
-  snapshotContainer.style.height = `${h}px`;
-  return snapshotContainer;
+function createOffscreenContainer(w: number, h: number): HTMLDivElement {
+  const el = document.createElement("div");
+  el.style.position = "fixed";
+  el.style.left = "-99999px";
+  el.style.top = "0";
+  el.style.width = `${w}px`;
+  el.style.height = `${h}px`;
+  el.style.pointerEvents = "none";
+  el.setAttribute("aria-hidden", "true");
+  document.body.appendChild(el);
+  return el;
 }
 
 /**
