@@ -131,6 +131,22 @@ function readImageDimensions(buf: Uint8Array, mime: string): { w: number; h: num
   return readPngDimensions(buf) ?? readJpegDimensions(buf);
 }
 
+// Mapbox Static API renders the style as-authored — including label layers.
+// To honour the editor's "show labels off" choice, swap in a label-free
+// variant of the style. Mapbox's stock styles do NOT ship label-free versions,
+// so for full parity you should create custom no-labels styles in Mapbox Studio
+// and map them here (e.g. "yourorg/light-no-labels").
+const NO_LABEL_STYLE: Record<string, string> = {
+  // Extend per project needs once custom no-label styles exist in Mapbox Studio.
+};
+
+function resolveMapboxStyle(styleId: string, showLabels: boolean): string {
+  // Style IDs come in as bare ("light-v11") or namespaced ("mapbox/light-v11").
+  const full = styleId.includes("/") ? styleId : `mapbox/${styleId}`;
+  if (showLabels) return full;
+  return NO_LABEL_STYLE[full] ?? NO_LABEL_STYLE[styleId] ?? full;
+}
+
 // Fetch the artwork source as raw bytes + mime type.
 async function fetchArtworkSource(
   artwork: Artwork,
@@ -142,7 +158,9 @@ async function fetchArtworkSource(
     const TILE_MAX = 1280;
     const tileW = aspect >= 1 ? TILE_MAX : Math.round(TILE_MAX * aspect);
     const tileH = aspect >= 1 ? Math.round(TILE_MAX / aspect) : TILE_MAX;
-    const url = `https://api.mapbox.com/styles/v1/mapbox/${artwork.styleId}/static/${artwork.center[0]},${artwork.center[1]},${artwork.zoom},0,0/${tileW}x${tileH}@2x?access_token=${mapboxToken}&attribution=false&logo=false`;
+    const effectiveStyle = resolveMapboxStyle(artwork.styleId, artwork.showLabels !== false);
+    const url = `https://api.mapbox.com/styles/v1/${effectiveStyle}/static/${artwork.center[0]},${artwork.center[1]},${artwork.zoom},0,0/${tileW}x${tileH}@2x?access_token=${mapboxToken}&attribution=false&logo=false`;
+    console.log(`[generate-print-file] mapbox style=${effectiveStyle} showLabels=${artwork.showLabels !== false}`);
     const res = await fetch(url);
     if (!res.ok) {
       const t = await res.text();
