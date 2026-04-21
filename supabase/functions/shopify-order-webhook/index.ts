@@ -266,72 +266,39 @@ async function processOrder(supabase: any, order: any) {
 
   for (const li of order.line_items ?? []) {
     const props = li.properties as Array<{ name: string; value: string }> | undefined;
-    const styleId = getProp(props, "_map_style");
-    const centerStr = getProp(props, "_map_center");
-    const zoomStr = getProp(props, "_map_zoom");
-    const artworkUrl = getProp(props, "_artwork_url"); // future: photo / AI image
+
+    // Observability: log every property name + value-length received per line
+    // item. Critical for diagnosing missing _print_file_url after a checkout.
+    if (Array.isArray(props) && props.length) {
+      const summary = props.map((p) => `${p.name}(${String(p.value ?? "").length})`).join(", ");
+      console.log(`[shopify-webhook] line ${li.id}: properties received: ${summary}`);
+    } else {
+      console.log(`[shopify-webhook] line ${li.id}: NO properties received`);
+    }
+
     const size = getProp(props, "_size");
     const variant = getProp(props, "_variant");
-    const bgColor = getProp(props, "_bg_color") ?? "#FFFFFF";
-    const mapShape = (getProp(props, "_map_shape") ?? "rect") as "rect" | "square" | "circle";
-    const textFont = getProp(props, "_text_font") ?? "Inter";
-    const textVisibleStr = getProp(props, "_text_visible");
-    const showLabelsStr = getProp(props, "_show_labels");
-    const showLabels = showLabelsStr === "true";
     const orientation = (getProp(props, "_orientation") ?? "portrait") as "portrait" | "landscape";
     const handle = getProp(props, "_product_handle") ?? li.product_handle ?? "";
-    const text = getProp(props, "Text") ?? "";
     const clientPrintFileUrl = getProp(props, "_print_file_url");
+    const designSource = getProp(props, "_design_source") ?? "map";
 
-    // Build artwork: image source takes precedence; otherwise fall back to map params.
-    let artwork: any = null;
-    if (artworkUrl) {
-      artwork = { kind: "image", sourceUrl: artworkUrl };
-    } else if (styleId && centerStr && zoomStr) {
-      const [latStr, lngStr] = centerStr.split(",");
-      artwork = {
-        kind: "map",
-        styleId,
-        center: [parseFloat(lngStr), parseFloat(latStr)],
-        zoom: parseFloat(zoomStr),
-        showLabels,
-      };
-    }
+    if (!size) continue; // not an editor item
 
-    if ((!artwork && !clientPrintFileUrl) || !size) {
-      continue; // not an editor item
-    }
+    console.log(
+      `[shopify-webhook] line ${li.id}: clientPrintFileUrl=${clientPrintFileUrl ?? "MISSING"} source=${designSource}`
+    );
 
-    // 1) Print file: prefer client-rendered hi-res snapshot (single source of truth
-    //    with the editor preview). Fall back to legacy server-side generation.
-    let printUrl: string | null = null;
-    if (clientPrintFileUrl) {
-      printUrl = clientPrintFileUrl;
-      console.log(`[shopify-webhook] line ${li.id}: using client print file ${printUrl}`);
-    } else {
-      try {
-        const res = await fetch(`${projectUrl}/functions/v1/generate-print-file`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}`, apikey: serviceKey },
-          body: JSON.stringify({
-            artwork,
-            size, orientation,
-            text,
-            textVisible: textVisibleStr === null ? !!text : textVisibleStr === "true",
-            textFont,
-            mapShape,
-            posterBgColor: bgColor,
-          }),
-        });
-        const json = await res.json();
-        if (!res.ok) throw new Error(`generate-print-file ${res.status}: ${JSON.stringify(json)}`);
-        printUrl = json.url ?? json.publicUrl ?? json.printUrl ?? null;
-        if (!printUrl) throw new Error("no print URL returned");
-      } catch (e) {
-        printErrors.push(`line ${li.id}: print ${String(e)}`);
-        continue;
-      }
+    // 1) Print file: REQUIRED to come from the client (single pipeline). No
+    //    legacy server-side fallback — that path renders text incorrectly and
+    //    cannot disable map labels, which produced broken Gelato orders.
+    if (!clientPrintFileUrl) {
+      printErrors.push(`line ${li.id}: missing _print_file_url (source=${designSource})`);
+      continue;
     }
+    const printUrl = clientPrintFileUrl;
+    console.log(`[shopify-webhook] line ${li.id}: using client print file ${printUrl}`);
+
 
     // 2) Resolve productUid
     const cfg = configByHandle[handle];
