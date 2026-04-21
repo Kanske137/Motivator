@@ -47,3 +47,18 @@ export async function uploadCartPreview(dataUrl: string, designId: string): Prom
   const { data } = supabase.storage.from("cart-previews").getPublicUrl(path);
   return data.publicUrl;
 }
+
+/** Upload a hi-res print-quality JPEG dataURL to print-files (no recompression).
+ *  Returns the public URL Gelato will fetch. */
+export async function uploadPrintFile(dataUrl: string, designId: string): Promise<string> {
+  // dataUrl is already a JPEG at print resolution — just convert to blob and upload.
+  const res = await fetch(dataUrl);
+  const blob = await res.blob();
+  const path = `${designId}.jpg`;
+  const { error } = await supabase.storage
+    .from("print-files")
+    .upload(path, blob, { contentType: "image/jpeg", upsert: true });
+  if (error) throw error;
+  const { data } = supabase.storage.from("print-files").getPublicUrl(path);
+  return data.publicUrl;
+}
