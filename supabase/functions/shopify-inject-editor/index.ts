@@ -24,9 +24,7 @@ async function shopifyAdmin(domain: string, token: string, path: string, init?: 
   });
   const text = await res.text();
   let body: unknown = text;
-  try {
-    body = JSON.parse(text);
-  } catch {}
+  try { body = JSON.parse(text); } catch {}
   if (!res.ok) {
     throw new Error(`Shopify ${path} ${res.status}: ${JSON.stringify(body).slice(0, 400)}`);
   }
@@ -35,13 +33,18 @@ async function shopifyAdmin(domain: string, token: string, path: string, init?: 
 
 function snippetLiquid(editorOrigin: string): string {
   return `{%- comment -%} Personlig Karta editor — auto-injected {%- endcomment -%}
-<div class="lovable-map-editor" style="width:100%;max-width:1400px;margin:0 auto;">
+<style>
+  /* Hide any leftover Shopify product chrome on this template */
+  .shopify-section-main-product, .product, .product__info-wrapper, .product__media-wrapper { display: none !important; }
+  .lovable-map-editor-wrap { width:100%; max-width:100%; margin:0; padding:0; }
+  .lovable-map-editor-wrap iframe { width:100%; min-height:100vh; border:0; display:block; background:#fff; }
+</style>
+<div class="lovable-map-editor-wrap">
   <iframe
     id="lovable-editor-iframe-{{ product.handle }}"
     src="${editorOrigin}/editor?handle={{ product.handle }}"
-    style="width:100%;height:90vh;border:0;display:block;background:#fff;"
-    allow="clipboard-write"
-    loading="lazy"
+    allow="clipboard-write; geolocation"
+    loading="eager"
   ></iframe>
 </div>
 <script>
@@ -49,7 +52,15 @@ function snippetLiquid(editorOrigin: string): string {
   var iframe = document.getElementById('lovable-editor-iframe-{{ product.handle }}');
   window.addEventListener('message', function(e) {
     var d = e.data;
-    if (!d || d.type !== 'ADD_TO_CART') return;
+    if (!d || typeof d !== 'object') return;
+
+    // Auto-resize from editor
+    if (d.type === 'EDITOR_RESIZE' && typeof d.height === 'number' && iframe) {
+      iframe.style.height = Math.max(600, d.height) + 'px';
+      return;
+    }
+
+    if (d.type !== 'ADD_TO_CART') return;
     if (d.handle && d.handle !== '{{ product.handle }}') return;
 
     fetch('/products/{{ product.handle }}.js')
@@ -76,31 +87,18 @@ function snippetLiquid(editorOrigin: string): string {
 </script>`;
 }
 
+// Minimal product template — only renders our editor snippet. No price, variants, gallery, etc.
 const TEMPLATE_JSON = JSON.stringify(
   {
     sections: {
-      main: {
-        type: "main-product",
-        blocks: {
-          editor: {
-            type: "@app",
-          },
-        },
-        block_order: ["editor"],
-        custom_liquid: {
-          type: "custom_liquid",
-          settings: { custom_liquid: "{% render 'personlig-karta-editor' %}" },
-        },
-        settings: {},
-      },
-      "custom-liquid": {
-        type: "custom_liquid",
+      "personlig-karta-editor": {
+        type: "custom-liquid",
         settings: {
           custom_liquid: "{% render 'personlig-karta-editor' %}",
         },
       },
     },
-    order: ["main", "custom-liquid"],
+    order: ["personlig-karta-editor"],
   },
   null,
   2
@@ -110,19 +108,18 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const domain = Deno.env.get("SHOPIFY_STORE_PERMANENT_DOMAIN") ??
-      Deno.env.get("SHOPIFY_STORE_DOMAIN");
+    const domain = Deno.env.get("SHOPIFY_STORE_PERMANENT_DOMAIN")
+      ?? Deno.env.get("SHOPIFY_STORE_DOMAIN")
+      ?? "canvas-poster-creator-2wh5d.myshopify.com";
     const token = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
     if (!domain || !token) {
       return new Response(JSON.stringify({ error: "Shopify credentials missing" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const body: InjectBody = req.method === "POST" ? await req.json().catch(() => ({})) : {};
-    const editorOrigin =
-      body.editorOrigin ?? "https://artful-create-studio-87.lovable.app";
+    const editorOrigin = body.editorOrigin ?? "https://artful-create-studio-87.lovable.app";
     const handles = body.handles ?? ["personlig-karta-poster", "personlig-karta-canvas"];
 
     // 1) Find main theme
@@ -135,10 +132,7 @@ Deno.serve(async (req) => {
     await shopifyAdmin(domain, token, `/themes/${themeId}/assets.json`, {
       method: "PUT",
       body: JSON.stringify({
-        asset: {
-          key: "snippets/personlig-karta-editor.liquid",
-          value: snippetLiquid(editorOrigin),
-        },
+        asset: { key: "snippets/personlig-karta-editor.liquid", value: snippetLiquid(editorOrigin) },
       }),
     });
 
@@ -146,29 +140,23 @@ Deno.serve(async (req) => {
     await shopifyAdmin(domain, token, `/themes/${themeId}/assets.json`, {
       method: "PUT",
       body: JSON.stringify({
-        asset: {
-          key: "templates/product.personlig-karta.json",
-          value: TEMPLATE_JSON,
-        },
+        asset: { key: "templates/product.personlig-karta.json", value: TEMPLATE_JSON },
       }),
     });
 
-    // 4) Assign template to products via product_listings update
+    // 4) Assign template to products
     const injected: string[] = [];
     for (const handle of handles) {
       try {
         const search = await shopifyAdmin(
-          domain,
-          token,
+          domain, token,
           `/products.json?handle=${encodeURIComponent(handle)}&fields=id,handle,template_suffix`
         );
         const product = search.products?.[0];
         if (!product) continue;
         await shopifyAdmin(domain, token, `/products/${product.id}.json`, {
           method: "PUT",
-          body: JSON.stringify({
-            product: { id: product.id, template_suffix: "personlig-karta" },
-          }),
+          body: JSON.stringify({ product: { id: product.id, template_suffix: "personlig-karta" } }),
         });
         injected.push(handle);
       } catch (e) {
@@ -176,13 +164,34 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ ok: true, themeId, injected: injected.length, handles: injected }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    // 5) Auto-register orders/paid webhook (idempotent)
+    let webhook: { id?: number; created?: boolean; address?: string } = {};
+    try {
+      const webhookAddress = `https://ptzmnusfgdwcqpjpbyco.supabase.co/functions/v1/shopify-order-webhook`;
+      const existing = await shopifyAdmin(domain, token, `/webhooks.json?topic=orders/paid`);
+      const match = (existing.webhooks || []).find((w: any) => w.address === webhookAddress);
+      if (match) {
+        webhook = { id: match.id, created: false, address: webhookAddress };
+      } else {
+        const created = await shopifyAdmin(domain, token, `/webhooks.json`, {
+          method: "POST",
+          body: JSON.stringify({
+            webhook: { topic: "orders/paid", address: webhookAddress, format: "json" },
+          }),
+        });
+        webhook = { id: created.webhook?.id, created: true, address: webhookAddress };
+      }
+    } catch (e) {
+      console.error("Webhook registration failed", e);
+    }
+
+    return new Response(
+      JSON.stringify({ ok: true, themeId, injected: injected.length, handles: injected, webhook }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
