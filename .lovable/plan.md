@@ -1,53 +1,57 @@
 
 
-## Fix: ImageScript-bibliotek inkompatibelt med Edge Runtime
+## Fix: Font 404 — byt till stabil jsDelivr fontsource-URL
 
-### Problemet
+### Problem (bekräftat i loggen)
 
-Edge function-loggen visar:
 ```
-event loop error: Error: unsupported arch/platform: Not supported
-at .../imagescript/1.3.0/codecs/node/index.js:3:21
+[generate-print-file] error: Font fetch failed 404
 ```
 
-`npm:imagescript@1.3.0` försöker ladda ett **native Node.js binding** som inte finns i Deno Edge Runtime. Funktionen kraschar redan vid boot → 0 print-filer genereras → Gelato får ingen order.
+Pipeline kommer hela vägen: Mapbox → decode → cirkel-clip lyckades på 69ms totalt. Den dör först vid `loadFont()` när text ska ritas, eftersom GitHub-URL:en till Inter-fontfilen returnerar 404 (filen har flyttat i `rsms/inter`-repot).
 
-### Lösningen: Byt till Deno-native bibliotek
+Resultat: `generate-print-file` returnerar 500 → webhook fångar fel → ingen Gelato-order skapas.
 
-ImageScript finns i en **ren Deno-version** på deno.land som inte har node-binding-problemet. Det är **samma bibliotek**, samma API, men distribuerat som ren TS för Deno.
+### Lösning — bekräftad fungerande URL
 
-**Ändring i `supabase/functions/generate-print-file/index.ts`:**
+Verifierat med direkta HEAD-requests:
 
-Byt rad 17:
+| URL | Status | Format | Storlek |
+|-----|--------|--------|---------|
+| `github.com/rsms/inter/raw/.../Inter-Regular.otf` (idag) | ❌ 404 | — | — |
+| `cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-ext-400-normal.ttf` | ✅ 200 | statisk TTF | 94 KB |
+
+`latin-ext` täcker **alla** svenska/nordiska tecken (ÅÄÖ, Æ, Ø, Å). jsDelivr har 99.9% uptime + edge cache → snabbare cold-start än GitHub raw.
+
+### Ändring
+
+**Endast en rad** i `supabase/functions/generate-print-file/index.ts`, inuti `loadFont()`:
+
 ```ts
-// FÖRE (kraschar):
-import { Image, decode } from "npm:imagescript@1.3.0";
+// FÖRE (404):
+const url = "https://github.com/rsms/inter/raw/master/docs/font-files/Inter-Regular.otf";
 
-// EFTER (fungerar i Deno Edge Runtime):
-import { Image, decode } from "https://deno.land/x/imagescript@1.2.17/mod.ts";
+// EFTER (verified 200):
+const url = "https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-ext-400-normal.ttf";
 ```
 
-Version 1.2.17 är den senaste stabila Deno-publicerade versionen. API:t (`Image`, `decode`, `Image.renderText`, `setPixelAt`, `composite`, `encode`, `resize`) är identiskt med det vi redan använder → **ingen annan kodändring behövs**.
-
-### Fallback-plan om deno.land-versionen också ger problem
-
-Om importen misslyckas (deno.land-registrets stilar varierar ibland), använd istället:
-```ts
-import { Image, decode } from "https://esm.sh/imagescript@1.2.17?target=deno";
-```
-`?target=deno` tvingar esm.sh att leverera Deno-kompatibel bundle utan node-bindings.
+Inget annat rörs. ImageScript hanterar TTF identiskt med OTF — `Image.renderText(fontBuf, ...)` bryr sig bara om att det är en giltig truetype-tabell.
 
 ### Verifiering
 
-1. Deploya funktionen → boot-loggen ska visa `booted` utan UncaughtException
+1. Deploya funktionen → loggen ska visa `text drawn in Xms` istället för `Font fetch failed`
 2. Du lägger ny testorder via Bogus Gateway (cirkel + labels off + text)
 3. `gelato_orders` → status `submitted`, `gelato_order_id` finns
 4. Print-fil-URL öppnas → cirkulär karta + text syns
 5. Gelato dashboard visar ordern
 
+### Robusthet — fallback
+
+Om jsDelivr någon gång returnerar fel kan vi enkelt lägga till en fallback-kedja senare (`try jsDelivr → unpkg → embedded base64`). Men för nu håller vi det enkelt: jsDelivr fontsource är de facto-standard för server-side font loading och har högre SLA än GitHub raw.
+
 ### Filer som ändras
 
-- `supabase/functions/generate-print-file/index.ts` — endast `import`-raden (rad 17)
+- `supabase/functions/generate-print-file/index.ts` — endast font-URL-strängen i `loadFont()`
 
-Inget annat rörs: editor, cart, webhook, store — allt orört.
+Editor, cart, webhook, store — orörda.
 
