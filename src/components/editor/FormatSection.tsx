@@ -35,22 +35,22 @@ function formatDiff(diff: number): string {
   return `−${Math.abs(diff)} kr`;
 }
 
-function NoFrameIcon() {
-  return (
-    <svg viewBox="0 0 40 40" className="w-1/2 h-1/2" fill="none" stroke="currentColor" strokeWidth="2">
-      <rect x="5" y="5" width="30" height="30" rx="1" strokeDasharray="3 3" />
-    </svg>
-  );
-}
+const NoFrameIcon = forwardRef<SVGSVGElement>((_, ref) => (
+  <svg ref={ref} viewBox="0 0 40 40" className="w-1/2 h-1/2" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="5" y="5" width="30" height="30" rx="1" strokeDasharray="3 3" />
+  </svg>
+));
+NoFrameIcon.displayName = "NoFrameIcon";
 
-function DepthIcon({ depth }: { depth: string }) {
+const DepthIcon = forwardRef<SVGSVGElement, { depth: string }>(({ depth }, ref) => {
   const thickness = depth.includes("4") ? 14 : 7;
   return (
-    <svg viewBox="0 0 40 40" className="w-2/3 h-2/3" fill="currentColor">
+    <svg ref={ref} viewBox="0 0 40 40" className="w-2/3 h-2/3" fill="currentColor">
       <rect x="6" y={20 - thickness / 2} width="28" height={thickness} rx="1" opacity="0.85" />
     </svg>
   );
-}
+});
+DepthIcon.displayName = "DepthIcon";
 
 export function FormatSection({ configs, activeHandle, onProductChange }: Props) {
   const { config, size, variant, orientation, setSize, setVariant, setOrientation } = useEditorStore();
