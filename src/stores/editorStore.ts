@@ -164,6 +164,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setVariant: (variant) => set({ variant }),
   setOrientation: (orientation) => set({ orientation }),
 
+  setPhotoSource: (file, previewUrl) => {
+    set({
+      photoFile: file,
+      photoPreviewUrl: previewUrl,
+      designSource: file ? "photo" : "map",
+      aiPrintFileUrl: file ? null : get().aiPrintFileUrl,
+    });
+  },
+  setAiPrintFileUrl: (url) => {
+    set({ aiPrintFileUrl: url, designSource: url ? "ai" : "map" });
+  },
+  resetDesignSource: () =>
+    set({ designSource: "map", photoFile: null, photoPreviewUrl: null, aiPrintFileUrl: null }),
+
   applyPlace: (args) => {
     const isCustom = get().textIsCustom;
     set({
