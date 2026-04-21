@@ -119,14 +119,16 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
           }
         }
       }
-      // Wait one more idle for label changes to apply
-      await new Promise<void>((resolve) => {
-        const t = window.setTimeout(() => resolve(), 1500);
-        map!.once("idle", () => {
-          window.clearTimeout(t);
-          resolve();
+      // Wait two idle cycles for label changes + tile redraw to settle
+      for (let i = 0; i < 2; i++) {
+        await new Promise<void>((resolve) => {
+          const t = window.setTimeout(() => resolve(), 1500);
+          map!.once("idle", () => {
+            window.clearTimeout(t);
+            resolve();
+          });
         });
-      });
+      }
     } catch (e) {
       console.warn("[snapshot] label toggle failed", e);
     }
