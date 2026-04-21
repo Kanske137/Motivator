@@ -204,10 +204,12 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding }: Props
     return () => ro.disconnect();
   }, [frameColor, frameWidthCm, sizeCm?.w, sizeCm?.h]);
 
+  const isPortrait = posterAspect < 1;
   const frameStyle: React.CSSProperties = {
     aspectRatio: `${posterAspect}`,
-    width: "100%",
-    maxWidth: "min(100%, 70vh)",
+    width: isPortrait ? "auto" : "min(100%, 70vh)",
+    height: isPortrait ? "min(100%, 78vh)" : "auto",
+    maxWidth: "100%",
     maxHeight: "78vh",
     background: posterBgColor,
     borderStyle: frameColor ? "solid" : undefined,

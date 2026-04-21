@@ -36,6 +36,8 @@ export function MockupGallery() {
 
   useEffect(() => {
     if (!config || !size) return;
+    // Invalidate any in-flight render synchronously so stale results never overwrite.
+    reqIdRef.current++;
     const scenes = isCanvas ? [] : getScenesFor(config.product_type);
     setSlots(scenes.map((s) => ({ scene: s, url: null, loading: true })));
     setSnapshotLoading(true);

@@ -41,20 +41,17 @@ function parsePct(v: string | undefined, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-let snapshotContainer: HTMLDivElement | null = null;
-function getOffscreenContainer(w: number, h: number): HTMLDivElement {
-  if (!snapshotContainer) {
-    snapshotContainer = document.createElement("div");
-    snapshotContainer.style.position = "fixed";
-    snapshotContainer.style.left = "-99999px";
-    snapshotContainer.style.top = "0";
-    snapshotContainer.style.pointerEvents = "none";
-    snapshotContainer.setAttribute("aria-hidden", "true");
-    document.body.appendChild(snapshotContainer);
-  }
-  snapshotContainer.style.width = `${w}px`;
-  snapshotContainer.style.height = `${h}px`;
-  return snapshotContainer;
+function createOffscreenContainer(w: number, h: number): HTMLDivElement {
+  const el = document.createElement("div");
+  el.style.position = "fixed";
+  el.style.left = "-99999px";
+  el.style.top = "0";
+  el.style.width = `${w}px`;
+  el.style.height = `${h}px`;
+  el.style.pointerEvents = "none";
+  el.setAttribute("aria-hidden", "true");
+  document.body.appendChild(el);
+  return el;
 }
 
 /**
@@ -79,7 +76,7 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
   const mapW = input.mapShape === "rect" ? w : sq;
   const mapH = input.mapShape === "rect" ? h : sq;
 
-  const container = getOffscreenContainer(Math.max(w, mapW), Math.max(h, mapH));
+  const container = createOffscreenContainer(Math.max(w, mapW), Math.max(h, mapH));
   // Inner div for THIS map render (so concurrent renders don't collide)
   const mapDiv = document.createElement("div");
   mapDiv.style.width = `${mapW}px`;
@@ -122,14 +119,16 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
           }
         }
       }
-      // Wait one more idle for label changes to apply
-      await new Promise<void>((resolve) => {
-        const t = window.setTimeout(() => resolve(), 1500);
-        map!.once("idle", () => {
-          window.clearTimeout(t);
-          resolve();
+      // Wait two idle cycles for label changes + tile redraw to settle
+      for (let i = 0; i < 2; i++) {
+        await new Promise<void>((resolve) => {
+          const t = window.setTimeout(() => resolve(), 1500);
+          map!.once("idle", () => {
+            window.clearTimeout(t);
+            resolve();
+          });
         });
-      });
+      }
     } catch (e) {
       console.warn("[snapshot] label toggle failed", e);
     }
@@ -203,6 +202,6 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
     } catch {
       /* noop */
     }
-    if (mapDiv.parentNode) mapDiv.parentNode.removeChild(mapDiv);
+    if (container.parentNode) container.parentNode.removeChild(container);
   }
 }
