@@ -36,6 +36,12 @@ interface EditorState {
   variant: string | null;
   orientation: Orientation;
 
+  // print-pipeline source
+  designSource: DesignSource;
+  photoFile: File | null;
+  photoPreviewUrl: string | null;
+  aiPrintFileUrl: string | null;
+
   // setters
   setConfig: (c: ProductConfig) => void;
   setMapCenter: (c: [number, number]) => void;
@@ -51,6 +57,9 @@ interface EditorState {
   setSize: (s: string) => void;
   setVariant: (v: string) => void;
   setOrientation: (o: Orientation) => void;
+  setPhotoSource: (file: File | null, previewUrl: string | null) => void;
+  setAiPrintFileUrl: (url: string | null) => void;
+  resetDesignSource: () => void;
   applyPlace: (args: ApplyPlaceArgs) => void;
   updateFromMap: (args: ApplyPlaceArgs) => void;
 
@@ -87,6 +96,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   size: null,
   variant: null,
   orientation: "portrait",
+
+  designSource: "map",
+  photoFile: null,
+  photoPreviewUrl: null,
+  aiPrintFileUrl: null,
 
   setConfig: (config) => {
     // Preserve all design state across product switches (poster <-> canvas).
