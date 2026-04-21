@@ -10,7 +10,7 @@ import { MockupGallery } from "@/components/editor/MockupGallery";
 import { useCartStore } from "@/stores/cartStore";
 import { CartDrawer } from "@/components/CartDrawer";
 import { renderArtworkSnapshot } from "@/lib/editor-snapshot";
-import { uploadCartPreview } from "@/lib/upload-preview";
+import { uploadCartPreview, uploadPrintFile } from "@/lib/upload-preview";
 import { toast } from "sonner";
 
 const FRAME_COLORS: Record<string, string> = {
