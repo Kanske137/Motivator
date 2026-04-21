@@ -128,6 +128,7 @@ export default function EditorPage() {
       _text_font: textFont,
     };
     if (previewUrl) properties._preview_image = previewUrl;
+    if (printFileUrl) properties._print_file_url = printFileUrl;
 
     if (inIframe) {
       window.parent.postMessage(
