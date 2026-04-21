@@ -44,9 +44,12 @@ export function CartDrawer() {
               <p>Varukorgen är tom</p>
             </div>
           ) : (
-            items.map((item) => (
+            items.map((item) => {
+              const previewAttr = item.attributes.find((a) => a.key === "_preview_image")?.value;
+              const thumb = previewAttr || item.imageUrl;
+              return (
               <div key={item.variantId} className="flex gap-3 p-2 border rounded-md">
-                <img src={item.imageUrl} alt={item.productTitle} className="size-16 rounded object-cover bg-muted" />
+                <img src={thumb} alt={item.productTitle} className="size-16 rounded object-cover bg-muted" />
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{item.productTitle}</p>
                   <p className="text-xs text-muted-foreground">{item.variantTitle}</p>
