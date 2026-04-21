@@ -1,65 +1,44 @@
 
 
-## Tre ändringar — reviderad plan
+## Två cart-fixar
 
-### 1. Sömlöst byte mellan Poster och Canvas (utan att förlora design)
+### 1. Ramen syns inte i preview-bilden
 
-**Krav:** Alla designval (kartposition, zoom, stil, text, font, bakgrund, form, labels) ska bevaras 1:1 vid byte. Ingen ny UI-kontroll får läggas till och inget får flytta runt.
+**Problem:** `editor-snapshot.ts` renderar bara karta + text + bakgrund. Ramen (poster) och canvas-wrap ritas separat i `MapPreview` via CSS/3D — alltså inte med i snapshoten som laddas upp till `cart-previews`.
 
-**Lösning — byt produkt-typ via befintliga Format-sektionen:**
+**Fix:** Utöka `renderArtworkSnapshot` i `src/lib/editor-snapshot.ts` så den även ritar ramen ovanpå artwork:
+- Acceptera nya parametrar: `frameColor` (hex/hsl-sträng), `frameWidthCm`, `wrapCm` (canvas-djup)
+- Efter att karta+text är ritat: lägg på en ram runt hela motivet med `ctx.fillStyle = frameColor` + `ctx.fillRect` på fyra sidor (top/bottom/left/right) skalat efter bildens DPI
+- För canvas: rita en mörkare "wrap-skugga" på sidorna istället för fast färg, så det visuellt ser ut som en duk
+- Skippa rambana när `frameColor === ""` (Ingen ram) — då ser snapshoten ut precis som idag
 
-Idag finns redan en produktväljare i `FormatSection` (via `onProductChange`). Vi gör inga nya kontroller — vi gör bara så att:
+I `EditorPage.handleAddToCart` skickar vi med `frameColor`, `FRAME_WIDTH_CM`, `canvasDepthCm` till `renderArtworkSnapshot`.
 
-- `editorStore.setConfig()` slutar nollställa map-state. Den ska bara röra fält som är *produkt-specifika* (sizes/variants som inte längre finns) — aldrig `mapCenter`, `mapZoom`, `mapStyleId`, `text`, `textFont`, `textVisible`, `posterBgColor`, `mapShape`, `showLabels`, `placeName`, `orientation`.
-- När man byter till en produkt vars `map_styles` inte innehåller nuvarande `mapStyleId` → fall tillbaka till första tillgängliga stil, men behåll allt annat.
-- När `size`/`variant` inte finns i nya produkten → välj första giltiga kombo (precis som idag), men karta + text rörs inte.
-- `EditorPage.onProductChange` uppdaterar `?handle=` (redan gjort) — inga UI-ändringar.
+### 2. Bild återgår till standardproduktbild när cart uppdateras
 
-**Resultat:** Kunden kan i Format-sektionen växla mellan poster och canvas (båda finns redan i `configs`-listan från `loadAllConfigs`) och behåller sin design intakt.
+**Problem:** Vår `cart-preview-override.liquid` körs bara på `DOMContentLoaded` + `cart:refresh` + `cart:updated` events. När Horizon byter ut DOM-noderna efter quantity-change/remove kommer den nya `<img>`-noden tillbaka med Shopifys default-URL och våra event-listeners triggas inte alltid (Horizon emittar egna custom events).
 
-**Shopify-snippet:** uppdateras så `ADD_TO_CART`-meddelandets `d.handle` används mot rätt produkt oavsett vilken produktsida snippet:en sitter på. Färdig kod levereras.
+**Fix:** Skriv om snippet:en till att använda en `MutationObserver` som permanent övervakar cart-containern. När som helst en ny `<img>` dyker upp i en line item som har `_preview_image`-property, byts `src` ut omedelbart. Detta är robust mot:
+- Horizon's egna section-rerenders efter quantity-update
+- AJAX-byten av cart-rader
+- Drawer-cart som öppnas/stängs
 
-### 2. Verifiera att print-fil genereras korrekt
+Mappning: vi cachar `key → previewUrl` från `/cart.js` och re-fetchar bara när cart-totalen ändras (lyssnar på `cart:updated` + fallback-poll var 2s när observer triggar).
 
-Inga kodändringar förrän vi sett resultatet. Jag kör:
-
-- `supabase--curl_edge_functions` mot `generate-print-file` med realistisk payload (Stockholm, A3, Vit ram + en canvas-variant separat)
-- Kontrollerar returnerad URL i `print-files`-bucket: korrekt fysisk storlek, DPI och bleed (canvas wrap kräver extra marginal)
-- Läser `shopify-order-webhook`-loggar för senaste försök
-- Rapporterar resultat. Fixar i `generate-print-file` om något fattas (vanligast: bleed för canvas, label-rendering, font-embedding)
-
-### 3. Exakt editor-bild som produktbild i Shopify-kundvagnen
-
-**Flöde:**
-
-1. Vid klick på "Lägg i varukorg":
-   - Utöka `editor-snapshot.ts` så den renderar hela kompositionen inklusive ram (poster) eller canvas-wrap (3D-look platt-projicerad) — samma vy som preview
-   - Komprimera till PNG ~max 400 kB
-   - Ladda upp till ny publik bucket `cart-previews` (filnamn `{design_id}.png`)
-   - Skicka publika URL:en som `_preview_image` i `ADD_TO_CART`-properties
-2. Shopify-sidan:
-   - Uppdaterad `personlig-karta-editor`-snippet skickar `_preview_image` som line-item-property
-   - Ny snippet `cart-preview-override` som inkluderas i cart-templaten byter ut `<img>` för rader som har `properties._preview_image` mot kundens unika bild
-
-**Du får färdig kod till båda Shopify-snippets + exakt instruktion var `cart-preview-override` ska klistras in.**
+**Du får uppdaterad `cart-preview-override.liquid` att klistra in (ersätter nuvarande).**
 
 ### Tekniska detaljer
 
-**Filer som ändras (i nästnästa steg, default mode):**
-- `src/stores/editorStore.ts` — `setConfig` bevarar allt design-state, fallback bara för ogiltiga val
-- `src/lib/editor-snapshot.ts` — utöka med ram/canvas-wrap-rendering
-- Ny: `src/lib/upload-preview.ts` — komprimera + ladda upp PNG
-- `src/pages/EditorPage.tsx` — anropa snapshot+upload före `postMessage`/`addItem`, skicka `_preview_image`
+**Filer som ändras:**
+- `src/lib/editor-snapshot.ts` — utöka signatur + rita ram/wrap
+- `src/pages/EditorPage.tsx` — skicka frame-params till snapshot
 
-**Ny Supabase-resurs:**
-- Storage bucket `cart-previews` (publik, 5MB-cap, image/png)
-
-**Inga UI-ändringar i `ControlPanel.tsx`** — produktbyte sker via befintlig `FormatSection`.
+**Shopify-snippet:**
+- `snippets/cart-preview-override.liquid` — ersätts med MutationObserver-version
 
 ### Ordning
 
-1. Verifiera `generate-print-file` (curl + logs, rapport till dig)
-2. Patcha `editorStore.setConfig` så design bevaras vid produktbyte
-3. Skapa `cart-previews`-bucket + utöka snapshot + upload-helper + skicka `_preview_image`
-4. Leverera färdiga Shopify-snippets
+1. Utöka snapshot-rendering med ram + wrap
+2. Uppdatera `EditorPage` att skicka frame-data
+3. Leverera ny `cart-preview-override.liquid`
 
