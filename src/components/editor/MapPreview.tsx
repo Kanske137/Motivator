@@ -243,8 +243,8 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
       ? {
           position: "absolute",
           left: "50%",
-          top: `${frontInsetY * 100}%`,
-          transform: "translateX(-50%)",
+          top: "50%",
+          transform: "translate(-50%, -50%)",
           width: isPortraitFront ? `${(1 - 2 * frontInsetX) * 100}%` : "auto",
           height: isPortraitFront ? "auto" : `${(1 - 2 * frontInsetY) * 100}%`,
           aspectRatio: "1 / 1",
