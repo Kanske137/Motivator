@@ -202,6 +202,6 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
     } catch {
       /* noop */
     }
-    if (mapDiv.parentNode) mapDiv.parentNode.removeChild(mapDiv);
+    if (container.parentNode) container.parentNode.removeChild(container);
   }
 }
