@@ -9,22 +9,210 @@ const corsHeaders = {
 
 const SHOPIFY_API_VERSION = "2025-07";
 
-// Local Gelato UID resolver (mirror of src/lib/gelato.ts logic, kept simple)
+// ============================================================================
+// Inline Gelato SKU map (mirror of src/lib/gelato-sku-map.json)
+// Edge functions cannot import from src/, so we embed it here. Keep in sync.
+// ============================================================================
+const GELATO_SKU_MAP: Record<string, Record<string, { portrait: string; landscape: string }>> = {
+  posters: {
+    "13x18|Ingen": {
+      portrait: "flat_product_pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_ver",
+      landscape: "flat_product_pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_hor",
+    },
+    "13x18|Svart": {
+      portrait: "frame_and_poster_mounted_product_frs_130x180-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      landscape: "frame_and_poster_mounted_product_frs_130x180-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+    },
+    "13x18|Vit": {
+      portrait: "frame_and_poster_mounted_product_frs_130x180-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      landscape: "frame_and_poster_mounted_product_frs_130x180-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+    },
+    "13x18|Ek": {
+      portrait: "frame_and_poster_mounted_product_frs_130x180-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      landscape: "frame_and_poster_mounted_product_frs_130x180-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+    },
+    "13x18|Valnöt": {
+      portrait: "frame_and_poster_mounted_product_frs_130x180-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      landscape: "frame_and_poster_mounted_product_frs_130x180-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+    },
+    "21x30|Ingen": {
+      portrait: "flat_product_pf_210x300-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_ver",
+      landscape: "flat_product_pf_210x300-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_hor",
+    },
+    "21x30|Svart": {
+      portrait: "frame_and_poster_mounted_product_frs_210x297mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      landscape: "frame_and_poster_mounted_product_frs_210x297mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+    },
+    "21x30|Vit": {
+      portrait: "frame_and_poster_mounted_product_frs_210x297mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      landscape: "frame_and_poster_mounted_product_frs_210x297mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+    },
+    "21x30|Ek": {
+      portrait: "frame_and_poster_mounted_product_frs_210x297mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      landscape: "frame_and_poster_mounted_product_frs_210x297mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+    },
+    "21x30|Valnöt": {
+      portrait: "frame_and_poster_mounted_product_frs_210x297mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      landscape: "frame_and_poster_mounted_product_frs_210x297mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+    },
+    "30x40|Ingen": {
+      portrait: "flat_product_pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_ver",
+      landscape: "flat_product_pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_hor",
+    },
+    "30x40|Svart": {
+      portrait: "frame_and_poster_mounted_product_frs_300x400-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      landscape: "frame_and_poster_mounted_product_frs_300x400-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+    },
+    "30x40|Vit": {
+      portrait: "frame_and_poster_mounted_product_frs_300x400-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      landscape: "frame_and_poster_mounted_product_frs_300x400-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+    },
+    "30x40|Ek": {
+      portrait: "frame_and_poster_mounted_product_frs_300x400-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      landscape: "frame_and_poster_mounted_product_frs_300x400-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+    },
+    "30x40|Valnöt": {
+      portrait: "frame_and_poster_mounted_product_frs_300x400-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      landscape: "frame_and_poster_mounted_product_frs_300x400-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+    },
+    "40x50|Ingen": {
+      portrait: "flat_product_pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_ver",
+      landscape: "flat_product_pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_hor",
+    },
+    "40x50|Svart": {
+      portrait: "frame_and_poster_mounted_product_frs_400x500-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      landscape: "frame_and_poster_mounted_product_frs_400x500-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+    },
+    "40x50|Vit": {
+      portrait: "frame_and_poster_mounted_product_frs_400x500-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      landscape: "frame_and_poster_mounted_product_frs_400x500-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+    },
+    "40x50|Ek": {
+      portrait: "frame_and_poster_mounted_product_frs_400x500-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      landscape: "frame_and_poster_mounted_product_frs_400x500-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+    },
+    "40x50|Valnöt": {
+      portrait: "frame_and_poster_mounted_product_frs_400x500-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      landscape: "frame_and_poster_mounted_product_frs_400x500-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+    },
+    "50x70|Ingen": {
+      portrait: "flat_product_pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_ver",
+      landscape: "flat_product_pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_hor",
+    },
+    "50x70|Svart": {
+      portrait: "frame_and_poster_mounted_product_frs_500x700-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      landscape: "frame_and_poster_mounted_product_frs_500x700-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+    },
+    "50x70|Vit": {
+      portrait: "frame_and_poster_mounted_product_frs_500x700-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      landscape: "frame_and_poster_mounted_product_frs_500x700-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+    },
+    "50x70|Ek": {
+      portrait: "frame_and_poster_mounted_product_frs_500x700-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      landscape: "frame_and_poster_mounted_product_frs_500x700-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+    },
+    "50x70|Valnöt": {
+      portrait: "frame_and_poster_mounted_product_frs_500x700-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      landscape: "frame_and_poster_mounted_product_frs_500x700-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+    },
+    "70x100|Ingen": {
+      portrait: "flat_product_pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_ver",
+      landscape: "flat_product_pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_hor",
+    },
+    "70x100|Svart": {
+      portrait: "frame_and_poster_mounted_product_frs_700x1000-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      landscape: "frame_and_poster_mounted_product_frs_700x1000-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+    },
+    "70x100|Vit": {
+      portrait: "frame_and_poster_mounted_product_frs_700x1000-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      landscape: "frame_and_poster_mounted_product_frs_700x1000-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+    },
+    "70x100|Ek": {
+      portrait: "frame_and_poster_mounted_product_frs_700x1000-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      landscape: "frame_and_poster_mounted_product_frs_700x1000-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+    },
+    "70x100|Valnöt": {
+      portrait: "frame_and_poster_mounted_product_frs_700x1000-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
+      landscape: "frame_and_poster_mounted_product_frs_700x1000-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
+    },
+  },
+  canvas: {
+    "20x25|2cm": { portrait: "canvas_product_cf_200x250-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver", landscape: "canvas_product_cf_200x250-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor" },
+    "20x25|4cm": { portrait: "canvas_product_cf_200x250-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver", landscape: "canvas_product_cf_200x250-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor" },
+    "20x30|2cm": { portrait: "canvas_product_cf_200x300-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver", landscape: "canvas_product_cf_200x300-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor" },
+    "20x30|4cm": { portrait: "canvas_product_cf_200x300-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver", landscape: "canvas_product_cf_200x300-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor" },
+    "30x40|2cm": { portrait: "canvas_product_cf_300x400-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver", landscape: "canvas_product_cf_300x400-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor" },
+    "30x40|4cm": { portrait: "canvas_product_cf_300x400-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver", landscape: "canvas_product_cf_300x400-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor" },
+    "40x50|2cm": { portrait: "canvas_product_cf_400x500-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver", landscape: "canvas_product_cf_400x500-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor" },
+    "40x50|4cm": { portrait: "canvas_product_cf_400x500-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver", landscape: "canvas_product_cf_400x500-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor" },
+    "40x60|2cm": { portrait: "canvas_product_cf_400x600-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver", landscape: "canvas_product_cf_400x600-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor" },
+    "40x60|4cm": { portrait: "canvas_product_cf_400x600-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver", landscape: "canvas_product_cf_400x600-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor" },
+    "50x70|2cm": { portrait: "canvas_product_cf_500x700-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver", landscape: "canvas_product_cf_500x700-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor" },
+    "50x70|4cm": { portrait: "canvas_product_cf_500x700-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver", landscape: "canvas_product_cf_500x700-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor" },
+    "60x80|2cm": { portrait: "canvas_product_cf_600x800-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver", landscape: "canvas_product_cf_600x800-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor" },
+    "60x80|4cm": { portrait: "canvas_product_cf_600x800-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver", landscape: "canvas_product_cf_600x800-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor" },
+    "70x100|2cm": { portrait: "canvas_product_cf_700x1000-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver", landscape: "canvas_product_cf_700x1000-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor" },
+    "70x100|4cm": { portrait: "canvas_product_cf_700x1000-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver", landscape: "canvas_product_cf_700x1000-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor" },
+  },
+};
+
+function productTypeFromHandle(handle: string): "posters" | "canvas" | null {
+  const h = (handle || "").toLowerCase();
+  if (h.includes("canvas")) return "canvas";
+  if (h.includes("poster") || h.includes("karta")) return "posters";
+  return null;
+}
+
+interface ResolveResult {
+  productUid: string | null;
+  source: "db" | "local-exact" | "local-size-fallback" | "missing";
+  detail: string;
+}
+
 function resolveProductUid(args: {
+  handle: string;
   size: string;
   variant?: string | null;
   orientation: "portrait" | "landscape";
   dbMap?: Record<string, Record<string, string>> | null;
-}): string | null {
-  const { size, variant, dbMap } = args;
-  if (variant && dbMap?.[size]?.[variant]) return dbMap[size][variant];
-  // Fallback: any variant for that size
-  const sizeRow = dbMap?.[size];
-  if (sizeRow) {
-    const first = Object.values(sizeRow)[0];
-    if (first) return first;
+}): ResolveResult {
+  const { handle, size, variant, orientation, dbMap } = args;
+
+  // 1) DB-mapping (per-handle override)
+  if (variant && dbMap?.[size]?.[variant]) {
+    return { productUid: dbMap[size][variant], source: "db", detail: `${size}|${variant}` };
   }
-  return null;
+
+  const ptype = productTypeFromHandle(handle);
+  if (!ptype) {
+    return { productUid: null, source: "missing", detail: `unknown product type for handle="${handle}"` };
+  }
+  const localForType = GELATO_SKU_MAP[ptype] ?? {};
+
+  // 2) Local exact size|variant
+  if (variant && localForType[`${size}|${variant}`]?.[orientation]) {
+    return {
+      productUid: localForType[`${size}|${variant}`][orientation],
+      source: "local-exact",
+      detail: `${ptype} ${size}|${variant} ${orientation}`,
+    };
+  }
+
+  // 3) Any variant for the same size
+  const sizeMatch = Object.entries(localForType).find(([k]) => k.startsWith(`${size}|`));
+  if (sizeMatch && sizeMatch[1]?.[orientation]) {
+    return {
+      productUid: sizeMatch[1][orientation],
+      source: "local-size-fallback",
+      detail: `${ptype} ${sizeMatch[0]} ${orientation} (fallback from variant="${variant}")`,
+    };
+  }
+
+  return {
+    productUid: null,
+    source: "missing",
+    detail: `no SKU for ${ptype} size=${size} variant=${variant} orientation=${orientation}`,
+  };
 }
 
 async function verifyHmac(rawBody: string, hmacHeader: string | null, secret: string): Promise<boolean> {
@@ -38,7 +226,6 @@ async function verifyHmac(rawBody: string, hmacHeader: string | null, secret: st
   );
   const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(rawBody));
   const digest = btoa(String.fromCharCode(...new Uint8Array(sig)));
-  // constant-time-ish compare
   if (digest.length !== hmacHeader.length) return false;
   let mismatch = 0;
   for (let i = 0; i < digest.length; i++) mismatch |= digest.charCodeAt(i) ^ hmacHeader.charCodeAt(i);
@@ -68,13 +255,14 @@ async function processOrder(supabase: any, order: any) {
     return;
   }
 
-  // Load all product configs once for SKU mapping
+  // Load DB overrides per handle
   const { data: configs } = await supabase.from("product_configs").select("shopify_handle, gelato_sku_map");
   const configByHandle: Record<string, any> = {};
   (configs ?? []).forEach((c: any) => { configByHandle[c.shopify_handle] = c; });
 
   const items: any[] = [];
-  const errors: string[] = [];
+  const printErrors: string[] = [];
+  const skuErrors: string[] = [];
 
   for (const li of order.line_items ?? []) {
     const props = li.properties as Array<{ name: string; value: string }> | undefined;
@@ -89,15 +277,14 @@ async function processOrder(supabase: any, order: any) {
     const text = getProp(props, "Text") ?? "";
 
     if (!styleId || !centerStr || !zoomStr || !size) {
-      // Not one of our editor items — skip silently
-      continue;
+      continue; // not an editor item
     }
 
     const [latStr, lngStr] = centerStr.split(",");
     const center: [number, number] = [parseFloat(lngStr), parseFloat(latStr)];
     const zoom = parseFloat(zoomStr);
 
-    // 1) Generate print file
+    // 1) Generate print file (PNG)
     let printUrl: string | null = null;
     try {
       const res = await fetch(`${projectUrl}/functions/v1/generate-print-file`, {
@@ -114,35 +301,44 @@ async function processOrder(supabase: any, order: any) {
       printUrl = json.url ?? json.publicUrl ?? json.printUrl ?? null;
       if (!printUrl) throw new Error("no print URL returned");
     } catch (e) {
-      errors.push(`line ${li.id}: print ${String(e)}`);
+      printErrors.push(`line ${li.id}: print ${String(e)}`);
       continue;
     }
 
     // 2) Resolve productUid
     const cfg = configByHandle[handle];
-    const productUid = resolveProductUid({
+    const resolved = resolveProductUid({
+      handle,
       size: size!,
       variant,
       orientation,
       dbMap: cfg?.gelato_sku_map ?? null,
     });
-    if (!productUid) {
-      errors.push(`line ${li.id}: no productUid for ${handle} ${size}|${variant}`);
+
+    console.log(
+      `[shopify-webhook] line ${li.id}: handle="${handle}" size=${size} variant=${variant} orient=${orientation} → source=${resolved.source} uid=${resolved.productUid ?? "NONE"} (${resolved.detail})`
+    );
+
+    if (!resolved.productUid) {
+      skuErrors.push(`line ${li.id}: ${resolved.detail}`);
       continue;
     }
 
     items.push({
       itemReferenceId: String(li.id),
-      productUid,
+      productUid: resolved.productUid,
       files: [{ type: "default", url: printUrl }],
       quantity: li.quantity ?? 1,
     });
   }
 
   if (items.length === 0) {
+    const status = printErrors.length ? "print_failed"
+      : skuErrors.length ? "sku_not_found"
+      : "skipped";
     await supabase.from("gelato_orders").update({
-      status: errors.length ? "print_failed" : "skipped",
-      error: errors.join(" | ") || "no editor items in order",
+      status,
+      error: [...printErrors, ...skuErrors].join(" | ") || "no editor items in order",
     }).eq("shopify_order_id", shopifyOrderId);
     return;
   }
@@ -169,6 +365,8 @@ async function processOrder(supabase: any, order: any) {
     },
   };
 
+  const partialErrors = [...printErrors, ...skuErrors];
+
   try {
     const res = await fetch("https://order.gelatoapis.com/v4/orders", {
       method: "POST",
@@ -177,13 +375,13 @@ async function processOrder(supabase: any, order: any) {
     });
     const json = await res.json();
     if (!res.ok) {
+      console.error(`[shopify-webhook] Gelato API failed ${res.status}:`, JSON.stringify(json).slice(0, 800));
       await supabase.from("gelato_orders").update({
         status: "gelato_failed",
         error: `${res.status}: ${JSON.stringify(json).slice(0, 800)}`,
         payload: gelatoBody,
       }).eq("shopify_order_id", shopifyOrderId);
 
-      // Add a note on the Shopify order for visibility
       if (shopifyDomain && shopifyToken) {
         await fetch(`https://${shopifyDomain}/admin/api/${SHOPIFY_API_VERSION}/orders/${shopifyOrderId}.json`, {
           method: "PUT",
@@ -193,11 +391,12 @@ async function processOrder(supabase: any, order: any) {
       }
       return;
     }
+    console.log(`[shopify-webhook] Gelato order submitted: ${json.id ?? json.orderId}`);
     await supabase.from("gelato_orders").update({
       status: "submitted",
       gelato_order_id: json.id ?? json.orderId ?? null,
       payload: gelatoBody,
-      error: errors.length ? errors.join(" | ") : null,
+      error: partialErrors.length ? partialErrors.join(" | ") : null,
     }).eq("shopify_order_id", shopifyOrderId);
   } catch (e) {
     await supabase.from("gelato_orders").update({
@@ -212,7 +411,6 @@ Deno.serve(async (req) => {
   const rawBody = await req.text();
   const hmac = req.headers.get("X-Shopify-Hmac-Sha256");
 
-  // Use API secret for HMAC verification (Shopify signs webhooks with the app's API secret)
   const secret = Deno.env.get("SHOPIFY_API_SECRET") ?? Deno.env.get("SHOPIFY_WEBHOOK_SECRET");
   if (secret) {
     const ok = await verifyHmac(rawBody, hmac, secret);
@@ -234,7 +432,6 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
-  // Idempotent insert
   const shopifyOrderId = String(order.id);
   const { error: insertErr } = await supabase.from("gelato_orders").insert({
     shopify_order_id: shopifyOrderId,
@@ -243,7 +440,6 @@ Deno.serve(async (req) => {
   });
 
   if (insertErr) {
-    // Duplicate → already processed (or in flight)
     if (String(insertErr.code) === "23505" || String(insertErr.message).includes("duplicate")) {
       return new Response("already processed", { status: 200, headers: corsHeaders });
     }
@@ -251,7 +447,6 @@ Deno.serve(async (req) => {
     return new Response("db error", { status: 500, headers: corsHeaders });
   }
 
-  // Respond fast, do work in background
   // @ts-ignore — EdgeRuntime is available in Supabase Edge Functions
   EdgeRuntime.waitUntil(processOrder(supabase, order));
 
