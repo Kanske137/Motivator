@@ -234,17 +234,31 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   const isWrap = wrapCm > 0;
 
   // Wrap mode: map is rendered ONLY within the front zone — wrap area shows bg color.
+  // For shaped (circle/square), center a square inside the front zone so the
+  // shape stays a true circle/square rather than being stretched into an ellipse.
   // Poster mode: shape clip is applied as a centered square/circle within the editor.
+  const isPortraitFront = frontH >= frontW;
   const mapWrapperStyle: React.CSSProperties = isWrap
-    ? {
-        position: "absolute",
-        left: `${frontInsetX * 100}%`,
-        top: `${frontInsetY * 100}%`,
-        right: `${frontInsetX * 100}%`,
-        bottom: `${frontInsetY * 100}%`,
-        borderRadius: isShaped && mapShape === "circle" ? "9999px" : "0",
-        overflow: "hidden",
-      }
+    ? isShaped
+      ? {
+          position: "absolute",
+          left: "50%",
+          top: "50%",
+          transform: "translate(-50%, -50%)",
+          width: isPortraitFront ? `${(1 - 2 * frontInsetX) * 100}%` : "auto",
+          height: isPortraitFront ? "auto" : `${(1 - 2 * frontInsetY) * 100}%`,
+          aspectRatio: "1 / 1",
+          borderRadius: mapShape === "circle" ? "9999px" : "0",
+          overflow: "hidden",
+        }
+      : {
+          position: "absolute",
+          left: `${frontInsetX * 100}%`,
+          top: `${frontInsetY * 100}%`,
+          right: `${frontInsetX * 100}%`,
+          bottom: `${frontInsetY * 100}%`,
+          overflow: "hidden",
+        }
     : isShaped
     ? {
         position: "absolute",
