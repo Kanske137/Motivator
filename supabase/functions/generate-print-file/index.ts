@@ -14,7 +14,7 @@
 //   3. Else: decode → composite bg → apply circle/square mask → draw text
 //   4. Encode PNG → upload → return URL
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { Image, decode } from "npm:imagescript@1.3.0";
+import { Image, decode } from "https://deno.land/x/imagescript@1.2.17/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
