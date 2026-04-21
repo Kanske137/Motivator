@@ -1,44 +1,71 @@
 
 
-## Två cart-fixar
+## Plan: Generalisera print-fil-pipeline för bilder + sänk CPU-belastning
 
-### 1. Ramen syns inte i preview-bilden
+### Bakgrund
+PNG-rastreringen i `generate-print-file` timeoutar (`WORKER_RESOURCE_LIMIT`) på 8.8 MP. Samtidigt kommer editorn snart stödja foton + AI-modifierade bilder som motiv — inte bara kartor. Vi behöver en pipeline som hanterar båda utan att rastrera om hela canvasen.
 
-**Problem:** `editor-snapshot.ts` renderar bara karta + text + bakgrund. Ramen (poster) och canvas-wrap ritas separat i `MapPreview` via CSS/3D — alltså inte med i snapshoten som laddas upp till `cart-previews`.
+### Designprincip: "Compose, don't rasterize"
 
-**Fix:** Utöka `renderArtworkSnapshot` i `src/lib/editor-snapshot.ts` så den även ritar ramen ovanpå artwork:
-- Acceptera nya parametrar: `frameColor` (hex/hsl-sträng), `frameWidthCm`, `wrapCm` (canvas-djup)
-- Efter att karta+text är ritat: lägg på en ram runt hela motivet med `ctx.fillStyle = frameColor` + `ctx.fillRect` på fyra sidor (top/bottom/left/right) skalat efter bildens DPI
-- För canvas: rita en mörkare "wrap-skugga" på sidorna istället för fast färg, så det visuellt ser ut som en duk
-- Skippa rambana när `frameColor === ""` (Ingen ram) — då ser snapshoten ut precis som idag
+Istället för att låta resvg rastrera en SVG som upscalar källbilden → låt **källbilden själv vara final-pixlarna**. Resvg används endast för text-overlay + clipping mask. Detta funkar identiskt för kartor och foton.
 
-I `EditorPage.handleAddToCart` skickar vi med `frameColor`, `FRAME_WIDTH_CM`, `canvasDepthCm` till `renderArtworkSnapshot`.
+### Arkitektur (ny `generate-print-file`)
 
-### 2. Bild återgår till standardproduktbild när cart uppdateras
+Edge function tar emot ett **generiskt motiv-objekt** istället för bara map-params:
 
-**Problem:** Vår `cart-preview-override.liquid` körs bara på `DOMContentLoaded` + `cart:refresh` + `cart:updated` events. När Horizon byter ut DOM-noderna efter quantity-change/remove kommer den nya `<img>`-noden tillbaka med Shopifys default-URL och våra event-listeners triggas inte alltid (Horizon emittar egna custom events).
+```ts
+type Artwork =
+  | { kind: "map"; styleId: string; center: [number,number]; zoom: number; showLabels?: boolean }
+  | { kind: "image"; sourceUrl: string }  // foton, AI-genererade bilder, uploads
+```
 
-**Fix:** Skriv om snippet:en till att använda en `MutationObserver` som permanent övervakar cart-containern. När som helst en ny `<img>` dyker upp i en line item som har `_preview_image`-property, byts `src` ut omedelbart. Detta är robust mot:
-- Horizon's egna section-rerenders efter quantity-update
-- AJAX-byten av cart-rader
-- Drawer-cart som öppnas/stängs
+Pipeline (samma för båda):
+1. **Hämta källbild** som hög-DPI PNG
+   - `map`: Mapbox Static API @2x (max 1280×1280 native ≈ 2560×2560 px)
+   - `image`: fetch från `sourceUrl` (Supabase storage / AI-output URL)
+2. **Bestäm canvas-storlek** = källbildens faktiska pixelmått (ingen upscaling)
+3. **Bygg liten SVG** med: bg-rect, `<image href={dataUrl}>` 1:1, clip-mask, text-overlay
+4. **Resvg rastrerar** → CPU-tid proportionell mot text-area, inte canvas-area
+5. **Upload PNG** till `print-files` bucket, returnera URL + faktiska px-mått
 
-Mappning: vi cachar `key → previewUrl` från `/cart.js` och re-fetchar bara när cart-totalen ändras (lyssnar på `cart:updated` + fallback-poll var 2s när observer triggar).
+### Vad detta löser
 
-**Du får uppdaterad `cart-preview-override.liquid` att klistra in (ersätter nuvarande).**
+- **CPU-problemet**: resvg jobbar på ~2.2 MP istället för 8.8 MP, ingen scaling-matematik
+- **Bild-stödet**: Samma kodväg — bara byt källa. Foto/AI-bild blir en `kind:"image"` istället för Mapbox-fetch
+- **Print-kvalitet**: Mapbox @2x ger ~2560 px på längsta sidan = ~215 DPI på 30 cm-sida (godkänt för Gelato). AI-bilder från Replicate/Nano-banana är typiskt 1024–2048 px → samma nivå.
 
-### Tekniska detaljer
+### Ingen ändring i editor/frontend
 
-**Filer som ändras:**
-- `src/lib/editor-snapshot.ts` — utöka signatur + rita ram/wrap
-- `src/pages/EditorPage.tsx` — skicka frame-params till snapshot
+- `EditorPage.tsx`, `MapPreview`, `ControlPanel`, store — orörda
+- `shopify-order-webhook` skickar idag bara map-params; vi gör payload **bakåtkompatibel**: om `artwork`-fältet saknas tolkas legacy `styleId/center/zoom` som `kind:"map"`
+- När bild-funktionen läggs till i editorn senare, postar webhook bara `{ kind:"image", sourceUrl }` istället — noll ändringar i pipeline
 
-**Shopify-snippet:**
-- `snippets/cart-preview-override.liquid` — ersätts med MutationObserver-version
+### Upload-flöde för bilder (förberedelse, ej implementeras nu)
 
-### Ordning
+För framtida bild-stöd behövs en `artwork-sources` storage bucket där editorn laddar upp foton/AI-resultat. Webhook får sedan en signed URL i `_artwork_url` cart-property. **Detta byggs i nästa steg** när själva bild-uppladdningen i editorn implementeras — nu bara förbereder vi att pipelinen accepterar det.
 
-1. Utöka snapshot-rendering med ram + wrap
-2. Uppdatera `EditorPage` att skicka frame-data
-3. Leverera ny `cart-preview-override.liquid`
+### Filer som ändras nu
+
+- `supabase/functions/generate-print-file/index.ts`
+  - Refaktorera till `Artwork`-baserad input (bakåtkompatibel)
+  - Byt SVG-rendering: använd källbildens native pixlar som canvas-storlek
+  - Cap: 2560 px längsta sida (matchar Mapbox @2x max)
+  - Lägg till `pngData.byteLength` + estimerad render-tid i loggar
+
+- `supabase/functions/shopify-order-webhook/index.ts`
+  - Skicka `{ artwork: { kind: "map", ... } }` i payload till `generate-print-file` (förbereder för `kind:"image"` senare)
+  - Inga ändringar i SKU-resolver, inget annat rörs
+
+### Verifiering
+
+1. Du lägger ny testorder via Bogus Gateway
+2. `gelato_orders` → status `submitted`, `gelato_order_id` finns
+3. Print-fil i `print-files` bucket öppnas i browser → karta + text syns korrekt
+4. Gelato dashboard visar ordern
+
+### Senare (separat task, ej nu)
+
+- Image-upload UI i editor (foto + AI-stilar)
+- `artwork-sources` storage bucket + RLS
+- Editor postar `_artwork_url` istället för map-params för bild-motiv
 
