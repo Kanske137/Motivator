@@ -20,6 +20,12 @@ export interface SnapshotInput {
   size: string;            // "30x40"
   orientation: "portrait" | "landscape";
   layout: LayoutDef | null; // for text x/y placement (matches editor)
+  /** Canvas wrap depth in cm. When > 0, output texture is extended with wrap+bleed
+   *  zones around the visible front, so 3D preview can sample wrap-around faces
+   *  exactly like Gelato's print file. */
+  wrapCm?: number;
+  /** Bleed in cm added outside the wrap zone (Gelato canvas = 0.3 cm). */
+  bleedCm?: number;
 }
 
 function parseSize(size: string, orientation: "portrait" | "landscape") {
