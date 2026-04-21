@@ -9,6 +9,8 @@ import { ControlPanel } from "@/components/editor/ControlPanel";
 import { MockupGallery } from "@/components/editor/MockupGallery";
 import { useCartStore } from "@/stores/cartStore";
 import { CartDrawer } from "@/components/CartDrawer";
+import { renderArtworkSnapshot } from "@/lib/editor-snapshot";
+import { uploadCartPreview } from "@/lib/upload-preview";
 import { toast } from "sonner";
 
 const FRAME_COLORS: Record<string, string> = {
@@ -26,10 +28,11 @@ export default function EditorPage() {
   const [configs, setConfigs] = useState<ProductConfig[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const { config, setConfig, currentPrice, mapStyleId, mapCenter, mapZoom, text, orientation, size, variant, posterBgColor } =
+  const { config, setConfig, currentPrice, currentLayout, mapStyleId, mapCenter, mapZoom, text, textFont, textVisible, showLabels, mapShape, orientation, size, variant, posterBgColor } =
     useEditorStore();
   const addItem = useCartStore((s) => s.addItem);
   const isAdding = useCartStore((s) => s.isLoading);
+  const [isPreparing, setIsPreparing] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -64,7 +67,35 @@ export default function EditorPage() {
   const handleAddToCart = async () => {
     if (!config || !size || !variant) return;
     const inIframe = window.self !== window.top;
-    const properties = {
+    const designId = (crypto as any)?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+    setIsPreparing(true);
+    let previewUrl = "";
+    try {
+      // Render the FRONT (no wrap) — matches what the customer sees in the editor preview.
+      const dataUrl = await renderArtworkSnapshot({
+        mapStyleId,
+        mapCenter,
+        mapZoom,
+        showLabels,
+        mapShape,
+        posterBgColor,
+        text,
+        textFont,
+        textVisible,
+        size,
+        orientation,
+        layout: currentLayout(),
+      });
+      previewUrl = await uploadCartPreview(dataUrl, designId);
+    } catch (err) {
+      console.error("[cart] preview snapshot/upload failed", err);
+      // Non-fatal — proceed without the preview image.
+    } finally {
+      setIsPreparing(false);
+    }
+
+    const properties: Record<string, string> = {
       Orientation: orientation === "portrait" ? "Stående" : "Liggande",
       Text: text,
       _map_style: mapStyleId,
@@ -75,8 +106,9 @@ export default function EditorPage() {
       _bg_color: posterBgColor,
       _orientation: orientation,
       _product_handle: config.shopify_handle,
-      _design_id: (crypto as any)?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      _design_id: designId,
     };
+    if (previewUrl) properties._preview_image = previewUrl;
 
     if (inIframe) {
       window.parent.postMessage(
@@ -94,12 +126,11 @@ export default function EditorPage() {
       return;
     }
 
-    // Standalone preview: simulate cart add (real Shopify variantId not resolved here)
     await addItem({
       variantId: `gid://shopify/ProductVariant/preview-${size}-${variant}`,
       productTitle: config.title,
       variantTitle: `${size} · ${variant}`,
-      imageUrl: "",
+      imageUrl: previewUrl,
       price: { amount: String(currentPrice()), currencyCode: "SEK" },
       quantity: 1,
       attributes: Object.entries(properties).map(([key, value]) => ({ key, value: String(value) })),
