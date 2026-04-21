@@ -50,6 +50,10 @@ export default function EditorPage() {
   };
 
   const frameColor = config?.product_type === "posters" ? FRAME_COLORS[variant ?? "Ingen"] : "";
+  const isCanvas = config?.product_type === "canvas";
+  const canvasDepthCm = isCanvas
+    ? (variant?.match(/(\d+)/)?.[1] ? parseInt(variant!.match(/(\d+)/)![1], 10) : 2)
+    : 0;
 
   const orientationLabel = orientation === "portrait" ? "Stående" : "Liggande";
   const variantLabel = config?.product_type === "canvas" ? `${variant ?? ""} djup` : `${variant ?? ""} ram`;
@@ -123,7 +127,7 @@ export default function EditorPage() {
       <div className="flex-1 flex flex-col md:flex-row min-h-0">
         {/* Preview */}
         <div className="paper-grain flex items-center justify-center h-[60vh] md:h-auto md:flex-1 md:min-h-[70vh]">
-          <MapPreview frameColor={frameColor} frameWidthCm={FRAME_WIDTH_CM} />
+          <MapPreview frameColor={frameColor} frameWidthCm={FRAME_WIDTH_CM} wrapCm={canvasDepthCm} />
         </div>
 
         {/* Control panel */}
