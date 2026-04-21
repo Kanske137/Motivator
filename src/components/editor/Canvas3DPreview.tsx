@@ -99,14 +99,16 @@ function CanvasMesh({
       t.colorSpace = THREE.SRGBColorSpace;
       t.anisotropy = 8;
       // Convert top-left-origin coordinates to UV (flip Y for the offset).
-      // We provide offsets in "from top-left" convention for clarity, then
-      // convert here: UV.offset.y = 1 - (offsetY_from_top + repeatY).
-      t.offset.set(offsetX, 1 - (offsetY + repeatY));
-      t.repeat.set(repeatX * (flipX ? -1 : 1), repeatY * (flipY ? -1 : 1));
-      if (flipX || flipY) {
-        // Re-center so flip pivots around the strip
-        t.center.set(0.5, 0.5);
-      }
+      const uvOffsetX = offsetX;
+      const uvOffsetY = 1 - (offsetY + repeatY);
+      // For flips, compensate offset so the SAME UV window is sampled, just
+      // mirrored. Using texture.center would pivot around the whole texture
+      // and shift the strip onto the wrong region (front face bleed).
+      t.offset.set(
+        flipX ? uvOffsetX + repeatX : uvOffsetX,
+        flipY ? uvOffsetY + repeatY : uvOffsetY,
+      );
+      t.repeat.set(flipX ? -repeatX : repeatX, flipY ? -repeatY : repeatY);
       return new THREE.MeshStandardMaterial({ map: t, roughness: 0.85, metalness: 0 });
     };
 
