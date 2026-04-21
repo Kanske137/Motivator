@@ -66,8 +66,8 @@ const NO_LABEL_STYLE: Record<string, string> = {
 let cachedFont: Uint8Array | null = null;
 async function loadFont(): Promise<Uint8Array> {
   if (cachedFont) return cachedFont;
-  // Inter Regular from Google Fonts CDN (TTF). ~140 KB, cached on warm starts.
-  const url = "https://github.com/rsms/inter/raw/master/docs/font-files/Inter-Regular.otf";
+  // Inter Regular via jsDelivr fontsource (TTF, latin-ext for ÅÄÖ). ~94 KB, cached on warm starts.
+  const url = "https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-ext-400-normal.ttf";
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Font fetch failed ${res.status}`);
   cachedFont = new Uint8Array(await res.arrayBuffer());
