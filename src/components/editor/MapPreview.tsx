@@ -284,37 +284,6 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
           <div ref={mapContainerRef} className="absolute inset-0" />
         </div>
 
-        {/* Canvas wrap mode: shape clip via SVG mask within front zone only */}
-        {isWrap && isShaped && (
-          <div
-            className="absolute pointer-events-none"
-            style={{
-              ...frontZoneStyle,
-              background: posterBgColor,
-              WebkitMaskImage:
-                mapShape === "circle"
-                  ? "radial-gradient(circle at 50% 50%, transparent 0, transparent 49.5%, #000 50%)"
-                  : "linear-gradient(#000,#000)",
-              WebkitMaskSize:
-                mapShape === "square"
-                  ? `${Math.min(100, (Math.min(frontW, frontH) / Math.max(frontW, frontH)) * 100)}% ${Math.min(100, (Math.min(frontW, frontH) / Math.max(frontW, frontH)) * 100)}%`
-                  : "100% 100%",
-              WebkitMaskPosition: "center",
-              WebkitMaskRepeat: "no-repeat",
-              maskImage:
-                mapShape === "circle"
-                  ? "radial-gradient(circle at 50% 50%, transparent 0, transparent 49.5%, #000 50%)"
-                  : "linear-gradient(#000,#000)",
-              maskSize:
-                mapShape === "square"
-                  ? `${Math.min(100, (Math.min(frontW, frontH) / Math.max(frontW, frontH)) * 100)}% ${Math.min(100, (Math.min(frontW, frontH) / Math.max(frontW, frontH)) * 100)}%`
-                  : "100% 100%",
-              maskPosition: "center",
-              maskRepeat: "no-repeat",
-            }}
-          />
-        )}
-
         {/* Visible front indicator (canvas wrap mode only) */}
         {isWrap && (
           <div
@@ -322,7 +291,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             style={frontZoneStyle}
           >
             <span className="absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full bg-background/90 backdrop-blur-sm px-2 py-0.5 text-[10px] uppercase tracking-wider rounded text-foreground/70 whitespace-nowrap">
-              Synlig framsida · kanterna wrappas
+              Synlig framsida · innehållet här viks om på sidorna
             </span>
           </div>
         )}
