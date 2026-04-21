@@ -1,12 +1,12 @@
-// Generates a high-resolution print file from a map state + text and uploads
+// Generates a high-resolution PNG print file from a map state + text and uploads
 // it to the print-files Supabase storage bucket.
 //
-// Renders an SVG composition that mirrors the editor preview:
-//   - poster background color
-//   - map clipped to mapShape (rect/square/circle)
-//   - optional labels (via Mapbox style raster)
-//   - optional text overlay (when textVisible)
+// Pipeline:
+//   1. Build SVG composition (bg + clipped Mapbox raster + text overlay)
+//   2. Rasterize SVG to PNG via @resvg/resvg-wasm (Gelato accepts PNG @300 DPI)
+//   3. Upload PNG to print-files bucket and return public URL
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { Resvg, initWasm } from "https://esm.sh/@resvg/[email protected]";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,9 +17,9 @@ type MapShape = "rect" | "square" | "circle";
 
 interface PrintBody {
   styleId: string;
-  center: [number, number]; // [lng, lat]
+  center: [number, number];
   zoom: number;
-  size: string; // "30x40"
+  size: string;
   orientation: "portrait" | "landscape";
   text?: string;
   textFont?: string;
@@ -29,12 +29,15 @@ interface PrintBody {
   posterBgColor?: string;
 }
 
+// Returns target print-file pixel dimensions at ~300 DPI.
+// Mapbox static API caps at 1280px @2x — so the tile we fetch is smaller
+// than the final PNG and is upscaled inside the SVG.
 function pxFromSize(sizeCm: string, orientation: "portrait" | "landscape"): { w: number; h: number } {
   const [a, b] = sizeCm.split("x").map(Number);
   const wCm = orientation === "portrait" ? Math.min(a, b) : Math.max(a, b);
   const hCm = orientation === "portrait" ? Math.max(a, b) : Math.min(a, b);
-  // 300 DPI capped at Mapbox 1280px hard limit per dimension
-  const dpiPx = (cm: number) => Math.min(1280, Math.round((cm / 2.54) * 300));
+  // Cap final PNG side to 4500px to keep memory/runtime sane (still > 300DPI for 30x40)
+  const dpiPx = (cm: number) => Math.min(4500, Math.round((cm / 2.54) * 300));
   return { w: dpiPx(wCm), h: dpiPx(hCm) };
 }
 
@@ -42,6 +45,18 @@ function escapeXml(s: string): string {
   return s.replace(/[<>&"']/g, (c) =>
     c === "<" ? "&lt;" : c === ">" ? "&gt;" : c === "&" ? "&amp;" : c === '"' ? "&quot;" : "&apos;"
   );
+}
+
+let wasmReady: Promise<void> | null = null;
+async function ensureResvg(): Promise<void> {
+  if (!wasmReady) {
+    wasmReady = (async () => {
+      const wasmRes = await fetch("https://esm.sh/@resvg/[email protected]/index_bg.wasm");
+      const wasmBuf = await wasmRes.arrayBuffer();
+      await initWasm(wasmBuf);
+    })();
+  }
+  return wasmReady;
 }
 
 Deno.serve(async (req) => {
@@ -61,26 +76,23 @@ Deno.serve(async (req) => {
       text = "",
       textFont = "Inter",
       textVisible = true,
-      showLabels = false,
+      showLabels: _showLabels = false,
       mapShape = "rect",
       posterBgColor = "#FFFFFF",
     } = body;
 
     const { w, h } = pxFromSize(size, orientation);
 
-    // Map fills the full poster always — shape is applied as a clip, centered on the
-    // poster rectangle (not the map rect). This way square/circle hug the shorter
-    // poster side regardless of orientation.
-    const mapSize = { w, h };
-
-    // Mapbox static. attribution=false&logo=false. Labels = whether style symbols render.
-    // We can't toggle layers via static API; instead we pick a no-labels variant when available.
-    // Approach: keep the chosen style; a future improvement could swap to a "no-labels" tileset.
-    const styleParam = styleId;
-    const mapUrl = `https://api.mapbox.com/styles/v1/mapbox/${styleParam}/static/${center[0]},${center[1]},${zoom},0,0/${mapSize.w}x${mapSize.h}@2x?access_token=${token}&attribution=false&logo=false`;
+    // Mapbox static tile — capped @2x at 1280px per side. We fetch at the
+    // largest tile size that fits the poster aspect, then upscale in SVG.
+    const TILE_MAX = 1280;
+    const aspect = w / h;
+    const tileW = aspect >= 1 ? TILE_MAX : Math.round(TILE_MAX * aspect);
+    const tileH = aspect >= 1 ? Math.round(TILE_MAX / aspect) : TILE_MAX;
+    const mapUrl = `https://api.mapbox.com/styles/v1/mapbox/${styleId}/static/${center[0]},${center[1]},${zoom},0,0/${tileW}x${tileH}@2x?access_token=${token}&attribution=false&logo=false`;
 
     console.log(
-      `[generate-print-file] ${size} ${orientation} ${w}x${h} shape=${mapShape} bg=${posterBgColor} labels=${showLabels} textVisible=${textVisible}`
+      `[generate-print-file] ${size} ${orientation} target=${w}x${h} tile=${tileW}x${tileH} shape=${mapShape} bg=${posterBgColor} text=${textVisible}`
     );
 
     const mapRes = await fetch(mapUrl);
@@ -100,14 +112,7 @@ Deno.serve(async (req) => {
     }
     const mapDataUrl = `data:image/png;base64,${btoa(binary)}`;
 
-    // Build SVG that mirrors the editor frame
-    const drawW = mapSize.w * 2;
-    const drawH = mapSize.h * 2;
-    const dx = (w - drawW) / 2;
-    const dy = (h - drawH) / 2;
-
-    // Shape clip is computed against the POSTER rect (w x h), centered, hugging
-    // the shorter poster side. This matches MapPreview's shape masking exactly.
+    // Shape clip (centered on poster rect, hugging shorter side)
     let clipDef = "";
     let clipAttr = "";
     if (mapShape === "circle") {
@@ -122,7 +127,7 @@ Deno.serve(async (req) => {
       clipAttr = ` clip-path="url(#mc)"`;
     }
 
-    // Text block — sized to match editor proportions (~3.5% of poster width)
+    // Text overlay
     let textSvg = "";
     if (textVisible && text.trim()) {
       const lines = text.split("\n");
@@ -143,22 +148,32 @@ Deno.serve(async (req) => {
 <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
   <defs>${clipDef}</defs>
   <rect width="${w}" height="${h}" fill="${posterBgColor}"/>
-  <image href="${mapDataUrl}" x="${dx}" y="${dy}" width="${drawW}" height="${drawH}"${clipAttr} preserveAspectRatio="xMidYMid slice"/>
+  <image href="${mapDataUrl}" x="0" y="0" width="${w}" height="${h}"${clipAttr} preserveAspectRatio="xMidYMid slice"/>
   ${textSvg}
 </svg>`;
 
-    // Upload SVG (browsers + canvas can render SVG via <img>)
+    // Rasterize SVG → PNG via resvg-wasm
+    await ensureResvg();
+    const resvg = new Resvg(svg, {
+      fitTo: { mode: "width", value: w },
+      background: posterBgColor,
+      font: { loadSystemFonts: false, defaultFontFamily: "Inter" },
+    });
+    const pngData = resvg.render().asPng();
+    console.log(`[generate-print-file] PNG rasterized: ${pngData.byteLength} bytes`);
+
+    // Upload PNG
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const filename = `prints/${crypto.randomUUID()}-${size}-${orientation}.svg`;
+    const filename = `prints/${crypto.randomUUID()}-${size}-${orientation}.png`;
     const upload = async (attempt: number): Promise<string> => {
       const { error: upErr } = await supabase.storage.from("print-files").upload(
         filename,
-        new TextEncoder().encode(svg),
-        { contentType: "image/svg+xml", upsert: false }
+        pngData,
+        { contentType: "image/png", upsert: false }
       );
       if (upErr) {
         console.error(`[generate-print-file] upload attempt ${attempt} failed:`, upErr.message);
