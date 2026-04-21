@@ -76,7 +76,7 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
   const mapW = input.mapShape === "rect" ? w : sq;
   const mapH = input.mapShape === "rect" ? h : sq;
 
-  const container = getOffscreenContainer(Math.max(w, mapW), Math.max(h, mapH));
+  const container = createOffscreenContainer(Math.max(w, mapW), Math.max(h, mapH));
   // Inner div for THIS map render (so concurrent renders don't collide)
   const mapDiv = document.createElement("div");
   mapDiv.style.width = `${mapW}px`;
