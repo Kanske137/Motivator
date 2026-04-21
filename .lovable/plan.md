@@ -1,62 +1,33 @@
 
 
-## Plan: Byt till Theme App Extension (Shopify 2026-flödet)
+## Visa Shopify-koderna direkt i chatten
 
-### Varför vi byter
-Nya Shopify Dev Dashboard exponerar inte längre `shpat_`-tokens. Den moderna vägen är **Theme App Extensions** — appen levererar ett **App Block** som butiksägaren aktiverar i Theme Editor med ett klick. Inget `write_themes`-scope, inga manuella theme-edits, fungerar för all framtid.
+Filen `SHOPIFY_SETUP.md` skapades men du hittar den inte i Code Editor. Istället för att leta — jag klistrar in allt du behöver direkt i nästa chat-meddelande.
 
-### Två vägar — välj en
+### Vad du får i nästa svar
 
-**Väg A: Theme App Extension via Shopify CLI** (officiellt 2026-flöde)
-- Kräver att vi sätter upp Shopify CLI lokalt på din dator
-- Ger en App Block som du aktiverar i Theme Editor
-- Mer setup nu, noll underhåll sen
-- Fungerar med din nya Dev Dashboard-app utan token
+**1. Liquid-snippet** (kopiera till Shopify → Edit code → Snippets → ny snippet `personlig-karta-editor`):
+- iframe som laddar editorn från `https://artful-create-studio-87.lovable.app/editor?handle={{ product.handle }}`
+- script som lyssnar på `ADD_TO_CART`-meddelanden från editorn och lägger varianten i Shopify-varukorgen med rätt line-item properties
+- döljer Shopifys default produktinfo (pris/varianter) så bara editorn syns
 
-**Väg B: Manuell theme-edit (en gång, 5 min)** ← rekommenderas
-- Du klistrar in ett snippet + skapar en template direkt i Theme Editor
-- Tilldelar templaten till båda produkterna i Shopify Admin
-- Vi registrerar order-webhook via Lovable-integrationens befintliga scopes
-- Ingen Custom App, ingen CLI, ingen token-jakt
+**2. JSON-template** (kopiera till Shopify → Templates → ny template `product.personlig-karta.json`):
+- en `custom-liquid`-section som renderar snippet:en
 
-### Rekommendation: Väg B
+**3. Steg-för-steg klick-instruktioner** för Shopify Admin:
+- Var du klickar för att skapa snippet
+- Var du klickar för att skapa template
+- Hur du tilldelar templaten till `personlig-karta-poster` och `personlig-karta-canvas`
+- Hur du skapar Order payment-webhook till `https://ptzmnusfgdwcqpjpbyco.supabase.co/functions/v1/shopify-order-webhook`
+- Var Shopify visar **Webhook signing secret** efter Save
 
-Du har redan gjort 80% av arbetet (produkter finns, editor fungerar, edge functions deployade). Vi behöver bara koppla ihop sista biten. Manuell theme-edit tar 5 minuter och är klart.
+**4. Felsökningstips** om editorn inte visas eller "Lägg i varukorg" inte fungerar.
 
----
+### Efter att du klistrat in allt
 
-### Steg för Väg B
+Säg **"webhook secret klart"** → jag öppnar säker dialog för `SHOPIFY_WEBHOOK_SECRET` → vi testar med Bogus Gateway-order → bekräftar att Gelato får ordern.
 
-**1. Jag förbereder (efter godkännande):**
-- Genererar exakt Liquid-snippet-kod du ska klistra in
-- Genererar exakt template-JSON du ska klistra in
-- Skriver tydlig copy-paste-instruktion med skärmdumps-referenser
-- Uppdaterar `shopify-order-webhook` så den hanterar Shopify webhook-format korrekt
-- Tar bort den nu obsoleta `shopify-inject-editor`-funktionen (eller markerar deprecated)
+### Inga kodändringar i projektet
 
-**2. Du gör i Shopify Admin (5 min):**
-- Online Store → Themes → ⋯ → **Edit code** på aktivt tema
-- **Snippets** → Add new snippet → `personlig-karta-editor` → klistra in koden jag ger
-- **Templates** → Add new template → JSON → product → suffix `personlig-karta` → klistra in JSON
-- Products → öppna `personlig-karta-poster` → höger sidofält **Theme template** → välj `personlig-karta`
-- Upprepa för `personlig-karta-canvas`
-- Settings → Notifications → Webhooks → **Create webhook** → Event: `Order payment` → Format: JSON → URL: `https://ptzmnusfgdwcqpjpbyco.supabase.co/functions/v1/shopify-order-webhook` → kopiera den **Webhook signing secret** som visas
-
-**3. Du ger mig webhook-secret:**
-- Jag begär secret-input för `SHOPIFY_WEBHOOK_SECRET`
-- Du klistrar in den säkert (visas inte i chat)
-
-**4. Vi testar:**
-- Du öppnar produktsidan → bekräftar att editorn renderas
-- Du lägger testorder via Shopify Bogus Gateway
-- Vi kollar `gelato_orders`-tabellen → bekräftar `status: submitted`
-
-### Vad du får
-- Editor injicerad på båda produktsidorna utan dubblerade Shopify-kontroller
-- Order-flöde som auto-skickar till Gelato vid betalning
-- HMAC-verifierad webhook (säker mot förfalskade requests)
-- Ingen beroende av Custom App eller Dev Dashboard-tokens
-
-### Om du föredrar Väg A istället
-Säg "Väg A" så ger jag CLI-instruktionerna istället. Kräver Node.js + terminalåtkomst på din dator.
+Det här är ren copy-paste från chat till Shopify Admin. Inget byggs om i Lovable-projektet — webhook-funktionen är redan deployad och redo.
 
