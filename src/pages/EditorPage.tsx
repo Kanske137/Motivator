@@ -181,10 +181,10 @@ export default function EditorPage() {
             </div>
             <Button
               onClick={handleAddToCart}
-              disabled={isAdding}
+              disabled={isAdding || isPreparing}
               className="w-full h-14 rounded-full text-base font-semibold"
             >
-              {isAdding ? (
+              {(isAdding || isPreparing) ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <span className="flex items-center justify-between w-full">
@@ -211,10 +211,10 @@ export default function EditorPage() {
         </div>
         <Button
           onClick={handleAddToCart}
-          disabled={isAdding}
+          disabled={isAdding || isPreparing}
           className="flex-1 h-12 rounded-full font-semibold"
         >
-          {isAdding ? (
+          {(isAdding || isPreparing) ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <span className="flex items-center justify-between w-full">
