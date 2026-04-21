@@ -6,6 +6,7 @@
 //   2. Rasterize SVG to PNG via @resvg/resvg-wasm (Gelato accepts PNG @300 DPI)
 //   3. Upload PNG to print-files bucket and return public URL
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+// resvg-wasm v2.6.2 (cache-bust)
 import { Resvg, initWasm } from "npm:@resvg/[email protected]";
 
 const corsHeaders = {
