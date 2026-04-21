@@ -1,29 +1,24 @@
 
 
-## Plan: Wrap-zonen visar bakgrundsfärg istället för karta + uppdaterad label
+## Plan: Be Lovable om utökad Shopify-behörighet (write_themes)
 
-### Ändringar
+### Bakgrund
+Lovable-appen är installerad i din butik som en **försäljningskanal**, inte som en admin-app. Den nuvarande OAuth-tokenen som Lovable fick vid installation saknar `write_themes`-scope, vilket krävs för att injicera vår editor-snippet och produkt-template i ditt Shopify-tema. Därför får vi `403: This action requires merchant approval for write_themes scope` när vi försöker köra `shopify-inject-editor`.
 
-**1. `src/components/editor/MapPreview.tsx`**
-- Ändra `mapWrapperStyle` så att kartan i canvas-läge (`wrapCm > 0`) endast renderas inom **front-zonen**, inte hela editorytan. Wrap-zonen runt om får då naturligt `posterBgColor` (från `frameStyle.background`).
-- Konkret: när `isWrap` är true, byt `mapWrapperStyle` från `inset: 0` till samma `frontZoneStyle` (left/top/right/bottom = frontInset%). Shape-clip (cirkel/kvadrat) appliceras fortfarande inom front-zonen som idag.
-- Uppdatera labeln på front-indikatorn från `"Synlig framsida · kanterna wrappas"` till `"Synlig framsida · innehållet här viks om på sidorna"`.
+Jag (assistenten) kan inte själv lägga till nya OAuth-scopes — det är Shopifys säkerhetsmodell: utökade behörigheter måste alltid godkännas av butiksägaren via en re-auth-prompt som Lovable-plattformen genererar.
 
-**2. `src/lib/editor-snapshot.ts`**
-- I wrap-grenen (`extraCm > 0`): rita inte längre kartan över hela `w × h`. Istället:
-  1. Fyll hela ytan med `posterBgColor` (redan gjort).
-  2. Rita kartan **endast** inom front-zonen (`frontPxX, frontPxY, frontPxW, frontPxH`), med samma shape-clip-logik som poster-läget (rect/square/circle).
-  3. Wrap- och bleed-zonerna förblir bakgrundsfärg → 3D-vyns sidor visar bakgrundsfärg, exakt som editorn.
-- Ta bort `evenodd`-clip-inverten (behövs inte längre eftersom kartan aldrig ritas i wrap-zonen).
-- Text-overlay oförändrad (renderas inom front-zonen).
+### Vad jag gör nu
+Jag triggar Lovables egen **reconnect-prompt** mot Shopify-anslutningen och ber om scopet `write_themes` (utöver de befintliga). Då dyker det upp en knapp/dialog i ditt Lovable-gränssnitt där du klickar "Reconnect / Approve" → du skickas till Shopify → godkänner det nya scopet → tillbaka till Lovable. Allt utan att gå via Shopify Admin manuellt.
 
-### Förväntat resultat
-- Editorn visar kartan endast inom den streckade front-ramen; runt om syns bakgrundsfärgen.
-- Labeln säger "Synlig framsida · innehållet här viks om på sidorna".
-- 3D-canvas-mockupens sidor visar bakgrundsfärgen istället för fortsatt karta — 100 % matchning mellan editor, snapshot och 3D-vy.
-- Poster-flödet helt orört.
+### Vad du gör
+1. Klicka på reconnect-prompten som dyker upp i chatten/sidopanelen efter denna plan godkänns.
+2. Godkänn `write_themes` i Shopifys auktoriseringsdialog.
+3. Säg till mig "klart" — då kör jag om `shopify-inject-editor` automatiskt och hela editor + webhook-flödet rullar igång på riktigt.
 
-### Filer som ändras
-- `src/components/editor/MapPreview.tsx`
-- `src/lib/editor-snapshot.ts`
+### Alternativ om reconnect-prompten inte funkar
+Om Lovable-plattformen inte exponerar Shopify-anslutningen via standard reconnect-flödet (Shopify hanteras delvis utanför connector-systemet), faller vi tillbaka på:
+- **Disconnect + Reconnect** av butiken via Shopify-menyn i Lovables nav-bar (ellipsis-meny → "Disconnect store" → sedan koppla på nytt via chatt). Vid den nya kopplingen begär Lovable utökade scopes inklusive `write_themes`. Inga produkter eller orderdata i din butik påverkas av disconnect.
+
+### Inga kodändringar behövs i denna iteration
+All kod (edge functions, migration, EditorPage-payload) är redan på plats sedan förra iterationen. Det enda som blockerar är behörigheten. När den är godkänd: jag kör inject-funktionen → snippet + template läggs in → båda produkterna får vår editor → webhook registreras → klart.
 
