@@ -34,6 +34,13 @@ export function MockupGallery() {
 
   const isCanvas = config?.product_type === "canvas";
 
+  // Compute canvas wrap depth from variant (e.g. "2 cm" → 2). Used both for
+  // the snapshot (extends print area with wrap+bleed) AND the 3D preview UVs.
+  const canvasDepthCm = isCanvas
+    ? (variant?.match(/(\d+)/)?.[1] ? parseInt(variant!.match(/(\d+)/)![1], 10) : 2)
+    : 0;
+  const BLEED_CM = 0.3; // Gelato canvas bleed per side
+
   useEffect(() => {
     if (!config || !size) return;
     // Invalidate any in-flight render synchronously so stale results never overwrite.
@@ -48,11 +55,15 @@ export function MockupGallery() {
       const myReq = ++reqIdRef.current;
       try {
         // Single source of truth: snapshot the editor artwork directly.
+        // For canvas, render the FULL print area (front + wrap + bleed) so the
+        // 3D preview can sample sides exactly like Gelato's print file.
         const newSnapshot = await renderArtworkSnapshot({
           mapStyleId, mapCenter, mapZoom,
           showLabels, mapShape, posterBgColor,
           text, textFont, textVisible,
           size, orientation, layout,
+          wrapCm: isCanvas ? canvasDepthCm : 0,
+          bleedCm: isCanvas ? BLEED_CM : 0,
         });
         if (myReq !== reqIdRef.current) return;
 
