@@ -72,7 +72,7 @@ export function MockupGallery() {
 
         if (isCanvas) return; // canvas uses 3D — no scene compositing needed
 
-        const canvasDepthCm = 2;
+        const sceneCanvasDepthCm = 2;
         const frameColor = frameColorFromVariant(variant);
 
         const results = await Promise.all(
