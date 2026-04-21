@@ -238,7 +238,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding }: Props
     : { position: "absolute", inset: 0, overflow: "hidden" };
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center p-4 min-h-[60vh] gap-2">
+    <div className="w-full h-full flex flex-col items-center justify-center p-4 gap-2">
       {/* Hide Mapbox watermark/attrib visually (credited below) */}
       <style>{`
         .mapboxgl-ctrl-logo, .mapboxgl-ctrl-attrib { display: none !important; }
