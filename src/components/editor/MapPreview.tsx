@@ -233,9 +233,19 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   const isPortraitFrame = posterAspect <= 1;
   const isWrap = wrapCm > 0;
 
-  // Map ALWAYS covers the full editor area (rect) when in wrap mode so the
-  // wrap zone shows continuous map. Shape clip is applied as a separate overlay.
-  const mapWrapperStyle: React.CSSProperties = isShaped && !isWrap
+  // Wrap mode: map is rendered ONLY within the front zone — wrap area shows bg color.
+  // Poster mode: shape clip is applied as a centered square/circle within the editor.
+  const mapWrapperStyle: React.CSSProperties = isWrap
+    ? {
+        position: "absolute",
+        left: `${frontInsetX * 100}%`,
+        top: `${frontInsetY * 100}%`,
+        right: `${frontInsetX * 100}%`,
+        bottom: `${frontInsetY * 100}%`,
+        borderRadius: isShaped && mapShape === "circle" ? "9999px" : "0",
+        overflow: "hidden",
+      }
+    : isShaped
     ? {
         position: "absolute",
         left: "50%",
