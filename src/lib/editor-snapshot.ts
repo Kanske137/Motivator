@@ -26,6 +26,13 @@ export interface SnapshotInput {
   wrapCm?: number;
   /** Bleed in cm added outside the wrap zone (Gelato canvas = 0.3 cm). */
   bleedCm?: number;
+  /** Frame color (CSS string). Empty = no frame. Drawn ON TOP of the artwork
+   *  so the cart thumbnail matches the editor preview. */
+  frameColor?: string;
+  /** Frame width in cm (poster only). */
+  frameWidthCm?: number;
+  /** When true, render a canvas wrap shadow on the sides instead of a flat frame. */
+  canvasWrap?: boolean;
 }
 
 function parseSize(size: string, orientation: "portrait" | "landscape") {
@@ -240,6 +247,46 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
       lines.forEach((line, i) => {
         ctx.fillText(line, tx, firstLineCenter + i * lineHeight);
       });
+      ctx.restore();
+    }
+
+    // Frame / canvas wrap overlay — drawn last so it appears on top.
+    // Only applies in poster (no wrap) mode; canvas wrap mode already extends the
+    // texture and the 3D preview handles the depth, so we add a soft side shadow.
+    const hasFrame = !!input.frameColor && input.frameColor.trim() !== "";
+    if (extraCm === 0 && hasFrame && (input.frameWidthCm ?? 0) > 0) {
+      const fw = Math.max(1, Math.round((input.frameWidthCm ?? 1.2) * PX_PER_CM * scale));
+      ctx.save();
+      ctx.fillStyle = input.frameColor!;
+      // top, bottom, left, right
+      ctx.fillRect(0, 0, w, fw);
+      ctx.fillRect(0, h - fw, w, fw);
+      ctx.fillRect(0, 0, fw, h);
+      ctx.fillRect(w - fw, 0, fw, h);
+      // subtle inner shadow line for depth
+      ctx.strokeStyle = "rgba(0,0,0,0.18)";
+      ctx.lineWidth = Math.max(1, Math.round(fw * 0.06));
+      ctx.strokeRect(fw, fw, w - 2 * fw, h - 2 * fw);
+      ctx.restore();
+    } else if (input.canvasWrap && extraCm === 0) {
+      // Canvas wrap (no extended texture): paint a soft inner shadow on edges so
+      // the cart thumbnail reads as a stretched canvas, not a flat poster.
+      const edge = Math.max(2, Math.round(0.25 * PX_PER_CM * scale));
+      ctx.save();
+      const grad = (x0: number, y0: number, x1: number, y1: number) => {
+        const g = ctx.createLinearGradient(x0, y0, x1, y1);
+        g.addColorStop(0, "rgba(0,0,0,0.22)");
+        g.addColorStop(1, "rgba(0,0,0,0)");
+        return g;
+      };
+      ctx.fillStyle = grad(0, 0, 0, edge);
+      ctx.fillRect(0, 0, w, edge);
+      ctx.fillStyle = grad(0, h, 0, h - edge);
+      ctx.fillRect(0, h - edge, w, edge);
+      ctx.fillStyle = grad(0, 0, edge, 0);
+      ctx.fillRect(0, 0, edge, h);
+      ctx.fillStyle = grad(w, 0, w - edge, 0);
+      ctx.fillRect(w - edge, 0, edge, h);
       ctx.restore();
     }
 

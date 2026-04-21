@@ -86,6 +86,9 @@ export default function EditorPage() {
         size,
         orientation,
         layout: currentLayout(),
+        frameColor: !isCanvas ? frameColor : "",
+        frameWidthCm: !isCanvas ? FRAME_WIDTH_CM : 0,
+        canvasWrap: isCanvas,
       });
       previewUrl = await uploadCartPreview(dataUrl, designId);
     } catch (err) {
