@@ -168,7 +168,9 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             // static layers stay locked to their template defaults.
             const effectiveShape = isLive ? mapShape : l.defaults.shape;
             const effectiveStyleId = isLive ? mapStyleId : l.defaults.styleId;
-            const effectiveCenter = isLive ? mapCenter : l.defaults.center;
+            const effectiveCenter: [number, number] = isLive
+              ? mapCenter
+              : [l.defaults.center[0]!, l.defaults.center[1]!];
             const effectiveZoom = isLive ? mapZoom : l.defaults.zoom;
             const effectiveLabels = isLive ? showLabels : l.defaults.showLabels;
             const clip = shapeClipPath(effectiveShape, heartIdRef.current);
