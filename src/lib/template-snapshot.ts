@@ -15,13 +15,19 @@
 import mapboxgl from "mapbox-gl";
 import { getMapboxToken, styleUrl } from "./mapbox";
 import type { Template, TemplateLayer } from "./template-schema";
+import type { LayerValue } from "@/stores/editorStore";
 
 export interface TemplateSnapshotInput {
   template: Template;
   orientation: "portrait" | "landscape";
   size: string; // "30x40"
 
-  // Live customer state — overrides defaults on the FIRST map/text layer.
+  // Per-layer values keyed by layer id. When provided, these override the
+  // legacy live* fields. Falls back to layer.defaults when missing.
+  layerValues?: Record<string, LayerValue>;
+
+  // Legacy live customer state — overrides defaults on the FIRST map/text
+  // layer when `layerValues` is not supplied.
   liveMapCenter: [number, number];
   liveMapZoom: number;
   liveMapStyleId: string;
