@@ -1,12 +1,20 @@
 // Section A of the admin designer: choose product types + which sizes/frames/depths
 // are available for this template. Pure UI — owns no state, just calls back.
+//
+// The available list per product type is the UNION of:
+//  - variants present in `config.sizes` (legacy/Gelato-mapped data)
+//  - hardcoded `DEFAULT_PRODUCT_VARIANTS` for that product type
+// This way the admin can enable e.g. canvas on a poster-only legacy config and
+// still see canvas-shaped sizes/depths instead of poster frames.
 import { useMemo } from "react";
+import { Info } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { ProductConfig } from "@/lib/product-config";
 import type { ProductOptions } from "@/lib/template-schema";
+import { DEFAULT_PRODUCT_VARIANTS, mergeUnique } from "@/lib/product-defaults";
 
 interface Props {
   config: ProductConfig;
@@ -17,10 +25,29 @@ interface Props {
 type Kind = "poster" | "canvas";
 
 export default function ProductOptionsSection({ config, value, onChange }: Props) {
-  const allSizes = useMemo(() => config.sizes.map((s) => s.size), [config]);
-  const allVariantNames = useMemo(
+  // Variant names from config (used so Gelato-mapped variants always appear)
+  const configVariantNames = useMemo(
     () => Array.from(new Set(config.sizes.flatMap((s) => s.variants.map((v) => v.name)))),
     [config],
+  );
+  const configSizes = useMemo(() => config.sizes.map((s) => s.size), [config]);
+
+  // Union per product type
+  const posterSizes = useMemo(
+    () => mergeUnique(configSizes, DEFAULT_PRODUCT_VARIANTS.poster.sizes),
+    [configSizes],
+  );
+  const posterFrames = useMemo(
+    () => mergeUnique(configVariantNames, DEFAULT_PRODUCT_VARIANTS.poster.frames),
+    [configVariantNames],
+  );
+  const canvasSizes = useMemo(
+    () => mergeUnique(configSizes, DEFAULT_PRODUCT_VARIANTS.canvas.sizes),
+    [configSizes],
+  );
+  const canvasDepths = useMemo(
+    () => mergeUnique(configVariantNames, DEFAULT_PRODUCT_VARIANTS.canvas.depths),
+    [configVariantNames],
   );
 
   function toggleEnabled(kind: Kind, enabled: boolean) {
@@ -28,14 +55,26 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
     if (kind === "poster") {
       next.poster = {
         enabled,
-        allowedSizes: value.poster?.allowedSizes ?? allSizes,
-        allowedFrames: value.poster?.allowedFrames ?? allVariantNames,
+        allowedSizes:
+          value.poster?.allowedSizes && value.poster.allowedSizes.length > 0
+            ? value.poster.allowedSizes
+            : [...DEFAULT_PRODUCT_VARIANTS.poster.sizes],
+        allowedFrames:
+          value.poster?.allowedFrames && value.poster.allowedFrames.length > 0
+            ? value.poster.allowedFrames
+            : [...DEFAULT_PRODUCT_VARIANTS.poster.frames],
       };
     } else {
       next.canvas = {
         enabled,
-        allowedSizes: value.canvas?.allowedSizes ?? allSizes,
-        allowedDepths: value.canvas?.allowedDepths ?? allVariantNames,
+        allowedSizes:
+          value.canvas?.allowedSizes && value.canvas.allowedSizes.length > 0
+            ? value.canvas.allowedSizes
+            : [...DEFAULT_PRODUCT_VARIANTS.canvas.sizes],
+        allowedDepths:
+          value.canvas?.allowedDepths && value.canvas.allowedDepths.length > 0
+            ? value.canvas.allowedDepths
+            : [...DEFAULT_PRODUCT_VARIANTS.canvas.depths],
       };
     }
     onChange(next);
@@ -54,6 +93,8 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
     onChange({ ...value, [kind]: { ...block, [field]: nextList } });
   }
 
+  const showDefaultsBanner = configSizes.length === 0 || configVariantNames.length === 0;
+
   return (
     <Card className="p-5 space-y-5">
       <div>
@@ -62,6 +103,16 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
           Välj vilka produkter, storlekar och varianter den här mallen säljs som.
         </p>
       </div>
+
+      {showDefaultsBanner && (
+        <div className="flex items-start gap-2 rounded-md border border-dashed bg-muted/40 p-3 text-xs text-muted-foreground">
+          <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+          <span>
+            Standardvarianter visas. Gelato-SKU saknas tills du fyller i <code className="font-mono">gelato_sku_map</code> —
+            publicering blockeras för storlekar utan SKU.
+          </span>
+        </div>
+      )}
 
       {/* Poster */}
       <div className="space-y-3 rounded-md border p-4">
@@ -76,13 +127,13 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
           <div className="grid gap-4 md:grid-cols-2">
             <ChecklistGroup
               title="Tillåtna storlekar"
-              all={allSizes}
+              all={posterSizes}
               selected={value.poster.allowedSizes}
               onToggle={(item, c) => toggleListItem("poster", "allowedSizes", item, c)}
             />
             <ChecklistGroup
               title="Tillåtna ramar"
-              all={allVariantNames}
+              all={posterFrames}
               selected={value.poster.allowedFrames}
               onToggle={(item, c) => toggleListItem("poster", "allowedFrames", item, c)}
             />
@@ -103,13 +154,13 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
           <div className="grid gap-4 md:grid-cols-2">
             <ChecklistGroup
               title="Tillåtna storlekar"
-              all={allSizes}
+              all={canvasSizes}
               selected={value.canvas.allowedSizes}
               onToggle={(item, c) => toggleListItem("canvas", "allowedSizes", item, c)}
             />
             <ChecklistGroup
               title="Tillåtna djup"
-              all={allVariantNames}
+              all={canvasDepths}
               selected={value.canvas.allowedDepths}
               onToggle={(item, c) => toggleListItem("canvas", "allowedDepths", item, c)}
             />
