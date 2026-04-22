@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { loadAllConfigs, type ProductConfig } from "@/lib/product-config";
-import { Loader2, ExternalLink, Zap } from "lucide-react";
+import { Loader2, ExternalLink, Zap, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -71,6 +71,12 @@ export default function AdminConfigs() {
                   <div>{c.text_config.fonts.length} typsnitt</div>
                 </div>
                 <div className="flex gap-2 pt-2">
+                  <Button asChild variant="default" size="sm" className="flex-1">
+                    <Link to={`/admin/designer/${c.shopify_handle}`}>
+                      <Pencil className="h-3 w-3 mr-1" />
+                      Redigera mall
+                    </Link>
+                  </Button>
                   <Button asChild variant="outline" size="sm" className="flex-1">
                     <Link to={`/editor?handle=${c.shopify_handle}`}>
                       <ExternalLink className="h-3 w-3 mr-1" />
@@ -84,7 +90,7 @@ export default function AdminConfigs() {
         )}
 
         <div className="mt-8 p-4 rounded-lg border border-dashed text-center text-sm text-muted-foreground">
-          Visuell layout-editor (drag & drop) kommer i nästa iteration. För nu redigeras layout-JSON direkt i databasen.
+          Klicka "Redigera mall" för att öppna drag & drop-designern.
         </div>
       </main>
     </div>

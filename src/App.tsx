@@ -7,6 +7,7 @@ import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import EditorPage from "./pages/EditorPage.tsx";
 import AdminConfigs from "./pages/AdminConfigs.tsx";
+import DesignerPage from "./pages/admin/DesignerPage.tsx";
 
 import { useCartSync } from "./hooks/useCartSync";
 
@@ -19,6 +20,7 @@ const AppRoutes = () => {
       <Route path="/" element={<Index />} />
       <Route path="/editor" element={<EditorPage />} />
       <Route path="/admin/configs" element={<AdminConfigs />} />
+      <Route path="/admin/designer/:handle" element={<DesignerPage />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
