@@ -207,13 +207,15 @@ export const templateSchema = z
 
 export type Template = z.infer<typeof templateSchema>;
 
+export type ParseTemplateResult =
+  | { ok: true; template: Template }
+  | { ok: false; error: z.ZodError };
+
 /**
  * `safeParse` + return either a typed template or a structured error report.
  * Use this at all read boundaries (loadConfig, edge function, snapshot).
  */
-export function parseTemplate(value: unknown):
-  | { ok: true; template: Template }
-  | { ok: false; error: z.ZodError } {
+export function parseTemplate(value: unknown): ParseTemplateResult {
   const r = templateSchema.safeParse(value);
   return r.success ? { ok: true, template: r.data } : { ok: false, error: r.error };
 }
