@@ -1,20 +1,35 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { loadAllConfigs, type ProductConfig } from "@/lib/product-config";
-import { Loader2, ExternalLink, Zap, Pencil } from "lucide-react";
+import { Loader2, ExternalLink, Zap, Pencil, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { resolveTemplate } from "@/lib/template-migrate";
+import type { Template } from "@/lib/template-schema";
+import CreateTemplateDialog from "@/components/admin/CreateTemplateDialog";
+import TemplateThumbnail from "@/components/admin/TemplateThumbnail";
+
+interface ConfigWithTemplate extends ProductConfig {
+  __template: Template;
+}
 
 export default function AdminConfigs() {
-  const [configs, setConfigs] = useState<ProductConfig[]>([]);
+  const [configs, setConfigs] = useState<ConfigWithTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
-      setConfigs(await loadAllConfigs());
+      const all = await loadAllConfigs();
+      const enriched = all.map((c) => {
+        const raw = (c as unknown as { template?: unknown }).template;
+        const { template } = resolveTemplate(c, raw);
+        return { ...c, __template: template };
+      });
+      setConfigs(enriched);
       setLoading(false);
     })();
   }, []);
@@ -35,15 +50,21 @@ export default function AdminConfigs() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h1 className="text-xl font-bold">Produktkonfigurationer</h1>
             <p className="text-sm text-muted-foreground">Layouter, kartstilar, storlekar och Gelato-mappning</p>
           </div>
-          <Button onClick={syncToShopify} disabled={syncing}>
-            {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
-            Synka till Shopify
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Skapa ny mall
+            </Button>
+            <Button onClick={syncToShopify} disabled={syncing}>
+              {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
+              Synka till Shopify
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -55,44 +76,60 @@ export default function AdminConfigs() {
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             {configs.map((c) => (
-              <Card key={c.id} className="p-5 space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h2 className="font-semibold">{c.title}</h2>
-                    <p className="text-xs text-muted-foreground font-mono">{c.shopify_handle}</p>
+              <Card key={c.id} className="p-5">
+                <div className="flex gap-4">
+                  <TemplateThumbnail template={c.__template} />
+                  <div className="flex-1 min-w-0 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h2 className="font-semibold truncate">{c.title}</h2>
+                        <p className="text-xs text-muted-foreground font-mono truncate">{c.shopify_handle}</p>
+                      </div>
+                      <span className="text-[10px] uppercase tracking-wider bg-secondary text-secondary-foreground px-2 py-1 rounded shrink-0">
+                        {c.product_type}
+                      </span>
+                    </div>
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      <div>{c.__template.defaultLayout.portrait.layers.length} lager (stående)</div>
+                      <div>
+                        {[
+                          c.__template.productOptions.poster?.enabled && "poster",
+                          c.__template.productOptions.canvas?.enabled && "canvas",
+                        ]
+                          .filter(Boolean)
+                          .join(" + ") || "ingen produkt aktiverad"}
+                      </div>
+                      <div>{c.__template.publishedAt ? "Publicerad" : "Draft"}</div>
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <Button asChild variant="default" size="sm" className="flex-1">
+                        <Link to={`/admin/designer/${c.shopify_handle}`}>
+                          <Pencil className="h-3 w-3 mr-1" />
+                          Redigera
+                        </Link>
+                      </Button>
+                      <Button asChild variant="outline" size="sm" className="flex-1">
+                        <Link to={`/editor?handle=${c.shopify_handle}`}>
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          Editor
+                        </Link>
+                      </Button>
+                    </div>
                   </div>
-                  <span className="text-[10px] uppercase tracking-wider bg-secondary text-secondary-foreground px-2 py-1 rounded">
-                    {c.product_type}
-                  </span>
-                </div>
-                <div className="text-sm text-muted-foreground space-y-1">
-                  <div>{c.sizes.length} storlekar</div>
-                  <div>{c.map_styles.length} kartstilar</div>
-                  <div>{c.text_config.fonts.length} typsnitt</div>
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <Button asChild variant="default" size="sm" className="flex-1">
-                    <Link to={`/admin/designer/${c.shopify_handle}`}>
-                      <Pencil className="h-3 w-3 mr-1" />
-                      Redigera mall
-                    </Link>
-                  </Button>
-                  <Button asChild variant="outline" size="sm" className="flex-1">
-                    <Link to={`/editor?handle=${c.shopify_handle}`}>
-                      <ExternalLink className="h-3 w-3 mr-1" />
-                      Öppna editor
-                    </Link>
-                  </Button>
                 </div>
               </Card>
             ))}
           </div>
         )}
 
-        <div className="mt-8 p-4 rounded-lg border border-dashed text-center text-sm text-muted-foreground">
-          Klicka "Redigera mall" för att öppna drag & drop-designern.
-        </div>
+        {!loading && configs.length === 0 && (
+          <div className="mt-8 p-8 rounded-lg border border-dashed text-center text-sm text-muted-foreground">
+            Inga mallar än. Klicka "Skapa ny mall" för att börja.
+          </div>
+        )}
       </main>
+
+      <CreateTemplateDialog open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   );
 }

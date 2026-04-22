@@ -25,7 +25,8 @@ import {
   type Template,
   type TemplateLayer,
 } from "@/lib/template-schema";
-import { createLayer, moveLayer, normaliseZIndex } from "@/lib/layer-utils";
+import { createDefaultLayout, createLayer, moveLayer, normaliseZIndex } from "@/lib/layer-utils";
+import { Sparkles } from "lucide-react";
 import ProductOptionsSection from "@/components/admin/ProductOptionsSection";
 import LayerCanvas from "@/components/admin/LayerCanvas";
 import LayerList, { toggleAllLocks } from "@/components/admin/LayerList";
@@ -249,14 +250,37 @@ export default function DesignerPage() {
             </div>
           </div>
 
-          <LayerCanvas
-            aspect={layout.aspect}
-            background={layout.background.color}
-            layers={layers}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onChange={updateLayer}
-          />
+          <div className="relative">
+            <LayerCanvas
+              aspect={layout.aspect}
+              background={layout.background.color}
+              layers={layers}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onChange={updateLayer}
+            />
+            {layers.length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="pointer-events-auto bg-background/95 backdrop-blur border-2 border-dashed border-primary/40 rounded-lg p-6 text-center max-w-xs shadow-lg">
+                  <Sparkles className="h-6 w-6 mx-auto mb-2 text-primary" />
+                  <p className="text-sm font-medium mb-1">Tomt — börja här</p>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Skapa en standardlayout (karta + text) eller lägg till lager manuellt ovan.
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      const seed = createDefaultLayout();
+                      setLayers(seed);
+                      setSelectedId(seed[0]?.id ?? null);
+                    }}
+                  >
+                    Skapa standardlayout
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         </Card>
 
         <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">

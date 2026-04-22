@@ -6,11 +6,16 @@
 //
 // Snap: 5% grid is always on. Alignment guides appear under drag when an edge
 // or centre lines up with another layer / canvas centre / canvas edge.
+//
+// Each layer renders a TYPE-SPECIFIC mini preview (real Mapbox tile, real
+// text with chosen font, etc.) so the admin sees what the customer will see.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Rnd } from "react-rnd";
 import type { Aspect, TemplateLayer } from "@/lib/template-schema";
 import { clampLayerBounds, snapPct } from "@/lib/layer-utils";
 import AlignmentGuides from "./AlignmentGuides";
+import MapLayerPreview from "./MapLayerPreview";
+import TextLayerPreview from "./TextLayerPreview";
 
 const SNAP_PCT = 5;
 const GUIDE_TOLERANCE_PCT = 1.5;
@@ -41,8 +46,8 @@ export default function LayerCanvas({
   const wrapRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [guides, setGuides] = useState<{ v: number[]; h: number[] }>({ v: [], h: [] });
+  const [hoverId, setHoverId] = useState<string | null>(null);
 
-  // Track the canvas pixel size so we can convert px<->%
   useEffect(() => {
     if (!wrapRef.current) return;
     const obs = new ResizeObserver((entries) => {
@@ -63,7 +68,6 @@ export default function LayerCanvas({
     return total === 0 ? 0 : (px / total) * 100;
   }
 
-  /** Compute alignment guides for the layer currently being moved. */
   function computeGuides(moving: TemplateLayer): { v: number[]; h: number[] } {
     const v: number[] = [];
     const h: number[] = [];
@@ -71,18 +75,12 @@ export default function LayerCanvas({
       x: [moving.xPct, moving.xPct + moving.wPct / 2, moving.xPct + moving.wPct],
       y: [moving.yPct, moving.yPct + moving.hPct / 2, moving.yPct + moving.hPct],
     };
-
-    // Canvas edges + centre
-    const canvasX = [0, 50, 100];
-    const canvasY = [0, 50, 100];
-    canvasX.forEach((cx) => {
+    [0, 50, 100].forEach((cx) => {
       if (movingCenters.x.some((mx) => Math.abs(mx - cx) <= GUIDE_TOLERANCE_PCT)) v.push(cx);
     });
-    canvasY.forEach((cy) => {
+    [0, 50, 100].forEach((cy) => {
       if (movingCenters.y.some((my) => Math.abs(my - cy) <= GUIDE_TOLERANCE_PCT)) h.push(cy);
     });
-
-    // Other layers
     layers
       .filter((l) => l.id !== moving.id)
       .forEach((other) => {
@@ -95,11 +93,49 @@ export default function LayerCanvas({
           if (movingCenters.y.some((my) => Math.abs(my - y) <= GUIDE_TOLERANCE_PCT)) h.push(y);
         });
       });
-
     return {
       v: Array.from(new Set(v.map((n) => Math.round(n * 10) / 10))),
       h: Array.from(new Set(h.map((n) => Math.round(n * 10) / 10))),
     };
+  }
+
+  function renderLayerContent(layer: TemplateLayer) {
+    const wPx = (layer.wPct / 100) * size.w;
+    const hPx = (layer.hPct / 100) * size.h;
+    switch (layer.type) {
+      case "map":
+        return <MapLayerPreview defaults={layer.defaults} width={wPx} height={hPx} />;
+      case "text":
+        return <TextLayerPreview defaults={layer.defaults} height={hPx} />;
+      case "image":
+        return layer.defaults.url ? (
+          <img
+            src={layer.defaults.url}
+            alt=""
+            className="w-full h-full object-cover"
+            draggable={false}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground bg-muted">
+            🖼 Bild
+          </div>
+        );
+      case "line":
+        return (
+          <div className="w-full h-full" style={{ background: layer.defaults.color }} />
+        );
+      case "margin":
+        return (
+          <div
+            className="w-full h-full"
+            style={{
+              border: `${Math.max(1, layer.defaults.thicknessMm)}px solid ${layer.defaults.color}`,
+            }}
+          />
+        );
+      default:
+        return null;
+    }
   }
 
   return (
@@ -114,7 +150,7 @@ export default function LayerCanvas({
       >
         {/* 5% grid */}
         <div
-          className="pointer-events-none absolute inset-0 opacity-30"
+          className="pointer-events-none absolute inset-0 opacity-20"
           style={{
             backgroundImage:
               "linear-gradient(to right, hsl(var(--border)) 1px, transparent 1px), linear-gradient(to bottom, hsl(var(--border)) 1px, transparent 1px)",
@@ -124,14 +160,12 @@ export default function LayerCanvas({
 
         {sortedLayers.map((layer) => {
           const isSelected = selectedId === layer.id;
+          const showName = isSelected || hoverId === layer.id;
           return (
             <Rnd
               key={layer.id}
               bounds="parent"
-              size={{
-                width: `${layer.wPct}%`,
-                height: `${layer.hPct}%`,
-              }}
+              size={{ width: `${layer.wPct}%`, height: `${layer.hPct}%` }}
               position={{
                 x: (layer.xPct / 100) * size.w,
                 y: (layer.yPct / 100) * size.h,
@@ -180,24 +214,29 @@ export default function LayerCanvas({
               className={
                 isSelected
                   ? "ring-2 ring-primary ring-offset-1"
-                  : "ring-1 ring-border hover:ring-primary/50"
+                  : "ring-1 ring-border/60 hover:ring-primary/50"
               }
             >
               <div
-                className="w-full h-full bg-card/70 backdrop-blur-[1px] flex items-center justify-center text-xs text-muted-foreground select-none cursor-move"
+                className="relative w-full h-full overflow-hidden cursor-move"
                 onClick={(e) => {
                   e.stopPropagation();
                   onSelect(layer.id);
                 }}
+                onMouseEnter={() => setHoverId(layer.id)}
+                onMouseLeave={() => setHoverId((h) => (h === layer.id ? null : h))}
               >
-                <span className="px-2 text-center truncate">
-                  {layer.type === "map" && "🗺 "}
-                  {layer.type === "text" && "T "}
-                  {layer.type === "image" && "🖼 "}
-                  {layer.type === "line" && "▬ "}
-                  {layer.type === "margin" && "▢ "}
-                  {layer.name}
-                </span>
+                {renderLayerContent(layer)}
+                {showName && (
+                  <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-background/90 text-[10px] font-medium text-foreground shadow-sm pointer-events-none">
+                    {layer.type === "map" && "🗺 "}
+                    {layer.type === "text" && "T "}
+                    {layer.type === "image" && "🖼 "}
+                    {layer.type === "line" && "▬ "}
+                    {layer.type === "margin" && "▢ "}
+                    {layer.name}
+                  </span>
+                )}
               </div>
             </Rnd>
           );

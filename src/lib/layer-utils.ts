@@ -143,3 +143,22 @@ export function createLayer(type: LayerType, existing: TemplateLayer[]): Templat
 function countOfType(layers: TemplateLayer[], type: LayerType): number {
   return layers.filter((l) => l.type === type).length;
 }
+
+/**
+ * Build a sensible starter layout (centred map + text below). Mirrors the
+ * default the customer editor used before the layer system existed.
+ */
+export function createDefaultLayout(): TemplateLayer[] {
+  const map = createLayer("map", []);
+  const text = createLayer("text", [map]);
+  // Position map nicely at top, text below
+  map.xPct = 10;
+  map.yPct = 8;
+  map.wPct = 80;
+  map.hPct = 62;
+  text.xPct = 10;
+  text.yPct = 75;
+  text.wPct = 80;
+  text.hPct = 12;
+  return normaliseZIndex([map, text]);
+}
