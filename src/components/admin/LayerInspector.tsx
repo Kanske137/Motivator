@@ -36,7 +36,7 @@ const LOCK_LABELS: Array<{ key: keyof LayerLocks; label: string }> = [
   { key: "style", label: "Stil" },
 ];
 
-export default function LayerInspector({ config, layer, onChange }: Props) {
+export default function LayerInspector({ config, layer, allLayers, onChange }: Props) {
   if (!layer) {
     return (
       <p className="text-xs text-muted-foreground py-4 text-center">
