@@ -1,0 +1,278 @@
+// Properties panel for the currently selected layer.
+//   - Edit defaults per layer-type
+//   - Toggle each lock independently
+//   - Edit position/size numerically (snap to 5%)
+import type { ProductConfig } from "@/lib/product-config";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import type {
+  LayerLocks,
+  TemplateLayer,
+} from "@/lib/template-schema";
+
+interface Props {
+  config: ProductConfig;
+  layer: TemplateLayer | null;
+  onChange: (next: TemplateLayer) => void;
+}
+
+const LOCK_LABELS: Array<{ key: keyof LayerLocks; label: string }> = [
+  { key: "position", label: "Position" },
+  { key: "size", label: "Storlek" },
+  { key: "shape", label: "Form" },
+  { key: "content", label: "Innehåll" },
+  { key: "font", label: "Typsnitt" },
+  { key: "visibility", label: "Synlighet" },
+  { key: "style", label: "Stil" },
+];
+
+export default function LayerInspector({ config, layer, onChange }: Props) {
+  if (!layer) {
+    return (
+      <p className="text-xs text-muted-foreground py-4 text-center">
+        Välj ett lager för att redigera dess inställningar.
+      </p>
+    );
+  }
+
+  function updateDefaults<T extends TemplateLayer>(patch: Partial<T["defaults"]>) {
+    onChange({
+      ...layer,
+      defaults: { ...layer!.defaults, ...patch },
+    } as TemplateLayer);
+  }
+
+  function updateLock(key: keyof LayerLocks, value: boolean) {
+    onChange({ ...layer!, locks: { ...layer!.locks, [key]: value } });
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Name */}
+      <Field label="Namn">
+        <Input
+          value={layer.name}
+          onChange={(e) => onChange({ ...layer, name: e.target.value })}
+        />
+      </Field>
+
+      {/* Position + size */}
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="X (%)">
+          <Input
+            type="number"
+            value={layer.xPct}
+            min={0}
+            max={100}
+            step={5}
+            onChange={(e) => onChange({ ...layer, xPct: Number(e.target.value) })}
+          />
+        </Field>
+        <Field label="Y (%)">
+          <Input
+            type="number"
+            value={layer.yPct}
+            min={0}
+            max={100}
+            step={5}
+            onChange={(e) => onChange({ ...layer, yPct: Number(e.target.value) })}
+          />
+        </Field>
+        <Field label="Bredd (%)">
+          <Input
+            type="number"
+            value={layer.wPct}
+            min={1}
+            max={100}
+            step={5}
+            onChange={(e) => onChange({ ...layer, wPct: Number(e.target.value) })}
+          />
+        </Field>
+        <Field label="Höjd (%)">
+          <Input
+            type="number"
+            value={layer.hPct}
+            min={1}
+            max={100}
+            step={5}
+            onChange={(e) => onChange({ ...layer, hPct: Number(e.target.value) })}
+          />
+        </Field>
+      </div>
+
+      {/* Type-specific defaults */}
+      {layer.type === "map" && (
+        <div className="space-y-3 border-t pt-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Karta — defaults
+          </p>
+          <Field label="Form">
+            <Select
+              value={layer.defaults.shape}
+              onValueChange={(v) => updateDefaults({ shape: v as typeof layer.defaults.shape })}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="rect">Rektangel</SelectItem>
+                <SelectItem value="square">Kvadrat</SelectItem>
+                <SelectItem value="circle">Cirkel</SelectItem>
+                <SelectItem value="heart">Hjärta</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Kartstil">
+            <Select
+              value={layer.defaults.styleId}
+              onValueChange={(v) => updateDefaults({ styleId: v })}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {config.map_styles.map((s) => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Lng">
+              <Input
+                type="number"
+                step="0.0001"
+                value={layer.defaults.center[0]}
+                onChange={(e) =>
+                  updateDefaults({ center: [Number(e.target.value), layer.defaults.center[1]] })
+                }
+              />
+            </Field>
+            <Field label="Lat">
+              <Input
+                type="number"
+                step="0.0001"
+                value={layer.defaults.center[1]}
+                onChange={(e) =>
+                  updateDefaults({ center: [layer.defaults.center[0], Number(e.target.value)] })
+                }
+              />
+            </Field>
+          </div>
+          <Field label="Zoom">
+            <Input
+              type="number"
+              step="0.5"
+              min={0}
+              max={22}
+              value={layer.defaults.zoom}
+              onChange={(e) => updateDefaults({ zoom: Number(e.target.value) })}
+            />
+          </Field>
+          <div className="flex items-center justify-between">
+            <Label className="text-sm">Visa labels</Label>
+            <Switch
+              checked={layer.defaults.showLabels}
+              onCheckedChange={(c) => updateDefaults({ showLabels: c })}
+            />
+          </div>
+        </div>
+      )}
+
+      {layer.type === "text" && (
+        <div className="space-y-3 border-t pt-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Text — defaults
+          </p>
+          <Field label="Innehåll">
+            <Textarea
+              value={layer.defaults.text}
+              rows={3}
+              onChange={(e) => updateDefaults({ text: e.target.value })}
+            />
+          </Field>
+          <Field label="Typsnitt">
+            <Select
+              value={layer.defaults.font}
+              onValueChange={(v) => updateDefaults({ font: v })}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {config.text_config.fonts.map((f) => (
+                  <SelectItem key={f} value={f}>{f}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Storlek (% av höjd)">
+              <Input
+                type="number"
+                min={1}
+                max={100}
+                step={0.5}
+                value={layer.defaults.fontSizePct}
+                onChange={(e) => updateDefaults({ fontSizePct: Number(e.target.value) })}
+              />
+            </Field>
+            <Field label="Justering">
+              <Select
+                value={layer.defaults.align}
+                onValueChange={(v) => updateDefaults({ align: v as typeof layer.defaults.align })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="left">Vänster</SelectItem>
+                  <SelectItem value="center">Mitten</SelectItem>
+                  <SelectItem value="right">Höger</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+          <Field label="Färg">
+            <Input
+              type="color"
+              value={layer.defaults.color}
+              onChange={(e) => updateDefaults({ color: e.target.value })}
+            />
+          </Field>
+        </div>
+      )}
+
+      {/* Locks */}
+      <div className="space-y-2 border-t pt-4">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Lås per egenskap
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Olåsta egenskaper kan kunden ändra i editorn.
+        </p>
+        <div className="grid grid-cols-2 gap-2 pt-2">
+          {LOCK_LABELS.map(({ key, label }) => (
+            <label key={key} className="flex items-center justify-between gap-2 text-sm">
+              <span>{label}</span>
+              <Switch
+                checked={layer.locks[key]}
+                onCheckedChange={(c) => updateLock(key, c)}
+              />
+            </label>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs">{label}</Label>
+      {children}
+    </div>
+  );
+}
