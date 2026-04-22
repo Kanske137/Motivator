@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import type { Orientation, ProductConfig } from "@/lib/product-config";
 import type { DesignSource } from "@/lib/print-pipeline";
+import type { ProductOptions } from "@/lib/template-schema";
+import { resolveTemplate } from "@/lib/template-migrate";
 
 interface ApplyPlaceArgs {
   placeName: string;
@@ -13,6 +15,7 @@ export type MapShape = "rect" | "square" | "circle";
 
 interface EditorState {
   config: ProductConfig | null;
+  productOptions: ProductOptions | null;
 
   // map
   mapCenter: [number, number]; // [lng, lat]
@@ -78,6 +81,7 @@ function buildAutoText(args: ApplyPlaceArgs): string {
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   config: null,
+  productOptions: null,
   mapCenter: [18.0686, 59.3293], // Stockholm
   mapZoom: 12,
   mapStyleId: "light-v11",
@@ -111,15 +115,36 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const prevStyle = state.mapStyleId;
     const prevFont = state.textFont;
 
-    // Size: keep if still available, else first size of new product
-    const sizeStillValid = prevSize && config.sizes.find((s) => s.size === prevSize);
-    const nextSize = sizeStillValid ? prevSize : config.sizes[0]?.size ?? null;
+    // Resolve the published template so we can filter sizes/variants by what
+    // admin actually allowed for THIS product type.
+    const rawTemplate = (config as unknown as { template?: unknown }).template;
+    const { template } = resolveTemplate(config, rawTemplate);
+    const productOptions = template.productOptions;
+
+    // Size: keep if still available + allowed by template, else first allowed
+    const allowedSizesForType =
+      config.product_type === "canvas"
+        ? productOptions.canvas?.allowedSizes ?? []
+        : productOptions.poster?.allowedSizes ?? [];
+    const allowedFiltered = config.sizes.filter(
+      (s) => allowedSizesForType.length === 0 || allowedSizesForType.includes(s.size),
+    );
+    const sizeStillValid = prevSize && allowedFiltered.find((s) => s.size === prevSize);
+    const nextSize = sizeStillValid ? prevSize : allowedFiltered[0]?.size ?? config.sizes[0]?.size ?? null;
     const nextSizeDef = config.sizes.find((s) => s.size === nextSize);
 
-    // Variant: keep if still available within the chosen size, else first variant
-    const variantStillValid =
-      prevVariant && nextSizeDef?.variants.find((v) => v.name === prevVariant);
-    const nextVariant = variantStillValid ? prevVariant : nextSizeDef?.variants[0]?.name ?? null;
+    // Variant: keep if still available within the chosen size + allowed by template
+    const allowedVariantsForType =
+      config.product_type === "canvas"
+        ? productOptions.canvas?.allowedDepths ?? []
+        : productOptions.poster?.allowedFrames ?? [];
+    const variantsForSize = (nextSizeDef?.variants ?? []).filter(
+      (v) => allowedVariantsForType.length === 0 || allowedVariantsForType.includes(v.name),
+    );
+    const variantStillValid = prevVariant && variantsForSize.find((v) => v.name === prevVariant);
+    const nextVariant = variantStillValid
+      ? prevVariant
+      : variantsForSize[0]?.name ?? nextSizeDef?.variants[0]?.name ?? null;
 
     // Map style: keep if supported by the new product, else fallback
     const styleStillValid = config.map_styles.includes(prevStyle);
@@ -131,13 +156,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     set({
       config,
+      productOptions,
       size: nextSize,
       variant: nextVariant,
       mapStyleId: nextStyle,
       textFont: nextFont,
-      // Everything else (mapCenter, mapZoom, text, textVisible, posterBgColor,
-      // mapShape, showLabels, placeName, city, country, orientation,
-      // textIsCustom) is intentionally preserved.
     });
   },
   setMapCenter: (mapCenter) => set({ mapCenter }),
