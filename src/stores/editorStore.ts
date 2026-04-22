@@ -430,9 +430,22 @@ function applyPlaceInternal(
     ...state.layerValues,
     [mapId]: nextMap,
   };
+  // Backward-compat: if no text layer in this template has any explicit
+  // linkedMapLayerId, treat the FIRST text layer as auto-linked to the FIRST
+  // map layer so single-layer legacy templates keep updating text-on-place.
+  const anyExplicitLink = layers.some(
+    (l) => l.type === "text" && typeof l.defaults.linkedMapLayerId === "string",
+  );
+  const firstMapId = layers.find((l) => l.type === "map")?.id ?? null;
+  const firstTextId = layers.find((l) => l.type === "text")?.id ?? null;
+
   for (const l of layers) {
     if (l.type !== "text") continue;
-    if (l.defaults.linkedMapLayerId !== mapId) continue;
+    const linked = l.defaults.linkedMapLayerId;
+    const isLinked =
+      linked === mapId ||
+      (!anyExplicitLink && firstMapId === mapId && firstTextId === l.id);
+    if (!isLinked) continue;
     const tv = state.layerValues[l.id];
     if (!tv || tv.kind !== "text" || tv.isCustom) continue;
     newLayerValues[l.id] = { ...tv, text: buildAutoText(args) };
