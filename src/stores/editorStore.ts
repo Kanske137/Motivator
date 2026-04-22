@@ -188,7 +188,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       // Hydrate location, zoom, shape, labels, bg from template on first load
       ...(isFirstLoad && mapDefaults
         ? {
-            mapCenter: mapDefaults.center,
+            mapCenter: [mapDefaults.center[0], mapDefaults.center[1]] as [number, number],
             mapZoom: mapDefaults.zoom,
             mapShape: mapDefaults.shape as MapShape,
             showLabels: mapDefaults.showLabels,
