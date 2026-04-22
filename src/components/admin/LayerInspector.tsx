@@ -22,6 +22,7 @@ import type {
 interface Props {
   config: ProductConfig;
   layer: TemplateLayer | null;
+  allLayers: TemplateLayer[];
   onChange: (next: TemplateLayer) => void;
 }
 
