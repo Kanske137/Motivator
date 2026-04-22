@@ -1,31 +1,21 @@
-// Renders a single Mapbox GL instance positioned at a layer's % rect.
-// `live=true` instances are bound to the editor store (pan/zoom/style updates
-// propagate to global state). `live=false` instances are static and locked to
-// the layer's own defaults (used when a template has multiple map layers).
+// Renders a single Mapbox GL instance bound to one template layer's value.
+// All pan/zoom/style updates write back into editorStore.layerValues[layerId]
+// — the concept of a single "live" map is gone; every map is independently
+// interactive (subject to its locks).
 import { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useEditorStore } from "@/stores/editorStore";
 import { getMapboxToken, reverseGeocode, styleUrl } from "@/lib/mapbox";
-import type { MapDefaults } from "@/lib/template-schema";
 
 interface Props {
-  defaults: MapDefaults;
-  /** Effective shape — for live layer, comes from store; else from defaults. */
+  layerId: string;
   shape: "rect" | "square" | "circle" | "heart";
-  /** Effective styleId — live=store, static=defaults. */
   styleId: string;
-  /** Effective center — live=store, static=defaults. */
   center: [number, number];
-  /** Effective zoom — live=store, static=defaults. */
   zoom: number;
-  /** Effective showLabels — live=store, static=defaults. */
   showLabels: boolean;
-  /** True if this instance owns global pan/zoom/center state. */
-  live: boolean;
-  /** Whether the user can interact (drag/zoom). */
   interactive: boolean;
-  /** clipPath CSS string (for heart shape via SVG ref). */
   clipPath?: string;
 }
 
@@ -48,17 +38,15 @@ function applyLabelVisibility(map: mapboxgl.Map, show: boolean) {
 }
 
 export function MapLayerInstance({
-  defaults,
+  layerId,
   shape,
   styleId,
   center,
   zoom,
   showLabels,
-  live,
   interactive,
   clipPath,
 }: Props) {
-  void defaults;
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const programmaticRef = useRef(false);
@@ -95,30 +83,30 @@ export function MapLayerInstance({
         applyLabelVisibility(map, showLabels);
       });
 
-      if (live) {
-        map.on("moveend", () => {
-          if (programmaticRef.current) {
-            programmaticRef.current = false;
-            return;
-          }
-          const c = map.getCenter();
-          const z = map.getZoom();
-          useEditorStore.setState({ mapCenter: [c.lng, c.lat], mapZoom: z });
+      map.on("moveend", () => {
+        if (programmaticRef.current) {
+          programmaticRef.current = false;
+          return;
+        }
+        const c = map.getCenter();
+        const z = map.getZoom();
+        const store = useEditorStore.getState();
+        store.setLayerMapCenter(layerId, [c.lng, c.lat]);
+        store.setLayerMapZoom(layerId, z);
 
-          if (reverseTimerRef.current) window.clearTimeout(reverseTimerRef.current);
-          reverseTimerRef.current = window.setTimeout(async () => {
-            const r = await reverseGeocode(c.lng, c.lat);
-            if (r) {
-              useEditorStore.getState().updateFromMap({
-                placeName: r.place_name,
-                center: [c.lng, c.lat],
-                city: r.city,
-                country: r.country,
-              });
-            }
-          }, 400);
-        });
-      }
+        if (reverseTimerRef.current) window.clearTimeout(reverseTimerRef.current);
+        reverseTimerRef.current = window.setTimeout(async () => {
+          const r = await reverseGeocode(c.lng, c.lat);
+          if (r) {
+            useEditorStore.getState().updateMapLayerFromPan(layerId, {
+              placeName: r.place_name,
+              center: [c.lng, c.lat],
+              city: r.city,
+              country: r.country,
+            });
+          }
+        }, 400);
+      });
 
       mapRef.current = map;
       setTimeout(() => map.resize(), 50);
@@ -132,7 +120,26 @@ export function MapLayerInstance({
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [layerId]);
+
+  // Toggle interactivity dynamically
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const handlers: Array<keyof mapboxgl.Map> = [
+      "scrollZoom",
+      "dragPan",
+      "doubleClickZoom",
+      "touchZoomRotate",
+    ];
+    for (const h of handlers) {
+      const inst = (map as unknown as Record<string, { enable: () => void; disable: () => void }>)[h as string];
+      if (inst && typeof inst.enable === "function" && typeof inst.disable === "function") {
+        if (interactive) inst.enable();
+        else inst.disable();
+      }
+    }
+  }, [interactive]);
 
   // resize observer
   useEffect(() => {
