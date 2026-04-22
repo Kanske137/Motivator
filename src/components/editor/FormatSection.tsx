@@ -53,43 +53,72 @@ const DepthIcon = forwardRef<SVGSVGElement, { depth: string }>(({ depth }, ref) 
 DepthIcon.displayName = "DepthIcon";
 
 export function FormatSection({ configs, activeHandle, onProductChange }: Props) {
-  const { config, size, variant, orientation, setSize, setVariant, setOrientation } = useEditorStore();
+  const { config, productOptions, size, variant, orientation, setSize, setVariant, setOrientation } = useEditorStore();
 
   if (!config) return null;
 
-  const sizeDef = config.sizes.find((s) => s.size === size);
   const isCanvas = config.product_type === "canvas";
+
+  // Filter sizes/variants by template's productOptions (admin-controlled).
+  // Falls back to all sizes/variants from config when template is missing/empty.
+  const allowedSizes = isCanvas
+    ? productOptions?.canvas?.allowedSizes
+    : productOptions?.poster?.allowedSizes;
+  const allowedVariants = isCanvas
+    ? productOptions?.canvas?.allowedDepths
+    : productOptions?.poster?.allowedFrames;
+
+  const visibleSizes = config.sizes.filter(
+    (s) => !allowedSizes || allowedSizes.length === 0 || allowedSizes.includes(s.size),
+  );
+  const sizeDef = visibleSizes.find((s) => s.size === size) ?? config.sizes.find((s) => s.size === size);
+  const visibleVariants = (sizeDef?.variants ?? []).filter(
+    (v) => !allowedVariants || allowedVariants.length === 0 || allowedVariants.includes(v.name),
+  );
+
   const currentVariantPrice = sizeDef?.variants.find((v) => v.name === variant)?.price ?? 0;
 
+  // Only show product types that are enabled in their template's productOptions.
+  // Fallback: always show the config's own product type.
+  const visibleConfigs = configs.filter((c) => {
+    const raw = (c as unknown as { template?: { productOptions?: { poster?: { enabled?: boolean }; canvas?: { enabled?: boolean } } } }).template;
+    const opts = raw?.productOptions;
+    if (!opts) return true; // legacy / no template
+    if (c.product_type === "canvas") return opts.canvas?.enabled !== false;
+    return opts.poster?.enabled !== false;
+  });
+
   // size price diffs use the current variant name (or first variant) for fair comparison
-  const variantNameForCompare = variant ?? sizeDef?.variants[0]?.name;
+  const variantNameForCompare = variant ?? visibleVariants[0]?.name ?? sizeDef?.variants[0]?.name;
   const currentSizeBasePrice =
     sizeDef?.variants.find((v) => v.name === variantNameForCompare)?.price ?? currentVariantPrice;
 
   return (
     <div className="space-y-5">
-      {/* Produkt — segmented pill toggle */}
-      <div className="space-y-2">
-        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Produkt</Label>
-        <div className="flex p-1 bg-muted rounded-full">
-          {configs.map((c) => {
-            const active = c.shopify_handle === activeHandle;
-            return (
-              <button
-                key={c.shopify_handle}
-                onClick={() => onProductChange(c.shopify_handle)}
-                className={`flex-1 h-10 rounded-full text-sm font-medium transition ${
-                  active
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-foreground/70 hover:text-foreground"
-                }`}
-              >
-                {c.product_type === "posters" ? "Poster" : "Canvas"}
-              </button>
-            );
-          })}
+      {/* Produkt — segmented pill toggle. Hidden when only one product type is available. */}
+      {visibleConfigs.length > 1 && (
+        <div className="space-y-2">
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Produkt</Label>
+          <div className="flex p-1 bg-muted rounded-full">
+            {visibleConfigs.map((c) => {
+              const active = c.shopify_handle === activeHandle;
+              return (
+                <button
+                  key={c.shopify_handle}
+                  onClick={() => onProductChange(c.shopify_handle)}
+                  className={`flex-1 h-10 rounded-full text-sm font-medium transition ${
+                    active
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-foreground/70 hover:text-foreground"
+                  }`}
+                >
+                  {c.product_type === "posters" ? "Poster" : "Canvas"}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Storlek dropdown */}
       <div className="space-y-2">
@@ -99,7 +128,7 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
             <SelectValue placeholder="Välj storlek" />
           </SelectTrigger>
           <SelectContent className="rounded-2xl">
-            {config.sizes.map((s) => {
+            {visibleSizes.map((s) => {
               const matchVariant =
                 s.variants.find((v) => v.name === variantNameForCompare) ?? s.variants[0];
               const diff = (matchVariant?.price ?? 0) - currentSizeBasePrice;
@@ -125,7 +154,7 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
           {isCanvas ? "Djup" : "Ram"}
         </Label>
         <div className={`grid gap-2 ${isCanvas ? "grid-cols-2" : "grid-cols-3"}`}>
-          {sizeDef?.variants.map((v) => {
+          {visibleVariants.map((v) => {
             const diff = v.price - currentVariantPrice;
             const isNoFrame = v.name.toLowerCase() === "ingen";
             return (
