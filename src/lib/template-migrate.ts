@@ -35,7 +35,8 @@ export function buildTemplateFromLegacy(config: ProductConfig): Template {
   );
 
   const productOptions: Template["productOptions"] = {};
-  if (config.product_type === "poster") {
+  // Legacy `product_type` is "posters" | "canvas"; template uses "poster" | "canvas"
+  if ((config.product_type as string) === "posters" || (config.product_type as string) === "poster") {
     productOptions.poster = {
       enabled: true,
       allowedSizes,
@@ -78,11 +79,11 @@ export function resolveTemplate(
     return { template: buildTemplateFromLegacy(config), fellBack: true };
   }
   const parsed = parseTemplate(rawTemplate);
-  if (!parsed.ok) {
-    console.warn("[template-migrate] invalid template, falling back to legacy", parsed.error);
-    return { template: buildTemplateFromLegacy(config), fellBack: true };
+  if (parsed.ok) {
+    return { template: parsed.template, fellBack: false };
   }
-  return { template: parsed.template, fellBack: false };
+  console.warn("[template-migrate] invalid template, falling back to legacy", parsed.error);
+  return { template: buildTemplateFromLegacy(config), fellBack: true };
 }
 
 // Re-export for convenience
