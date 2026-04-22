@@ -1,0 +1,225 @@
+// Zod schema + TS types for the modular design template stored in
+// `product_configs.template`. See `.lovable/plan.md` for the high-level model.
+//
+// Coordinate system: layer position/size are PERCENT of the FRONT zone of the
+// design canvas. Marginal/line thickness is in millimetres so the print-file
+// pipeline can convert them via PX_PER_CM.
+import { z } from "zod";
+
+// ---------- shared ----------
+export const orientationSchema = z.enum(["portrait", "landscape"]);
+export type Orientation = z.infer<typeof orientationSchema>;
+
+export const aspectSchema = z.enum(["3:4", "4:3", "1:1"]);
+export type Aspect = z.infer<typeof aspectSchema>;
+
+export const productTypeSchema = z.enum(["poster", "canvas"]);
+export type TemplateProductType = z.infer<typeof productTypeSchema>;
+
+export const mapShapeSchema = z.enum(["rect", "square", "circle", "heart"]);
+export type MapShape = z.infer<typeof mapShapeSchema>;
+
+export const imageFitSchema = z.enum(["cover", "contain"]);
+export const imageShapeSchema = z.enum(["rect", "square", "circle"]);
+export const textAlignSchema = z.enum(["left", "center", "right"]);
+export const lineOrientationSchema = z.enum(["horizontal", "vertical"]);
+
+// Hex string `#RRGGBB`. We keep this loose on purpose — the editor enforces
+// the picker, so a free-form hex is enough at the schema level.
+export const hexColorSchema = z
+  .string()
+  .regex(/^#([0-9a-fA-F]{6})$/u, "Must be a #RRGGBB hex colour");
+
+// ---------- locks ----------
+// Every layer carries the same lock surface. Defaults are set per layer-type
+// where it makes sense (e.g. text font usually stays admin-controlled).
+export const layerLocksSchema = z.object({
+  position: z.boolean(),
+  size: z.boolean(),
+  shape: z.boolean(),
+  content: z.boolean(),
+  font: z.boolean(),
+  visibility: z.boolean(),
+  style: z.boolean(),
+});
+export type LayerLocks = z.infer<typeof layerLocksSchema>;
+
+export const defaultLocks = (overrides: Partial<LayerLocks> = {}): LayerLocks => ({
+  position: true,
+  size: true,
+  shape: true,
+  content: false,
+  font: true,
+  visibility: true,
+  style: true,
+  ...overrides,
+});
+
+// ---------- per-type defaults ----------
+export const mapDefaultsSchema = z.object({
+  shape: mapShapeSchema,
+  styleId: z.string().min(1),
+  center: z.tuple([z.number(), z.number()]), // [lng, lat]
+  zoom: z.number().min(0).max(22),
+  showLabels: z.boolean(),
+});
+export type MapDefaults = z.infer<typeof mapDefaultsSchema>;
+
+export const imageDefaultsSchema = z.object({
+  url: z.string().url().optional(),
+  fit: imageFitSchema,
+  shape: imageShapeSchema,
+});
+export type ImageDefaults = z.infer<typeof imageDefaultsSchema>;
+
+export const textDefaultsSchema = z.object({
+  text: z.string(),
+  font: z.string().min(1),
+  fontSizePct: z.number().positive().max(100),
+  align: textAlignSchema,
+  color: hexColorSchema,
+});
+export type TextDefaults = z.infer<typeof textDefaultsSchema>;
+
+export const lineDefaultsSchema = z.object({
+  orientation: lineOrientationSchema,
+  thicknessMm: z.number().positive().max(50),
+  color: hexColorSchema,
+});
+export type LineDefaults = z.infer<typeof lineDefaultsSchema>;
+
+export const marginDefaultsSchema = z.object({
+  thicknessMm: z.number().positive().max(100),
+  color: hexColorSchema,
+});
+export type MarginDefaults = z.infer<typeof marginDefaultsSchema>;
+
+// ---------- layer base + discriminated union ----------
+const layerBase = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  xPct: z.number().min(0).max(100),
+  yPct: z.number().min(0).max(100),
+  wPct: z.number().min(0).max(100),
+  hPct: z.number().min(0).max(100),
+  rotation: z.number().min(-360).max(360).default(0),
+  zIndex: z.number().int(),
+  locks: layerLocksSchema,
+});
+
+export const mapLayerSchema = layerBase.extend({
+  type: z.literal("map"),
+  defaults: mapDefaultsSchema,
+});
+export const imageLayerSchema = layerBase.extend({
+  type: z.literal("image"),
+  defaults: imageDefaultsSchema,
+});
+export const textLayerSchema = layerBase.extend({
+  type: z.literal("text"),
+  defaults: textDefaultsSchema,
+});
+export const lineLayerSchema = layerBase.extend({
+  type: z.literal("line"),
+  defaults: lineDefaultsSchema,
+});
+export const marginLayerSchema = layerBase.extend({
+  type: z.literal("margin"),
+  defaults: marginDefaultsSchema,
+});
+
+export const layerSchema = z.discriminatedUnion("type", [
+  mapLayerSchema,
+  imageLayerSchema,
+  textLayerSchema,
+  lineLayerSchema,
+  marginLayerSchema,
+]);
+export type TemplateLayer = z.infer<typeof layerSchema>;
+export type LayerType = TemplateLayer["type"];
+
+// ---------- layout per orientation ----------
+export const orientationLayoutSchema = z.object({
+  aspect: aspectSchema,
+  background: z.object({ color: hexColorSchema }),
+  layers: z.array(layerSchema),
+});
+export type OrientationLayout = z.infer<typeof orientationLayoutSchema>;
+
+export const sizeOverrideSchema = z.object({
+  portrait: orientationLayoutSchema.partial({ aspect: true, background: true }).optional(),
+  landscape: orientationLayoutSchema.partial({ aspect: true, background: true }).optional(),
+});
+export type SizeOverride = z.infer<typeof sizeOverrideSchema>;
+
+// ---------- product options (replaces old `supports` block) ----------
+const posterOptionsSchema = z.object({
+  enabled: z.boolean(),
+  allowedSizes: z.array(z.string()),
+  allowedFrames: z.array(z.string()),
+});
+const canvasOptionsSchema = z.object({
+  enabled: z.boolean(),
+  allowedSizes: z.array(z.string()),
+  allowedDepths: z.array(z.string()),
+});
+export const productOptionsSchema = z.object({
+  poster: posterOptionsSchema.optional(),
+  canvas: canvasOptionsSchema.optional(),
+});
+export type ProductOptions = z.infer<typeof productOptionsSchema>;
+
+// ---------- root template ----------
+export const templateSchema = z
+  .object({
+    version: z.literal(1),
+    publishedAt: z.string().datetime().nullable().optional(),
+    productOptions: productOptionsSchema,
+    orientations: z.array(orientationSchema).min(1),
+    defaultLayout: z.object({
+      portrait: orientationLayoutSchema,
+      landscape: orientationLayoutSchema,
+    }),
+    sizeOverrides: z.record(z.string(), sizeOverrideSchema).default({}),
+  })
+  .superRefine((tpl, ctx) => {
+    const anyEnabled =
+      (tpl.productOptions.poster?.enabled ?? false) ||
+      (tpl.productOptions.canvas?.enabled ?? false);
+    if (!anyEnabled) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "At least one product type must be enabled",
+        path: ["productOptions"],
+      });
+    }
+    for (const key of ["poster", "canvas"] as const) {
+      const opt = tpl.productOptions[key];
+      if (opt?.enabled && opt.allowedSizes.length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${key} is enabled but has no allowedSizes`,
+          path: ["productOptions", key, "allowedSizes"],
+        });
+      }
+    }
+  });
+
+export type Template = z.infer<typeof templateSchema>;
+
+/**
+ * `safeParse` + return either a typed template or a structured error report.
+ * Use this at all read boundaries (loadConfig, edge function, snapshot).
+ */
+export function parseTemplate(value: unknown):
+  | { ok: true; template: Template }
+  | { ok: false; error: z.ZodError } {
+  const r = templateSchema.safeParse(value);
+  return r.success ? { ok: true, template: r.data } : { ok: false, error: r.error };
+}
+
+export function isEmptyTemplate(value: unknown): boolean {
+  if (!value || typeof value !== "object") return true;
+  const v = value as Record<string, unknown>;
+  return Object.keys(v).length === 0;
+}
