@@ -13,27 +13,39 @@ interface ApplyPlaceArgs {
 
 export type MapShape = "rect" | "square" | "circle" | "heart";
 
+export interface MapLayerValue {
+  kind: "map";
+  center: [number, number];
+  zoom: number;
+  styleId: string;
+  shape: MapShape;
+  showLabels: boolean;
+  placeName: string;
+  city?: string;
+  country?: string;
+}
+
+export interface TextLayerValue {
+  kind: "text";
+  text: string;
+  font: string;
+  visible: boolean;
+  isCustom: boolean;
+}
+
+export type LayerValue = MapLayerValue | TextLayerValue;
+
 interface EditorState {
   config: ProductConfig | null;
   template: Template | null;
   productOptions: ProductOptions | null;
 
-  // map
-  mapCenter: [number, number]; // [lng, lat]
-  mapZoom: number;
-  mapStyleId: string;
-  placeName: string;
-  city?: string;
-  country?: string;
-  showLabels: boolean;
-  mapShape: MapShape;
-  posterBgColor: string;
+  // Per-layer values keyed by layer id (covers map + text layers).
+  layerValues: Record<string, LayerValue>;
 
-  // text
-  text: string;
-  textFont: string;
-  textVisible: boolean;
-  textIsCustom: boolean;
+  // Global background (one per layout). Other map/text values now live in
+  // `layerValues`; the fields below are derived getters for legacy callers.
+  posterBgColor: string;
 
   // format
   size: string | null;
@@ -46,24 +58,39 @@ interface EditorState {
   photoPreviewUrl: string | null;
   aiPrintFileUrl: string | null;
 
-  // setters
+  // ---------- setters ----------
   setConfig: (c: ProductConfig) => void;
-  setMapCenter: (c: [number, number]) => void;
-  setMapZoom: (z: number) => void;
-  setMapStyleId: (s: string) => void;
-  setPlaceName: (n: string) => void;
-  setShowLabels: (v: boolean) => void;
-  setMapShape: (s: MapShape) => void;
   setPosterBgColor: (c: string) => void;
-  setText: (t: string) => void;
-  setTextFont: (f: string) => void;
-  setTextVisible: (v: boolean) => void;
   setSize: (s: string) => void;
   setVariant: (v: string) => void;
   setOrientation: (o: Orientation) => void;
   setPhotoSource: (file: File | null, previewUrl: string | null) => void;
   setAiPrintFileUrl: (url: string | null) => void;
   resetDesignSource: () => void;
+
+  // Per-layer setters
+  setLayerMapCenter: (id: string, c: [number, number]) => void;
+  setLayerMapZoom: (id: string, z: number) => void;
+  setLayerMapStyle: (id: string, s: string) => void;
+  setLayerMapShape: (id: string, s: MapShape) => void;
+  setLayerShowLabels: (id: string, v: boolean) => void;
+  applyPlaceToLayer: (id: string, args: ApplyPlaceArgs) => void;
+  updateMapLayerFromPan: (id: string, args: ApplyPlaceArgs) => void;
+  setLayerText: (id: string, t: string) => void;
+  setLayerTextFont: (id: string, f: string) => void;
+  setLayerTextVisible: (id: string, v: boolean) => void;
+
+  // ---------- legacy globals (derived getters; mutators apply to first layer) ----------
+  // These setters/getters keep older code (EditorPage cart payload, snapshot
+  // pipeline, etc.) working unchanged while we migrate to per-layer everywhere.
+  setMapCenter: (c: [number, number]) => void;
+  setMapZoom: (z: number) => void;
+  setMapStyleId: (s: string) => void;
+  setShowLabels: (v: boolean) => void;
+  setMapShape: (s: MapShape) => void;
+  setText: (t: string) => void;
+  setTextFont: (f: string) => void;
+  setTextVisible: (v: boolean) => void;
   applyPlace: (args: ApplyPlaceArgs) => void;
   updateFromMap: (args: ApplyPlaceArgs) => void;
 
@@ -71,6 +98,22 @@ interface EditorState {
   currentPrice: () => number;
   currentLayout: () => ProductConfig["layouts"]["portrait"] | null;
   templateLayers: () => TemplateLayer[];
+  firstMapLayerId: () => string | null;
+  firstTextLayerId: () => string | null;
+  getMapValue: (id: string) => MapLayerValue | null;
+  getTextValue: (id: string) => TextLayerValue | null;
+  // Legacy mirrors of "first map / first text" for backward compat reads.
+  mapCenter: [number, number];
+  mapZoom: number;
+  mapStyleId: string;
+  mapShape: MapShape;
+  showLabels: boolean;
+  placeName: string;
+  city?: string;
+  country?: string;
+  text: string;
+  textFont: string;
+  textVisible: boolean;
 }
 
 function buildAutoText(args: ApplyPlaceArgs): string {
@@ -81,24 +124,62 @@ function buildAutoText(args: ApplyPlaceArgs): string {
   return [cityLine, countryLine, coordLine].filter(Boolean).join("\n");
 }
 
+function hydrateLayerValues(template: Template, orientation: Orientation): Record<string, LayerValue> {
+  const layout = template.defaultLayout[orientation];
+  const out: Record<string, LayerValue> = {};
+  if (!layout) return out;
+  for (const l of layout.layers) {
+    if (l.type === "map") {
+      out[l.id] = {
+        kind: "map",
+        center: [l.defaults.center[0], l.defaults.center[1]],
+        zoom: l.defaults.zoom,
+        styleId: l.defaults.styleId,
+        shape: l.defaults.shape as MapShape,
+        showLabels: l.defaults.showLabels,
+        placeName: "",
+      };
+    } else if (l.type === "text") {
+      out[l.id] = {
+        kind: "text",
+        text: l.defaults.text,
+        font: l.defaults.font,
+        visible: true,
+        isCustom: false,
+      };
+    }
+  }
+  return out;
+}
+
+/** Recompute legacy "first map / first text" mirrors from layerValues. */
+function mirrorLegacy(state: Pick<EditorState, "template" | "orientation" | "layerValues">) {
+  const layout = state.template?.defaultLayout[state.orientation];
+  const firstMap = layout?.layers.find((l) => l.type === "map");
+  const firstText = layout?.layers.find((l) => l.type === "text");
+  const m = firstMap ? (state.layerValues[firstMap.id] as MapLayerValue | undefined) : undefined;
+  const t = firstText ? (state.layerValues[firstText.id] as TextLayerValue | undefined) : undefined;
+  return {
+    mapCenter: m?.center ?? ([18.0686, 59.3293] as [number, number]),
+    mapZoom: m?.zoom ?? 12,
+    mapStyleId: m?.styleId ?? "light-v11",
+    mapShape: m?.shape ?? ("rect" as MapShape),
+    showLabels: m?.showLabels ?? false,
+    placeName: m?.placeName ?? "",
+    city: m?.city,
+    country: m?.country,
+    text: t?.text ?? "",
+    textFont: t?.font ?? "Inter",
+    textVisible: t?.visible ?? true,
+  };
+}
+
 export const useEditorStore = create<EditorState>((set, get) => ({
   config: null,
   template: null,
   productOptions: null,
-  mapCenter: [18.0686, 59.3293], // Stockholm
-  mapZoom: 12,
-  mapStyleId: "light-v11",
-  placeName: "Stockholm, Sverige",
-  city: "Stockholm",
-  country: "Sverige",
-  showLabels: false,
-  mapShape: "rect",
+  layerValues: {},
   posterBgColor: "#EFE7D6",
-
-  text: "STOCKHOLM\nSverige\n59.3293°N · 18.0686°E",
-  textFont: "Inter",
-  textVisible: true,
-  textIsCustom: false,
 
   size: null,
   variant: null,
@@ -109,22 +190,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   photoPreviewUrl: null,
   aiPrintFileUrl: null,
 
+  // legacy mirrors (initial values, replaced once a config is loaded)
+  mapCenter: [18.0686, 59.3293],
+  mapZoom: 12,
+  mapStyleId: "light-v11",
+  mapShape: "rect",
+  showLabels: false,
+  placeName: "",
+  city: undefined,
+  country: undefined,
+  text: "",
+  textFont: "Inter",
+  textVisible: true,
+
   setConfig: (config) => {
-    // Preserve all design state across product switches (poster <-> canvas).
-    // Only update fields that are no longer valid for the new product.
     const state = get();
     const prevSize = state.size;
     const prevVariant = state.variant;
-    const prevStyle = state.mapStyleId;
-    const prevFont = state.textFont;
 
-    // Resolve the published template — this is the source of truth for what
-    // the customer sees and is allowed to change.
     const rawTemplate = (config as unknown as { template?: unknown }).template;
     const { template } = resolveTemplate(config, rawTemplate);
     const productOptions = template.productOptions;
 
-    // Size: keep if still available + allowed by template, else first allowed
     const allowedSizesForType =
       config.product_type === "canvas"
         ? productOptions.canvas?.allowedSizes ?? []
@@ -136,7 +223,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const nextSize = sizeStillValid ? prevSize : allowedFiltered[0]?.size ?? config.sizes[0]?.size ?? null;
     const nextSizeDef = config.sizes.find((s) => s.size === nextSize);
 
-    // Variant: keep if still available within the chosen size + allowed by template
     const allowedVariantsForType =
       config.product_type === "canvas"
         ? productOptions.canvas?.allowedDepths ?? []
@@ -149,66 +235,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ? prevVariant
       : variantsForSize[0]?.name ?? nextSizeDef?.variants[0]?.name ?? null;
 
-    // Hydrate map/text state from the FIRST map/text layer in the active
-    // orientation IF the customer hasn't already customised these values.
-    // This is what makes mall-redigeringen i admin slå igenom i kund-vyn.
     const orientation = state.orientation;
-    const layout = template.defaultLayout[orientation];
-    const firstMap = layout?.layers.find((l) => l.type === "map");
-    const firstText = layout?.layers.find((l) => l.type === "text");
-
     const isFirstLoad = state.config === null;
-    const mapDefaults = firstMap?.type === "map" ? firstMap.defaults : null;
-    const textDefaults = firstText?.type === "text" ? firstText.defaults : null;
+    const layerValues = hydrateLayerValues(template, orientation);
+    const layout = template.defaultLayout[orientation];
 
-    // Map style: prefer template default on first load, else keep user's pick if supported
-    const styleStillValid = config.map_styles.includes(prevStyle);
-    const nextStyle = isFirstLoad && mapDefaults
-      ? mapDefaults.styleId
-      : styleStillValid
-      ? prevStyle
-      : mapDefaults?.styleId ?? config.map_styles[0] ?? prevStyle;
-
-    // Font: prefer template default on first load, else keep if supported
-    const fontStillValid = config.text_config.fonts?.includes(prevFont);
-    const nextFont = isFirstLoad && textDefaults
-      ? textDefaults.font
-      : fontStillValid
-      ? prevFont
-      : textDefaults?.font ?? config.text_config.defaultFont ?? prevFont;
-
-    set({
+    const next = {
       config,
       template,
       productOptions,
       size: nextSize,
       variant: nextVariant,
-      mapStyleId: nextStyle,
-      textFont: nextFont,
-      // Hydrate location, zoom, shape, labels, bg from template on first load
-      ...(isFirstLoad && mapDefaults
-        ? {
-            mapCenter: [mapDefaults.center[0], mapDefaults.center[1]] as [number, number],
-            mapZoom: mapDefaults.zoom,
-            mapShape: mapDefaults.shape as MapShape,
-            showLabels: mapDefaults.showLabels,
-          }
-        : {}),
+      layerValues,
       ...(isFirstLoad && layout?.background?.color
         ? { posterBgColor: layout.background.color }
         : {}),
-    });
+    };
+    set({ ...next, ...mirrorLegacy({ template, orientation, layerValues }) });
   },
-  setMapCenter: (mapCenter) => set({ mapCenter }),
-  setMapZoom: (mapZoom) => set({ mapZoom }),
-  setMapStyleId: (mapStyleId) => set({ mapStyleId }),
-  setPlaceName: (placeName) => set({ placeName }),
-  setShowLabels: (showLabels) => set({ showLabels }),
-  setMapShape: (mapShape) => set({ mapShape }),
+
   setPosterBgColor: (posterBgColor) => set({ posterBgColor }),
-  setText: (text) => set({ text, textIsCustom: true }),
-  setTextFont: (textFont) => set({ textFont }),
-  setTextVisible: (textVisible) => set({ textVisible }),
   setSize: (size) => {
     const config = get().config;
     if (!config) return set({ size });
@@ -221,7 +267,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
   setVariant: (variant) => set({ variant }),
-  setOrientation: (orientation) => set({ orientation }),
+  setOrientation: (orientation) => {
+    const { template } = get();
+    if (!template) return set({ orientation });
+    const layerValues = hydrateLayerValues(template, orientation);
+    set({ orientation, layerValues, ...mirrorLegacy({ template, orientation, layerValues }) });
+  },
 
   setPhotoSource: (file, previewUrl) => {
     set({
@@ -237,28 +288,67 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   resetDesignSource: () =>
     set({ designSource: "map", photoFile: null, photoPreviewUrl: null, aiPrintFileUrl: null }),
 
+  // ---------- per-layer setters ----------
+  setLayerMapCenter: (id, c) => updateMap(set, get, id, { center: c }),
+  setLayerMapZoom: (id, z) => updateMap(set, get, id, { zoom: z }),
+  setLayerMapStyle: (id, s) => updateMap(set, get, id, { styleId: s }),
+  setLayerMapShape: (id, s) => updateMap(set, get, id, { shape: s }),
+  setLayerShowLabels: (id, v) => updateMap(set, get, id, { showLabels: v }),
+
+  applyPlaceToLayer: (id, args) => {
+    applyPlaceInternal(set, get, id, args, /* moveCenter */ true);
+  },
+  updateMapLayerFromPan: (id, args) => {
+    applyPlaceInternal(set, get, id, args, /* moveCenter */ false);
+  },
+
+  setLayerText: (id, t) => updateText(set, get, id, { text: t, isCustom: true }),
+  setLayerTextFont: (id, f) => updateText(set, get, id, { font: f }),
+  setLayerTextVisible: (id, v) => updateText(set, get, id, { visible: v }),
+
+  // ---------- legacy globals → operate on first layer ----------
+  setMapCenter: (c) => {
+    const id = get().firstMapLayerId();
+    if (id) updateMap(set, get, id, { center: c });
+  },
+  setMapZoom: (z) => {
+    const id = get().firstMapLayerId();
+    if (id) updateMap(set, get, id, { zoom: z });
+  },
+  setMapStyleId: (s) => {
+    const id = get().firstMapLayerId();
+    if (id) updateMap(set, get, id, { styleId: s });
+  },
+  setShowLabels: (v) => {
+    const id = get().firstMapLayerId();
+    if (id) updateMap(set, get, id, { showLabels: v });
+  },
+  setMapShape: (s) => {
+    const id = get().firstMapLayerId();
+    if (id) updateMap(set, get, id, { shape: s });
+  },
+  setText: (t) => {
+    const id = get().firstTextLayerId();
+    if (id) updateText(set, get, id, { text: t, isCustom: true });
+  },
+  setTextFont: (f) => {
+    const id = get().firstTextLayerId();
+    if (id) updateText(set, get, id, { font: f });
+  },
+  setTextVisible: (v) => {
+    const id = get().firstTextLayerId();
+    if (id) updateText(set, get, id, { visible: v });
+  },
   applyPlace: (args) => {
-    const isCustom = get().textIsCustom;
-    set({
-      mapCenter: args.center,
-      placeName: args.placeName,
-      city: args.city,
-      country: args.country,
-      ...(isCustom ? {} : { text: buildAutoText(args) }),
-    });
+    const id = get().firstMapLayerId();
+    if (id) applyPlaceInternal(set, get, id, args, true);
   },
-
-  // Used when user pans/zooms map: don't move center (already moved), just refresh metadata
   updateFromMap: (args) => {
-    const isCustom = get().textIsCustom;
-    set({
-      placeName: args.placeName,
-      city: args.city,
-      country: args.country,
-      ...(isCustom ? {} : { text: buildAutoText(args) }),
-    });
+    const id = get().firstMapLayerId();
+    if (id) applyPlaceInternal(set, get, id, args, false);
   },
 
+  // ---------- computed ----------
   currentPrice: () => {
     const { config, size, variant } = get();
     if (!config || !size || !variant) return 0;
@@ -274,4 +364,95 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!template) return [];
     return [...template.defaultLayout[orientation].layers].sort((a, b) => a.zIndex - b.zIndex);
   },
+  firstMapLayerId: () => {
+    const layers = get().templateLayers();
+    return layers.find((l) => l.type === "map")?.id ?? null;
+  },
+  firstTextLayerId: () => {
+    const layers = get().templateLayers();
+    return layers.find((l) => l.type === "text")?.id ?? null;
+  },
+  getMapValue: (id) => {
+    const v = get().layerValues[id];
+    return v && v.kind === "map" ? v : null;
+  },
+  getTextValue: (id) => {
+    const v = get().layerValues[id];
+    return v && v.kind === "text" ? v : null;
+  },
 }));
+
+// ---------- internal helpers ----------
+type SetFn = (partial: Partial<EditorState> | ((s: EditorState) => Partial<EditorState>)) => void;
+type GetFn = () => EditorState;
+
+function updateMap(set: SetFn, get: GetFn, id: string, patch: Partial<MapLayerValue>) {
+  const state = get();
+  const cur = state.layerValues[id];
+  if (!cur || cur.kind !== "map") return;
+  const next: MapLayerValue = { ...cur, ...patch };
+  const layerValues = { ...state.layerValues, [id]: next };
+  set({ layerValues, ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues }) });
+}
+
+function updateText(set: SetFn, get: GetFn, id: string, patch: Partial<TextLayerValue>) {
+  const state = get();
+  const cur = state.layerValues[id];
+  if (!cur || cur.kind !== "text") return;
+  const next: TextLayerValue = { ...cur, ...patch };
+  const layerValues = { ...state.layerValues, [id]: next };
+  set({ layerValues, ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues }) });
+}
+
+function applyPlaceInternal(
+  set: SetFn,
+  get: GetFn,
+  mapId: string,
+  args: ApplyPlaceArgs,
+  moveCenter: boolean,
+) {
+  const state = get();
+  const cur = state.layerValues[mapId];
+  if (!cur || cur.kind !== "map") return;
+  const nextMap: MapLayerValue = {
+    ...cur,
+    ...(moveCenter ? { center: args.center } : {}),
+    placeName: args.placeName,
+    city: args.city,
+    country: args.country,
+  };
+
+  // Update any text layers linked to this map (only when not user-customised).
+  const layers = state.template
+    ? state.template.defaultLayout[state.orientation].layers
+    : [];
+  const newLayerValues: Record<string, LayerValue> = {
+    ...state.layerValues,
+    [mapId]: nextMap,
+  };
+  // Backward-compat: if no text layer in this template has any explicit
+  // linkedMapLayerId, treat the FIRST text layer as auto-linked to the FIRST
+  // map layer so single-layer legacy templates keep updating text-on-place.
+  const anyExplicitLink = layers.some(
+    (l) => l.type === "text" && typeof l.defaults.linkedMapLayerId === "string",
+  );
+  const firstMapId = layers.find((l) => l.type === "map")?.id ?? null;
+  const firstTextId = layers.find((l) => l.type === "text")?.id ?? null;
+
+  for (const l of layers) {
+    if (l.type !== "text") continue;
+    const linked = l.defaults.linkedMapLayerId;
+    const isLinked =
+      linked === mapId ||
+      (!anyExplicitLink && firstMapId === mapId && firstTextId === l.id);
+    if (!isLinked) continue;
+    const tv = state.layerValues[l.id];
+    if (!tv || tv.kind !== "text" || tv.isCustom) continue;
+    newLayerValues[l.id] = { ...tv, text: buildAutoText(args) };
+  }
+
+  set({
+    layerValues: newLayerValues,
+    ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues: newLayerValues }),
+  });
+}

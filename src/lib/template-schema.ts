@@ -78,6 +78,10 @@ export const textDefaultsSchema = z.object({
   fontSizePct: z.number().positive().max(100),
   align: textAlignSchema,
   color: hexColorSchema,
+  // When set, this text auto-updates to match the selected place of the
+  // referenced map layer (city/country/coords). Customer manual edits override
+  // the auto-text until the field is cleared.
+  linkedMapLayerId: z.string().nullable().optional(),
 });
 export type TextDefaults = z.infer<typeof textDefaultsSchema>;
 

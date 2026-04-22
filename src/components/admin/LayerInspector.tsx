@@ -22,6 +22,7 @@ import type {
 interface Props {
   config: ProductConfig;
   layer: TemplateLayer | null;
+  allLayers: TemplateLayer[];
   onChange: (next: TemplateLayer) => void;
 }
 
@@ -35,7 +36,7 @@ const LOCK_LABELS: Array<{ key: keyof LayerLocks; label: string }> = [
   { key: "style", label: "Stil" },
 ];
 
-export default function LayerInspector({ config, layer, onChange }: Props) {
+export default function LayerInspector({ config, layer, allLayers, onChange }: Props) {
   if (!layer) {
     return (
       <p className="text-xs text-muted-foreground py-4 text-center">
@@ -241,6 +242,31 @@ export default function LayerInspector({ config, layer, onChange }: Props) {
               onChange={(e) => updateDefaults({ color: e.target.value })}
             />
           </Field>
+          <Field label="Länka till karta">
+            <Select
+              value={layer.defaults.linkedMapLayerId ?? "__none__"}
+              onValueChange={(v) =>
+                updateDefaults({ linkedMapLayerId: v === "__none__" ? null : v })
+              }
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Ingen (statisk text)</SelectItem>
+                {allLayers
+                  .filter((l) => l.type === "map")
+                  .map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.name || m.id}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <p className="text-[11px] text-muted-foreground -mt-2">
+            När länkad uppdateras texten automatiskt med stad / koordinater när
+            kunden ändrar plats på den valda kartan (om kunden inte har ändrat
+            texten manuellt).
+          </p>
         </div>
       )}
 

@@ -15,13 +15,19 @@
 import mapboxgl from "mapbox-gl";
 import { getMapboxToken, styleUrl } from "./mapbox";
 import type { Template, TemplateLayer } from "./template-schema";
+import type { LayerValue } from "@/stores/editorStore";
 
 export interface TemplateSnapshotInput {
   template: Template;
   orientation: "portrait" | "landscape";
   size: string; // "30x40"
 
-  // Live customer state — overrides defaults on the FIRST map/text layer.
+  // Per-layer values keyed by layer id. When provided, these override the
+  // legacy live* fields. Falls back to layer.defaults when missing.
+  layerValues?: Record<string, LayerValue>;
+
+  // Legacy live customer state — overrides defaults on the FIRST map/text
+  // layer when `layerValues` is not supplied.
   liveMapCenter: [number, number];
   liveMapZoom: number;
   liveMapStyleId: string;
@@ -342,8 +348,10 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
   const layout = input.template.defaultLayout[input.orientation];
   const layers = [...layout.layers].sort((a, b) => a.zIndex - b.zIndex);
 
-  // First map / text layer = the LIVE one (uses customer state)
+  // First map / text layer — used when no `layerValues` is provided so legacy
+  // callers (cart pipeline) still produce the same output.
   const liveMapId = layers.find((l) => l.type === "map")?.id ?? null;
+  const liveTextId = layers.find((l) => l.type === "text")?.id ?? null;
 
   for (const layer of layers) {
     const rect = {
@@ -354,17 +362,28 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
     };
 
     if (layer.type === "map") {
+      const lv = input.layerValues?.[layer.id];
+      const mv = lv && lv.kind === "map" ? lv : null;
       const isLive = layer.id === liveMapId;
-      await drawMapLayer(ctx, rect, {
-        center: isLive ? input.liveMapCenter : [layer.defaults.center[0]!, layer.defaults.center[1]!],
-        zoom: isLive ? input.liveMapZoom : layer.defaults.zoom,
-        styleId: isLive ? input.liveMapStyleId : layer.defaults.styleId,
-        showLabels: isLive ? input.liveShowLabels : layer.defaults.showLabels,
-        shape: isLive ? input.liveMapShape : layer.defaults.shape,
-      });
+      const center: [number, number] = mv
+        ? mv.center
+        : isLive
+        ? input.liveMapCenter
+        : [layer.defaults.center[0]!, layer.defaults.center[1]!];
+      const zoom = mv ? mv.zoom : isLive ? input.liveMapZoom : layer.defaults.zoom;
+      const styleId = mv ? mv.styleId : isLive ? input.liveMapStyleId : layer.defaults.styleId;
+      const showLabels = mv ? mv.showLabels : isLive ? input.liveShowLabels : layer.defaults.showLabels;
+      const shape = mv ? mv.shape : isLive ? input.liveMapShape : layer.defaults.shape;
+      await drawMapLayer(ctx, rect, { center, zoom, styleId, showLabels, shape });
     } else if (layer.type === "text") {
-      if (!input.liveTextVisible) continue;
-      drawTextLayer(ctx, rect, layer, input.liveText, input.liveTextFont);
+      const lv = input.layerValues?.[layer.id];
+      const tv = lv && lv.kind === "text" ? lv : null;
+      const isLive = layer.id === liveTextId;
+      const visible = tv ? tv.visible : isLive ? input.liveTextVisible : true;
+      if (!visible) continue;
+      const text = tv ? tv.text : isLive ? input.liveText : layer.defaults.text;
+      const font = tv ? tv.font : isLive ? input.liveTextFont : layer.defaults.font;
+      drawTextLayer(ctx, rect, layer, text, font);
     } else if (layer.type === "image") {
       try {
         await drawImageLayer(ctx, rect, layer);

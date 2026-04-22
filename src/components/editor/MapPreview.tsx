@@ -50,23 +50,14 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   const heartIdRef = useRef(`heart-${Math.random().toString(36).slice(2)}`);
 
   const {
-    mapCenter,
-    mapZoom,
-    mapStyleId,
-    text,
-    textFont,
-    textVisible,
     orientation,
     size,
-    showLabels,
-    mapShape,
     posterBgColor,
     templateLayers,
+    layerValues,
   } = useEditorStore();
 
   const layers = templateLayers();
-  // First map layer is the LIVE one bound to global pan/zoom state.
-  const liveMapId = layers.find((l) => l.type === "map")?.id ?? null;
 
   // Outer poster/canvas frame
   const sizeCm = parseCm(size);
@@ -163,28 +154,27 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
           };
 
           if (l.type === "map") {
-            const isLive = l.id === liveMapId;
-            // Live layer reads shape/style/etc from store (customer can change);
-            // static layers stay locked to their template defaults.
-            const effectiveShape = isLive ? mapShape : l.defaults.shape;
-            const effectiveStyleId = isLive ? mapStyleId : l.defaults.styleId;
-            const effectiveCenter: [number, number] = isLive
-              ? mapCenter
-              : [l.defaults.center[0]!, l.defaults.center[1]!];
-            const effectiveZoom = isLive ? mapZoom : l.defaults.zoom;
-            const effectiveLabels = isLive ? showLabels : l.defaults.showLabels;
+            const v = layerValues[l.id];
+            const mv = v && v.kind === "map" ? v : null;
+            const effectiveShape = mv?.shape ?? (l.defaults.shape as "rect" | "square" | "circle" | "heart");
+            const effectiveStyleId = mv?.styleId ?? l.defaults.styleId;
+            const effectiveCenter: [number, number] = mv?.center ?? [
+              l.defaults.center[0]!,
+              l.defaults.center[1]!,
+            ];
+            const effectiveZoom = mv?.zoom ?? l.defaults.zoom;
+            const effectiveLabels = mv?.showLabels ?? l.defaults.showLabels;
             const clip = shapeClipPath(effectiveShape, heartIdRef.current);
             return (
               <div key={l.id} style={wrapStyle}>
                 <MapLayerInstance
-                  defaults={l.defaults}
-                  shape={effectiveShape as "rect" | "square" | "circle" | "heart"}
+                  layerId={l.id}
+                  shape={effectiveShape}
                   styleId={effectiveStyleId}
                   center={effectiveCenter}
                   zoom={effectiveZoom}
                   showLabels={effectiveLabels}
-                  live={isLive}
-                  interactive={isLive && !l.locks.position}
+                  interactive={!l.locks.position}
                   clipPath={clip}
                 />
               </div>
@@ -192,15 +182,19 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
           }
 
           if (l.type === "text") {
-            if (!textVisible) return null;
+            const v = layerValues[l.id];
+            const tv = v && v.kind === "text" ? v : null;
+            if (tv && !tv.visible) return null;
             const d = l.defaults;
+            const effectiveText = tv?.text ?? d.text;
+            const effectiveFont = tv?.font || d.font;
             return (
               <div
                 key={l.id}
                 className="absolute pointer-events-none whitespace-pre-line leading-tight"
                 style={{
                   ...wrapStyle,
-                  fontFamily: textFont || d.font,
+                  fontFamily: effectiveFont,
                   color: d.color,
                   textAlign: d.align,
                   fontSize: `calc(${rect.height}cqh * ${d.fontSizePct / 100})`,
@@ -212,7 +206,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
                   containerType: "size",
                 }}
               >
-                <span style={{ width: "100%" }}>{text || d.text || "Lägg till text…"}</span>
+                <span style={{ width: "100%" }}>{effectiveText || "Lägg till text…"}</span>
               </div>
             );
           }
