@@ -1,37 +1,44 @@
-// Admin designer page — Fas 1 scaffold.
+// Admin designer page — Fas 1.
 //
-// Sections (top→bottom):
-//   A. Produkt & varianter (ProductOptionsSection)
-//   B. Designyta (placeholder — drag & drop canvas comes next)
-//   C. Lager-lista (placeholder)
-//   D. Properties-panel (placeholder)
+// Layout:
+//   Header — back / title / Save draft / Publish / Visa som kund
+//   Section A — ProductOptionsSection (poster/canvas + sizes/frames/depths)
+//   Section B — Orientation tabs + tool palette + LayerCanvas (drag & drop)
+//   Section C — LayerList (sidebar) + LayerInspector (right panel)
 //
-// State lives entirely in this page for now (zustand split comes later when the
-// canvas + layer interactions land). Save / publish actions write to the
-// `template` jsonb column on `product_configs`.
-import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Loader2, Save, Send } from "lucide-react";
+// All template state lives here. Saving writes the whole `template` jsonb to
+// product_configs. Publish stamps `publishedAt` and runs zod validation.
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { ArrowLeft, Eye, Loader2, MapPin, Save, Send, Type } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { loadConfig, type ProductConfig } from "@/lib/product-config";
 import { resolveTemplate } from "@/lib/template-migrate";
 import {
   parseTemplate,
+  type LayerType,
+  type Orientation,
   type Template,
+  type TemplateLayer,
 } from "@/lib/template-schema";
+import { createLayer, moveLayer, normaliseZIndex } from "@/lib/layer-utils";
 import ProductOptionsSection from "@/components/admin/ProductOptionsSection";
+import LayerCanvas from "@/components/admin/LayerCanvas";
+import LayerList, { toggleAllLocks } from "@/components/admin/LayerList";
+import LayerInspector from "@/components/admin/LayerInspector";
 
 export default function DesignerPage() {
   const { handle } = useParams<{ handle: string }>();
-  const navigate = useNavigate();
-
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [config, setConfig] = useState<ProductConfig | null>(null);
   const [template, setTemplate] = useState<Template | null>(null);
+  const [orientation, setOrientation] = useState<Orientation>("portrait");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!handle) return;
@@ -43,7 +50,6 @@ export default function DesignerPage() {
         setLoading(false);
         return;
       }
-      // The DB row has both legacy fields + the new `template` jsonb.
       const raw = (cfg as unknown as { template?: unknown }).template;
       const { template: tpl, fellBack } = resolveTemplate(cfg, raw);
       if (fellBack) {
@@ -57,11 +63,66 @@ export default function DesignerPage() {
     })();
   }, [handle]);
 
-  async function persistTemplate(next: Template, opts: { publish: boolean }) {
-    if (!handle) return;
+  // Active orientation layout
+  const layout = template?.defaultLayout[orientation] ?? null;
+  const layers = useMemo(() => layout?.layers ?? [], [layout]);
+  const selectedLayer = useMemo(
+    () => layers.find((l) => l.id === selectedId) ?? null,
+    [layers, selectedId],
+  );
+
+  // ---------- mutators ----------
+  function setLayers(next: TemplateLayer[]) {
+    if (!template) return;
+    setTemplate({
+      ...template,
+      defaultLayout: {
+        ...template.defaultLayout,
+        [orientation]: { ...template.defaultLayout[orientation], layers: next },
+      },
+    });
+  }
+
+  function addLayer(type: LayerType) {
+    const nextLayer = createLayer(type, layers);
+    setLayers(normaliseZIndex([...layers, nextLayer]));
+    setSelectedId(nextLayer.id);
+  }
+
+  function updateLayer(updated: TemplateLayer) {
+    setLayers(layers.map((l) => (l.id === updated.id ? updated : l)));
+  }
+
+  function deleteLayer(id: string) {
+    setLayers(normaliseZIndex(layers.filter((l) => l.id !== id)));
+    if (selectedId === id) setSelectedId(null);
+  }
+
+  function reorder(id: string, direction: "up" | "down") {
+    setLayers(moveLayer(layers, id, direction));
+  }
+
+  function toggleVisibility(id: string) {
+    const target = layers.find((l) => l.id === id);
+    if (!target) return;
+    updateLayer({
+      ...target,
+      locks: { ...target.locks, visibility: !target.locks.visibility },
+    });
+  }
+
+  function toggleLockAll(id: string) {
+    const target = layers.find((l) => l.id === id);
+    if (!target) return;
+    updateLayer(toggleAllLocks(target));
+  }
+
+  // ---------- persist ----------
+  async function persistTemplate(opts: { publish: boolean }) {
+    if (!handle || !template) return;
     const finalTemplate: Template = opts.publish
-      ? { ...next, publishedAt: new Date().toISOString() }
-      : next;
+      ? { ...template, publishedAt: new Date().toISOString() }
+      : template;
 
     const parsed = parseTemplate(finalTemplate);
     if (parsed.ok !== true) {
@@ -93,7 +154,7 @@ export default function DesignerPage() {
     );
   }
 
-  if (!config || !template) {
+  if (!config || !template || !layout) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
         <p className="text-muted-foreground">Mall kunde inte laddas.</p>
@@ -106,7 +167,7 @@ export default function DesignerPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b sticky top-0 bg-background z-10">
+      <header className="border-b sticky top-0 bg-background z-20">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <Button asChild variant="ghost" size="icon">
@@ -123,10 +184,20 @@ export default function DesignerPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button asChild variant="ghost" size="sm">
+              <a
+                href={`/editor?handle=${handle}&preview=draft`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                Visa som kund
+              </a>
+            </Button>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => persistTemplate(template, { publish: false })}
+              onClick={() => persistTemplate({ publish: false })}
               disabled={saving}
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
@@ -134,7 +205,7 @@ export default function DesignerPage() {
             </Button>
             <Button
               size="sm"
-              onClick={() => persistTemplate(template, { publish: true })}
+              onClick={() => persistTemplate({ publish: true })}
               disabled={saving}
             >
               <Send className="h-4 w-4 mr-2" />
@@ -151,28 +222,59 @@ export default function DesignerPage() {
           onChange={(productOptions) => setTemplate({ ...template, productOptions })}
         />
 
-        <Card className="p-5">
-          <h2 className="text-base font-semibold mb-1">Designyta</h2>
-          <p className="text-xs text-muted-foreground mb-4">
-            Drag & drop-canvas med snap-to-grid och alignment-guides kommer i nästa steg.
-          </p>
-          <div className="aspect-[3/4] max-w-sm mx-auto rounded-md border border-dashed bg-muted/30 flex items-center justify-center text-sm text-muted-foreground">
-            Canvas placeholder
+        <Card className="p-5 space-y-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="text-base font-semibold">Designyta</h2>
+              <p className="text-xs text-muted-foreground">
+                Drag & drop · 5% snap · alignment-guides under drag.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Tabs value={orientation} onValueChange={(v) => setOrientation(v as Orientation)}>
+                <TabsList>
+                  <TabsTrigger value="portrait">Stående</TabsTrigger>
+                  <TabsTrigger value="landscape">Liggande</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <div className="h-6 w-px bg-border" />
+              <Button size="sm" variant="outline" onClick={() => addLayer("map")}>
+                <MapPin className="h-3.5 w-3.5 mr-1.5" />
+                Lägg till karta
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => addLayer("text")}>
+                <Type className="h-3.5 w-3.5 mr-1.5" />
+                Lägg till text
+              </Button>
+            </div>
           </div>
+
+          <LayerCanvas
+            aspect={layout.aspect}
+            background={layout.background.color}
+            layers={layers}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onChange={updateLayer}
+          />
         </Card>
 
-        <div className="grid gap-6 md:grid-cols-[1fr_1fr]">
+        <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
           <Card className="p-5">
-            <h2 className="text-base font-semibold mb-1">Lager</h2>
-            <p className="text-xs text-muted-foreground">
-              Lager-lista (zIndex, dölj/lås) implementeras i nästa steg.
-            </p>
+            <h2 className="text-base font-semibold mb-3">Lager</h2>
+            <LayerList
+              layers={layers}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onMove={reorder}
+              onToggleVisibility={toggleVisibility}
+              onToggleLockAll={toggleLockAll}
+              onDelete={deleteLayer}
+            />
           </Card>
           <Card className="p-5">
-            <h2 className="text-base font-semibold mb-1">Egenskaper</h2>
-            <p className="text-xs text-muted-foreground">
-              Defaults + locks per valt lager implementeras i nästa steg.
-            </p>
+            <h2 className="text-base font-semibold mb-3">Egenskaper</h2>
+            <LayerInspector config={config} layer={selectedLayer} onChange={updateLayer} />
           </Card>
         </div>
       </main>
