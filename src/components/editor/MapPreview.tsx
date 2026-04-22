@@ -50,23 +50,14 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   const heartIdRef = useRef(`heart-${Math.random().toString(36).slice(2)}`);
 
   const {
-    mapCenter,
-    mapZoom,
-    mapStyleId,
-    text,
-    textFont,
-    textVisible,
     orientation,
     size,
-    showLabels,
-    mapShape,
     posterBgColor,
     templateLayers,
+    layerValues,
   } = useEditorStore();
 
   const layers = templateLayers();
-  // First map layer is the LIVE one bound to global pan/zoom state.
-  const liveMapId = layers.find((l) => l.type === "map")?.id ?? null;
 
   // Outer poster/canvas frame
   const sizeCm = parseCm(size);
