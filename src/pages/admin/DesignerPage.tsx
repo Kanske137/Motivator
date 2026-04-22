@@ -64,7 +64,7 @@ export default function DesignerPage() {
       : next;
 
     const parsed = parseTemplate(finalTemplate);
-    if (!parsed.ok) {
+    if (parsed.ok !== true) {
       console.error(parsed.error);
       toast.error("Mallen är ogiltig", { description: parsed.error.issues[0]?.message });
       return;
