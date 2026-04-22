@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useEditorStore } from "@/stores/editorStore";
 import { getMapboxToken, reverseGeocode, styleUrl } from "@/lib/mapbox";
+import type { TemplateLayer } from "@/lib/template-schema";
 
 interface Props {
   frameColor?: string; // CSS color for border. Empty/undefined = no border.
@@ -24,20 +25,43 @@ function applyLabelVisibility(map: mapboxgl.Map, show: boolean) {
     try {
       const style = map.getStyle();
       if (!style?.layers) return;
-      let count = 0;
       for (const layer of style.layers) {
         if (layer.type === "symbol") {
           map.setLayoutProperty(layer.id, "visibility", show ? "visible" : "none");
-          count++;
         }
       }
-      console.log(`[MapPreview] labels ${show ? "ON" : "OFF"} (${count} symbol layers)`);
     } catch (e) {
       console.warn("[MapPreview] applyLabelVisibility failed", e);
     }
   };
   if (map.isStyleLoaded()) apply();
   else map.once("idle", apply);
+}
+
+/** Heart clipPath used for both map and image layers. Stable id per render. */
+function HeartClipDef({ id }: { id: string }) {
+  return (
+    <svg width="0" height="0" className="absolute pointer-events-none">
+      <defs>
+        <clipPath id={id} clipPathUnits="objectBoundingBox">
+          <path d="M0.5,1 C0.5,1 0,0.65 0,0.3 C0,0.1 0.2,0 0.35,0 C0.42,0 0.48,0.05 0.5,0.15 C0.52,0.05 0.58,0 0.65,0 C0.8,0 1,0.1 1,0.3 C1,0.65 0.5,1 0.5,1 Z" />
+        </clipPath>
+      </defs>
+    </svg>
+  );
+}
+
+function shapeClipPath(shape: string, heartId: string): string | undefined {
+  switch (shape) {
+    case "circle":
+      return "circle(50% at 50% 50%)";
+    case "heart":
+      return `url(#${heartId})`;
+    case "square":
+    case "rect":
+    default:
+      return undefined;
+  }
 }
 
 export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm = 0 }: Props) {
@@ -47,6 +71,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const programmaticRef = useRef(false);
   const reverseTimerRef = useRef<number | null>(null);
+  const heartIdRef = useRef(`heart-${Math.random().toString(36).slice(2)}`);
 
   const {
     mapCenter,
@@ -60,10 +85,18 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
     showLabels,
     mapShape,
     posterBgColor,
-    currentLayout,
+    templateLayers,
     updateFromMap,
   } = useEditorStore();
-  const layout = currentLayout();
+
+  const layers = templateLayers();
+
+  // Pick the first map layer to drive the live Mapbox instance position/shape.
+  // (Future: support multiple maps via per-layer instances.)
+  const mapLayer = useMemo<TemplateLayer | null>(
+    () => layers.find((l) => l.type === "map") ?? null,
+    [layers],
+  );
 
   // init map
   useEffect(() => {
@@ -151,7 +184,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
     if (mapRef.current) mapRef.current.setStyle(styleUrl(mapStyleId));
   }, [mapStyleId]);
 
-  // labels toggle (in case style already loaded)
+  // labels toggle
   useEffect(() => {
     if (mapRef.current) applyLabelVisibility(mapRef.current, showLabels);
   }, [showLabels]);
@@ -175,11 +208,9 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   useEffect(() => {
     setTimeout(() => mapRef.current?.resize(), 80);
     setTimeout(() => mapRef.current?.resize(), 320);
-  }, [orientation, size, mapShape]);
+  }, [orientation, size, mapShape, mapLayer?.xPct, mapLayer?.yPct, mapLayer?.wPct, mapLayer?.hPct]);
 
-  // Outer poster/canvas frame. For canvas (wrapCm>0) the editor renders the
-  // FULL print area (front + wrap on all sides) so users see what wraps onto
-  // the sides of the physical canvas.
+  // Outer poster/canvas frame
   const sizeCm = parseCm(size);
   const frontW = sizeCm ? (orientation === "portrait" ? Math.min(sizeCm.w, sizeCm.h) : Math.max(sizeCm.w, sizeCm.h)) : 30;
   const frontH = sizeCm ? (orientation === "portrait" ? Math.max(sizeCm.w, sizeCm.h) : Math.min(sizeCm.w, sizeCm.h)) : 40;
@@ -189,7 +220,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   const frontInsetX = wrapCm > 0 ? wrapCm / editorW : 0;
   const frontInsetY = wrapCm > 0 ? wrapCm / editorH : 0;
 
-  // Compute frame border in pixels relative to physical short side (Gelato ~2cm)
+  // Compute frame border in pixels
   useEffect(() => {
     const el = frameRef.current;
     if (!el) return;
@@ -225,56 +256,64 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
     boxSizing: "border-box",
   };
 
-  // Inner map wrapper kept ALWAYS within the poster frame.
-  // Square/circle: fit a centered square that hugs the poster's shorter side.
-  // For canvas (wrapCm>0) the shape applies only to the FRONT zone — the wrap
-  // strip around it always shows the rectangular map continuation.
-  const isShaped = mapShape === "square" || mapShape === "circle";
-  const isPortraitFrame = posterAspect <= 1;
+  // Helper: convert a layer's % rect (in front-zone coords) into editor-coord %.
+  const layerToEditorRect = (l: TemplateLayer) => {
+    const left = (frontInsetX + (l.xPct / 100) * (1 - 2 * frontInsetX)) * 100;
+    const top = (frontInsetY + (l.yPct / 100) * (1 - 2 * frontInsetY)) * 100;
+    const width = (l.wPct / 100) * (1 - 2 * frontInsetX) * 100;
+    const height = (l.hPct / 100) * (1 - 2 * frontInsetY) * 100;
+    return { left, top, width, height };
+  };
+
+  // Map-layer wrapper position. The customer's chosen shape (mapShape) wins
+  // over the template default to keep the live shape-toggle responsive.
+  const mapLayerRect = mapLayer ? layerToEditorRect(mapLayer) : { left: 0, top: 0, width: 100, height: 100 };
   const isWrap = wrapCm > 0;
+  const isShaped = mapShape === "square" || mapShape === "circle" || mapShape === "heart";
 
-  // Wrap mode: map is rendered ONLY within the front zone — wrap area shows bg color.
-  // For shaped (circle/square), center a square inside the front zone so the
-  // shape stays a true circle/square rather than being stretched into an ellipse.
-  // Poster mode: shape clip is applied as a centered square/circle within the editor.
-  const isPortraitFront = frontH >= frontW;
-  const mapWrapperStyle: React.CSSProperties = isWrap
-    ? isShaped
-      ? {
-          position: "absolute",
-          left: "50%",
-          top: "50%",
-          transform: "translate(-50%, -50%)",
-          width: isPortraitFront ? `${(1 - 2 * frontInsetX) * 100}%` : "auto",
-          height: isPortraitFront ? "auto" : `${(1 - 2 * frontInsetY) * 100}%`,
-          aspectRatio: "1 / 1",
-          borderRadius: mapShape === "circle" ? "9999px" : "0",
-          overflow: "hidden",
-        }
-      : {
-          position: "absolute",
-          left: `${frontInsetX * 100}%`,
-          top: `${frontInsetY * 100}%`,
-          right: `${frontInsetX * 100}%`,
-          bottom: `${frontInsetY * 100}%`,
-          overflow: "hidden",
-        }
-    : isShaped
-    ? {
-        position: "absolute",
-        left: "50%",
-        top: "50%",
-        transform: "translate(-50%, -50%)",
-        width: isPortraitFrame ? "100%" : "auto",
-        height: isPortraitFrame ? "auto" : "100%",
+  // For "square" and "circle" we keep aspect-ratio 1:1, centered inside the
+  // map-layer rect. For "heart" we let it fill the rect (the SVG path scales).
+  const mapWrapperStyle: React.CSSProperties = (() => {
+    const base: React.CSSProperties = {
+      position: "absolute",
+      left: `${mapLayerRect.left}%`,
+      top: `${mapLayerRect.top}%`,
+      width: `${mapLayerRect.width}%`,
+      height: `${mapLayerRect.height}%`,
+      overflow: "hidden",
+    };
+    if (mapShape === "circle") {
+      // Center a square that fits the rect, then round it.
+      const minSide = Math.min(mapLayerRect.width, mapLayerRect.height);
+      return {
+        ...base,
+        width: `${minSide}%`,
+        height: undefined,
         aspectRatio: "1 / 1",
-        borderRadius: mapShape === "circle" ? "9999px" : "0",
-        overflow: "hidden",
-      }
-    : { position: "absolute", inset: 0, overflow: "hidden" };
+        left: `${mapLayerRect.left + (mapLayerRect.width - minSide) / 2}%`,
+        top: `calc(${mapLayerRect.top}% + (${mapLayerRect.height}% - ${minSide}%) / 2 * (${editorH} / ${editorW}))`,
+        borderRadius: "9999px",
+      };
+    }
+    if (mapShape === "square") {
+      const minSide = Math.min(mapLayerRect.width, mapLayerRect.height);
+      return {
+        ...base,
+        width: `${minSide}%`,
+        height: undefined,
+        aspectRatio: "1 / 1",
+        left: `${mapLayerRect.left + (mapLayerRect.width - minSide) / 2}%`,
+        top: `calc(${mapLayerRect.top}% + (${mapLayerRect.height}% - ${minSide}%) / 2 * (${editorH} / ${editorW}))`,
+      };
+    }
+    if (mapShape === "heart") {
+      return { ...base, clipPath: shapeClipPath("heart", heartIdRef.current) };
+    }
+    return base;
+  })();
+  void isShaped;
 
-  // Front zone (where the visible front lives in canvas mode). For posters
-  // this equals the whole editor.
+  // Front zone indicator (canvas wrap mode only)
   const frontZoneStyle: React.CSSProperties = {
     position: "absolute",
     left: `${frontInsetX * 100}%`,
@@ -294,9 +333,14 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
         className="relative shadow-[0_30px_60px_-20px_rgba(0,0,0,0.25)]"
         style={frameStyle}
       >
-        <div style={mapWrapperStyle}>
-          <div ref={mapContainerRef} className="absolute inset-0" />
-        </div>
+        {mapShape === "heart" && <HeartClipDef id={heartIdRef.current} />}
+
+        {/* Map layer */}
+        {mapLayer && (
+          <div style={mapWrapperStyle}>
+            <div ref={mapContainerRef} className="absolute inset-0" />
+          </div>
+        )}
 
         {/* Visible front indicator (canvas wrap mode only) */}
         {isWrap && (
@@ -310,29 +354,39 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
           </div>
         )}
 
+        {/* Text layers — driven by template defaults (font sizing, color, alignment) */}
         {textVisible &&
-          layout?.layers
-            .filter((l) => l.type === "text")
-            .map((l, i) => {
-              // Parse l.x/l.y as % within FRONT zone, then map to editor coords
-              const xPct = parseFloat(String(l.x)) / 100;
-              const yPct = parseFloat(String(l.y)) / 100;
-              const leftPct = (frontInsetX + xPct * (1 - 2 * frontInsetX)) * 100;
-              const topPct = (frontInsetY + yPct * (1 - 2 * frontInsetY)) * 100;
+          layers
+            .filter((l): l is Extract<TemplateLayer, { type: "text" }> => l.type === "text")
+            .map((l) => {
+              const rect = layerToEditorRect(l);
+              const d = l.defaults;
+              // Use customer's font choice if they've changed it; else template default
+              const font = textFont || d.font;
+              const color = d.color;
+              const align = d.align;
               return (
                 <div
-                  key={`text-${i}`}
-                  className="absolute -translate-x-1/2 -translate-y-1/2 text-center px-2 text-foreground pointer-events-none"
+                  key={l.id}
+                  className="absolute pointer-events-none whitespace-pre-line leading-tight"
                   style={{
-                    left: `${leftPct}%`,
-                    top: `${topPct}%`,
-                    fontFamily: textFont,
-                    width: `${(1 - 2 * frontInsetX) * 90}%`,
+                    left: `${rect.left}%`,
+                    top: `${rect.top}%`,
+                    width: `${rect.width}%`,
+                    height: `${rect.height}%`,
+                    fontFamily: font,
+                    color,
+                    textAlign: align,
+                    // fontSizePct is % of the LAYER's height
+                    fontSize: `calc(${rect.height}cqh * ${d.fontSizePct / 100})`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: align === "left" ? "flex-start" : align === "right" ? "flex-end" : "center",
+                    padding: "0 4px",
+                    containerType: "size",
                   }}
                 >
-                  <div className="whitespace-pre-line text-sm md:text-base lg:text-lg font-medium tracking-wide leading-tight">
-                    {text || "Lägg till text…"}
-                  </div>
+                  <span style={{ width: "100%" }}>{text || "Lägg till text…"}</span>
                 </div>
               );
             })}

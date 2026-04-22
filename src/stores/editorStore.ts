@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { Orientation, ProductConfig } from "@/lib/product-config";
 import type { DesignSource } from "@/lib/print-pipeline";
-import type { ProductOptions } from "@/lib/template-schema";
+import type { ProductOptions, Template, TemplateLayer } from "@/lib/template-schema";
 import { resolveTemplate } from "@/lib/template-migrate";
 
 interface ApplyPlaceArgs {
@@ -11,10 +11,11 @@ interface ApplyPlaceArgs {
   country?: string;
 }
 
-export type MapShape = "rect" | "square" | "circle";
+export type MapShape = "rect" | "square" | "circle" | "heart";
 
 interface EditorState {
   config: ProductConfig | null;
+  template: Template | null;
   productOptions: ProductOptions | null;
 
   // map
@@ -69,6 +70,7 @@ interface EditorState {
   // computed
   currentPrice: () => number;
   currentLayout: () => ProductConfig["layouts"]["portrait"] | null;
+  templateLayers: () => TemplateLayer[];
 }
 
 function buildAutoText(args: ApplyPlaceArgs): string {
@@ -81,6 +83,7 @@ function buildAutoText(args: ApplyPlaceArgs): string {
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   config: null,
+  template: null,
   productOptions: null,
   mapCenter: [18.0686, 59.3293], // Stockholm
   mapZoom: 12,
@@ -115,8 +118,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const prevStyle = state.mapStyleId;
     const prevFont = state.textFont;
 
-    // Resolve the published template so we can filter sizes/variants by what
-    // admin actually allowed for THIS product type.
+    // Resolve the published template — this is the source of truth for what
+    // the customer sees and is allowed to change.
     const rawTemplate = (config as unknown as { template?: unknown }).template;
     const { template } = resolveTemplate(config, rawTemplate);
     const productOptions = template.productOptions;
@@ -146,21 +149,54 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ? prevVariant
       : variantsForSize[0]?.name ?? nextSizeDef?.variants[0]?.name ?? null;
 
-    // Map style: keep if supported by the new product, else fallback
-    const styleStillValid = config.map_styles.includes(prevStyle);
-    const nextStyle = styleStillValid ? prevStyle : config.map_styles[0] ?? prevStyle;
+    // Hydrate map/text state from the FIRST map/text layer in the active
+    // orientation IF the customer hasn't already customised these values.
+    // This is what makes mall-redigeringen i admin slå igenom i kund-vyn.
+    const orientation = state.orientation;
+    const layout = template.defaultLayout[orientation];
+    const firstMap = layout?.layers.find((l) => l.type === "map");
+    const firstText = layout?.layers.find((l) => l.type === "text");
 
-    // Font: keep if supported, else use new product's default
+    const isFirstLoad = state.config === null;
+    const mapDefaults = firstMap?.type === "map" ? firstMap.defaults : null;
+    const textDefaults = firstText?.type === "text" ? firstText.defaults : null;
+
+    // Map style: prefer template default on first load, else keep user's pick if supported
+    const styleStillValid = config.map_styles.includes(prevStyle);
+    const nextStyle = isFirstLoad && mapDefaults
+      ? mapDefaults.styleId
+      : styleStillValid
+      ? prevStyle
+      : mapDefaults?.styleId ?? config.map_styles[0] ?? prevStyle;
+
+    // Font: prefer template default on first load, else keep if supported
     const fontStillValid = config.text_config.fonts?.includes(prevFont);
-    const nextFont = fontStillValid ? prevFont : config.text_config.defaultFont ?? prevFont;
+    const nextFont = isFirstLoad && textDefaults
+      ? textDefaults.font
+      : fontStillValid
+      ? prevFont
+      : textDefaults?.font ?? config.text_config.defaultFont ?? prevFont;
 
     set({
       config,
+      template,
       productOptions,
       size: nextSize,
       variant: nextVariant,
       mapStyleId: nextStyle,
       textFont: nextFont,
+      // Hydrate location, zoom, shape, labels, bg from template on first load
+      ...(isFirstLoad && mapDefaults
+        ? {
+            mapCenter: [mapDefaults.center[0], mapDefaults.center[1]] as [number, number],
+            mapZoom: mapDefaults.zoom,
+            mapShape: mapDefaults.shape as MapShape,
+            showLabels: mapDefaults.showLabels,
+          }
+        : {}),
+      ...(isFirstLoad && layout?.background?.color
+        ? { posterBgColor: layout.background.color }
+        : {}),
     });
   },
   setMapCenter: (mapCenter) => set({ mapCenter }),
@@ -232,5 +268,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   currentLayout: () => {
     const { config, orientation } = get();
     return config?.layouts[orientation] ?? null;
+  },
+  templateLayers: () => {
+    const { template, orientation } = get();
+    if (!template) return [];
+    return [...template.defaultLayout[orientation].layers].sort((a, b) => a.zIndex - b.zIndex);
   },
 }));
