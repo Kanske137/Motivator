@@ -79,11 +79,11 @@ export function resolveTemplate(
     return { template: buildTemplateFromLegacy(config), fellBack: true };
   }
   const parsed = parseTemplate(rawTemplate);
-  if (parsed.ok) {
-    return { template: parsed.template, fellBack: false };
+  if (!parsed.ok) {
+    console.warn("[template-migrate] invalid template, falling back to legacy", parsed.error);
+    return { template: buildTemplateFromLegacy(config), fellBack: true };
   }
-  console.warn("[template-migrate] invalid template, falling back to legacy", parsed.error);
-  return { template: buildTemplateFromLegacy(config), fellBack: true };
+  return { template: parsed.template, fellBack: false };
 }
 
 // Re-export for convenience
