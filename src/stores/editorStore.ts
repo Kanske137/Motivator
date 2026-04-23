@@ -354,6 +354,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setLayerText: (id, t) => updateText(set, get, id, { text: t, isCustom: true }),
   setLayerTextFont: (id, f) => updateText(set, get, id, { font: f }),
   setLayerTextVisible: (id, v) => updateText(set, get, id, { visible: v }),
+  setLayerPhotoShape: (id, s) => updatePhoto(set, get, id, { shape: s }),
+  setLayerPhotoOffset: (id, x, y) =>
+    updatePhoto(set, get, id, {
+      offsetX: Math.max(-50, Math.min(50, x)),
+      offsetY: Math.max(-50, Math.min(50, y)),
+    }),
 
   // ---------- legacy globals → operate on first layer ----------
   setMapCenter: (c) => {
