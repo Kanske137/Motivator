@@ -36,13 +36,24 @@ export default function AdminConfigs() {
 
   const syncToShopify = async () => {
     setSyncing(true);
-    const { data, error } = await supabase.functions.invoke("shopify-inject-editor", {});
+    let okCount = 0;
+    const failures: string[] = [];
+    for (const cfg of configs) {
+      const { data, error } = await supabase.functions.invoke("shopify-sync-template", {
+        body: { handle: cfg.shopify_handle },
+      });
+      if (error || !data?.ok) {
+        failures.push(`${cfg.shopify_handle}: ${error?.message ?? data?.error ?? "fel"}`);
+      } else {
+        okCount += 1;
+      }
+    }
     setSyncing(false);
-    if (error) {
-      toast.error("Synk misslyckades", { description: error.message });
+    if (failures.length === 0) {
+      toast.success("Synkad till Shopify", { description: `${okCount} mall(ar) uppdaterade` });
     } else {
-      toast.success("Synkad till Shopify", {
-        description: `${data?.injected ?? 0} produkter uppdaterade`,
+      toast.warning(`Synk klar med ${failures.length} fel`, {
+        description: failures.slice(0, 3).join(" · "),
       });
     }
   };
