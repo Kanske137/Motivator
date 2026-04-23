@@ -509,6 +509,8 @@ function PhotoShapeSection({
     </div>
   );
 }
+
+function stylePreviewBg(styleId: string): string {
   switch (styleId) {
     case "light-v11":
       return "linear-gradient(135deg, #f5f5f0, #e8e8e0)";
