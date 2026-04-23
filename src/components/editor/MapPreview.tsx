@@ -49,6 +49,8 @@ function StarClipDef({ id }: { id: string }) {
 function shapeClipPath(shape: string, heartId: string, starId: string): string | undefined {
   switch (shape) {
     case "circle":
+      // Fallback only — for perfect-circle in non-square containers, callers
+      // should use `useCircleClip` to get a px-based radius instead.
       return "circle(50% at 50% 50%)";
     case "heart":
       return `url(#${heartId})`;
@@ -57,6 +59,37 @@ function shapeClipPath(shape: string, heartId: string, starId: string): string |
     default:
       return undefined;
   }
+}
+
+/**
+ * Measures the host element and returns a pixel-based circle clip-path that
+ * always renders a perfect circle (diameter = min(width, height)) centered
+ * inside the container — even when the layer rect is non-square.
+ */
+function useCircleClip(enabled: boolean): {
+  ref: React.RefObject<HTMLDivElement>;
+  clipPath: string | undefined;
+} {
+  const ref = useRef<HTMLDivElement>(null);
+  const [clipPath, setClipPath] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!enabled) {
+      setClipPath(undefined);
+      return;
+    }
+    const el = ref.current;
+    if (!el) return;
+    const update = () => {
+      const r = el.getBoundingClientRect();
+      const radius = Math.max(0, Math.min(r.width, r.height) / 2);
+      setClipPath(`circle(${radius}px at 50% 50%)`);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [enabled]);
+  return { ref, clipPath };
 }
 
 export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm = 0 }: Props) {
@@ -188,20 +221,31 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             ];
             const effectiveZoom = mv?.zoom ?? l.defaults.zoom;
             const effectiveLabels = mv?.showLabels ?? l.defaults.showLabels;
-            const clip = shapeClipPath(effectiveShape, heartIdRef.current, starIdRef.current);
+            const staticClip = shapeClipPath(
+              effectiveShape,
+              heartIdRef.current,
+              starIdRef.current,
+            );
             return (
-              <div key={l.id} style={wrapStyle}>
-                <MapLayerInstance
-                  layerId={l.id}
-                  shape={effectiveShape}
-                  styleId={effectiveStyleId}
-                  center={effectiveCenter}
-                  zoom={effectiveZoom}
-                  showLabels={effectiveLabels}
-                  interactive={!l.locks.position}
-                  clipPath={clip}
-                />
-              </div>
+              <MapLayerSlot
+                key={l.id}
+                wrapStyle={wrapStyle}
+                isCircle={effectiveShape === "circle"}
+                staticClip={staticClip}
+              >
+                {(clip) => (
+                  <MapLayerInstance
+                    layerId={l.id}
+                    shape={effectiveShape}
+                    styleId={effectiveStyleId}
+                    center={effectiveCenter}
+                    zoom={effectiveZoom}
+                    showLabels={effectiveLabels}
+                    interactive={!l.locks.position}
+                    clipPath={clip}
+                  />
+                )}
+              </MapLayerSlot>
             );
           }
 
@@ -215,7 +259,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
               | "star";
             const offsetX = pv?.offsetX ?? 0;
             const offsetY = pv?.offsetY ?? 0;
-            const clip = shapeClipPath(
+            const staticClip = shapeClipPath(
               effectiveShape,
               heartIdRef.current,
               starIdRef.current,
@@ -227,7 +271,8 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
                   layerId={l.id}
                   src={src}
                   fit={l.defaults.fit}
-                  clipPath={clip}
+                  shape={effectiveShape}
+                  staticClipPath={staticClip}
                   offsetX={offsetX}
                   offsetY={offsetY}
                   draggable={!!src}
@@ -310,11 +355,37 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   );
 }
 
+/**
+ * Renders a map layer wrapper that, when the shape is `circle`, measures its
+ * own pixel size and produces a perfect-circle clip-path. For other shapes it
+ * passes through the static (SVG / fallback) clip-path.
+ */
+function MapLayerSlot({
+  wrapStyle,
+  isCircle,
+  staticClip,
+  children,
+}: {
+  wrapStyle: React.CSSProperties;
+  isCircle: boolean;
+  staticClip: string | undefined;
+  children: (clip: string | undefined) => React.ReactNode;
+}) {
+  const { ref, clipPath } = useCircleClip(isCircle);
+  const effectiveClip = isCircle ? clipPath ?? staticClip : staticClip;
+  return (
+    <div ref={ref} style={wrapStyle}>
+      {children(effectiveClip)}
+    </div>
+  );
+}
+
 interface PhotoLayerViewProps {
   layerId: string;
   src: string | null;
   fit: "cover" | "contain";
-  clipPath?: string;
+  shape: "rect" | "circle" | "heart" | "star";
+  staticClipPath?: string;
   offsetX: number;
   offsetY: number;
   draggable: boolean;
@@ -324,7 +395,8 @@ function PhotoLayerView({
   layerId,
   src,
   fit,
-  clipPath,
+  shape,
+  staticClipPath,
   offsetX,
   offsetY,
   draggable,
@@ -432,6 +504,13 @@ function PhotoLayerView({
   );
 
   const canPan = fit !== "contain" && draggable && (maxX > 0 || maxY > 0);
+
+  // Perfect-circle clip from measured pixel size (so non-square layers still
+  // render as a true circle, not an ellipse / cropped oval).
+  const clipPath =
+    shape === "circle" && box.w > 0 && box.h > 0
+      ? `circle(${Math.min(box.w, box.h) / 2}px at 50% 50%)`
+      : staticClipPath;
 
   return (
     <div

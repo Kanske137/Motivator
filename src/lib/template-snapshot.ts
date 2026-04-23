@@ -103,6 +103,8 @@ function clipForShape(
 ): void {
   ctx.beginPath();
   if (shape === "circle") {
+    // Perfect circle inscribed within the rect (diameter = shortest side),
+    // centered. Matches editor's `useCircleClip` / px-radius CSS clip-path.
     const r = Math.min(w, h) / 2;
     ctx.arc(x + w / 2, y + h / 2, r, 0, Math.PI * 2);
   } else if (shape === "heart") {
