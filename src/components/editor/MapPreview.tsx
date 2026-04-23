@@ -191,16 +191,27 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             const clip = shapeClipPath(effectiveShape, heartIdRef.current, starIdRef.current);
             return (
               <div key={l.id} style={wrapStyle}>
-                <MapLayerInstance
-                  layerId={l.id}
-                  shape={effectiveShape}
-                  styleId={effectiveStyleId}
-                  center={effectiveCenter}
-                  zoom={effectiveZoom}
-                  showLabels={effectiveLabels}
-                  interactive={!l.locks.position}
-                  clipPath={clip}
-                />
+                {photoOverlayUrl ? (
+                  <div className="absolute inset-0 overflow-hidden" style={{ clipPath: clip }}>
+                    <img
+                      src={photoOverlayUrl}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover"
+                      draggable={false}
+                    />
+                  </div>
+                ) : (
+                  <MapLayerInstance
+                    layerId={l.id}
+                    shape={effectiveShape}
+                    styleId={effectiveStyleId}
+                    center={effectiveCenter}
+                    zoom={effectiveZoom}
+                    showLabels={effectiveLabels}
+                    interactive={!l.locks.position}
+                    clipPath={clip}
+                  />
+                )}
               </div>
             );
           }
