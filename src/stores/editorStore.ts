@@ -459,7 +459,24 @@ function updateText(set: SetFn, get: GetFn, id: string, patch: Partial<TextLayer
   set({ layerValues, ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues }) });
 }
 
-function applyPlaceInternal(
+function updatePhoto(set: SetFn, get: GetFn, id: string, patch: Partial<PhotoLayerValue>) {
+  const state = get();
+  const cur = state.layerValues[id];
+  if (!cur || cur.kind !== "photo") return;
+  const next: PhotoLayerValue = { ...cur, ...patch };
+  const layerValues = { ...state.layerValues, [id]: next };
+  set({ layerValues });
+}
+
+function resetPhotoOffsets(values: Record<string, LayerValue>): Record<string, LayerValue> {
+  const out: Record<string, LayerValue> = { ...values };
+  for (const [id, v] of Object.entries(values)) {
+    if (v.kind === "photo") {
+      out[id] = { ...v, offsetX: 0, offsetY: 0 };
+    }
+  }
+  return out;
+}
   set: SetFn,
   get: GetFn,
   mapId: string,
