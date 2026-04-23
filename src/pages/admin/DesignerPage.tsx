@@ -298,7 +298,13 @@ export default function DesignerPage() {
           </Card>
           <Card className="p-5">
             <h2 className="text-base font-semibold mb-3">Egenskaper</h2>
-            <LayerInspector config={config} layer={selectedLayer} allLayers={layers} onChange={updateLayer} />
+            <LayerInspector
+              config={config}
+              layer={selectedLayer}
+              allLayers={layers}
+              onChange={updateLayer}
+              onLayersChange={setLayers}
+            />
           </Card>
         </div>
       </main>
