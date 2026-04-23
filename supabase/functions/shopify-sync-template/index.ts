@@ -10,8 +10,11 @@
 import { corsHeaders } from "https://esm.sh/@supabase/supabase-js@2.95.0/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import skuMap from "../_shared/gelato-sku-map.json" with { type: "json" };
-
-const SHOPIFY_API_VERSION = "2025-07";
+import {
+  ensureShopifyAuth,
+  shopifyAdmin,
+  type ShopifyAuthError,
+} from "../_shared/shopify-admin.ts";
 
 // Mirrors src/lib/pricing.ts — used by the live "Personlig Karta" products.
 const POSTER_PRICES: Record<string, Record<string, number>> = {
@@ -49,54 +52,6 @@ function getPrice(kind: "poster" | "canvas", size: string, variant: string): num
 
 interface SyncBody {
   handle: string;
-}
-
-function getShopifyDomain(): string {
-  const domain = Deno.env.get("SHOPIFY_STORE_PERMANENT_DOMAIN")
-    ?? Deno.env.get("SHOPIFY_STORE_DOMAIN")
-    ?? "canvas-poster-creator-2wh5d.myshopify.com";
-  return domain.replace(/^https?:\/\//, "").replace(/\/$/, "");
-}
-
-function getShopifyToken(): string {
-  // Prefer the user-bound online token Lovable's Shopify integration installs
-  // (env var pattern: SHOPIFY_ONLINE_ACCESS_TOKEN:user:<uid>). The plain
-  // SHOPIFY_ACCESS_TOKEN secret in this project predates the integration and
-  // is no longer valid against the Admin API, so we only use it as a fallback.
-  for (const [k, v] of Object.entries(Deno.env.toObject())) {
-    if (k.startsWith("SHOPIFY_ONLINE_ACCESS_TOKEN") && v) return v;
-  }
-  const fallback = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
-  if (fallback) return fallback;
-  throw new Error("No Shopify access token configured");
-}
-
-async function shopifyAdmin<T>(query: string, variables: Record<string, unknown>): Promise<T> {
-  const token = getShopifyToken();
-  const domain = getShopifyDomain();
-  const r = await fetch(`https://${domain}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Shopify-Access-Token": token,
-    },
-    body: JSON.stringify({ query, variables }),
-  });
-
-  const raw = await r.text();
-  let json: any = null;
-  try {
-    json = raw ? JSON.parse(raw) : null;
-  } catch {
-    json = null;
-  }
-
-  if (!r.ok || json?.errors) {
-    const detail = json?.errors ?? json ?? raw;
-    throw new Error(`Shopify API ${r.status}: ${JSON.stringify(detail).slice(0, 500)}`);
-  }
-
-  return json.data as T;
 }
 
 interface VariantInput {
@@ -260,6 +215,9 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Preflight: fail fast with a clear auth error before doing any work.
+    await ensureShopifyAuth();
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -436,10 +394,15 @@ Deno.serve(async (req) => {
     );
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
-    console.error("shopify-sync-template error:", msg);
-    return new Response(JSON.stringify({ ok: false, error: msg }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    const code = (e as ShopifyAuthError | undefined)?.code;
+    const source = (e as ShopifyAuthError | undefined)?.source;
+    console.error("shopify-sync-template error:", code ?? "generic", msg);
+    const status = code === "invalid_token" || code === "no_token" || code === "missing_scope"
+      ? 401
+      : 500;
+    return new Response(
+      JSON.stringify({ ok: false, error: msg, code, source }),
+      { status, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   }
 });

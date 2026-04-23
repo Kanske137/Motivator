@@ -49,9 +49,13 @@ export default function DesignerPage() {
       body: { handle },
     });
     setSyncing(false);
+    const code = (data as { code?: string } | null)?.code;
     if (error || !data?.ok) {
-      toast.error("Synk misslyckades", {
-        description: error?.message ?? data?.error ?? "Okänt fel",
+      const isAuth = code === "invalid_token" || code === "no_token" || code === "missing_scope";
+      toast.error(isAuth ? "Shopify-anslutningen är ogiltig" : "Synk misslyckades", {
+        description: isAuth
+          ? "Backendens Shopify Admin-token avvisades. Återanslut Shopify-integrationen i Lovable och försök igen."
+          : (error?.message ?? data?.error ?? "Okänt fel"),
       });
     } else {
       toast.success("Synkad till Shopify", {
