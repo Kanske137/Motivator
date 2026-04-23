@@ -135,20 +135,92 @@ function CanvasMesh({
       receiveShadow
       material={materials}
       position={[0, 0, 0]}
-      onPointerDown={onUserInteract}
     >
       <boxGeometry args={[w, h, d]} />
     </mesh>
   );
 }
 
-/** Tunn vägg bakom duken så skuggorna landar på något. */
+/** Stor bakvägg så skuggor + miljö landar naturligt. */
 function Wall() {
   return (
-    <mesh position={[0, 0, -0.6]} receiveShadow>
-      <planeGeometry args={[12, 8]} />
+    <mesh position={[0, 0, -1.6]} receiveShadow>
+      <planeGeometry args={[16, 10]} />
       <meshStandardMaterial color="#ece7df" roughness={1} metalness={0} />
     </mesh>
+  );
+}
+
+/** Vardagsrumsmiljö: golv, soffa, sidobord + lampa. Allt enkelt low-poly. */
+function LivingRoomScene() {
+  return (
+    <group>
+      {/* Golv */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.6, 0]} receiveShadow>
+        <planeGeometry args={[18, 10]} />
+        <meshStandardMaterial color="#d4b896" roughness={0.85} />
+      </mesh>
+
+      {/* Soffa — bas */}
+      <mesh position={[0, -1.05, -0.45]} castShadow receiveShadow>
+        <boxGeometry args={[3.2, 0.45, 1.0]} />
+        <meshStandardMaterial color="#3a3f4a" roughness={0.8} />
+      </mesh>
+      {/* Soffa — ryggstöd */}
+      <mesh position={[0, -0.55, -0.85]} castShadow receiveShadow>
+        <boxGeometry args={[3.2, 0.7, 0.25]} />
+        <meshStandardMaterial color="#3a3f4a" roughness={0.8} />
+      </mesh>
+      {/* Soffa — vänster armstöd */}
+      <mesh position={[-1.5, -0.75, -0.45]} castShadow receiveShadow>
+        <boxGeometry args={[0.25, 0.5, 1.0]} />
+        <meshStandardMaterial color="#3a3f4a" roughness={0.8} />
+      </mesh>
+      {/* Soffa — höger armstöd */}
+      <mesh position={[1.5, -0.75, -0.45]} castShadow receiveShadow>
+        <boxGeometry args={[0.25, 0.5, 1.0]} />
+        <meshStandardMaterial color="#3a3f4a" roughness={0.8} />
+      </mesh>
+
+      {/* Sidobord (cylinder) */}
+      <mesh position={[2.4, -1.15, -0.35]} castShadow receiveShadow>
+        <cylinderGeometry args={[0.28, 0.28, 0.9, 24]} />
+        <meshStandardMaterial color="#8a6a48" roughness={0.7} />
+      </mesh>
+      {/* Lampa — fot */}
+      <mesh position={[2.4, -0.6, -0.35]} castShadow>
+        <cylinderGeometry args={[0.04, 0.06, 0.5, 16]} />
+        <meshStandardMaterial color="#2a2a2a" roughness={0.6} />
+      </mesh>
+      {/* Lampskärm/glödlampa */}
+      <mesh position={[2.4, -0.25, -0.35]}>
+        <sphereGeometry args={[0.18, 24, 24]} />
+        <meshStandardMaterial
+          color="#fff2c8"
+          emissive="#ffd28a"
+          emissiveIntensity={1.4}
+          roughness={0.4}
+        />
+      </mesh>
+      {/* Varmt rumsljus från lampan */}
+      <pointLight
+        position={[2.4, -0.25, -0.35]}
+        intensity={1.6}
+        color="#ffcb85"
+        distance={6}
+        decay={2}
+      />
+
+      {/* Liten växt på andra sidan för balans */}
+      <mesh position={[-2.6, -1.2, -0.35]} castShadow>
+        <cylinderGeometry args={[0.22, 0.18, 0.35, 16]} />
+        <meshStandardMaterial color="#8a4a32" roughness={0.9} />
+      </mesh>
+      <mesh position={[-2.6, -0.85, -0.35]} castShadow>
+        <sphereGeometry args={[0.32, 16, 16]} />
+        <meshStandardMaterial color="#3f6b3a" roughness={0.95} />
+      </mesh>
+    </group>
   );
 }
 
@@ -168,15 +240,16 @@ function InteractionTracker({ onInteract }: { onInteract: () => void }) {
 }
 
 function Scene({
-  printUrl, widthCm, heightCm, depthCm, bleedCm,
+  printUrl, widthCm, heightCm, depthCm, bleedCm, scene,
 }: {
   printUrl: string;
   widthCm: number; heightCm: number; depthCm: number; bleedCm: number;
+  scene: "minimal" | "livingroom";
 }) {
   const tex = useTexture(printUrl);
   const [autoRotate, setAutoRotate] = useState(true);
 
-  // Stoppa auto-rotate efter 4s om användaren inte rört duken.
+  // Stoppa auto-rotate efter 4s om användaren inte interagerat.
   useEffect(() => {
     const t = setTimeout(() => setAutoRotate(false), 4000);
     return () => clearTimeout(t);
@@ -205,6 +278,7 @@ function Scene({
 
       <Environment preset="apartment" />
       <Wall />
+      {scene === "livingroom" && <LivingRoomScene />}
 
       <InteractionTracker onInteract={stopAutoRotate} />
 
@@ -215,16 +289,19 @@ function Scene({
           heightCm={heightCm}
           depthCm={depthCm}
           bleedCm={bleedCm}
-          autoRotate={autoRotate}
-          onUserInteract={stopAutoRotate}
         />
       )}
       <ContactShadows position={[0, -1.35, 0]} opacity={0.45} scale={6} blur={3.2} far={2.2} />
       <OrbitControls
         enablePan={false}
-        enableZoom={false}
+        enableZoom
+        zoomSpeed={0.6}
+        minDistance={2.5}
+        maxDistance={5.5}
         enableDamping
         dampingFactor={0.08}
+        autoRotate={autoRotate}
+        autoRotateSpeed={0.8}
         minPolarAngle={Math.PI / 2 - Math.PI / 4}
         maxPolarAngle={Math.PI / 2 + Math.PI / 4}
         minAzimuthAngle={-Math.PI / 4}
