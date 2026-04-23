@@ -15,6 +15,8 @@ import { useEditorStore, type MapLayerValue, type TextLayerValue } from "@/store
 import { geocode, type GeocodeResult } from "@/lib/mapbox";
 import { MAPBOX_STYLE_LABELS, type ProductConfig } from "@/lib/product-config";
 import { FormatSection } from "./FormatSection";
+import { PhotoUploadSection } from "./PhotoUploadSection";
+import { AiStyleSection } from "./AiStyleSection";
 import { Loader2, Search } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
