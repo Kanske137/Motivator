@@ -54,54 +54,6 @@ interface SyncBody {
   handle: string;
 }
 
-function getShopifyDomain(): string {
-  const domain = Deno.env.get("SHOPIFY_STORE_PERMANENT_DOMAIN")
-    ?? Deno.env.get("SHOPIFY_STORE_DOMAIN")
-    ?? "canvas-poster-creator-2wh5d.myshopify.com";
-  return domain.replace(/^https?:\/\//, "").replace(/\/$/, "");
-}
-
-function getShopifyToken(): string {
-  // Prefer the user-bound online token Lovable's Shopify integration installs
-  // (env var pattern: SHOPIFY_ONLINE_ACCESS_TOKEN:user:<uid>). The plain
-  // SHOPIFY_ACCESS_TOKEN secret in this project predates the integration and
-  // is no longer valid against the Admin API, so we only use it as a fallback.
-  for (const [k, v] of Object.entries(Deno.env.toObject())) {
-    if (k.startsWith("SHOPIFY_ONLINE_ACCESS_TOKEN") && v) return v;
-  }
-  const fallback = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
-  if (fallback) return fallback;
-  throw new Error("No Shopify access token configured");
-}
-
-async function shopifyAdmin<T>(query: string, variables: Record<string, unknown>): Promise<T> {
-  const token = getShopifyToken();
-  const domain = getShopifyDomain();
-  const r = await fetch(`https://${domain}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Shopify-Access-Token": token,
-    },
-    body: JSON.stringify({ query, variables }),
-  });
-
-  const raw = await r.text();
-  let json: any = null;
-  try {
-    json = raw ? JSON.parse(raw) : null;
-  } catch {
-    json = null;
-  }
-
-  if (!r.ok || json?.errors) {
-    const detail = json?.errors ?? json ?? raw;
-    throw new Error(`Shopify API ${r.status}: ${JSON.stringify(detail).slice(0, 500)}`);
-  }
-
-  return json.data as T;
-}
-
 interface VariantInput {
   optionValues: { optionName: string; name: string }[];
   price: string;
