@@ -181,8 +181,22 @@ export default function EditorPage() {
       return;
     }
 
+    // Resolve real variant ID. Fall back to a fresh lookup if not yet cached
+    // (race when user clicks before the effect resolves).
+    let variantGid = shopifyVariantId;
+    if (!variantGid) {
+      variantGid = await resolveShopifyVariantId(config.shopify_handle, size, variant);
+      if (variantGid) setShopifyVariantId(variantGid);
+    }
+    if (!variantGid) {
+      toast.error("Den här kombinationen är inte tillgänglig i butiken ännu", {
+        description: `${size} · ${variant} hittades inte för ${config.shopify_handle}.`,
+      });
+      return;
+    }
+
     await addItem({
-      variantId: `gid://shopify/ProductVariant/preview-${size}-${variant}`,
+      variantId: variantGid,
       productTitle: config.title,
       variantTitle: `${size} · ${variant}`,
       imageUrl: previewUrl,
