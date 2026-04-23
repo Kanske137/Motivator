@@ -112,7 +112,7 @@ export function PhotoUploadSection() {
             </Button>
           </div>
           <p className="text-[11px] text-muted-foreground">
-            Bilden ersätter kartan. Återgå till karta genom att ta bort bilden.
+            Dra i bilden för att välja utsnitt inom ramen.
           </p>
         </div>
       )}
