@@ -48,6 +48,9 @@ export interface TemplateSnapshotInput {
   frameColor?: string;
   frameWidthCm?: number;
   canvasWrap?: boolean;
+
+  /** Customer-uploaded photo or AI result. Rendered into every `photo` layer. */
+  photoOverlayUrl?: string;
 }
 
 export interface TemplateSnapshotResult {
