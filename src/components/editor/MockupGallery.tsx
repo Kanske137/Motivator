@@ -22,6 +22,7 @@ export function MockupGallery() {
     text, textFont, textVisible,
     showLabels, mapShape, posterBgColor,
     layerValues,
+    designSource, photoPreviewUrl, aiPrintFileUrl,
   } = useEditorStore();
   const [slots, setSlots] = useState<MockupSlot[]>([]);
   const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null);
@@ -71,6 +72,12 @@ export function MockupGallery() {
           liveTextVisible: textVisible,
           wrapCm: isCanvas ? canvasDepthCm : 0,
           bleedCm: isCanvas ? BLEED_CM : 0,
+          photoOverlayUrl:
+            designSource === "ai"
+              ? aiPrintFileUrl ?? undefined
+              : designSource === "photo"
+              ? photoPreviewUrl ?? undefined
+              : undefined,
         });
         if (myReq !== reqIdRef.current) return;
 
