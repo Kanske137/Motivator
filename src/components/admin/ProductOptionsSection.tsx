@@ -147,33 +147,160 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
         )}
       </div>
 
-      {/* Canvas */}
-      <div className="space-y-3 rounded-md border p-4">
-        <div className="flex items-center justify-between">
-          <Label className="text-sm font-medium">Canvas</Label>
-          <Switch
-            checked={value.canvas?.enabled ?? false}
-            onCheckedChange={(c) => toggleEnabled("canvas", c)}
-          />
+      {/* AI Styles */}
+      <AiStylesEditor
+        value={value.aiStyles ?? []}
+        onChange={(aiStyles) => onChange({ ...value, aiStyles })}
+      />
+    </Card>
+  );
+}
+
+function AiStylesEditor({
+  value,
+  onChange,
+}: {
+  value: AiStylePreset[];
+  onChange: (next: AiStylePreset[]) => void;
+}) {
+  const presets = value.length === 0 ? DEFAULT_AI_STYLES : value;
+
+  const updateAt = (idx: number, patch: Partial<AiStylePreset>) => {
+    const next = presets.map((p, i) => (i === idx ? { ...p, ...patch } : p));
+    onChange(next);
+  };
+  const removeAt = (idx: number) => onChange(presets.filter((_, i) => i !== idx));
+  const addPreset = () => {
+    const id = `style-${Date.now().toString(36)}`;
+    onChange([...presets, { id, label: "Ny stil", prompt: "Describe the artistic style here." }]);
+  };
+  const seedDefaults = () => onChange([...DEFAULT_AI_STYLES]);
+
+  return (
+    <div className="space-y-3 rounded-md border p-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <Label className="text-sm font-medium">AI-stilar</Label>
+          <p className="text-xs text-muted-foreground">
+            Stilar som kunden kan tillämpa på sin uppladdade bild.
+          </p>
         </div>
-        {value.canvas?.enabled && (
-          <div className="grid gap-4 md:grid-cols-2">
-            <ChecklistGroup
-              title="Tillåtna storlekar"
-              all={canvasSizes}
-              selected={value.canvas.allowedSizes}
-              onToggle={(item, c) => toggleListItem("canvas", "allowedSizes", item, c)}
-            />
-            <ChecklistGroup
-              title="Tillåtna djup"
-              all={canvasDepths}
-              selected={value.canvas.allowedDepths}
-              onToggle={(item, c) => toggleListItem("canvas", "allowedDepths", item, c)}
-            />
-          </div>
+        <div className="flex gap-2">
+          {value.length === 0 && (
+            <Button type="button" variant="outline" size="sm" onClick={seedDefaults}>
+              Använd standard
+            </Button>
+          )}
+          <Button type="button" variant="outline" size="sm" onClick={addPreset}>
+            <Plus className="h-3.5 w-3.5 mr-1" />
+            Lägg till
+          </Button>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {presets.map((p, i) => (
+          <AiStyleRow
+            key={p.id + i}
+            preset={p}
+            onChange={(patch) => updateAt(i, patch)}
+            onRemove={() => removeAt(i)}
+          />
+        ))}
+        {presets.length === 0 && (
+          <p className="text-xs text-muted-foreground">Inga AI-stilar konfigurerade.</p>
         )}
       </div>
-    </Card>
+    </div>
+  );
+}
+
+function AiStyleRow({
+  preset,
+  onChange,
+  onRemove,
+}: {
+  preset: AiStylePreset;
+  onChange: (patch: Partial<AiStylePreset>) => void;
+  onRemove: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = async (file: File | undefined) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const reader = new FileReader();
+      const dataUrl: string = await new Promise((res, rej) => {
+        reader.onload = () => res(reader.result as string);
+        reader.onerror = () => rej(new Error("read failed"));
+        reader.readAsDataURL(file);
+      });
+      const url = await uploadCartPreview(dataUrl, `aistyle-${preset.id}-${Date.now()}`);
+      onChange({ thumbnailUrl: url });
+    } catch (e) {
+      toast.error("Kunde inte ladda upp thumbnail", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="flex gap-3 rounded-md border bg-background p-3">
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        className="relative h-16 w-16 shrink-0 rounded-md overflow-hidden border bg-muted flex items-center justify-center"
+        aria-label="Ladda upp thumbnail"
+      >
+        {preset.thumbnailUrl ? (
+          <img src={preset.thumbnailUrl} alt={preset.label} className="h-full w-full object-cover" />
+        ) : (
+          <Upload className="h-4 w-4 text-muted-foreground" />
+        )}
+        {uploading && (
+          <div className="absolute inset-0 bg-background/70 flex items-center justify-center">
+            <Loader2 className="h-4 w-4 animate-spin" />
+          </div>
+        )}
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={(e) => handleUpload(e.target.files?.[0])}
+      />
+      <div className="flex-1 space-y-2 min-w-0">
+        <div className="flex items-center gap-2">
+          <Input
+            value={preset.label}
+            onChange={(e) => onChange({ label: e.target.value })}
+            placeholder="Etikett"
+            className="h-8 text-sm"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-destructive shrink-0"
+            onClick={onRemove}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+        <Textarea
+          value={preset.prompt}
+          onChange={(e) => onChange({ prompt: e.target.value })}
+          rows={2}
+          placeholder="Prompt till AI-modellen…"
+          className="text-xs"
+        />
+      </div>
+    </div>
   );
 }
 
