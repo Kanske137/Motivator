@@ -52,9 +52,19 @@ interface SyncBody {
   handle: string;
 }
 
+function getShopifyToken(): string {
+  // Prefer the user-bound online token Lovable's Shopify integration installs
+  // (env var name pattern: SHOPIFY_ONLINE_ACCESS_TOKEN:user:<uid>).
+  for (const [k, v] of Object.entries(Deno.env.toObject())) {
+    if (k.startsWith("SHOPIFY_ONLINE_ACCESS_TOKEN") && v) return v;
+  }
+  const fallback = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
+  if (fallback) return fallback;
+  throw new Error("No Shopify access token configured");
+}
+
 async function shopifyAdmin<T>(query: string, variables: Record<string, unknown>): Promise<T> {
-  const TOKEN = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
-  if (!TOKEN) throw new Error("SHOPIFY_ACCESS_TOKEN not configured");
+  const TOKEN = getShopifyToken();
   const r = await fetch(`https://${DOMAIN}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`, {
     method: "POST",
     headers: {
