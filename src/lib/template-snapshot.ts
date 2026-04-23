@@ -450,9 +450,7 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
         console.warn("[template-snapshot] image layer failed", e);
       }
     } else if (layer.type === "photo") {
-      const url =
-        (input as TemplateSnapshotInput & { photoOverlayUrl?: string }).photoOverlayUrl ??
-        layer.defaults.placeholderUrl;
+      const url = input.photoOverlayUrl ?? layer.defaults.placeholderUrl;
       if (url) {
         try {
           await drawPhotoLayer(ctx, rect, url, layer.defaults.shape, layer.defaults.fit);
