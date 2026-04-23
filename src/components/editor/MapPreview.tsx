@@ -331,7 +331,43 @@ function PhotoLayerView({
 }: PhotoLayerViewProps) {
   const setLayerPhotoOffset = useEditorStore((s) => s.setLayerPhotoOffset);
   const containerRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
+  const [box, setBox] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+
+  // Track container size.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const update = () => {
+      const r = el.getBoundingClientRect();
+      setBox({ w: r.width, h: r.height });
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Reset natural when src changes.
+  useEffect(() => {
+    setNatural(null);
+  }, [src]);
+
+  // Compute max pan offsets in percent of layer (cover overflow / 2).
+  const { maxX, maxY } = (() => {
+    if (fit === "contain" || !natural || box.w === 0 || box.h === 0) {
+      return { maxX: 0, maxY: 0 };
+    }
+    const scale = Math.max(box.w / natural.w, box.h / natural.h);
+    const scaledW = natural.w * scale;
+    const scaledH = natural.h * scale;
+    const overflowXPct = ((scaledW - box.w) / box.w) * 100;
+    const overflowYPct = ((scaledH - box.h) / box.h) * 100;
+    return { maxX: overflowXPct / 2, maxY: overflowYPct / 2 };
+  })();
+
   const dragStateRef = useRef<{
     startX: number;
     startY: number;
@@ -341,9 +377,20 @@ function PhotoLayerView({
     height: number;
   } | null>(null);
 
+  // Re-clamp current offset whenever bounds change (e.g. new image loaded).
+  useEffect(() => {
+    if (fit === "contain") return;
+    const cx = Math.max(-maxX, Math.min(maxX, offsetX));
+    const cy = Math.max(-maxY, Math.min(maxY, offsetY));
+    if (cx !== offsetX || cy !== offsetY) {
+      setLayerPhotoOffset(layerId, cx, cy);
+    }
+  }, [maxX, maxY, fit, layerId, offsetX, offsetY, setLayerPhotoOffset]);
+
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (!draggable || fit === "contain") return;
+      if (maxX === 0 && maxY === 0) return;
       const el = containerRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
@@ -358,7 +405,7 @@ function PhotoLayerView({
       el.setPointerCapture(e.pointerId);
       setDragging(true);
     },
-    [draggable, fit, offsetX, offsetY],
+    [draggable, fit, offsetX, offsetY, maxX, maxY],
   );
 
   const onPointerMove = useCallback(
@@ -367,9 +414,11 @@ function PhotoLayerView({
       if (!s) return;
       const dxPct = ((e.clientX - s.startX) / s.width) * 100;
       const dyPct = ((e.clientY - s.startY) / s.height) * 100;
-      setLayerPhotoOffset(layerId, s.baseX + dxPct, s.baseY + dyPct);
+      const nextX = Math.max(-maxX, Math.min(maxX, s.baseX + dxPct));
+      const nextY = Math.max(-maxY, Math.min(maxY, s.baseY + dyPct));
+      setLayerPhotoOffset(layerId, nextX, nextY);
     },
-    [layerId, setLayerPhotoOffset],
+    [layerId, setLayerPhotoOffset, maxX, maxY],
   );
 
   const onPointerUp = useCallback(
@@ -382,14 +431,16 @@ function PhotoLayerView({
     [],
   );
 
+  const canPan = fit !== "contain" && draggable && (maxX > 0 || maxY > 0);
+
   return (
     <div
       ref={containerRef}
       className="absolute inset-0 overflow-hidden"
       style={{
         clipPath,
-        cursor: draggable && fit !== "contain" ? (dragging ? "grabbing" : "grab") : "default",
-        touchAction: draggable && fit !== "contain" ? "none" : undefined,
+        cursor: canPan ? (dragging ? "grabbing" : "grab") : "default",
+        touchAction: canPan ? "none" : undefined,
       }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -398,8 +449,13 @@ function PhotoLayerView({
     >
       {src ? (
         <img
+          ref={imgRef}
           src={src}
           alt=""
+          onLoad={(e) => {
+            const i = e.currentTarget;
+            setNatural({ w: i.naturalWidth, h: i.naturalHeight });
+          }}
           className={`absolute inset-0 w-full h-full ${
             fit === "contain" ? "object-contain" : "object-cover"
           }`}

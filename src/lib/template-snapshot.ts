@@ -303,9 +303,6 @@ async function drawPhotoLayer(
   });
   ctx.save();
   clipForShape(ctx, shape, rect.x, rect.y, rect.w, rect.h);
-  // Pan offset is percent of layer width/height — only applies to cover.
-  const tx = fit === "contain" ? 0 : (offsetX / 100) * rect.w;
-  const ty = fit === "contain" ? 0 : (offsetY / 100) * rect.h;
   if (fit === "contain") {
     const ar = img.width / img.height;
     const rar = rect.w / rect.h;
@@ -315,15 +312,26 @@ async function drawPhotoLayer(
     else dw = rect.h * ar;
     ctx.drawImage(img, rect.x + (rect.w - dw) / 2, rect.y + (rect.h - dh) / 2, dw, dh);
   } else {
-    const ar = img.width / img.height;
-    const rar = rect.w / rect.h;
-    let sw = img.width;
-    let sh = img.height;
-    if (ar > rar) sw = img.height * rar;
-    else sh = img.width / rar;
-    const sx = (img.width - sw) / 2;
-    const sy = (img.height - sh) / 2;
-    ctx.drawImage(img, sx, sy, sw, sh, rect.x + tx, rect.y + ty, rect.w, rect.h);
+    // Cover: pick the source-image rect that maps 1:1 to the layer rect.
+    // scale = max(layerW/imgW, layerH/imgH) — same as CSS object-fit: cover.
+    // Source crop in image pixels: sw = layerW/scale, sh = layerH/scale.
+    // Pan offsets are percent of LAYER size in editor → convert to source px.
+    const scale = Math.max(rect.w / img.width, rect.h / img.height);
+    const sw = rect.w / scale;
+    const sh = rect.h / scale;
+    const overflowXPx = img.width - sw; // source pixels of horizontal overflow
+    const overflowYPx = img.height - sh;
+    const maxOffsetXPct = (overflowXPx / sw) * 50; // matches editor clamp
+    const maxOffsetYPct = (overflowYPx / sh) * 50;
+    const clampedX = Math.max(-maxOffsetXPct, Math.min(maxOffsetXPct, offsetX));
+    const clampedY = Math.max(-maxOffsetYPct, Math.min(maxOffsetYPct, offsetY));
+    // Editor: positive offsetX shifts the image to the right → source crop
+    // moves left → subtract from sx.
+    const srcOffsetX = (clampedX / 100) * sw;
+    const srcOffsetY = (clampedY / 100) * sh;
+    const sx = overflowXPx / 2 - srcOffsetX;
+    const sy = overflowYPx / 2 - srcOffsetY;
+    ctx.drawImage(img, sx, sy, sw, sh, rect.x, rect.y, rect.w, rect.h);
   }
   ctx.restore();
 }
