@@ -31,7 +31,7 @@ export interface TemplateSnapshotInput {
   liveMapCenter: [number, number];
   liveMapZoom: number;
   liveMapStyleId: string;
-  liveMapShape: "rect" | "square" | "circle" | "heart";
+  liveMapShape: "circle" | "heart" | "star";
   liveShowLabels: boolean;
   liveText: string;
   liveTextFont: string;
@@ -77,7 +77,7 @@ function createOffscreen(w: number, h: number): HTMLDivElement {
   return el;
 }
 
-/** Apply heart clip via Path2D (approximation of the SVG path). */
+/** Apply shape clip via Path2D. Mirrors the SVG paths used in MapPreview. */
 function clipForShape(
   ctx: CanvasRenderingContext2D,
   shape: string,
@@ -91,7 +91,6 @@ function clipForShape(
     const r = Math.min(w, h) / 2;
     ctx.arc(x + w / 2, y + h / 2, r, 0, Math.PI * 2);
   } else if (shape === "heart") {
-    // Mirror the SVG path d="M0.5,1 C0.5,1 0,0.65 0,0.3 C0,0.1 0.2,0 0.35,0 …"
     const sx = (vx: number) => x + vx * w;
     const sy = (vy: number) => y + vy * h;
     ctx.moveTo(sx(0.5), sy(1));
@@ -102,9 +101,16 @@ function clipForShape(
     ctx.bezierCurveTo(sx(0.8), sy(0), sx(1), sy(0.1), sx(1), sy(0.3));
     ctx.bezierCurveTo(sx(1), sy(0.65), sx(0.5), sy(1), sx(0.5), sy(1));
     ctx.closePath();
-  } else if (shape === "square") {
-    const sq = Math.min(w, h);
-    ctx.rect(x + (w - sq) / 2, y + (h - sq) / 2, sq, sq);
+  } else if (shape === "star") {
+    const sx = (vx: number) => x + vx * w;
+    const sy = (vy: number) => y + vy * h;
+    const pts: Array<[number, number]> = [
+      [0.5, 0], [0.618, 0.345], [0.976, 0.345], [0.690, 0.560], [0.794, 0.905],
+      [0.5, 0.690], [0.206, 0.905], [0.310, 0.560], [0.024, 0.345], [0.382, 0.345],
+    ];
+    ctx.moveTo(sx(pts[0][0]), sy(pts[0][1]));
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(sx(pts[i][0]), sy(pts[i][1]));
+    ctx.closePath();
   } else {
     ctx.rect(x, y, w, h);
   }

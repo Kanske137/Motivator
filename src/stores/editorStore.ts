@@ -137,7 +137,9 @@ function hydrateLayerValues(template: Template, orientation: Orientation): Recor
         styleId: l.defaults.styleId,
         shape: l.defaults.shape as MapShape,
         showLabels: l.defaults.showLabels,
-        placeName: "",
+        placeName: l.defaults.placeName ?? "",
+        city: l.defaults.city,
+        country: l.defaults.country,
       };
     } else if (l.type === "text") {
       out[l.id] = {
@@ -422,7 +424,10 @@ function applyPlaceInternal(
     country: args.country,
   };
 
-  // Update any text layers linked to this map (only when not user-customised).
+  // Update any text layers explicitly linked to this map (only when not
+  // user-customised). No implicit "first map → first text" fallback — that
+  // promise is upheld by the migration step in template-migrate.ts which
+  // back-fills `linkedMapLayerId` for single-map+single-text templates.
   const layers = state.template
     ? state.template.defaultLayout[state.orientation].layers
     : [];
@@ -430,22 +435,9 @@ function applyPlaceInternal(
     ...state.layerValues,
     [mapId]: nextMap,
   };
-  // Backward-compat: if no text layer in this template has any explicit
-  // linkedMapLayerId, treat the FIRST text layer as auto-linked to the FIRST
-  // map layer so single-layer legacy templates keep updating text-on-place.
-  const anyExplicitLink = layers.some(
-    (l) => l.type === "text" && typeof l.defaults.linkedMapLayerId === "string",
-  );
-  const firstMapId = layers.find((l) => l.type === "map")?.id ?? null;
-  const firstTextId = layers.find((l) => l.type === "text")?.id ?? null;
-
   for (const l of layers) {
     if (l.type !== "text") continue;
-    const linked = l.defaults.linkedMapLayerId;
-    const isLinked =
-      linked === mapId ||
-      (!anyExplicitLink && firstMapId === mapId && firstTextId === l.id);
-    if (!isLinked) continue;
+    if (l.defaults.linkedMapLayerId !== mapId) continue;
     const tv = state.layerValues[l.id];
     if (!tv || tv.kind !== "text" || tv.isCustom) continue;
     newLayerValues[l.id] = { ...tv, text: buildAutoText(args) };
