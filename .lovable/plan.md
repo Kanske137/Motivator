@@ -1,143 +1,124 @@
 
 
-# Fas 2 — AI-stilar, foto-upload, Gelato-mockup-API, end-to-end checkout
+## Mellansteg: Separera fotolager från kartlager + dölj flikar baserat på faktiska lager
 
-Mål: Editorn ska stödja alla tre design-källor (karta / foto / AI-stil), visa professionella mockup-bilder från Gelato istället för lokala composites, och Shopify-checkout ska faktiskt fungera mot riktiga produktvarianter.
+### Problemet idag
 
----
+1. När kunden laddar upp ett foto i "Bild"-fliken renderas det **inom kartlagrens form** (cirkel/hjärta/stjärna) via `photoOverlayUrl` i `MapPreview`. Detta kapar kartans visningsyta och blandar samman foto-flödet med det redan färdiga kart-flödet.
+2. "Bild"-fliken visas så fort mallen har minst ett **kart**-lager — inte när det finns ett dedikerat fotolager.
+3. AI-stilar har en egen accordion-sektion istället för att smältas in under "Bild" när foto är uppladdat.
+4. "Plats"/"Kartstil"/"Text"-flikarna visas alltid om motsvarande lager-typ finns — det är redan rätt logik, men vi formaliserar regeln.
 
-## Steg 1 — Foto-upload som design-källa
+### Lösning — i ett svep
 
-Idag: store har `photoFile`/`setPhotoSource` men ingen UI för det. Print-pipelinen klarar källan redan.
-
-- Ny komponent `src/components/editor/PhotoUploadSection.tsx`: drag-and-drop + filväljare (jpg/png/webp/heic, max 25 MB). Visar miniatyr + "Ta bort foto"-knapp.
-- Lägg en ny accordion-sektion **"Bild"** i `ControlPanel.tsx` ovanför "Plats". Sektionen visas bara om mallen har minst ett map-lager (foto ersätter kartytan).
-- När foto valt: `setPhotoSource(file, previewUrl)` → `designSource="photo"`. `MapPreview` visar fotot i map-lagrens form (cirkel/hjärta/stjärna) istället för Mapbox.
-- Uppdatera `MapLayerInstance.tsx` så att om `designSource==="photo"` renderas `<img>` med `object-fit: cover` clippad av samma SVG-shape istället för mapbox-canvas. Pan/zoom inom fotot via samma drag-handlers (offset-state per lager).
-- "Återgå till karta"-knapp anropar `resetDesignSource()`.
-
-Filer: `PhotoUploadSection.tsx` (ny), `ControlPanel.tsx`, `MapLayerInstance.tsx`, `MapPreview.tsx`.
+Inför en ny lager-typ **`photo`** som admin kan lägga till (knapp uppe till höger i designytan, bredvid "Lägg till karta" och "Lägg till text"). Foto-uppladdning på kundsidan blir då bunden till det lagret och rör aldrig kartlagren.
 
 ---
 
-## Steg 2 — AI-stilar (Replicate Flux Kontext Pro)
+### 1. Schema: ny `photo`-layer-typ
 
-Edge-funktionen `replicate-style` finns och returnerar `printFileUrl` direkt. Saknas: UI + admin-konfiguration av presets.
+`src/lib/template-schema.ts`:
+- Ny `photoDefaultsSchema`:
+  ```
+  { shape: z.enum(["rect","circle","heart","star"]), fit: imageFitSchema (cover|contain), placeholderUrl?: string }
+  ```
+- Ny `photoLayerSchema = layerBase.extend({ type: "photo", defaults: photoDefaultsSchema })`.
+- Lägg till i `layerSchema` discriminated union.
+- `LayerType` får `"photo"` automatiskt.
 
-### 2a. Admin: AI-stil-presets per produkt
-- Schema-tillägg i `template-schema.ts`: `productOptions.aiStyles?: { id, label, thumbnailUrl, prompt }[]`.
-- Ny sektion i `ProductOptionsSection.tsx`: lista AI-stil-presets, lägg till/ta bort, redigera label + prompt + ladda upp thumbnail (uploadas till `cart-previews`-bucket via `uploadCartPreview`).
-- Default-presets seedas (Akvarell, Skiss, Olja, Pop-art, Linjeart, Vintage poster) första gången admin öppnar fliken om listan är tom.
+### 2. Layer factory + admin-UI
 
-### 2b. Kund: AI-stil-galleri
-- Ny komponent `src/components/editor/AiStyleSection.tsx` — visas i `ControlPanel` när `designSource === "photo"` OCH foto är valt. Grid med thumbnail-knappar.
-- Vid klick: anropa `supabase.functions.invoke("replicate-style", { body: { imageUrl, prompt, designId }})` med kundens uppladdade foto (eller dess uppladdade URL). Visa loading-spinner per knapp.
-- Vid svar: `setAiPrintFileUrl(printFileUrl)` → `designSource="ai"`. `MapPreview` visar AI-bilden inom samma form.
-- Foto-URL till Replicate: ladda upp originalfotot till `cart-previews`-bucket en gång (lazy) så Replicate kan hämta den.
-- "Ångra AI"-knapp → `setPhotoSource(photoFile, previewUrl)` (tillbaka till foto utan stil).
+`src/lib/layer-utils.ts`:
+- `createLayer("photo", existing)` → 60×60% i mitten, default `shape: "rect"`, `fit: "cover"`, `name: "Foto N"`, `locks: defaultLocks({ content: false, shape: false })`.
 
-Filer: `template-schema.ts`, `ProductOptionsSection.tsx`, `AiStyleSection.tsx` (ny), `ControlPanel.tsx`, `editorStore.ts` (lägg till `originalPhotoUrl` cachning).
+`src/pages/admin/DesignerPage.tsx`:
+- Ny knapp **"Lägg till bild"** med `Image`-ikon (lucide) i tool-paletten, anropar `addLayer("photo")`.
+
+`src/components/admin/LayerList.tsx`:
+- `typeLabel.photo = "Bild"`.
+
+`src/components/admin/LayerInspector.tsx`:
+- Ny inspector-sektion för foto-lagret: form-väljare (Rektangel/Cirkel/Hjärta/Stjärna), fit (cover/contain), valfri placeholder-bild-URL (för admin-preview när inget kund-foto finns).
+
+### 3. Render foto-lager i admin- & kund-canvas
+
+**Admin** (`src/components/admin/LayerCanvas.tsx` + `MapLayerPreview` finns redan, vi behöver foto-preview):
+- I `renderLayerContent`: ny `case "photo"` som visar `placeholderUrl` (eller en streckad ruta med "📷 Bildplats") clippad enligt `defaults.shape`.
+
+**Kund** (`src/components/editor/MapPreview.tsx`):
+- I layer-loopen: ny `if (l.type === "photo")` gren.
+- Hämtar `photoOverlayUrl` från store (samma `photoPreviewUrl`/`aiPrintFileUrl`-logik som idag, men **bara** för foto-lager).
+- Renderar `<img>` clippad till lagrets form. Om inget foto finns: visar streckad placeholder med ikon + "Ladda upp en bild".
+- **Tar bort** `photoOverlayUrl`-grenen från `case "map"` så kartlager återigen alltid renderar Mapbox (eller AI-stilad **karta** i framtiden, men aldrig fotot).
+
+### 4. Snapshot-pipeline
+
+`src/lib/template-snapshot.ts`:
+- Ny `case "photo"` i layer-rendreringen: rita fotot (eller AI-resultatet) clippad till formen via Path2D (samma `clipForShape`-mönster som map). Om inget foto: hoppa över (lämna tom yta).
+- Tar bort fallback i `case "map"` som idag ritar foto i kartans form.
+
+`src/lib/print-pipeline.ts`:
+- Foto/AI-källa kräver nu att mallen har minst ett `photo`-lager. Om inte: kasta tydligt fel "Mallen saknar bildplats — be admin lägga till ett bildlager."
+
+### 5. ControlPanel: dölj flikar baserat på lager
+
+`src/components/editor/ControlPanel.tsx`:
+- Ny härledning: `photoLayers = layers.filter(l => l.type === "photo")`.
+- `showImageSection = photoLayers.length > 0` (tidigare `mapLayers.length > 0`).
+- "Plats"-fliken: oförändrad (`editableMaps.length > 0`).
+- "Kartstil"-fliken: oförändrad (`editableMaps.length > 0`).
+- "Text"-fliken: oförändrad (`editableTexts.length > 0`).
+- "Format"-fliken: alltid synlig.
+
+### 6. Slå ihop AI-stilar med Bild-fliken
+
+`src/components/editor/ControlPanel.tsx`:
+- Ta bort separat `<AccordionItem value="ai-stil">`.
+- Inuti "Bild"-sektionens `<AccordionContent>`:
+  ```
+  <PhotoUploadSection />
+  {photoFile && aiStyles.length > 0 && (
+    <div className="mt-4 pt-4 border-t">
+      <Label>AI-stil</Label>
+      <AiStyleSection presets={aiStyles} />
+    </div>
+  )}
+  ```
+- AI-grid syns alltså **endast** när foto är uppladdat — exakt vad du efterfrågade.
+
+### 7. Migration för befintliga mallar
+
+`src/lib/template-migrate.ts`:
+- Ingen tvångsmigrering — befintliga publicerade mallar (Personlig karta poster/canvas) saknar foto-lager och kommer helt enkelt inte visa "Bild"-fliken på kundsidan. Det är korrekt beteende: foto-flödet kräver att admin aktivt lägger till ett bildlager. Ingen visuell regression på kart-only-mallar.
+- Befintliga `image`-lager (om några) påverkas inte — de är en annan typ (statisk admin-bild).
 
 ---
 
-## Steg 3 — Gelato Mockup Generator API för posters
-
-Nuvarande `compositeMockup` (lokal canvas-blandning av interiörbilder) är amatörmässig och ramen renderas platt utan riktig perspektiv. Gelato har ett produktion-mockup-API.
-
-- Ny edge-funktion `supabase/functions/gelato-mockup/index.ts`:
-  - Body: `{ productUid, printFileUrl }` → POST till `https://product-api.gelatoapis.com/v3/products/{productUid}/mockups` med `imageUrl`. Returnerar fält av mockup-URL:er.
-  - Cachar resultat i en ny Supabase-tabell `mockup_cache(product_uid, print_file_url, mockup_urls jsonb, created_at)` så identiska poster+motiv inte renderas om.
-- Ersätt `MockupGallery.tsx`-flödet (när `productType==="posters"`):
-  1. Skapa snapshot via `renderTemplateSnapshot` (som nu).
-  2. Ladda upp som temporary print-URL till `print-files`-bucket.
-  3. Anropa `gelato-mockup` med produktens `productUid` (resolvat från `gelato-sku-map.json` via befintlig `resolveProductUid`).
-  4. Visa returnerade scen-URLs i samma swipe-galleri.
-- Behåll `compositeMockup` som fallback om API:t fallerar (offline / saknad UID).
-
-Migration: `mockup_cache`-tabell + RLS (public read, service-role write).
-
-Filer: `gelato-mockup/index.ts` (ny edge), `MockupGallery.tsx`, ny migration.
-
----
-
-## Steg 4 — 3D Canvas-preview-polish
-
-Idag fungerar 3D-vyn men är statisk. Önskemål:
-
-- Auto-rotation från sida till framsida vid första laddning (1.5 s ease-out → vila i frontvy).
-- Mjuk realistisk skugga — ersätt `ContactShadows` med `AccumulativeShadows` + en HDR-environment (`useEnvironment` med `studio.hdr` från drei) för riktig duk-textur.
-- Liten "vägg + golvlist"-bakgrund istället för platt färg (en enkel plane + ljusa pastell-toner).
-- Behåll OrbitControls för manuell rotation.
-
-Fil: `Canvas3DPreview.tsx`.
-
----
-
-## Steg 5 — Shopify-checkout end-to-end
-
-Idag: `EditorPage.tsx` skickar `gid://shopify/ProductVariant/preview-${size}-${variant}` till cart-storen. Det är en sträng, inte en riktig variant → checkout-länken kommer fungera men varianten är ogiltig.
-
-- I `ControlPanel`/`FormatSection` när storlek + variant valts: slå upp den verkliga Shopify variant-ID:n via Storefront API.
-  - Ny edge-helper i `shopify-storefront/index.ts` (befintlig proxy fungerar — bara skicka rätt query): GraphQL `productByHandle(handle).variants` matchat på `selectedOptions` (Storlek + Ram/Djup).
-  - Cache i `editorStore` (`shopifyVariantId: string | null`) som uppdateras när handle/size/variant ändras.
-- `handleAddToCart` använder den riktiga `variantId` (`gid://shopify/ProductVariant/<numeric>`) istället för fake-strängen. Lämnar in `attributes` (cart line attributes) — alla `_print_file_url`, `_size`, etc. som idag.
-- Verifiera att webhook fortsatt mottar properties: shopify cart line `attributes` blir `note_attributes` på order line items — detta kontrollerades fungera redan i webhook.
-- Toast på fel: om variant inte hittas (t.ex. produkten är inte publicerad i Shopify) → visa "Denna kombination är inte tillgänglig i butiken ännu" och blockera knappen.
-
-Filer: `EditorPage.tsx`, `editorStore.ts`, `cartStore.ts` (ingen ändring förväntas), ev. ny helper `src/lib/shopify-variant-resolver.ts`.
-
----
-
-## Steg 6 — Order-flöde-validering
-
-Snabb verifikation av befintlig webhook → Gelato-pipeline med ett verkligt köp:
-
-- Bekräfta att `_print_file_url` faktiskt landar i Shopify order line `note_attributes` (kontrollera via webhook-logg vid testbeställning).
-- Lägg till en "Beställnings­status"-tabell i `AdminConfigs.tsx` som visar senaste 20 raderna i `gelato_orders` (status, error, gelato_order_id, ts) — read-only, hjälper admin se om något fail. Bygger på enklast möjliga `select`.
-
-Filer: `AdminConfigs.tsx`.
-
----
-
-## Filer (sammanställning)
+### Filer
 
 | Fil | Ändring |
 |---|---|
-| `src/components/editor/PhotoUploadSection.tsx` | NY — uppladdning + miniatyr |
-| `src/components/editor/AiStyleSection.tsx` | NY — preset-grid + Replicate-anrop |
-| `src/components/editor/ControlPanel.tsx` | Lägg till Bild + AI-stil sektioner |
-| `src/components/editor/MapPreview.tsx` + `layers/MapLayerInstance.tsx` | Foto/AI-källa renderas i shape |
-| `src/components/editor/MockupGallery.tsx` | Posters → Gelato mockup API |
-| `src/components/editor/Canvas3DPreview.tsx` | HDR + auto-rotation + miljö |
-| `src/components/admin/ProductOptionsSection.tsx` | AI-presets-editor |
-| `src/lib/template-schema.ts` | `aiStyles` i productOptions |
-| `src/lib/shopify-variant-resolver.ts` | NY — handle+options → variantId |
-| `src/stores/editorStore.ts` | `originalPhotoUrl`, `shopifyVariantId` |
-| `src/pages/EditorPage.tsx` | Använd riktig variantId i addItem |
-| `src/pages/AdminConfigs.tsx` | Senaste gelato-orders-tabell |
-| `supabase/functions/gelato-mockup/index.ts` | NY edge för mockup-API |
-| `supabase/migrations/...` | `mockup_cache`-tabell + RLS |
+| `src/lib/template-schema.ts` | `photoLayerSchema` + union-tillägg |
+| `src/lib/layer-utils.ts` | `createLayer("photo", …)` factory |
+| `src/pages/admin/DesignerPage.tsx` | "Lägg till bild"-knapp |
+| `src/components/admin/LayerList.tsx` | `typeLabel.photo = "Bild"` |
+| `src/components/admin/LayerInspector.tsx` | Foto-inspector (form/fit/placeholder) |
+| `src/components/admin/LayerCanvas.tsx` | Foto-preview i admin-canvas |
+| `src/components/editor/MapPreview.tsx` | Render `photo`-lager; ta bort foto från `map`-grenen |
+| `src/components/editor/ControlPanel.tsx` | Visa Bild-fliken bara vid `photo`-lager; AI inuti Bild-fliken |
+| `src/lib/template-snapshot.ts` | `case "photo"` i snapshot; bort foto från `map` |
+| `src/lib/print-pipeline.ts` | Felmeddelande om foto-källa utan foto-lager |
 
----
+### Verifiering
 
-## Verifiering
+1. Admin: ny "Lägg till bild"-knapp lägger till en bildplats — separata kartlager påverkas inte.
+2. Mall med karta + bildlager + text på kundsidan: alla tre flikar visas. Kart-only-mall: bara Plats/Kartstil/Text.
+3. Kund laddar upp foto → fotot hamnar i bildlagret, kartorna kvarstår orörda.
+4. AI-stil-grid syns först efter att foto laddats upp, inuti "Bild"-fliken.
+5. Befintliga single-map-mallar utan bildlager fungerar exakt som tidigare — ingen "Bild"-flik visas.
+6. Tryckfilen för photo/AI-källa renderar fotot i bildlagrets form (inte kartans).
 
-1. **Foto**: Ladda upp ett JPG → fotot visas inom hjärt-formen i editorn → "Lägg i varukorg" → tryckfilen i `print-files` är originalfotot oförändrat.
-2. **AI**: Foto → klick på "Akvarell"-preset → loading 5–15 s → bild ersätts med stiliserad version → tryckfilen är AI-bilden.
-3. **Mockup**: Posters visar minst 4 Gelato-mockup-bilder (kontrollerad mot Network-flik). Andra gången samma motiv laddas → cache-hit (snabbare svar).
-4. **3D-preview**: Canvas roterar in från sidan, stannar i framsidesvy, går att rotera manuellt; skuggan är mjuk och realistisk.
-5. **Checkout**: Lägg i varukorg → öppna kassan i ny flik → korrekt produkt + variant + alla custom attributes är synliga i Shopify-order. Webhooken triggar Gelato-order med rätt productUid + printFileUrl. Statusen "submitted" visas i `AdminConfigs`-vyn.
-6. **Befintliga single-layer-poster fungerar oförändrat** — ingen visuell regression.
+### Direkt efter detta
 
----
-
-## Förslag på arbetsordning
-
-1. Steg 5 (riktig variant-checkout) — kortast väg till en fungerande end-to-end-beställning, blockerar inget annat.
-2. Steg 1 (foto-upload) → Steg 2 (AI-stil) — bygger på varandra.
-3. Steg 3 (Gelato-mockup) — visuell uppgradering, oberoende av 1+2.
-4. Steg 4 (3D-polish) — kosmetiskt, kan vänta.
-5. Steg 6 (admin-vy) — operativt, sist.
-
-Vill du att jag kör i den ordningen, eller prioritera om någon del?
+Tillbaka till **Fas 2**: Steg 3 (Gelato Mockup API), Steg 4 (3D-polish), Steg 6 (admin order-status).
 
