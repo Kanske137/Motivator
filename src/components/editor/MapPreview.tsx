@@ -49,6 +49,8 @@ function StarClipDef({ id }: { id: string }) {
 function shapeClipPath(shape: string, heartId: string, starId: string): string | undefined {
   switch (shape) {
     case "circle":
+      // Fallback only — for perfect-circle in non-square containers, callers
+      // should use `useCircleClip` to get a px-based radius instead.
       return "circle(50% at 50% 50%)";
     case "heart":
       return `url(#${heartId})`;
@@ -57,6 +59,37 @@ function shapeClipPath(shape: string, heartId: string, starId: string): string |
     default:
       return undefined;
   }
+}
+
+/**
+ * Measures the host element and returns a pixel-based circle clip-path that
+ * always renders a perfect circle (diameter = min(width, height)) centered
+ * inside the container — even when the layer rect is non-square.
+ */
+function useCircleClip(enabled: boolean): {
+  ref: React.RefObject<HTMLDivElement>;
+  clipPath: string | undefined;
+} {
+  const ref = useRef<HTMLDivElement>(null);
+  const [clipPath, setClipPath] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!enabled) {
+      setClipPath(undefined);
+      return;
+    }
+    const el = ref.current;
+    if (!el) return;
+    const update = () => {
+      const r = el.getBoundingClientRect();
+      const radius = Math.max(0, Math.min(r.width, r.height) / 2);
+      setClipPath(`circle(${radius}px at 50% 50%)`);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [enabled]);
+  return { ref, clipPath };
 }
 
 export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm = 0 }: Props) {
