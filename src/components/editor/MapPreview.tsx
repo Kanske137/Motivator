@@ -355,11 +355,37 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   );
 }
 
+/**
+ * Renders a map layer wrapper that, when the shape is `circle`, measures its
+ * own pixel size and produces a perfect-circle clip-path. For other shapes it
+ * passes through the static (SVG / fallback) clip-path.
+ */
+function MapLayerSlot({
+  wrapStyle,
+  isCircle,
+  staticClip,
+  children,
+}: {
+  wrapStyle: React.CSSProperties;
+  isCircle: boolean;
+  staticClip: string | undefined;
+  children: (clip: string | undefined) => React.ReactNode;
+}) {
+  const { ref, clipPath } = useCircleClip(isCircle);
+  const effectiveClip = isCircle ? clipPath ?? staticClip : staticClip;
+  return (
+    <div ref={ref} style={wrapStyle}>
+      {children(effectiveClip)}
+    </div>
+  );
+}
+
 interface PhotoLayerViewProps {
   layerId: string;
   src: string | null;
   fit: "cover" | "contain";
-  clipPath?: string;
+  shape: "rect" | "circle" | "heart" | "star";
+  staticClipPath?: string;
   offsetX: number;
   offsetY: number;
   draggable: boolean;
@@ -369,7 +395,8 @@ function PhotoLayerView({
   layerId,
   src,
   fit,
-  clipPath,
+  shape,
+  staticClipPath,
   offsetX,
   offsetY,
   draggable,
