@@ -206,33 +206,32 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
           }
 
           if (l.type === "photo") {
+            const v = layerValues[l.id];
+            const pv = v && v.kind === "photo" ? (v as PhotoLayerValue) : null;
+            const effectiveShape = (pv?.shape ?? l.defaults.shape) as
+              | "rect"
+              | "circle"
+              | "heart"
+              | "star";
+            const offsetX = pv?.offsetX ?? 0;
+            const offsetY = pv?.offsetY ?? 0;
             const clip = shapeClipPath(
-              l.defaults.shape,
+              effectiveShape,
               heartIdRef.current,
               starIdRef.current,
             );
             const src = photoOverlayUrl ?? l.defaults.placeholderUrl ?? null;
             return (
               <div key={l.id} style={wrapStyle}>
-                <div
-                  className="absolute inset-0 overflow-hidden"
-                  style={{ clipPath: clip }}
-                >
-                  {src ? (
-                    <img
-                      src={src}
-                      alt=""
-                      className={`absolute inset-0 w-full h-full ${
-                        l.defaults.fit === "contain" ? "object-contain" : "object-cover"
-                      }`}
-                      draggable={false}
-                    />
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center bg-muted/40 border-2 border-dashed border-foreground/30 text-[11px] text-muted-foreground text-center px-2">
-                      Ladda upp en bild
-                    </div>
-                  )}
-                </div>
+                <PhotoLayerView
+                  layerId={l.id}
+                  src={src}
+                  fit={l.defaults.fit}
+                  clipPath={clip}
+                  offsetX={offsetX}
+                  offsetY={offsetY}
+                  draggable={!!src}
+                />
               </div>
             );
           }
