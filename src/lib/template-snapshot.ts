@@ -521,7 +521,7 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
     ctx.restore();
   }
 
-  const dataUrl = out.toDataURL("image/jpeg", 0.92);
+  const dataUrl = out.toDataURL("image/jpeg", 0.95);
   if (!dataUrl || dataUrl.length < 1000) {
     throw new Error("Empty template snapshot");
   }
