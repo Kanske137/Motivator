@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { useEditorStore } from "@/stores/editorStore";
+import { useEditorStore, type PhotoLayerValue } from "@/stores/editorStore";
 import type { TemplateLayer } from "@/lib/template-schema";
 import { MapLayerInstance } from "./layers/MapLayerInstance";
 import { ImageLayerView, LineLayerView, MarginLayerView } from "./layers/StaticLayers";
