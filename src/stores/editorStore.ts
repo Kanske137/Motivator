@@ -56,7 +56,14 @@ interface EditorState {
   designSource: DesignSource;
   photoFile: File | null;
   photoPreviewUrl: string | null;
+  /** Public URL of the original photo (uploaded to cart-previews lazily) so
+   *  Replicate can fetch it for AI styles. Cached so we don't re-upload. */
+  originalPhotoUrl: string | null;
   aiPrintFileUrl: string | null;
+  /** Real Shopify variant GID (e.g. gid://shopify/ProductVariant/123). Resolved
+   *  lazily based on (handle, size, variant). Null while resolving / not found. */
+  shopifyVariantId: string | null;
+  shopifyVariantResolving: boolean;
 
   // ---------- setters ----------
   setConfig: (c: ProductConfig) => void;
@@ -65,8 +72,11 @@ interface EditorState {
   setVariant: (v: string) => void;
   setOrientation: (o: Orientation) => void;
   setPhotoSource: (file: File | null, previewUrl: string | null) => void;
+  setOriginalPhotoUrl: (url: string | null) => void;
   setAiPrintFileUrl: (url: string | null) => void;
   resetDesignSource: () => void;
+  setShopifyVariantId: (id: string | null) => void;
+  setShopifyVariantResolving: (resolving: boolean) => void;
 
   // Per-layer setters
   setLayerMapCenter: (id: string, c: [number, number]) => void;
@@ -190,7 +200,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   designSource: "map",
   photoFile: null,
   photoPreviewUrl: null,
+  originalPhotoUrl: null,
   aiPrintFileUrl: null,
+  shopifyVariantId: null,
+  shopifyVariantResolving: false,
 
   // legacy mirrors (initial values, replaced once a config is loaded)
   mapCenter: [18.0686, 59.3293],
@@ -281,14 +294,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       photoFile: file,
       photoPreviewUrl: previewUrl,
       designSource: file ? "photo" : "map",
+      // Switching photo invalidates AI result + cached upload URL.
       aiPrintFileUrl: file ? null : get().aiPrintFileUrl,
+      originalPhotoUrl: file ? null : get().originalPhotoUrl,
     });
   },
+  setOriginalPhotoUrl: (url) => set({ originalPhotoUrl: url }),
   setAiPrintFileUrl: (url) => {
     set({ aiPrintFileUrl: url, designSource: url ? "ai" : "map" });
   },
   resetDesignSource: () =>
-    set({ designSource: "map", photoFile: null, photoPreviewUrl: null, aiPrintFileUrl: null }),
+    set({
+      designSource: "map",
+      photoFile: null,
+      photoPreviewUrl: null,
+      originalPhotoUrl: null,
+      aiPrintFileUrl: null,
+    }),
+  setShopifyVariantId: (shopifyVariantId) => set({ shopifyVariantId }),
+  setShopifyVariantResolving: (shopifyVariantResolving) => set({ shopifyVariantResolving }),
 
   // ---------- per-layer setters ----------
   setLayerMapCenter: (id, c) => updateMap(set, get, id, { center: c }),

@@ -15,6 +15,8 @@ import { useEditorStore, type MapLayerValue, type TextLayerValue } from "@/store
 import { geocode, type GeocodeResult } from "@/lib/mapbox";
 import { MAPBOX_STYLE_LABELS, type ProductConfig } from "@/lib/product-config";
 import { FormatSection } from "./FormatSection";
+import { PhotoUploadSection } from "./PhotoUploadSection";
+import { AiStyleSection } from "./AiStyleSection";
 import { Loader2, Search } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -36,10 +38,12 @@ const BG_SWATCHES = [
 
 export function ControlPanel({ configs, activeHandle, onProductChange }: Props) {
   const config = useEditorStore((s) => s.config);
+  const template = useEditorStore((s) => s.template);
   const templateLayers = useEditorStore((s) => s.templateLayers);
   const layerValues = useEditorStore((s) => s.layerValues);
   const posterBgColor = useEditorStore((s) => s.posterBgColor);
   const setPosterBgColor = useEditorStore((s) => s.setPosterBgColor);
+  const photoFile = useEditorStore((s) => s.photoFile);
 
   if (!config) return null;
 
