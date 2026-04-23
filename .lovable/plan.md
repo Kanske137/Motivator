@@ -1,106 +1,82 @@
 
 
-## Steg 3: Gelato Mockup API-integration
+## Fas 3 — Steg 1: Tryckfilen ska vara identisk med editor-vyn
 
-### Bakgrund
+### Problem (kritiskt)
 
-Idag genereras alla mockup-bilder klient-side: vi tar snapshot av tryckfilen och komponerar in den i statiska scen-bilder via canvas (`mockup-composite.ts`). Det fungerar men ser “klistrat” ut, saknar äkta belysning/skuggor och har bara 4–6 rumsmiljöer.
+`getPrintFileUrl()` i `src/lib/print-pipeline.ts` har tre grenar:
 
-Gelato har ett **Mockup Generator API** som tar emot en print-fil + product UID och returnerar fotorealistiska mockups (samma bilder som syns i deras egna butiker). Vi har redan allt på plats för att koppla in det:
+| Source | Vad som skickas till Gelato idag |
+|---|---|
+| `map` | ✅ Hi-res komposit av alla lager |
+| `photo` | ❌ Bara den uppladdade originalbilden |
+| `ai` | ❌ Bara AI-resultatet, ingen komposit |
 
-- `GELATO_API_KEY` finns som secret.
-- `gelato-fetch-uids` edge function visar redan hur Gelato-API:et anropas.
-- `getPrintFileUrl()` ger en publik URL till tryckfilen i `print-files`-bucket.
-- `cart-previews` bucket kan återanvändas för cache.
+För `photo`/`ai` görs en **passthrough-uppladdning** — alla andra lager (kartor, text, bakgrund, shape-clip på fotot) ignoreras. Det är därför din senaste beställning bara fick AI-bilden i full storlek istället för hela posterdesignen.
 
-### Varför tidigare försök fastnade
-
-Gelato Mockup API kräver att vi skickar **både** ett `productUid` (för att veta vilken mockup-mall som ska användas) **och** en publik URL till tryckfilen. När detta försöktes tidigare fanns ingen stabil publik tryckfil-URL ännu (uppladdningen till `print-files` byggdes senare som del av cart-flödet) och UID-mappningen var ofullständig. Båda problemen är nu lösta — `print-files`-bucket är public och `gelato-sku-map.json` täcker alla varianter.
+Cart-thumbnailen är korrekt eftersom den alltid kör genom `renderTemplateSnapshot()` som komponerar alla lager och redan tar emot `photoOverlayUrl` som målas in i fotolagrets shape-clippade rektangel.
 
 ### Lösning
 
-#### 1. Ny edge function `gelato-mockups`
+#### 1. `src/lib/print-pipeline.ts` — kör ALLTID hi-res-snapshot
 
-`supabase/functions/gelato-mockups/index.ts`
+Ta bort passthrough-grenarna för `photo` och `ai`. Alla källor → `renderHiresTemplateSnapshotSafe(templateInput)` → upload till `print-files`-bucket. `templateInput.photoOverlayUrl` är redan korrekt satt av `EditorPage.handleAddToCart` så fotot/AI-resultatet hamnar inuti rätt fotolager med rätt shape-clip och pan-offset.
 
-**Input** (POST JSON):
-```ts
-{
-  productUid: string,        // från resolveProductUid()
-  printFileUrl: string,      // public URL i print-files-bucket
-  designId: string,          // för cache-key
-}
-```
+Behåll guarden som kräver att mallen har ett `photo`-lager när `source !== "map"`.
 
-**Flöde:**
-1. Validera input (Zod).
-2. Cache-check: kolla `mockup-cache`-bucket på path `${designId}/${md5(productUid)}.json`. Om finns → returnera cachad lista direkt.
-3. Anropa Gelato:
-   - `POST https://order.gelatoapis.com/v4/mockups` (eller motsv. mockup-endpoint, vi verifierar exakt path mot deras docs i implementationsfasen) med body `{ productUid, printFileUrl, mockupTypes: ["default", "in-room", "lifestyle"] }`.
-   - Polla status om async, eller läs URLs direkt om sync.
-4. Spara JSON-array `[{ id, label, url }]` i cache-bucket.
-5. Returnera samma lista till klienten.
+Ny semantik:
+- `designSource` används bara för att avgöra om `photoOverlayUrl` ska sättas — själva print-renderingen är nu identisk för alla källor.
+- `photoFile` / `aiPrintFileUrl` behöver inte längre laddas upp separat innan tryck, men `aiPrintFileUrl` är fortfarande den URL som matas in i editor + snapshot.
 
-**Felhantering:** vid Gelato-fel → returnera `{ ok: false, error }` med 502; klienten faller tillbaka till lokal komposit (befintlig `compositeMockup`).
+#### 2. `src/lib/template-snapshot.ts` — höj print-DPI
 
-#### 2. Ny storage-bucket `mockup-cache` (public, read-only via signed-not-needed eftersom URLs redan är publika hos Gelato)
+Idag: `PX_PER_CM = 32` i hires-läge, max-px klamp `2000–3600` beroende på enhet. För en 21×30 cm poster ger det ~960×1370 px → ca 116 DPI. Gelato rekommenderar **300 DPI** för fotokvalitet (≈ 118 PX_PER_CM). Det är inte realistiskt att rendera 21×30 cm @ 300 DPI i webbläsaren (~2480×3540 px = OK), men 30×40 / 50×70 blir gigantiskt och WebGL-kontexten dör.
 
-```sql
-insert into storage.buckets (id, name, public)
-values ('mockup-cache', 'mockup-cache', true);
+Justering:
+- `PX_PER_CM` höjs till `48` i hires (motsvarar ~122 DPI), vilket Gelato accepterar för posters/canvas i de flesta storlekar.
+- `pickHiresMaxPx()`-tak höjs till `4800` på desktop, `2800` på mobil.
+- Lägg till `ctx.imageSmoothingEnabled = true` och `ctx.imageSmoothingQuality = "high"` innan `drawImage`-anropen i `drawPhotoLayer`, `drawImageLayer` och `drawMapLayer`.
+- Byt JPEG-kvalitet från `0.92` → `0.95` (fortfarande betydligt mindre fil än PNG).
 
--- Public read; service-role write
-create policy "Public read mockup-cache"
-on storage.objects for select
-to public
-using (bucket_id = 'mockup-cache');
-```
+För **stora** storlekar (50×70 / 70×100) håller automatisk-skalningen redan koll på maxpixel-budgeten — vi får då lägre faktisk DPI, men inte värre än idag.
 
-(Skrivning sker bara från edge function via service-role, ingen insert-policy behövs.)
+#### 3. `src/components/CartDrawer.tsx` — rensa cart-radens metadata
 
-#### 3. Klient-integration i `MockupGallery.tsx`
+Kunden ser idag:
+- Produkttitel
+- Variant (storlek · ram)
+- **Alla** non-underscore-attribut (idag: `Orientation`, `Text` — och `Text` visar bara ena textrutan vilket är missvisande)
 
-Refaktorera `useEffect` så den först:
-1. Producerar `printFileUrl` via befintliga `getPrintFileUrl()` (samma som cart använder).
-2. Resolver `productUid` via befintliga `resolveProductUid()`.
-3. Anropar `supabase.functions.invoke("gelato-mockups", { body: { productUid, printFileUrl, designId } })`.
-4. Om svaret innehåller `urls.length > 0` → visa Gelato-bilderna i karusellen.
-5. Om edge function failar eller returnerar tom lista → fall tillbaka på dagens `compositeMockup` så vi aldrig visar en tom galleri.
+Fix: visa endast storlek + ram + orientering. Konkret:
+- Ta bort `Orientation` och `Text` från `properties` i `EditorPage.handleAddToCart`. (Variantens namn `${size} · ${variant}` täcker storlek + ram, så vi lägger till orientering som en line-item-attribut: `Orientering: Stående`.)
+- Resten av designdatan ligger fortsatt i `_-prefixade` attribut för Shopify-webhooken, oförändrat.
+- `CartDrawer`s filter `a.key.startsWith("_")` fungerar då redan — bara `Orientering` visas under variant-raden.
 
-För canvas: behåll 3D-previewen som primär, men **lägg till** Gelato-mockups under (canvas-på-vägg-renders från Gelato är riktigt bra).
+#### 4. `supabase/functions/shopify-order-webhook/index.ts`
 
-#### 4. Debounce + request invalidation
+Ingen kod-ändring krävs här — webhooken läser redan `_print_file_url` från line item properties och skickar till Gelato. Eftersom URL:en nu pekar på en korrekt komposit-tryckfil löser det sig automatiskt.
 
-Behåll dagens `reqIdRef`-mönster — Gelato-anropet kan ta 2–5 s, så att avbryta in-flight requests när användaren ändrar något är kritiskt. Edge function-anropet wrappas i samma `myReq`-check.
-
-#### 5. Cache-invalidation
-
-Cache-keyn bygger på `designId` (UUID per komposit-state) — eftersom `designId` regenereras vid `handleAddToCart`, men inom editor-sessionen är `designId` stabilt **per design-state**. Vi behöver alltså generera en deterministisk hash av `printFileUrl` + `productUid` istället, så att samma design + samma produkt ger samma cache-träff. Använd `crypto.subtle.digest("SHA-1", ...)` i edge function.
+Verifiera dock i loggen efter nästa testorder att:
+- `_print_file_url` pekar på en ny fil
+- `source=` rapporterar fortfarande "ai"/"photo" (för spårbarhet — men filen är nu en full komposit)
 
 ### Filer
 
 | Fil | Ändring |
 |---|---|
-| `supabase/functions/gelato-mockups/index.ts` | NY edge function |
-| `supabase/migrations/<ts>_mockup_cache_bucket.sql` | NY: skapa `mockup-cache` bucket + RLS |
-| `src/components/editor/MockupGallery.tsx` | Anropa nya edge function först, fall tillbaka på lokal composite |
-| `src/lib/mockup-gelato.ts` | NY liten helper som wrappar `supabase.functions.invoke` + resolve UID |
+| `src/lib/print-pipeline.ts` | Ta bort `ai`/`photo` passthrough, alla källor → hi-res komposit |
+| `src/lib/template-snapshot.ts` | PX_PER_CM 32→48, max-px-tak höjs, smoothingQuality=high, JPEG 0.95 |
+| `src/pages/EditorPage.tsx` | Ta bort `Orientation` + `Text` från properties; lägg `Orientering: …` |
+| `src/components/CartDrawer.tsx` | Ingen ändring (filtret fungerar redan när vi tar bort attributen) |
 
 ### Verifiering
 
-1. Öppna editorn, designa en poster → Gelato-mockups laddas i galleriet (loading spinner ~3 s, sen 3–5 fotorealistiska bilder).
-2. Klicka på bild → lightbox öppnas precis som idag.
-3. Stäng nätverket / blockera Gelato → fallback till lokal composite, inga tomma slots.
-4. Ändra mapZoom → ny `printFileUrl` → ny mockup-uppsättning hämtas (med debounce).
-5. Samma design + samma produkt två gånger → andra anropet träffar cache (< 200 ms).
-6. Canvas-produkt: 3D-preview kvarstår överst, Gelato-canvas-mockups visas under.
-7. Gelato 4xx/5xx → fallback aktiveras, toast loggas i console (ingen användar-toast eftersom fallbacken levererar fungerande bilder).
-
-### Arbetsordning
-
-1. Skapa `mockup-cache`-bucket via migration.
-2. Bygg `gelato-mockups` edge function — börja med ett minimalt anrop till Gelatos endpoint för att verifiera exakt request/response-form (testa via `curl_edge_functions` direkt).
-3. Lägg till caching.
-4. Bygg klient-helpern + integrera i `MockupGallery`.
-5. Bekräfta fallback-vägen genom att tillfälligt stänga av edge function.
+1. Gör om beställningen (mall med 2 kartor + 3 texter + 1 AI-bild, 21×30 vit ram).
+2. Cart-raden visar: `Personlig karta poster · 21x30 · Vit · Orientering: Stående`. Ingen "Text"-attribut.
+3. Cart-thumbnailen oförändrad (visuellt identisk med editorn).
+4. `_print_file_url` i webhook-loggen pekar på en NY fil i `print-files/`.
+5. Öppna URL:en direkt i webbläsaren → bilden visar **hela kompositen** (bakgrund + båda kartor + alla texter + cirkulär AI-bild i sin shape).
+6. Filen är ≥ 2480×3540 px för 21×30 (≈ 300 DPI på kortsidan, ≈ 122 DPI faktisk efter klamp om enheten triggar maxpx-skalning).
+7. Gelato accepterar filen utan DPI-varning i admin (kontrollera nästa orderbekräftelse).
+8. Testa även `source=map` (utan AI/foto) → fortsatt korrekt, ingen regression.
 
