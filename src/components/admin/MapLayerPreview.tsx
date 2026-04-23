@@ -27,15 +27,15 @@ export default function MapLayerPreview({ defaults, width, height }: Props) {
   }, [token, defaults, width, height]);
 
   const clipId = useMemo(() => `clip-${Math.random().toString(36).slice(2)}`, []);
+  const starId = useMemo(() => `star-${Math.random().toString(36).slice(2)}`, []);
   const clipPath = (() => {
     switch (defaults.shape) {
       case "circle":
         return "circle(50% at 50% 50%)";
-      case "square":
-        return "inset(0 round 0)";
       case "heart":
         return `url(#${clipId})`;
-      case "rect":
+      case "star":
+        return `url(#${starId})`;
       default:
         return undefined;
     }
@@ -48,6 +48,15 @@ export default function MapLayerPreview({ defaults, width, height }: Props) {
           <defs>
             <clipPath id={clipId} clipPathUnits="objectBoundingBox">
               <path d="M0.5,1 C0.5,1 0,0.65 0,0.3 C0,0.1 0.2,0 0.35,0 C0.42,0 0.48,0.05 0.5,0.15 C0.52,0.05 0.58,0 0.65,0 C0.8,0 1,0.1 1,0.3 C1,0.65 0.5,1 0.5,1 Z" />
+            </clipPath>
+          </defs>
+        </svg>
+      )}
+      {defaults.shape === "star" && (
+        <svg width="0" height="0" className="absolute">
+          <defs>
+            <clipPath id={starId} clipPathUnits="objectBoundingBox">
+              <path d="M0.5,0 L0.618,0.345 L0.976,0.345 L0.690,0.560 L0.794,0.905 L0.5,0.690 L0.206,0.905 L0.310,0.560 L0.024,0.345 L0.382,0.345 Z" />
             </clipPath>
           </defs>
         </svg>
