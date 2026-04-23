@@ -115,7 +115,7 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
       gelato_sku_map: {} as unknown as never,
     });
 
-    setSaving(false);
+    // (don't reset saving yet — sync still pending)
     if (error) {
       setSaving(false);
       toast.error("Kunde inte skapa", { description: error.message });
