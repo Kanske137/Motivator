@@ -477,6 +477,8 @@ function resetPhotoOffsets(values: Record<string, LayerValue>): Record<string, L
   }
   return out;
 }
+
+function applyPlaceInternal(
   set: SetFn,
   get: GetFn,
   mapId: string,
