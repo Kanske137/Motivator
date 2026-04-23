@@ -100,6 +100,8 @@ interface EditorState {
   setLayerText: (id: string, t: string) => void;
   setLayerTextFont: (id: string, f: string) => void;
   setLayerTextVisible: (id: string, v: boolean) => void;
+  setLayerPhotoShape: (id: string, s: PhotoShape) => void;
+  setLayerPhotoOffset: (id: string, x: number, y: number) => void;
 
   // ---------- legacy globals (derived getters; mutators apply to first layer) ----------
   // These setters/getters keep older code (EditorPage cart payload, snapshot
