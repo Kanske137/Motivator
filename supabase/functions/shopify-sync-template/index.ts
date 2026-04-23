@@ -394,10 +394,15 @@ Deno.serve(async (req) => {
     );
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
-    console.error("shopify-sync-template error:", msg);
-    return new Response(JSON.stringify({ ok: false, error: msg }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    const code = (e as ShopifyAuthError | undefined)?.code;
+    const source = (e as ShopifyAuthError | undefined)?.source;
+    console.error("shopify-sync-template error:", code ?? "generic", msg);
+    const status = code === "invalid_token" || code === "no_token" || code === "missing_scope"
+      ? 401
+      : 500;
+    return new Response(
+      JSON.stringify({ ok: false, error: msg, code, source }),
+      { status, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   }
 });
