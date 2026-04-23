@@ -216,6 +216,9 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Preflight: fail fast with a clear auth error before doing any work.
+    await ensureShopifyAuth();
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
