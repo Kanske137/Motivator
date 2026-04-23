@@ -172,6 +172,13 @@ function hydrateLayerValues(template: Template, orientation: Orientation): Recor
         visible: true,
         isCustom: false,
       };
+    } else if (l.type === "photo") {
+      out[l.id] = {
+        kind: "photo",
+        shape: l.defaults.shape as PhotoShape,
+        offsetX: 0,
+        offsetY: 0,
+      };
     }
   }
   return out;
