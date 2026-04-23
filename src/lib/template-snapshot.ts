@@ -64,9 +64,9 @@ function pickHiresMaxPx(): number {
   const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
   const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
   const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(ua);
-  if (isMobile) return 2000;
-  if (dpr >= 2) return 3600;
-  return 3000;
+  if (isMobile) return 2800;
+  if (dpr >= 2) return 4800;
+  return 4200;
 }
 
 function parseSize(size: string, orientation: "portrait" | "landscape") {
