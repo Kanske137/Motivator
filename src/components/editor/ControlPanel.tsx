@@ -38,10 +38,12 @@ const BG_SWATCHES = [
 
 export function ControlPanel({ configs, activeHandle, onProductChange }: Props) {
   const config = useEditorStore((s) => s.config);
+  const template = useEditorStore((s) => s.template);
   const templateLayers = useEditorStore((s) => s.templateLayers);
   const layerValues = useEditorStore((s) => s.layerValues);
   const posterBgColor = useEditorStore((s) => s.posterBgColor);
   const setPosterBgColor = useEditorStore((s) => s.setPosterBgColor);
+  const photoFile = useEditorStore((s) => s.photoFile);
 
   if (!config) return null;
 
