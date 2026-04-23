@@ -294,14 +294,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       photoFile: file,
       photoPreviewUrl: previewUrl,
       designSource: file ? "photo" : "map",
+      // Switching photo invalidates AI result + cached upload URL.
       aiPrintFileUrl: file ? null : get().aiPrintFileUrl,
+      originalPhotoUrl: file ? null : get().originalPhotoUrl,
     });
   },
+  setOriginalPhotoUrl: (url) => set({ originalPhotoUrl: url }),
   setAiPrintFileUrl: (url) => {
     set({ aiPrintFileUrl: url, designSource: url ? "ai" : "map" });
   },
   resetDesignSource: () =>
-    set({ designSource: "map", photoFile: null, photoPreviewUrl: null, aiPrintFileUrl: null }),
+    set({
+      designSource: "map",
+      photoFile: null,
+      photoPreviewUrl: null,
+      originalPhotoUrl: null,
+      aiPrintFileUrl: null,
+    }),
+  setShopifyVariantId: (shopifyVariantId) => set({ shopifyVariantId }),
+  setShopifyVariantResolving: (shopifyVariantResolving) => set({ shopifyVariantResolving }),
 
   // ---------- per-layer setters ----------
   setLayerMapCenter: (id, c) => updateMap(set, get, id, { center: c }),
