@@ -319,6 +319,8 @@ async function drawPhotoLayer(
   }
   ctx.restore();
 }
+
+function drawLineLayer(
   ctx: CanvasRenderingContext2D,
   rect: { x: number; y: number; w: number; h: number },
   layer: Extract<TemplateLayer, { type: "line" }>,
