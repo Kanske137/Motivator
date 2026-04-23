@@ -3,6 +3,14 @@
 // backfilled existing rows, but this helper is the single source of truth for
 // any row that was inserted before migration ran or where `template = '{}'`.
 import type { ProductConfig } from "./product-config";
+import {
+  defaultLocks,
+  isEmptyTemplate,
+  parseTemplate,
+  type OrientationLayout,
+  type Template,
+  type TemplateLayer,
+} from "./template-schema";
 import { DEFAULT_AI_STYLES } from "./ai-style-defaults";
 
 const DEFAULT_BG = "#EFE7D6";
