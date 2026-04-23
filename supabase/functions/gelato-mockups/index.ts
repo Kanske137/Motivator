@@ -109,15 +109,16 @@ Deno.serve(async (req) => {
 
   try {
     const u = new URL(req.url);
-    if (u.searchParams.get("debug") === "scenes") {
-      const productUid = u.searchParams.get("productUid") ?? "";
+    const body = await req.json().catch(() => ({}));
+
+    if (u.searchParams.get("debug") === "scenes" || body?.debug === "scenes") {
+      const productUid = (u.searchParams.get("productUid") ?? body?.productUid ?? "") as string;
       const data = await fetchSceneIds(productUid);
       return new Response(JSON.stringify(data, null, 2), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const body = await req.json().catch(() => ({}));
     const productUid: unknown = body?.productUid;
     const printFileUrl: unknown = body?.printFileUrl;
 
