@@ -36,10 +36,29 @@ export default function DesignerPage() {
   const { handle } = useParams<{ handle: string }>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [config, setConfig] = useState<ProductConfig | null>(null);
   const [template, setTemplate] = useState<Template | null>(null);
   const [orientation, setOrientation] = useState<Orientation>("portrait");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  async function syncToShopify() {
+    if (!handle) return;
+    setSyncing(true);
+    const { data, error } = await supabase.functions.invoke("shopify-sync-template", {
+      body: { handle },
+    });
+    setSyncing(false);
+    if (error || !data?.ok) {
+      toast.error("Synk misslyckades", {
+        description: error?.message ?? data?.error ?? "Okänt fel",
+      });
+    } else {
+      toast.success("Synkad till Shopify", {
+        description: `${data.results?.length ?? 0} produkt(er) uppdaterade`,
+      });
+    }
+  }
 
   useEffect(() => {
     if (!handle) return;
@@ -203,6 +222,15 @@ export default function DesignerPage() {
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
               Spara draft
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={syncToShopify}
+              disabled={syncing}
+            >
+              {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
+              Synka till Shopify
             </Button>
             <Button
               size="sm"
