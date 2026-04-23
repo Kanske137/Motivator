@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Square, Circle, RectangleHorizontal, Heart } from "lucide-react";
+import { Circle, Heart, Star } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useEditorStore, type MapLayerValue, type TextLayerValue } from "@/stores/editorStore";
 import { geocode, type GeocodeResult } from "@/lib/mapbox";
@@ -281,10 +281,9 @@ function MapStyleLayerSection({
   const shape = value?.shape ?? layer.defaults.shape;
 
   const shapeOptions = ([
-    { id: "rect", label: "Standard", Icon: RectangleHorizontal },
-    { id: "square", label: "Kvadrat", Icon: Square },
     { id: "circle", label: "Cirkel", Icon: Circle },
     { id: "heart", label: "Hjärta", Icon: Heart },
+    { id: "star", label: "Stjärna", Icon: Star },
   ] as const);
 
   return (
@@ -322,7 +321,7 @@ function MapStyleLayerSection({
       {!layer.locks.shape && (
         <div className="space-y-2 pt-1">
           <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Kartans form</Label>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {shapeOptions.map(({ id, label, Icon }) => {
               const selected = shape === id;
               return (
