@@ -12,6 +12,7 @@ import { CartDrawer } from "@/components/CartDrawer";
 import { renderTemplateSnapshot } from "@/lib/template-snapshot";
 import { uploadCartPreview } from "@/lib/upload-preview";
 import { getPrintFileUrl } from "@/lib/print-pipeline";
+import { resolveShopifyVariantId } from "@/lib/shopify-variant-resolver";
 import { toast } from "sonner";
 
 const FRAME_COLORS: Record<string, string> = {
@@ -29,11 +30,33 @@ export default function EditorPage() {
   const [configs, setConfigs] = useState<ProductConfig[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const { config, template, layerValues, setConfig, currentPrice, currentLayout, mapStyleId, mapCenter, mapZoom, text, textFont, textVisible, showLabels, mapShape, orientation, size, variant, posterBgColor, designSource, photoFile, aiPrintFileUrl } =
+  const { config, template, layerValues, setConfig, currentPrice, currentLayout, mapStyleId, mapCenter, mapZoom, text, textFont, textVisible, showLabels, mapShape, orientation, size, variant, posterBgColor, designSource, photoFile, aiPrintFileUrl, shopifyVariantId, shopifyVariantResolving, setShopifyVariantId, setShopifyVariantResolving } =
     useEditorStore();
   const addItem = useCartStore((s) => s.addItem);
   const isAdding = useCartStore((s) => s.isLoading);
   const [isPreparing, setIsPreparing] = useState(false);
+
+  // Resolve real Shopify variant ID whenever handle/size/variant changes.
+  // The fake `preview-${size}-${variant}` placeholder no longer hits cart.
+  useEffect(() => {
+    if (!config || !size || !variant) {
+      setShopifyVariantId(null);
+      return;
+    }
+    let cancelled = false;
+    setShopifyVariantResolving(true);
+    resolveShopifyVariantId(config.shopify_handle, size, variant)
+      .then((id) => {
+        if (cancelled) return;
+        setShopifyVariantId(id);
+      })
+      .finally(() => {
+        if (!cancelled) setShopifyVariantResolving(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [config, size, variant, setShopifyVariantId, setShopifyVariantResolving]);
 
   useEffect(() => {
     (async () => {
