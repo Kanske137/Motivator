@@ -87,9 +87,11 @@ async function fetchSceneIds(productUid: string): Promise<any> {
   if (!key) throw new Error("GELATO_API_KEY missing");
   // Try Gelato's product mockups discovery endpoints in order of likelihood.
   const candidates = [
-    `https://product.gelatoapis.com/v3/products/${productUid}/mockups`,
-    `https://product.gelatoapis.com/v3/products/${productUid}/scenes`,
-    `https://product.gelatoapis.com/v3/products/${productUid}`,
+    `https://product.gelatoapis.com/v3/mockups/scenes?productUid=${encodeURIComponent(productUid)}`,
+    `https://product.gelatoapis.com/v1/mockups/scenes?productUid=${encodeURIComponent(productUid)}`,
+    `https://mockup.gelatoapis.com/v1/scenes?productUid=${encodeURIComponent(productUid)}`,
+    `https://ecommerce.gelatoapis.com/v1/mockup-scenes?productUid=${encodeURIComponent(productUid)}`,
+    `https://product.gelatoapis.com/v3/products/${productUid}/mockup-scenes`,
   ];
   const results: any[] = [];
   for (const url of candidates) {
