@@ -457,8 +457,13 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
     } else if (layer.type === "photo") {
       const url = input.photoOverlayUrl ?? layer.defaults.placeholderUrl;
       if (url) {
+        const lv = input.layerValues?.[layer.id];
+        const pv = lv && lv.kind === "photo" ? lv : null;
+        const shape = pv?.shape ?? layer.defaults.shape;
+        const offsetX = pv?.offsetX ?? 0;
+        const offsetY = pv?.offsetY ?? 0;
         try {
-          await drawPhotoLayer(ctx, rect, url, layer.defaults.shape, layer.defaults.fit);
+          await drawPhotoLayer(ctx, rect, url, shape, layer.defaults.fit, offsetX, offsetY);
         } catch (e) {
           console.warn("[template-snapshot] photo layer failed", e);
         }
