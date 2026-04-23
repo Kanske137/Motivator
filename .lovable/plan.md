@@ -1,90 +1,140 @@
 
+## Felsökning: varför bilder fortfarande känns beskurna
 
-## Korrigering: Foto laddas i nativ aspekt + smart pan-beteende
+Det finns två separata fel i nuvarande implementation:
 
-### Problemet
+1. `PhotoLayerView` använder `<img className="w-full h-full object-cover">` och flyttar sedan hela `<img>`-elementet med `transform: translate(...)`.
+   - Det betyder att det som flyttas är den redan beskurna viewporten, inte den fulla bilden.
+   - Resultat: kunden kan inte nå innehåll som finns utanför den initiala `object-cover`-cropen.
 
-Idag använder både editor-förhandsvisning och snapshot-pipeline `object-fit: cover`. Det betyder att bilden tvingas täcka hela lager-rektangeln genom att skala upp till **längsta** sidan och beskära den korta — kunden ser bara en hårt beskuren del från start och kan aldrig se eller välja från hela bilden.
-
-### Önskat beteende
-
-Bilden visas alltid i sitt **nativa aspektförhållande** (ingen sträckning) och placeras enligt en "**fit**"-regel som behåller hela bilden när det är möjligt:
-
-- Om bilden är bredare än formen → hela höjden syns, sidor sticker ut → kunden panar i x-led för att välja utsnitt.
-- Om bilden är högre än formen → hela bredden syns, topp/botten sticker ut → kunden panar i y-led.
-- Om bilden har samma aspekt som formen → fyller perfekt, ingen pan behövs.
-
-Det här är `object-fit: cover` matematiskt — **men startpositionen är centrerad och kunden behåller alltid kontroll över utsnittet**. Skillnaden mot idag är inte koden för cover, utan att vi måste **se till att fotot inte komprimeras eller beskärs vid uppladdning** och att vår clamp-logik tillåter att bilden pannas tills dess kanter når formens kanter (inte bara ±50%).
-
-### Vad är faktiskt fel just nu
-
-Två separata buggar:
-
-1. **`PhotoUploadSection.tsx`** anropar inte `preparePhotoSource` (som har downscaling) — men jag måste verifiera att inget annat ställe ändå downscalar. Dock: `object-fit: cover` på en bild *bevarar* aspekten, den beskär bara visuellt. Så den verkliga frågan är pan-clamp:
-2. **Pan-clamp [-50, 50]** är fel — den bygger på antagandet att överskottet alltid är 50% av layer-storleken, men det stämmer bara när bildens aspekt skiljer sig oändligt mycket från formens. Korrekt clamp är `±((scaledImgEdge - layerEdge) / layerEdge / 2 * 100)%` per axel, beräknat från bildens nativa dimensioner och formens dimensioner. På den axel där bilden täcker exakt → clamp = 0.
-
-### Lösning
-
-#### 1. Editor-rendering — visa bilden i nativ aspekt + korrekt clamp
-
-`MapPreview.tsx` (`PhotoLayerView`):
-
-- Behåll `object-fit: cover` på `<img>` (det är rätt CSS-beteende: behåller aspekt, fyller container, beskär överskott).
-- Ladda in `naturalWidth`/`naturalHeight` när bilden laddas (`onLoad`) → spara i lokalt state.
-- Mät containerns `clientWidth`/`clientHeight` via ref + ResizeObserver.
-- Beräkna **överskottet i procent** per axel:
-  ```
-  scale = max(layerW/imgW, layerH/imgH)   // cover-skala
-  scaledImgW = imgW * scale
-  scaledImgH = imgH * scale
-  overflowX% = (scaledImgW - layerW) / layerW * 100
-  overflowY% = (scaledImgH - layerH) / layerH * 100
-  maxOffsetX = overflowX / 2     // procent av layerW
-  maxOffsetY = overflowY / 2
-  ```
-- Drag-handlers clampar mot `[-maxOffsetX, +maxOffsetX]` och `[-maxOffsetY, +maxOffsetY]` istället för konstanten ±50.
-- Om en axel har överskott = 0 → ingen pan i den axeln (cursor blir default i den riktningen, men vi kan behålla en gemensam grab-cursor).
-
-#### 2. Snapshot-rendering — matcha exakt
-
-`template-snapshot.ts` (`drawPhotoLayer`):
-
-- Beräkna samma cover-scale + overflow där.
-- Konvertera `offsetX/offsetY` (som är procent av layer-bredd/höjd, samma som editorn) till källbild-pixel-offset:
-  ```
-  srcOffsetX_px = -(offsetX / 100) * layerW / scale
-  srcOffsetY_px = -(offsetY / 100) * layerH / scale
-  sx = (img.width - layerW/scale) / 2 + srcOffsetX_px
-  sy = (img.height - layerH/scale) / 2 + srcOffsetY_px
-  sw = layerW / scale
-  sh = layerH / scale
-  ```
-- `ctx.drawImage(img, sx, sy, sw, sh, rect.x, rect.y, rect.w, rect.h)` — beskär källbilden i nativa pixlar precis där editorn visar utsnittet.
-- Detta säkerställer att tryckfilen och cart-thumbnail visar **exakt** samma utsnitt som kunden ser.
-
-#### 3. Reset-pan vid byte av aspekt
-
-När kunden ändrar form (rect → cirkel etc.) så ändras inte lager-aspekten (formen är en clip ovanpå rektangeln) → ingen reset behövs. Men när nytt foto laddas upp → nollställ offset (gjort redan).
-
-#### 4. Verifiera att uppladdning är native
-
-`PhotoUploadSection.tsx`: filen sparas direkt i `photoFile` utan komprimering — detta är redan korrekt. `URL.createObjectURL(file)` ger en blob-URL till originalbilden. Bekräftat: ingen pre-upload downscaling sker. (`preparePhotoSource` används bara av äldre flöde — irrelevant här.)
+2. Clamp-logiken räknas ut från bildens naturliga storlek, men CSS-rörelsen sker på ett element vars storlek fortfarande är `100% x 100%`.
+   - Matematik och faktisk rendering matchar alltså inte helt.
+   - Det gör att drag kan kännas fel och inte stanna exakt vid bildens kanter.
 
 ---
 
-### Filer
+## Korrigering
+
+### 1. Byt renderingsmodell för foto-lager i editorn
+
+`src/components/editor/MapPreview.tsx`
+
+I `PhotoLayerView`:
+- Sluta använda `object-cover` + `translate` på ett fullstort `<img>`.
+- Rendera istället bilden som ett absolut-positionerat element med **faktisk skalad storlek**:
+  - beräkna `scale = max(boxW / imgW, boxH / imgH)` för `cover`
+  - `renderW = imgW * scale`
+  - `renderH = imgH * scale`
+- Placera bilden centrerat i containern:
+  - `left = (boxW - renderW) / 2`
+  - `top = (boxH - renderH) / 2`
+- Applicera pan som pixel-offset ovanpå denna centrering.
+- Containern fortsätter ha `overflow: hidden` + aktuell clip-path/form.
+
+Detta gör att hela originalbilden faktiskt finns “bakom” behållaren, och att drag visar mer av bilden istället för att bara flytta en redan beskuren ruta.
+
+### 2. Ändra pan-state från procent till verkligt användbar modell
+
+Behåll gärna store-fälten som `offsetX` / `offsetY`, men definiera dem tydligt som:
+- procent av **max tillåten overflow per axel**, eller
+- pixlar i editorcontainern.
+
+Rekommenderat för minst friktion:
+- fortsätt lagra dem som procent av container, men beräkna faktisk pixelrörelse från verklig overflow:
+  - `overflowX = max(0, renderW - boxW)`
+  - `overflowY = max(0, renderH - boxH)`
+  - `minLeft = -overflowX`
+  - `maxLeft = 0`
+  - `minTop = -overflowY`
+  - `maxTop = 0`
+
+Alternativt, enklare och robustare:
+- lagra `offsetX` / `offsetY` i pixlar i store för foto-lager.
+- Då blir editor och snapshot enklare att synka exakt.
+
+### 3. Clamp exakt till bildens kanter
+
+I `MapPreview.tsx`:
+- Pan ska bara vara möjlig på axlar där overflow finns.
+- Vid drag:
+  - bred bild i smal behållare → bara x-led
+  - hög bild i bred behållare → bara y-led
+- Clamp ska vara:
+  - `left` mellan `[-overflowX, 0]`
+  - `top` mellan `[-overflowY, 0]`
+
+Detta säkerställer:
+- ingen tom yta någonsin visas
+- kunden kan dra hela vägen fram till respektive kant
+- man kan inte dra bortom bildens innehåll
+
+### 4. Matcha snapshot-/thumbnail-/print-rendering exakt
+
+`src/lib/template-snapshot.ts`
+
+`drawPhotoLayer` ska inte använda nuvarande mellanvariant längre, utan samma modell som editorn:
+- beräkna samma `scale`, `renderW`, `renderH`, `overflowX`, `overflowY`
+- konvertera sparad pan till källbildens crop-rect exakt
+- använd `ctx.drawImage(img, sx, sy, sw, sh, rect.x, rect.y, rect.w, rect.h)`
+
+Formelmässigt ska snapshoten utgå från samma “cover + centered + pan within overflow”-logik som editorn, så att:
+- editor
+- cart thumbnail
+- mockup preview
+- slutlig tryckfil
+
+visar identiskt utsnitt.
+
+### 5. Säkerställ att preview inte misstolkas som crop
+
+`src/components/editor/PhotoUploadSection.tsx`
+
+Uppladdningen verkar redan använda originalfilen via `URL.createObjectURL(file)`, så problemet är inte själva filen.
+
+Men det finns en missvisande text som fortfarande säger:
+- “Bilden ersätter kartan. Återgå till karta genom att ta bort bilden.”
+
+Den bör uppdateras så den speglar dagens lagerbaserade foto-flöde, annars skapar den förvirring under test.
+
+---
+
+## Filer att ändra
 
 | Fil | Ändring |
 |---|---|
-| `src/components/editor/MapPreview.tsx` | Mät `naturalSize` + container, dynamisk pan-clamp baserad på cover-overflow |
-| `src/lib/template-snapshot.ts` | `drawPhotoLayer` använder samma overflow-matematik för pixel-perfekt utsnitt |
+| `src/components/editor/MapPreview.tsx` | Byt från `object-cover`-elementförflyttning till explicit skalad bildyta med riktig overflow-pan och exakt clamp |
+| `src/lib/template-snapshot.ts` | Spegla samma cover/pan-logik pixelperfekt i snapshot/thumbnail/print |
+| `src/stores/editorStore.ts` | Eventuellt justera semantik för foto-offsets om pixelbaserad modell väljs |
+| `src/components/editor/PhotoUploadSection.tsx` | Uppdatera hjälptext så den inte längre refererar till gamla “ersätter kartan”-flödet |
 
-### Verifiering
+---
 
-1. Ladda upp ett **liggande** foto i ett **stående** lager → hela höjden syns, sidor sticker ut → kunden kan panna i x-led tills kanten av bilden når formens kant.
-2. Ladda upp ett **stående** foto i ett **liggande** lager → omvänt.
-3. Ladda upp ett **kvadratiskt** foto i en **kvadratisk** form → ingen pan möjlig (clamp = 0), bilden fyller perfekt.
-4. Pan-klamp respekteras: bilden går aldrig att dra utanför formens kant (ingen tom yta).
-5. Cart-thumbnail och tryckfilen visar **exakt** samma utsnitt som editorn (pixel-perfekt match).
-6. Form-byte (cirkel ↔ rektangel) påverkar inte panningen — bara clip-shape ovanpå.
+## Verifiering
+
+1. Ladda upp en stående bild i en bred foto-placeholder:
+   - hela bredd-logiken fungerar
+   - kunden kan dra upp/ned tills bildens topp/botten precis når kanten
+
+2. Ladda upp en liggande bild i en smal foto-placeholder:
+   - kunden kan dra vänster/höger tills sidorna precis når kanten
+
+3. Ingen tom yta ska någonsin kunna visas i foto-lagret.
+
+4. Innehåll som tidigare var “otillgängligt” ska nu kunna nås om det faktiskt finns inom bildens overflow.
+
+5. Cart-thumbnail och tryckfil ska matcha exakt det kunden ser i editorn.
+
+6. Kvadratisk bild i matchande behållare:
+   - ingen onödig pan
+   - clamp blir 0 på båda axlar
+
+---
+
+## Arbetsordning
+
+1. Refaktorera `PhotoLayerView` i `MapPreview.tsx`
+2. Synka samma matematik i `template-snapshot.ts`
+3. Justera eventuell store-semantik för offsets
+4. Uppdatera missvisande hjälptext i `PhotoUploadSection.tsx`
+5. Verifiera editor + cart preview + print snapshot mot samma foto
 
