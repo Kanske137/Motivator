@@ -129,9 +129,18 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
     );
     setSaving(false);
     if (syncErr || !syncData?.ok) {
-      toast.warning("Mall skapad, men Shopify-synk misslyckades", {
-        description: syncErr?.message ?? syncData?.error ?? "Okänt fel — försök igen via Synka-knappen.",
-      });
+      const code = (syncData as { code?: string } | null)?.code;
+      const isAuth = code === "invalid_token" || code === "no_token" || code === "missing_scope";
+      toast.warning(
+        isAuth
+          ? "Mall skapad — men Shopify-anslutningen är ogiltig"
+          : "Mall skapad, men Shopify-synk misslyckades",
+        {
+          description: isAuth
+            ? "Återanslut Shopify-integrationen i Lovable och kör Synka-knappen igen."
+            : (syncErr?.message ?? syncData?.error ?? "Okänt fel — försök igen via Synka-knappen."),
+        },
+      );
     } else {
       toast.success("Mall skapad och Shopify-produkt synkad", {
         description: `${syncData.results?.length ?? 0} produkt(er) uppdaterade`,
