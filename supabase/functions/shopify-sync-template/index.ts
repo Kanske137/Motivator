@@ -299,10 +299,14 @@ Deno.serve(async (req) => {
             status: "DRAFT",
             descriptionHtml: "<p>Personlig design — skapas i editorn.</p>",
             productOptions: [
-              { name: "Storlek", values: [...new Set(group.variants.map((v) => ({ name: v.size })))].length
-                ? [...new Set(group.variants.map((v) => v.size))].map((name) => ({ name }))
-                : [] },
-              { name: group.variantOptionName, values: [...new Set(group.variants.map((v) => v.variant))].map((name) => ({ name })) },
+              {
+                name: "Storlek",
+                values: [...new Set(group.variants.map((v) => v.size))].map((name) => ({ name })),
+              },
+              {
+                name: group.variantOptionName,
+                values: [...new Set(group.variants.map((v) => v.variant))].map((name) => ({ name })),
+              },
             ],
           },
         });
