@@ -33,7 +33,18 @@ export interface TextLayerValue {
   isCustom: boolean;
 }
 
-export type LayerValue = MapLayerValue | TextLayerValue;
+export type PhotoShape = "rect" | "circle" | "heart" | "star";
+
+export interface PhotoLayerValue {
+  kind: "photo";
+  shape: PhotoShape;
+  /** Pan offset within the layer's frame, in percent of layer width/height.
+   *  Range clamped to [-50, 50]. 0,0 = centered cover crop. */
+  offsetX: number;
+  offsetY: number;
+}
+
+export type LayerValue = MapLayerValue | TextLayerValue | PhotoLayerValue;
 
 interface EditorState {
   config: ProductConfig | null;
@@ -89,6 +100,8 @@ interface EditorState {
   setLayerText: (id: string, t: string) => void;
   setLayerTextFont: (id: string, f: string) => void;
   setLayerTextVisible: (id: string, v: boolean) => void;
+  setLayerPhotoShape: (id: string, s: PhotoShape) => void;
+  setLayerPhotoOffset: (id: string, x: number, y: number) => void;
 
   // ---------- legacy globals (derived getters; mutators apply to first layer) ----------
   // These setters/getters keep older code (EditorPage cart payload, snapshot
@@ -158,6 +171,13 @@ function hydrateLayerValues(template: Template, orientation: Orientation): Recor
         font: l.defaults.font,
         visible: true,
         isCustom: false,
+      };
+    } else if (l.type === "photo") {
+      out[l.id] = {
+        kind: "photo",
+        shape: l.defaults.shape as PhotoShape,
+        offsetX: 0,
+        offsetY: 0,
       };
     }
   }
@@ -297,6 +317,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       // Switching photo invalidates AI result + cached upload URL.
       aiPrintFileUrl: file ? null : get().aiPrintFileUrl,
       originalPhotoUrl: file ? null : get().originalPhotoUrl,
+      // Reset pan offsets so a freshly-uploaded photo starts centered.
+      layerValues: resetPhotoOffsets(get().layerValues),
     });
   },
   setOriginalPhotoUrl: (url) => set({ originalPhotoUrl: url }),
@@ -310,6 +332,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       photoPreviewUrl: null,
       originalPhotoUrl: null,
       aiPrintFileUrl: null,
+      layerValues: resetPhotoOffsets(get().layerValues),
     }),
   setShopifyVariantId: (shopifyVariantId) => set({ shopifyVariantId }),
   setShopifyVariantResolving: (shopifyVariantResolving) => set({ shopifyVariantResolving }),
@@ -331,6 +354,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setLayerText: (id, t) => updateText(set, get, id, { text: t, isCustom: true }),
   setLayerTextFont: (id, f) => updateText(set, get, id, { font: f }),
   setLayerTextVisible: (id, v) => updateText(set, get, id, { visible: v }),
+  setLayerPhotoShape: (id, s) => updatePhoto(set, get, id, { shape: s }),
+  setLayerPhotoOffset: (id, x, y) =>
+    updatePhoto(set, get, id, {
+      offsetX: Math.max(-50, Math.min(50, x)),
+      offsetY: Math.max(-50, Math.min(50, y)),
+    }),
 
   // ---------- legacy globals → operate on first layer ----------
   setMapCenter: (c) => {
@@ -428,6 +457,25 @@ function updateText(set: SetFn, get: GetFn, id: string, patch: Partial<TextLayer
   const next: TextLayerValue = { ...cur, ...patch };
   const layerValues = { ...state.layerValues, [id]: next };
   set({ layerValues, ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues }) });
+}
+
+function updatePhoto(set: SetFn, get: GetFn, id: string, patch: Partial<PhotoLayerValue>) {
+  const state = get();
+  const cur = state.layerValues[id];
+  if (!cur || cur.kind !== "photo") return;
+  const next: PhotoLayerValue = { ...cur, ...patch };
+  const layerValues = { ...state.layerValues, [id]: next };
+  set({ layerValues });
+}
+
+function resetPhotoOffsets(values: Record<string, LayerValue>): Record<string, LayerValue> {
+  const out: Record<string, LayerValue> = { ...values };
+  for (const [id, v] of Object.entries(values)) {
+    if (v.kind === "photo") {
+      out[id] = { ...v, offsetX: 0, offsetY: 0 };
+    }
+  }
+  return out;
 }
 
 function applyPlaceInternal(

@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Circle, Heart, Star } from "lucide-react";
+import { Circle, Heart, Star, Square } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
-import { useEditorStore, type MapLayerValue, type TextLayerValue } from "@/stores/editorStore";
+import { useEditorStore, type MapLayerValue, type TextLayerValue, type PhotoLayerValue, type PhotoShape } from "@/stores/editorStore";
 import { geocode, type GeocodeResult } from "@/lib/mapbox";
 import { MAPBOX_STYLE_LABELS, type ProductConfig } from "@/lib/product-config";
 import { FormatSection } from "./FormatSection";
@@ -76,6 +76,20 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
           </AccordionTrigger>
           <AccordionContent className="pt-1 pb-4">
             <PhotoUploadSection />
+            {photoLayers.some((l) => !l.locks.shape) && (
+              <div className="mt-4 pt-4 border-t space-y-3">
+                {photoLayers
+                  .filter((l) => !l.locks.shape)
+                  .map((l, idx, arr) => (
+                    <PhotoShapeSection
+                      key={l.id}
+                      layer={l}
+                      value={(layerValues[l.id] as PhotoLayerValue | undefined) ?? null}
+                      heading={arr.length > 1 ? l.name || `Bild ${idx + 1}` : null}
+                    />
+                  ))}
+              </div>
+            )}
             {showAiInsideImage && (
               <div className="mt-4 pt-4 border-t space-y-2">
                 <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
@@ -439,6 +453,59 @@ function TextLayerSection({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function PhotoShapeSection({
+  layer,
+  value,
+  heading,
+}: {
+  layer: Extract<TemplateLayer, { type: "photo" }>;
+  value: PhotoLayerValue | null;
+  heading: string | null;
+}) {
+  const setLayerPhotoShape = useEditorStore((s) => s.setLayerPhotoShape);
+  const shape = value?.shape ?? layer.defaults.shape;
+  const options = [
+    { id: "rect", label: "Rektangel", Icon: Square },
+    { id: "circle", label: "Cirkel", Icon: Circle },
+    { id: "heart", label: "Hjärta", Icon: Heart },
+    { id: "star", label: "Stjärna", Icon: Star },
+  ] as const;
+
+  return (
+    <div className="space-y-2">
+      {heading && (
+        <h4 className="text-[11px] font-semibold uppercase tracking-wider text-foreground">
+          {heading}
+        </h4>
+      )}
+      <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
+        Bildens form
+      </Label>
+      <div className="grid grid-cols-4 gap-2">
+        {options.map(({ id, label, Icon }) => {
+          const selected = shape === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setLayerPhotoShape(layer.id, id as PhotoShape)}
+              className={cn(
+                "flex flex-col items-center justify-center gap-1.5 aspect-square rounded-xl transition",
+                selected
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-background ring-1 ring-border hover:bg-accent/50",
+              )}
+            >
+              <Icon className="h-5 w-5" />
+              <span className="text-[10px] font-medium">{label}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
