@@ -1,22 +1,32 @@
-// Standard variant catalog per product type. Used by ProductOptionsSection
-// so the admin always sees a sane list of sizes/frames/depths even when the
-// underlying ProductConfig only contains data for one of the types.
-//
-// NOTE: These names must eventually map to Gelato SKUs in `gelato_sku_map`
-// before the template can be published. Validation enforces this elsewhere.
+// Backward-compat shim. The single source of truth for available variants is
+// now `gelato-catalog.ts` (derived from gelato-sku-map.json).
+import {
+  getPosterSizes,
+  getPosterFrames,
+  getCanvasSizes,
+  getCanvasDepths,
+} from "./gelato-catalog";
 
 export const DEFAULT_PRODUCT_VARIANTS = {
   poster: {
-    sizes: ["13x18", "21x30", "30x40", "50x70", "70x100"] as string[],
-    frames: ["Ingen", "Vit", "Svart", "Ek", "Valnöt"] as string[],
+    get sizes() {
+      return getPosterSizes();
+    },
+    get frames() {
+      return getPosterFrames();
+    },
   },
   canvas: {
-    sizes: ["30x40", "50x70", "60x90", "70x100"] as string[],
-    depths: ["2cm", "4cm"] as string[],
+    get sizes() {
+      return getCanvasSizes();
+    },
+    get depths() {
+      return getCanvasDepths();
+    },
   },
 } as const;
 
-export type DefaultProductKind = keyof typeof DEFAULT_PRODUCT_VARIANTS;
+export type DefaultProductKind = "poster" | "canvas";
 
 /** Union of values from config + defaults, preserving order (config first). */
 export function mergeUnique(fromConfig: string[], fromDefaults: readonly string[]): string[] {
