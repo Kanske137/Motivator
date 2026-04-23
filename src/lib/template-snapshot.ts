@@ -291,6 +291,8 @@ async function drawPhotoLayer(
   url: string,
   shape: "rect" | "circle" | "heart" | "star",
   fit: "cover" | "contain",
+  offsetX: number,
+  offsetY: number,
 ): Promise<void> {
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const i = new Image();
@@ -301,6 +303,9 @@ async function drawPhotoLayer(
   });
   ctx.save();
   clipForShape(ctx, shape, rect.x, rect.y, rect.w, rect.h);
+  // Pan offset is percent of layer width/height — only applies to cover.
+  const tx = fit === "contain" ? 0 : (offsetX / 100) * rect.w;
+  const ty = fit === "contain" ? 0 : (offsetY / 100) * rect.h;
   if (fit === "contain") {
     const ar = img.width / img.height;
     const rar = rect.w / rect.h;
@@ -318,7 +323,7 @@ async function drawPhotoLayer(
     else sh = img.width / rar;
     const sx = (img.width - sw) / 2;
     const sy = (img.height - sh) / 2;
-    ctx.drawImage(img, sx, sy, sw, sh, rect.x, rect.y, rect.w, rect.h);
+    ctx.drawImage(img, sx, sy, sw, sh, rect.x + tx, rect.y + ty, rect.w, rect.h);
   }
   ctx.restore();
 }
