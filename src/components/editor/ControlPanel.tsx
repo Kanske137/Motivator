@@ -39,6 +39,7 @@ const BG_SWATCHES = [
 export function ControlPanel({ configs, activeHandle, onProductChange }: Props) {
   const config = useEditorStore((s) => s.config);
   const template = useEditorStore((s) => s.template);
+  const productOptions = useEditorStore((s) => s.productOptions);
   const templateLayers = useEditorStore((s) => s.templateLayers);
   const layerValues = useEditorStore((s) => s.layerValues);
   const posterBgColor = useEditorStore((s) => s.posterBgColor);
@@ -59,8 +60,36 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
     (l) => !l.locks.content || !l.locks.font || !l.locks.visibility,
   );
 
+  // Photo / AI sections only make sense when at least one map layer exists
+  // (the photo replaces the map area). AI section additionally requires presets.
+  const showImageSection = mapLayers.length > 0;
+  const aiStyles = productOptions?.aiStyles ?? [];
+  const showAiSection = mapLayers.length > 0 && !!photoFile && aiStyles.length > 0;
+
   return (
     <Accordion type="single" collapsible defaultValue="plats" className="w-full space-y-3">
+      {showImageSection && (
+        <AccordionItem value="bild" className={cn(cardClass, "border-b-0")}>
+          <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
+            Bild
+          </AccordionTrigger>
+          <AccordionContent className="pt-1 pb-4">
+            <PhotoUploadSection />
+          </AccordionContent>
+        </AccordionItem>
+      )}
+
+      {showAiSection && (
+        <AccordionItem value="ai-stil" className={cn(cardClass, "border-b-0")}>
+          <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
+            AI-stil
+          </AccordionTrigger>
+          <AccordionContent className="pt-1 pb-4">
+            <AiStyleSection presets={aiStyles} />
+          </AccordionContent>
+        </AccordionItem>
+      )}
+
       {editableMaps.length > 0 && (
         <AccordionItem value="plats" className={cn(cardClass, "border-b-0")}>
           <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
