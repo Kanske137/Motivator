@@ -1,80 +1,58 @@
 // Single dispatcher for producing a print-ready file URL the Shopify webhook
-// can hand directly to Gelato. The SOURCE of the design dictates which path:
+// can hand directly to Gelato.
 //
-//   "map"   → render hi-res browser snapshot (Mapbox GL + WebGL) via the
-//             multi-layer template renderer (all map/text/line/margin layers).
-//   "photo" → upload the user's original file (no re-encoding)
-//   "ai"    → already lives in the print-files bucket (uploaded by edge fn)
+// ALL sources (map / photo / ai) now go through the multi-layer hi-res
+// snapshot renderer so the print file is an exact composite of every layer
+// the customer sees in the editor (background, all maps, text, photo with
+// shape-clip + pan, lines, margins). The customer-uploaded photo or AI
+// result is supplied as `photoOverlayUrl` and rendered into the photo layer.
 //
-// Every path returns a public URL pointing at the print-files bucket. NO
-// silent fallbacks — if any step fails, throw so the caller can show a toast
-// and abort the cart-add flow.
+// No silent fallbacks — if any step fails, throw so the caller can show a
+// toast and abort the cart-add flow.
 import {
   renderHiresTemplateSnapshotSafe,
   type TemplateSnapshotInput,
 } from "./template-snapshot";
-import { uploadPrintFile, uploadPrintFileBlob } from "./upload-preview";
+import { uploadPrintFile } from "./upload-preview";
 
 export type DesignSource = "map" | "photo" | "ai";
 
 export interface PrintPipelineArgs {
   source: DesignSource;
   designId: string;
-  /** Required when source = "map" */
-  templateInput?: TemplateSnapshotInput;
-  /** Required when source = "photo" */
-  photoFile?: File;
-  /** Required when source = "ai" — already uploaded to print-files. */
-  aiPrintFileUrl?: string;
+  /** Required for ALL sources — the multi-layer template input. */
+  templateInput: TemplateSnapshotInput;
 }
 
 export async function getPrintFileUrl(args: PrintPipelineArgs): Promise<string> {
-  const { source, designId } = args;
+  const { source, designId, templateInput } = args;
 
+  if (!templateInput) throw new Error("Missing templateInput.");
+
+  // Photo/AI sources require the template to actually have a photo layer
+  // (otherwise the uploaded image has nowhere to land).
   if (source === "ai" || source === "photo") {
-    const layers = args.templateInput?.template.defaultLayout[
-      args.templateInput.orientation
-    ]?.layers;
+    const layers =
+      templateInput.template.defaultLayout[templateInput.orientation]?.layers;
     const hasPhotoLayer = !!layers?.some((l) => l.type === "photo");
-    if (args.templateInput && !hasPhotoLayer) {
+    if (!hasPhotoLayer) {
       throw new Error(
         "Mallen saknar bildplats — be admin lägga till ett bildlager.",
       );
     }
-  }
-
-  if (source === "ai") {
-    if (!args.aiPrintFileUrl) {
-      throw new Error("AI source missing printFileUrl — apply an AI style first.");
+    if (!templateInput.photoOverlayUrl) {
+      throw new Error(
+        `Source=${source} men ingen photoOverlayUrl tillhandahölls.`,
+      );
     }
-    console.info(`[print-pipeline] source=ai, passthrough → ${args.aiPrintFileUrl}`);
-    return args.aiPrintFileUrl;
   }
 
-  if (source === "photo") {
-    if (!args.photoFile) throw new Error("Photo source missing file.");
-    const t0 = performance.now();
-    const ext = pickExt(args.photoFile.type);
-    const url = await uploadPrintFileBlob(args.photoFile, designId, ext);
-    const ms = Math.round(performance.now() - t0);
-    console.info(
-      `[print-pipeline] source=photo, passthrough ${(args.photoFile.size / 1024 / 1024).toFixed(2)}MB, upload=${ms}ms → ${url}`
-    );
-    return url;
-  }
-
-  // source === "map"
-  if (!args.templateInput) throw new Error("Map source missing templateInput.");
-  const snap = await renderHiresTemplateSnapshotSafe(args.templateInput);
+  const snap = await renderHiresTemplateSnapshotSafe(templateInput);
   const t0 = performance.now();
   const url = await uploadPrintFile(snap.dataUrl, designId);
   const ms = Math.round(performance.now() - t0);
-  console.info(`[print-pipeline] source=map, upload=${ms}ms → ${url}`);
+  console.info(
+    `[print-pipeline] source=${source}, composite ${snap.widthPx}×${snap.heightPx}px, upload=${ms}ms → ${url}`,
+  );
   return url;
-}
-
-function pickExt(mime: string): "jpg" | "png" | "webp" {
-  if (mime === "image/png") return "png";
-  if (mime === "image/webp") return "webp";
-  return "jpg";
 }

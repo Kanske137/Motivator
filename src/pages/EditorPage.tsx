@@ -30,7 +30,7 @@ export default function EditorPage() {
   const [configs, setConfigs] = useState<ProductConfig[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const { config, template, layerValues, setConfig, currentPrice, currentLayout, mapStyleId, mapCenter, mapZoom, text, textFont, textVisible, showLabels, mapShape, orientation, size, variant, posterBgColor, designSource, photoFile, aiPrintFileUrl, shopifyVariantId, shopifyVariantResolving, setShopifyVariantId, setShopifyVariantResolving } =
+  const { config, template, layerValues, setConfig, currentPrice, currentLayout, mapStyleId, mapCenter, mapZoom, text, textFont, textVisible, showLabels, mapShape, orientation, size, variant, posterBgColor, designSource, aiPrintFileUrl, shopifyVariantId, shopifyVariantResolving, setShopifyVariantId, setShopifyVariantResolving } =
     useEditorStore();
   const addItem = useCartStore((s) => s.addItem);
   const isAdding = useCartStore((s) => s.isLoading);
@@ -122,13 +122,11 @@ export default function EditorPage() {
     let previewUrl = "";
     let printFileUrl = "";
     try {
-      // 1) Print file via dispatcher (map / photo / ai). Hard-fail if missing.
+      // 1) Print file via dispatcher (always full multi-layer composite).
       printFileUrl = await getPrintFileUrl({
         source: designSource,
         designId,
         templateInput: baseTemplateInput,
-        photoFile: photoFile ?? undefined,
-        aiPrintFileUrl: aiPrintFileUrl ?? undefined,
       });
 
       // 2) Thumbnail for cart display — multi-layer snapshot WITH frame/wrap
@@ -151,8 +149,7 @@ export default function EditorPage() {
     }
 
     const properties: Record<string, string> = {
-      Orientation: orientation === "portrait" ? "Stående" : "Liggande",
-      Text: text,
+      Orientering: orientation === "portrait" ? "Stående" : "Liggande",
       _map_style: mapStyleId,
       _map_center: `${mapCenter[1].toFixed(6)},${mapCenter[0].toFixed(6)}`,
       _map_zoom: mapZoom.toFixed(2),
@@ -166,6 +163,7 @@ export default function EditorPage() {
       _show_labels: showLabels ? "true" : "false",
       _text_visible: textVisible ? "true" : "false",
       _text_font: textFont,
+      _text: text,
       _design_source: designSource,
       _preview_image: previewUrl,
       _print_file_url: printFileUrl,

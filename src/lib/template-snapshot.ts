@@ -64,9 +64,9 @@ function pickHiresMaxPx(): number {
   const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
   const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
   const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(ua);
-  if (isMobile) return 2000;
-  if (dpr >= 2) return 3600;
-  return 3000;
+  if (isMobile) return 2800;
+  if (dpr >= 2) return 4800;
+  return 4200;
 }
 
 function parseSize(size: string, orientation: "portrait" | "landscape") {
@@ -394,7 +394,7 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
   const wCm = frontWcm + 2 * extraCm;
   const hCm = frontHcm + 2 * extraCm;
 
-  const PX_PER_CM = input.hires ? 32 : 24;
+  const PX_PER_CM = input.hires ? 48 : 24;
   const MAX_PX = input.maxPxOverride ?? (input.hires ? pickHiresMaxPx() : 1800);
   const longestPx = Math.max(wCm, hCm) * PX_PER_CM;
   const scale = longestPx > MAX_PX ? MAX_PX / longestPx : 1;
@@ -413,6 +413,8 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
   out.height = h;
   const ctx = out.getContext("2d");
   if (!ctx) throw new Error("2D ctx unavailable");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
 
   // Background — full extended area (wrap inherits bg)
   ctx.fillStyle = input.livePosterBgColor || "#ffffff";
@@ -519,7 +521,7 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
     ctx.restore();
   }
 
-  const dataUrl = out.toDataURL("image/jpeg", 0.92);
+  const dataUrl = out.toDataURL("image/jpeg", 0.95);
   if (!dataUrl || dataUrl.length < 1000) {
     throw new Error("Empty template snapshot");
   }
