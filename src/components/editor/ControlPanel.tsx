@@ -76,6 +76,20 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
           </AccordionTrigger>
           <AccordionContent className="pt-1 pb-4">
             <PhotoUploadSection />
+            {photoLayers.some((l) => !l.locks.shape) && (
+              <div className="mt-4 pt-4 border-t space-y-3">
+                {photoLayers
+                  .filter((l) => !l.locks.shape)
+                  .map((l, idx, arr) => (
+                    <PhotoShapeSection
+                      key={l.id}
+                      layer={l}
+                      value={(layerValues[l.id] as PhotoLayerValue | undefined) ?? null}
+                      heading={arr.length > 1 ? l.name || `Bild ${idx + 1}` : null}
+                    />
+                  ))}
+              </div>
+            )}
             {showAiInsideImage && (
               <div className="mt-4 pt-4 border-t space-y-2">
                 <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
