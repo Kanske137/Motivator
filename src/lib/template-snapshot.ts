@@ -413,6 +413,8 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
   out.height = h;
   const ctx = out.getContext("2d");
   if (!ctx) throw new Error("2D ctx unavailable");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
 
   // Background — full extended area (wrap inherits bg)
   ctx.fillStyle = input.livePosterBgColor || "#ffffff";
