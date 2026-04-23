@@ -1,103 +1,64 @@
 
 
-## Fix: Per-lager state för flera kartor & texter
+## Mellansteg: Form-rensning, default-plats per karta, oberoende textrutor
 
-### Problemet
+Tre fokuserade fixar innan Fas 2.
 
-Kund-store har **ett globalt** `mapCenter`/`mapZoom`/`mapShape`/`text`/`textFont` osv. När en mall har 2 kartor + 2 texter:
-- Bara den **första** kartan är "live" — övriga är låsta till sina admin-defaults.
-- "Plats"-fliken styr bara den första kartan.
-- Bägge text-lagren renderar samma globala `text` → blir dubletter.
-- Drag-och-drop på kartan i preview slutar fungera när admin har låst position på lagret (och den andra kartan har aldrig varit interaktiv).
+### 1. Begränsa kartformer till `circle | heart | star`
 
-### Lösning — per-lager värden + per-lager UI + valbar text↔karta-länkning
+**Tillåtna former:** Cirkel, Hjärta, Stjärna. Rektangel + Kvadrat tas bort överallt. Befintliga lager med `"rect"`/`"square"` migreras tyst till `"circle"` vid läsning.
 
-#### 1. Schema: ny `linkedMapLayerId` på text-lager
+**Filer:**
+- `src/lib/template-schema.ts` — `mapShapeSchema = z.enum(["circle", "heart", "star"])`. `MapShape`-typen följer med.
+- `src/lib/template-migrate.ts` — i `resolveTemplate`/`buildTemplateFromLegacy`: om `defaults.shape` är `"rect"` eller `"square"` → sätt `"circle"`.
+- `src/lib/layer-utils.ts` — ny map-lager-default `shape: "circle"` (istället för `"rect"`).
+- `src/components/admin/LayerInspector.tsx` — ta bort `<SelectItem>` för rect/square; lägg till `star`.
+- `src/components/admin/MapLayerPreview.tsx` + `TemplateThumbnail.tsx` — clipPath-switch: ta bort `rect`/`square`, lägg till `star` (SVG-clipPath, 5-uddig stjärna i `objectBoundingBox`-koordinater).
+- `src/components/editor/ControlPanel.tsx` — `shapeOptions`-array: bara cirkel/hjärta/stjärna. Importera `Star` från lucide-react. Grid blir `grid-cols-3` istället för `grid-cols-4`.
+- `src/components/editor/MapPreview.tsx` — `shapeClipPath()` får ny `case "star"` som returnerar `url(#starId)`. Lägg till `<StarClipDef>` (parallellt med `HeartClipDef`).
+- `src/components/editor/layers/MapLayerInstance.tsx` + `StaticLayers.tsx` — Props-typer uppdateras till `"circle" | "heart" | "star"`.
+- `src/lib/template-snapshot.ts` — `clipForShape()`: ta bort `square`, lägg till `star` (Path2D med 5 uddar, samma `objectBoundingBox`-mappning som SVG-versionen). `liveMapShape`-typ uppdateras.
+- `src/stores/editorStore.ts` — `MapShape`-typ uppdateras; legacy-mirror default `"circle"` istället för `"rect"`.
 
-`src/lib/template-schema.ts`:
-- `textDefaultsSchema` får valfritt `linkedMapLayerId: z.string().nullable().optional()`.
-  - `null`/undefined = ingen länk (statisk text)
-  - sträng = id på ett map-lager → text auto-uppdateras med stad/koordinater när den kartan flyttas/byts plats på.
+**Stjärn-path** (5-uddig, `objectBoundingBox` 0–1): klassisk pentagram-formel runt centrum (0.5, 0.5), ytterradie 0.5, innerradie 0.2, första udden uppåt. Samma path används både i SVG-clipPath och som Path2D i snapshot.
 
-#### 2. Editor-store: `layerValues` map
+### 2. Förvald plats per karta i admin
 
-`src/stores/editorStore.ts`:
-- Nytt state:
-  ```ts
-  layerValues: Record<string /* layerId */, MapLayerValue | TextLayerValue>
-  ```
-  - `MapLayerValue`: `{ center, zoom, styleId, shape, showLabels, placeName, city, country }`
-  - `TextLayerValue`: `{ text, font, isCustom, visible }`
-- `setConfig` hydrerar `layerValues` från **alla** lager i `template.defaultLayout[orientation].layers` (inte bara första).
-- Nya setters: `setLayerMapCenter(id, c)`, `setLayerMapZoom(id, z)`, `setLayerMapStyle(id, s)`, `setLayerMapShape(id, s)`, `setLayerShowLabels(id, v)`, `applyPlaceToLayer(id, args)`, `setLayerText(id, t)`, `setLayerTextFont(id, f)`, `setLayerTextVisible(id, v)`.
-- `applyPlaceToLayer(mapId, args)`:
-  1. Uppdaterar map-lagrets `center/placeName/city/country`.
-  2. Loopar alla text-lager där `defaults.linkedMapLayerId === mapId` och `value.isCustom === false` → regenererar texten via `buildAutoText`.
-- Behåller globala fält som **derived getters** för bakåtkompatibilitet (returnerar första kartans/textens värde) — så ingenting går sönder under övergången.
+I `LayerInspector` får varje map-lager en **plats-sökruta** (samma Mapbox geocoding som kund-editorn) som sätter både `defaults.center` och `defaults.zoom` på lagret samt sparar `defaults.placeName`/`city`/`country` så att länkad text-default kan auto-byggas.
 
-#### 3. `MapLayerInstance.tsx`: ta `layerId` istället för "live"-flagga
+**Schema** (`template-schema.ts`):
+- `mapDefaultsSchema` får valfria `placeName`, `city`, `country` (alla `z.string().optional()`). Bakåtkompatibelt.
 
-- Tar bort `live` boolean. Tar emot `layerId` + `interactive`.
-- Alla map-events (`moveend`) skriver tillbaka till `layerValues[layerId]` via `setLayerMapCenter/Zoom`.
-- `interactive` styrs av `!layer.locks.position` per lager.
-- Reverse-geocoding triggar `applyPlaceToLayer(layerId, ...)`.
+**Admin-UI** (`LayerInspector.tsx`, för map-lager):
+- Ny "Förvald plats"-sektion ovanför Lng/Lat/Zoom: input + dropdown med geocode-resultat (återanvänder `geocode()` från `@/lib/mapbox`, samma debounce-mönster som `PlaceLayerSection`).
+- När admin väljer ett resultat: skriver `defaults.center = r.center`, `zoom = 12` (eller behåller nuvarande om satt), `placeName = r.place_name`, `city = r.city`, `country = r.country`.
+- Lng/Lat/Zoom-inputs blir kvar för finjustering.
+- För **alla länkade text-lager i samma orientation** (där `defaults.linkedMapLayerId === mapLayer.id`): auto-uppdatera `defaults.text` med samma `STAD\nLand\n00.0000°N · 00.0000°E`-format som kund-runtime använder. Detta sker i Designer-state-nivå (`DesignerPage` har redan `onChange` för layers). Lägg en helper `applyAdminPlaceToLinkedTexts(layers, mapId, place)` i `template-migrate.ts` (eller ny `template-helpers.ts`) och anropa den vid plats-pick.
 
-#### 4. `MapPreview.tsx`: läs per-lager-värden
+**Kund-runtime** (`editorStore.hydrateLayerValues`):
+- När en map-lager hydreras, kopiera in `defaults.placeName/city/country` till `MapLayerValue` så kund-editorn visar adminens valda plats direkt under "Vald plats".
 
-- För varje map-lager: läs `layerValues[l.id]` istället för globalt store.
-- För varje text-lager: läs `layerValues[l.id].text/font/visible` istället för globalt `text`/`textFont`/`textVisible`.
-- Tar bort konceptet "first map = live" — alla kartor är nu interaktiva (om locks tillåter).
+### 3. Olänkade textrutor uppdateras ALDRIG av kartändringar
 
-#### 5. `ControlPanel.tsx`: dynamiska sektioner per lager
+Nuvarande `applyPlaceInternal` i `editorStore.ts` har en bakåtkompatibilitets-fallback (rad 436–447) som behandlar första text-lagret som auto-länkat till första kart-lagret om **inget** text-lager har en explicit länk. Detta är roten till "olänkad text uppdateras ändå".
 
-Bygg om från statiska accordions till dynamiska:
+**Fix** (`editorStore.ts`):
+- Ta bort hela `anyExplicitLink`/`firstMapId`/`firstTextId`-fallbacken.
+- Ny regel, exakt: text-lager auto-uppdateras **endast** om `l.defaults.linkedMapLayerId === mapId` **och** `tv.isCustom === false`.
+- Olänkade text-lager rör vi aldrig vid plats-byten — de visar `defaults.text` (som admin satt) tills kunden själv ändrar dem.
 
-**Plats-sektion**: Loopar alla map-lager i mallen.
-- Om endast 1 karta → header bara "Plats".
-- Om flera → "Plats — Karta 1", "Plats — Karta 2" osv (använder `layer.name` om satt).
-- Varje karta får sin egen sub-sektion med: vald plats, sökruta, tipstext. Sökresultat triggar `applyPlaceToLayer(layerId, ...)`.
+**Migrationsstöd** för befintliga single-layer-mallar som nu skulle "tappa" auto-uppdateringen:
+- I `template-migrate.ts` / `resolveTemplate`: om en mall har **exakt en map** + **exakt en text** och text-lagrets `linkedMapLayerId` är `undefined` → sätt det automatiskt till map-lagrets id. Säkerställer att de två befintliga publicerade produkterna (Personlig karta poster/canvas) fortsätter fungera utan admin-handpåläggning.
 
-**Kartstil-sektion**: Samma mönster — en sub-grupp per map-lager med stil/labels/form/bg. Bg är fortfarande globalt (en per layout).
+### Verifieringssteg
 
-**Text-sektion**: Loopar alla text-lager. Var och en får: visa-toggle, textarea, font-grid. Skriver till `setLayerText(id, ...)`.
+1. Admin-form-väljaren visar bara Cirkel/Hjärta/Stjärna. Kund-editorns "Kartans form" visar samma tre i grid-cols-3. Stjärna renderar både i preview och i print-snapshot.
+2. Befintliga mallar med `shape: "rect"` öppnas utan fel — visas som cirkel.
+3. I admin: sätt förvald plats "Göteborg" på Karta 2 → kund-editorn öppnar med Karta 2 centrerad på Göteborg, "Vald plats" visar Göteborg, länkad Text 2 visar `GÖTEBORG\nSverige\n…`.
+4. Mall med 2 kartor + 2 texter där bara Text 1 är länkad till Karta 1: byt plats på Karta 2 → Text 2 ändras INTE (visar admin-default eller kundens egna inmatning). Byt plats på Karta 1 → Text 1 uppdateras (om kund inte redan skrivit eget).
+5. Befintlig single-layer-poster: byta plats uppdaterar fortfarande texten (auto-länkning från migration kickar in).
 
-Lager med fullt låsta defaults (alla relevanta `locks` true) hoppas över helt eller visas som read-only info.
+### Direkt efter detta
 
-#### 6. Admin: `LayerInspector` får text↔karta-koppling
-
-`src/components/admin/LayerInspector.tsx`:
-- I text-lager-defaults: ny `Select` "Länka till karta":
-  - "Ingen (statisk text)"
-  - En option per map-lager i samma orientation (visar `layer.name`).
-- Sätter/rensar `defaults.linkedMapLayerId`.
-
-#### 7. Snapshot-pipeline läser `layerValues`
-
-`src/lib/template-snapshot.ts`:
-- Tar `layerValues` i input. För varje lager: använd `layerValues[l.id]` om finns, annars `l.defaults`. Säkrar att print-filen matchar exakt det kunden ser.
-
-### Filer
-
-| Fil | Ändring |
-|---|---|
-| `src/lib/template-schema.ts` | `linkedMapLayerId` i textDefaults |
-| `src/stores/editorStore.ts` | `layerValues` map + per-lager setters + `applyPlaceToLayer` |
-| `src/components/editor/layers/MapLayerInstance.tsx` | Per-lager binding via `layerId` |
-| `src/components/editor/MapPreview.tsx` | Läs `layerValues` per lager |
-| `src/components/editor/ControlPanel.tsx` | Dynamiska Plats/Kartstil/Text-sektioner per lager |
-| `src/components/admin/LayerInspector.tsx` | Länka-text-till-karta select |
-| `src/lib/template-snapshot.ts` | Läs `layerValues` |
-| `src/lib/template-migrate.ts` (om behövs) | Default `linkedMapLayerId = null` på legacy-text |
-
-### Verifiering
-
-1. Mall med 2 kartor + 2 texter → kund kan dra/zooma båda kartorna fritt.
-2. Plats-fliken visar "Karta 1" och "Karta 2" sektioner separat — sök i Karta 2 flyttar bara Karta 2.
-3. Text-fliken visar "Text 1" och "Text 2" separat — redigera Text 1 ändrar inte Text 2.
-4. I admin: sätt Text 1 länkad till Karta 1, Text 2 länkad till Karta 2 → ändra plats i Karta 2 uppdaterar Text 2 (om kund inte redigerat den manuellt) men inte Text 1.
-5. Befintliga single-layer-mallar fungerar oförändrat.
-
-### Efter detta
-
-Tillbaka till plan: **Fas 2** (kund-editor: AI-stilar, mockup-galleri, 3D canvas-preview, cart-integration med snapshot-pipelinen).
+Tillbaka till **Fas 2** (AI-stilar, mockup-galleri, 3D canvas-preview, cart-integration med snapshot-pipelinen).
 
