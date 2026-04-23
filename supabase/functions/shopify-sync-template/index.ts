@@ -10,8 +10,11 @@
 import { corsHeaders } from "https://esm.sh/@supabase/supabase-js@2.95.0/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import skuMap from "../_shared/gelato-sku-map.json" with { type: "json" };
-
-const SHOPIFY_API_VERSION = "2025-07";
+import {
+  ensureShopifyAuth,
+  shopifyAdmin,
+  type ShopifyAuthError,
+} from "../_shared/shopify-admin.ts";
 
 // Mirrors src/lib/pricing.ts — used by the live "Personlig Karta" products.
 const POSTER_PRICES: Record<string, Record<string, number>> = {
