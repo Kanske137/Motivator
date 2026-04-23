@@ -6,15 +6,21 @@
 //  - hardcoded `DEFAULT_PRODUCT_VARIANTS` for that product type
 // This way the admin can enable e.g. canvas on a poster-only legacy config and
 // still see canvas-shaped sizes/depths instead of poster frames.
-import { useMemo } from "react";
-import { Info } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { Info, Plus, Trash2, Upload, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import type { ProductConfig } from "@/lib/product-config";
-import type { ProductOptions } from "@/lib/template-schema";
+import type { AiStylePreset, ProductOptions } from "@/lib/template-schema";
 import { DEFAULT_PRODUCT_VARIANTS, mergeUnique } from "@/lib/product-defaults";
+import { DEFAULT_AI_STYLES } from "@/lib/ai-style-defaults";
+import { uploadCartPreview } from "@/lib/upload-preview";
+import { toast } from "sonner";
 
 interface Props {
   config: ProductConfig;
