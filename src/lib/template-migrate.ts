@@ -11,6 +11,7 @@ import {
   type Template,
   type TemplateLayer,
 } from "./template-schema";
+import { DEFAULT_AI_STYLES } from "./ai-style-defaults";
 
 const DEFAULT_BG = "#EFE7D6";
 
@@ -117,6 +118,13 @@ function migrateTemplate(template: Template): Template {
         ...next.defaultLayout,
         [o]: { ...layout, layers: newLayers },
       },
+    };
+  }
+  // Seed default AI styles when none are configured (admin can edit/remove later).
+  if (!next.productOptions.aiStyles || next.productOptions.aiStyles.length === 0) {
+    next = {
+      ...next,
+      productOptions: { ...next.productOptions, aiStyles: [...DEFAULT_AI_STYLES] },
     };
   }
   return autoLinkSingleLayerTemplate(next);
