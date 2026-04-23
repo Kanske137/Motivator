@@ -313,6 +313,7 @@ function Scene({
 
 export function Canvas3DPreview({
   printUrl, loading, error, widthCm, heightCm, depthCm, bleedCm = 0.3,
+  scene = "livingroom",
 }: Canvas3DPreviewProps) {
   return (
     <div className="border-t bg-[hsl(var(--paper))]">
@@ -353,6 +354,7 @@ export function Canvas3DPreview({
                   heightCm={heightCm}
                   depthCm={depthCm}
                   bleedCm={bleedCm}
+                  scene={scene}
                 />
               </Suspense>
             </Canvas>
