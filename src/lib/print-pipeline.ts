@@ -1,15 +1,18 @@
 // Single dispatcher for producing a print-ready file URL the Shopify webhook
 // can hand directly to Gelato. The SOURCE of the design dictates which path:
 //
-//   "map"   → render hi-res browser snapshot (Mapbox GL + WebGL)
+//   "map"   → render hi-res browser snapshot (Mapbox GL + WebGL) via the
+//             multi-layer template renderer (all map/text/line/margin layers).
 //   "photo" → upload the user's original file (no re-encoding)
 //   "ai"    → already lives in the print-files bucket (uploaded by edge fn)
 //
 // Every path returns a public URL pointing at the print-files bucket. NO
 // silent fallbacks — if any step fails, throw so the caller can show a toast
 // and abort the cart-add flow.
-import type { SnapshotInput } from "./editor-snapshot";
-import { renderHiresSnapshotSafe } from "./editor-snapshot";
+import {
+  renderHiresTemplateSnapshotSafe,
+  type TemplateSnapshotInput,
+} from "./template-snapshot";
 import { uploadPrintFile, uploadPrintFileBlob } from "./upload-preview";
 
 export type DesignSource = "map" | "photo" | "ai";
@@ -18,7 +21,7 @@ export interface PrintPipelineArgs {
   source: DesignSource;
   designId: string;
   /** Required when source = "map" */
-  mapInput?: SnapshotInput;
+  templateInput?: TemplateSnapshotInput;
   /** Required when source = "photo" */
   photoFile?: File;
   /** Required when source = "ai" — already uploaded to print-files. */
@@ -49,8 +52,8 @@ export async function getPrintFileUrl(args: PrintPipelineArgs): Promise<string> 
   }
 
   // source === "map"
-  if (!args.mapInput) throw new Error("Map source missing mapInput.");
-  const snap = await renderHiresSnapshotSafe(args.mapInput);
+  if (!args.templateInput) throw new Error("Map source missing templateInput.");
+  const snap = await renderHiresTemplateSnapshotSafe(args.templateInput);
   const t0 = performance.now();
   const url = await uploadPrintFile(snap.dataUrl, designId);
   const ms = Math.round(performance.now() - t0);

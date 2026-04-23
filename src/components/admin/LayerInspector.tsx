@@ -4,7 +4,7 @@
 //   - Edit position/size numerically (snap to 5%)
 //   - Map: search a default place (geocoding) → updates center/zoom +
 //     placeName/city/country, AND auto-builds text for any linked text layers.
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Loader2, Search } from "lucide-react";
 import type { ProductConfig } from "@/lib/product-config";
 import { Input } from "@/components/ui/input";
@@ -332,14 +332,15 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1.5">
+const Field = React.forwardRef<HTMLDivElement, { label: string; children: React.ReactNode }>(
+  ({ label, children }, ref) => (
+    <div ref={ref} className="space-y-1.5">
       <Label className="text-xs">{label}</Label>
       {children}
     </div>
-  );
-}
+  ),
+);
+Field.displayName = "Field";
 
 // ---------- inline geocoding search for default place ----------
 function DefaultPlaceSearch({

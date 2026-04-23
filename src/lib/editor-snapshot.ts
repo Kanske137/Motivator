@@ -1,7 +1,7 @@
-// Renders the SAME editor artwork (Mapbox GL + shape mask + bg + text) into
-// an offscreen canvas, returning a PNG dataURL. This is the SINGLE SOURCE OF
-// TRUTH for all preview mockups and 3D canvas textures — guaranteeing
-// pixel-identical parity with the live editor.
+// @deprecated — Single-layer legacy renderer. Use `renderTemplateSnapshot`
+// from `./template-snapshot` instead. Kept temporarily for any straggling
+// callers; safe to delete once nothing imports `renderArtworkSnapshot` /
+// `renderHiresSnapshotSafe`.
 import mapboxgl from "mapbox-gl";
 import { getMapboxToken, styleUrl } from "./mapbox";
 import type { MapShape } from "@/stores/editorStore";

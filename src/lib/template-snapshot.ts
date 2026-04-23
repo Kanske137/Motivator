@@ -43,6 +43,18 @@ export interface TemplateSnapshotInput {
   bleedCm?: number;
   hires?: boolean;
   maxPxOverride?: number;
+
+  // Optional frame / canvas-wrap overlay (drawn ON TOP of layers — preview/cart only).
+  frameColor?: string;
+  frameWidthCm?: number;
+  canvasWrap?: boolean;
+}
+
+export interface TemplateSnapshotResult {
+  dataUrl: string;
+  widthPx: number;
+  heightPx: number;
+  sizeBytes: number;
 }
 
 function pickHiresMaxPx(): number {
@@ -403,9 +415,88 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
     }
   }
 
+  // Frame / canvas-wrap overlay (preview/cart only — never on hires print).
+  const hasFrame = !!input.frameColor && input.frameColor.trim() !== "";
+  if (!input.hires && extraCm === 0 && hasFrame && (input.frameWidthCm ?? 0) > 0) {
+    const fw = Math.max(1, Math.round((input.frameWidthCm ?? 1.2) * PX_PER_CM * scale));
+    ctx.save();
+    ctx.fillStyle = input.frameColor!;
+    ctx.fillRect(0, 0, w, fw);
+    ctx.fillRect(0, h - fw, w, fw);
+    ctx.fillRect(0, 0, fw, h);
+    ctx.fillRect(w - fw, 0, fw, h);
+    ctx.strokeStyle = "rgba(0,0,0,0.18)";
+    ctx.lineWidth = Math.max(1, Math.round(fw * 0.06));
+    ctx.strokeRect(fw, fw, w - 2 * fw, h - 2 * fw);
+    ctx.restore();
+  } else if (!input.hires && input.canvasWrap && extraCm === 0) {
+    const edge = Math.max(2, Math.round(0.25 * PX_PER_CM * scale));
+    ctx.save();
+    const grad = (x0: number, y0: number, x1: number, y1: number) => {
+      const g = ctx.createLinearGradient(x0, y0, x1, y1);
+      g.addColorStop(0, "rgba(0,0,0,0.22)");
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      return g;
+    };
+    ctx.fillStyle = grad(0, 0, 0, edge);
+    ctx.fillRect(0, 0, w, edge);
+    ctx.fillStyle = grad(0, h, 0, h - edge);
+    ctx.fillRect(0, h - edge, w, edge);
+    ctx.fillStyle = grad(0, 0, edge, 0);
+    ctx.fillRect(0, 0, edge, h);
+    ctx.fillStyle = grad(w, 0, w - edge, 0);
+    ctx.fillRect(w - edge, 0, edge, h);
+    ctx.restore();
+  }
+
   const dataUrl = out.toDataURL("image/jpeg", 0.92);
   if (!dataUrl || dataUrl.length < 1000) {
     throw new Error("Empty template snapshot");
   }
   return dataUrl;
+}
+
+/**
+ * Hires snapshot with one retry at 70 % size if the first attempt fails
+ * (typically WebGL context loss on weaker GPUs / very large posters).
+ */
+export async function renderHiresTemplateSnapshotSafe(
+  input: TemplateSnapshotInput,
+): Promise<TemplateSnapshotResult> {
+  const t0 = performance.now();
+  let lastErr: unknown = null;
+  const initialMax = pickHiresMaxPx();
+  const attempts = [initialMax, Math.round(initialMax * 0.7)];
+  for (const maxPx of attempts) {
+    try {
+      const dataUrl = await renderTemplateSnapshot({
+        ...input,
+        hires: true,
+        maxPxOverride: maxPx,
+        // Never bake frame/wrap into print files.
+        frameColor: undefined,
+        frameWidthCm: undefined,
+        canvasWrap: false,
+      });
+      const base64 = dataUrl.split(",")[1] ?? "";
+      const sizeBytes = Math.round((base64.length * 3) / 4);
+      const dims = await new Promise<{ w: number; h: number }>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve({ w: img.width, h: img.height });
+        img.onerror = () => reject(new Error("dim probe failed"));
+        img.src = dataUrl;
+      });
+      const ms = Math.round(performance.now() - t0);
+      console.info(
+        `[print-pipeline] template snapshot ok: ${dims.w}×${dims.h}px, ${(sizeBytes / 1024 / 1024).toFixed(2)}MB, ${ms}ms (maxPx=${maxPx})`,
+      );
+      return { dataUrl, widthPx: dims.w, heightPx: dims.h, sizeBytes };
+    } catch (e) {
+      console.warn(`[print-pipeline] template snapshot failed at maxPx=${maxPx}, retrying…`, e);
+      lastErr = e;
+    }
+  }
+  throw new Error(
+    `Hi-res template snapshot failed: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`,
+  );
 }
