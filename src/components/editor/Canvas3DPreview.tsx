@@ -40,12 +40,10 @@ function useTexture(url: string | null) {
 }
 
 function CanvasMesh({
-  texture, widthCm, heightCm, depthCm, bleedCm, autoRotate, onUserInteract,
+  texture, widthCm, heightCm, depthCm, bleedCm,
 }: {
   texture: THREE.Texture;
   widthCm: number; heightCm: number; depthCm: number; bleedCm: number;
-  autoRotate: boolean;
-  onUserInteract: () => void;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const weaveMap = useMemo(() => getCanvasWeaveNormalMap(256), []);
@@ -55,12 +53,6 @@ function CanvasMesh({
   const w = (widthCm / maxCm) * 2;
   const h = (heightCm / maxCm) * 2;
   const d = (depthCm / maxCm) * 2;
-
-  useFrame((_, dt) => {
-    if (autoRotate && meshRef.current) {
-      meshRef.current.rotation.y += dt * 0.25;
-    }
-  });
 
   // BoxGeometry material order: [+X, -X, +Y, -Y, +Z, -Z]
   // = right, left, top, bottom, front, back
