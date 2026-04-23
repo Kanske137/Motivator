@@ -13,6 +13,44 @@ import skuMap from "../_shared/gelato-sku-map.json" with { type: "json" };
 
 const SHOPIFY_API_VERSION = "2025-07";
 
+// Mirrors src/lib/pricing.ts — used by the live "Personlig Karta" products.
+const POSTER_PRICES: Record<string, Record<string, number>> = {
+  "13x18": { Ingen: 199, Vit: 349, Svart: 349, Ek: 369, "Valnöt": 369 },
+  "21x30": { Ingen: 239, Vit: 399, Svart: 399, Ek: 429, "Valnöt": 429 },
+  "30x40": { Ingen: 259, Vit: 559, Svart: 559, Ek: 589, "Valnöt": 589 },
+  "40x50": { Ingen: 289, Vit: 749, Svart: 749, Ek: 789, "Valnöt": 789 },
+  "50x70": { Ingen: 329, Vit: 919, Svart: 919, Ek: 969, "Valnöt": 969 },
+  "70x100": { Ingen: 429, Vit: 1249, Svart: 1249, Ek: 1299, "Valnöt": 1299 },
+};
+
+const CANVAS_PRICES: Record<string, Record<string, number>> = {
+  "20x25": { "2cm": 299, "4cm": 319 },
+  "20x30": { "2cm": 349, "4cm": 379 },
+  "30x40": { "2cm": 449, "4cm": 489 },
+  "40x50": { "2cm": 599, "4cm": 649 },
+  "40x60": { "2cm": 699, "4cm": 759 },
+  "50x70": { "2cm": 799, "4cm": 869 },
+  "60x80": { "2cm": 999, "4cm": 1099 },
+  "70x100": { "2cm": 1299, "4cm": 1399 },
+};
+
+type SkuMap = Record<string, Record<string, { portrait: string; landscape: string }>>;
+const SKUS = skuMap as SkuMap;
+
+function getUid(kind: "poster" | "canvas", size: string, variant: string): string | null {
+  const block = SKUS[kind === "poster" ? "posters" : "canvas"] ?? {};
+  return block[`${size}|${variant}`]?.portrait ?? null;
+}
+
+function getPrice(kind: "poster" | "canvas", size: string, variant: string): number {
+  const table = kind === "poster" ? POSTER_PRICES : CANVAS_PRICES;
+  return table[size]?.[variant] ?? 0;
+}
+
+interface SyncBody {
+  handle: string;
+}
+
 function getShopifyDomain(): string {
   const domain = Deno.env.get("SHOPIFY_STORE_PERMANENT_DOMAIN")
     ?? Deno.env.get("SHOPIFY_STORE_DOMAIN")
