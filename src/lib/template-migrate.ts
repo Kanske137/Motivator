@@ -120,6 +120,13 @@ function migrateTemplate(template: Template): Template {
       },
     };
   }
+  // Seed default AI styles when none are configured (admin can edit/remove later).
+  if (!next.productOptions.aiStyles || next.productOptions.aiStyles.length === 0) {
+    next = {
+      ...next,
+      productOptions: { ...next.productOptions, aiStyles: [...DEFAULT_AI_STYLES] },
+    };
+  }
   return autoLinkSingleLayerTemplate(next);
 }
 
