@@ -21,15 +21,15 @@ function getShopifyDomain(): string {
 }
 
 function getShopifyToken(): string {
-  // Prefer the permanent admin token for backend sync work.
-  // Online user-bound tokens can expire and cause 401s in background/admin sync flows.
-  const permanent = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
-  if (permanent) return permanent;
-
+  // Prefer the user-bound online token Lovable's Shopify integration installs
+  // (env var pattern: SHOPIFY_ONLINE_ACCESS_TOKEN:user:<uid>). The plain
+  // SHOPIFY_ACCESS_TOKEN secret in this project predates the integration and
+  // is no longer valid against the Admin API, so we only use it as a fallback.
   for (const [k, v] of Object.entries(Deno.env.toObject())) {
     if (k.startsWith("SHOPIFY_ONLINE_ACCESS_TOKEN") && v) return v;
   }
-
+  const fallback = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
+  if (fallback) return fallback;
   throw new Error("No Shopify access token configured");
 }
 
