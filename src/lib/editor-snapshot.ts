@@ -123,7 +123,7 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
 
   // Map renders in shape-aware container. With wrap, the map ALWAYS covers the
   // full extended canvas as a rect (wrap continues the map outside the front).
-  const useShapeClip = extraCm === 0 && input.mapShape !== "rect";
+  const useShapeClip = extraCm === 0 && (input.mapShape as string) !== "rect";
   const sq = Math.min(frontPxW, frontPxH);
   const mapW = useShapeClip ? Math.min(w, h) : w;
   const mapH = useShapeClip ? Math.min(w, h) : h;
@@ -210,7 +210,7 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
         ctx.arc(fcx, fcy, fsq / 2, 0, Math.PI * 2);
         ctx.clip();
         ctx.drawImage(mapCanvas, fcx - fsq / 2, fcy - fsq / 2, fsq, fsq);
-      } else if (input.mapShape === "square") {
+      } else if ((input.mapShape as string) === "square") {
         ctx.beginPath();
         ctx.rect(fcx - fsq / 2, fcy - fsq / 2, fsq, fsq);
         ctx.clip();
@@ -230,14 +230,14 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
         ctx.beginPath();
         ctx.arc(w / 2, h / 2, r, 0, Math.PI * 2);
         ctx.clip();
-      } else if (input.mapShape === "square") {
+      } else if ((input.mapShape as string) === "square") {
         const sx = (w - sq) / 2;
         const sy = (h - sq) / 2;
         ctx.beginPath();
         ctx.rect(sx, sy, sq, sq);
         ctx.clip();
       }
-      if (input.mapShape === "rect") {
+      if ((input.mapShape as string) === "rect") {
         ctx.drawImage(mapCanvas, 0, 0, w, h);
       } else {
         const dx = (w - sq) / 2;
