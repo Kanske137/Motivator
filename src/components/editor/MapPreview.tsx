@@ -33,12 +33,27 @@ function HeartClipDef({ id }: { id: string }) {
   );
 }
 
-function shapeClipPath(shape: string, heartId: string): string | undefined {
+/** Stable star-clip SVG def (5-point star). */
+function StarClipDef({ id }: { id: string }) {
+  return (
+    <svg width="0" height="0" className="absolute pointer-events-none">
+      <defs>
+        <clipPath id={id} clipPathUnits="objectBoundingBox">
+          <path d="M0.5,0 L0.618,0.345 L0.976,0.345 L0.690,0.560 L0.794,0.905 L0.5,0.690 L0.206,0.905 L0.310,0.560 L0.024,0.345 L0.382,0.345 Z" />
+        </clipPath>
+      </defs>
+    </svg>
+  );
+}
+
+function shapeClipPath(shape: string, heartId: string, starId: string): string | undefined {
   switch (shape) {
     case "circle":
       return "circle(50% at 50% 50%)";
     case "heart":
       return `url(#${heartId})`;
+    case "star":
+      return `url(#${starId})`;
     default:
       return undefined;
   }
@@ -48,6 +63,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   const frameRef = useRef<HTMLDivElement>(null);
   const [borderPx, setBorderPx] = useState(0);
   const heartIdRef = useRef(`heart-${Math.random().toString(36).slice(2)}`);
+  const starIdRef = useRef(`star-${Math.random().toString(36).slice(2)}`);
 
   const {
     orientation,
@@ -140,6 +156,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
         style={frameStyle}
       >
         <HeartClipDef id={heartIdRef.current} />
+        <StarClipDef id={starIdRef.current} />
 
         {/* Loop all template layers in zIndex order */}
         {layers.map((l) => {
@@ -156,7 +173,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
           if (l.type === "map") {
             const v = layerValues[l.id];
             const mv = v && v.kind === "map" ? v : null;
-            const effectiveShape = mv?.shape ?? (l.defaults.shape as "rect" | "square" | "circle" | "heart");
+            const effectiveShape = (mv?.shape ?? l.defaults.shape) as "circle" | "heart" | "star";
             const effectiveStyleId = mv?.styleId ?? l.defaults.styleId;
             const effectiveCenter: [number, number] = mv?.center ?? [
               l.defaults.center[0]!,
@@ -164,7 +181,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             ];
             const effectiveZoom = mv?.zoom ?? l.defaults.zoom;
             const effectiveLabels = mv?.showLabels ?? l.defaults.showLabels;
-            const clip = shapeClipPath(effectiveShape, heartIdRef.current);
+            const clip = shapeClipPath(effectiveShape, heartIdRef.current, starIdRef.current);
             return (
               <div key={l.id} style={wrapStyle}>
                 <MapLayerInstance

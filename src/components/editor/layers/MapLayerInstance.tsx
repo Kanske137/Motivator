@@ -10,7 +10,7 @@ import { getMapboxToken, reverseGeocode, styleUrl } from "@/lib/mapbox";
 
 interface Props {
   layerId: string;
-  shape: "rect" | "square" | "circle" | "heart";
+  shape: "circle" | "heart" | "star";
   styleId: string;
   center: [number, number];
   zoom: number;

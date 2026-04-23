@@ -85,7 +85,7 @@ export function createLayer(type: LayerType, existing: TemplateLayer[]): Templat
         type: "map",
         name: `Karta ${countOfType(existing, "map") + 1}`,
         defaults: {
-          shape: "rect",
+          shape: "circle",
           styleId: "light-v11",
           center: [18.0686, 59.3293],
           zoom: 12,

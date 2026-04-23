@@ -16,7 +16,7 @@ export type Aspect = z.infer<typeof aspectSchema>;
 export const productTypeSchema = z.enum(["poster", "canvas"]);
 export type TemplateProductType = z.infer<typeof productTypeSchema>;
 
-export const mapShapeSchema = z.enum(["rect", "square", "circle", "heart"]);
+export const mapShapeSchema = z.enum(["circle", "heart", "star"]);
 export type MapShape = z.infer<typeof mapShapeSchema>;
 
 export const imageFitSchema = z.enum(["cover", "contain"]);
@@ -62,6 +62,11 @@ export const mapDefaultsSchema = z.object({
   center: z.tuple([z.number(), z.number()]), // [lng, lat]
   zoom: z.number().min(0).max(22),
   showLabels: z.boolean(),
+  // Optional admin-set default place metadata (used to hydrate "Vald plats" and
+  // auto-build linked text content on customer-side load).
+  placeName: z.string().optional(),
+  city: z.string().optional(),
+  country: z.string().optional(),
 });
 export type MapDefaults = z.infer<typeof mapDefaultsSchema>;
 
