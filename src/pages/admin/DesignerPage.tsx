@@ -10,7 +10,7 @@
 // product_configs. Publish stamps `publishedAt` and runs zod validation.
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Eye, Image as ImageIcon, Loader2, MapPin, Save, Send, Type } from "lucide-react";
+import { ArrowLeft, Eye, Image as ImageIcon, Loader2, MapPin, Save, Send, Type, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
