@@ -1,58 +1,61 @@
 
 
-## Steg 4: 3D-Canvas Polish
+## Steg 4b: 3D-Canvas Polish — fixar & vardagsrumsscen
 
-### Mål
-Göra `Canvas3DPreview` mer fotorealistisk så canvas-produkten känns lika säljbar som en riktig produktbild — utan att bryta dagens wrap-precision.
+### Problem att lösa
 
-### Förbättringar
+1. **Auto-rotate krockar in i väggen** → duken roterar och försvinner in i vägg-planet bakom.
+2. **Zoom avstängd** → `enableZoom={false}` blockerar både scroll-zoom på desktop och pinch-zoom på mobil.
+3. **Bakgrundsfärgsändringar syns inte i 3D** → tryckfilen som genereras till 3D-vyn cachar/regenererar inte när `posterBgColor` ändras.
+4. **Saknas vardagsrumskontext** → idag bara en platt vägg.
 
-**1. Realistisk dukväv-textur**
-- Lägg en subtil canvas-väv-overlay (procedurell normal map genererad i Three.js, ingen extern asset) på alla sex materialen.
-- Använder `MeshStandardMaterial.normalMap` med låg intensitet (~0.15) så trycket fortfarande dominerar men ytan får mikro-relief vid belysning.
-- Roughness höjs lätt på sidorna jämfört med fronten (sidorna sträcks mer → mindre reflektion).
+### Lösning
 
-**2. Bättre belysning**
-- Byt nuvarande två directional lights mot ett **3-punkts-setup**: key (varm framifrån-höger), fill (sval vänster), rim (bakifrån för kantljus).
-- Lägg till `Environment preset="apartment"` från `@react-three/drei` för naturliga reflektioner i normal-mappen (väggljus-känsla).
-- Mjukare `ContactShadows` (blur 3.2, opacity 0.45).
+**1. Statisk duk + orbiterande kamera**
+- Ta bort `meshRef.current.rotation.y += dt * 0.25` helt. Duken står still.
+- Aktivera `OrbitControls.autoRotate={true}` + `autoRotateSpeed={0.8}` i 4 sekunder vid mount, stoppas vid första interaktion.
+- Kameran roterar då runt duken istället för att duken roterar in i väggen.
+- Behåll `min/maxAzimuthAngle ±45°` så användaren aldrig ser baksidan eller in i väggen.
 
-**3. Vägg-kontext (valfritt på/av)**
-- Bakom duken: en stor neutral "vägg"-plan (ljust beige `#ece7df`) med svag vinjettering via radialgradient i bakgrundsfärgen.
-- Duken hängs ~0.05 enheter framför väggen så `ContactShadows` projicerar på väggen istället för i luften → "hänger på vägg"-känsla.
+**2. Återaktivera zoom**
+- `enableZoom={true}` på `OrbitControls` (fungerar för både scroll och pinch).
+- Sätt `minDistance={2.5}` och `maxDistance={5.5}` så användaren inte kan zooma in i duken eller ut till tomheten.
+- `zoomSpeed={0.6}` för mjukare scroll-känsla.
 
-**4. Mobil-interaktion**
-- Aktivera touch-rotate (OrbitControls fungerar redan, men `enableDamping={true}` + `dampingFactor={0.08}` ger smidigare swipe).
-- Auto-rotate i 4 sekunder vid första render, stoppas vid första touch/drag.
-- Behåll dagens begränsningar (±45° azimuth, ±45° polar) så kunden aldrig ser baksidan.
+**3. Vardagsrumsscen**
+Bygg en enkel low-poly miljö i Three.js (inga externa GLB-filer):
+- **Vägg bakom duken** (befintlig, men gjord större: 16×10).
+- **Golv** under duken (`PlaneGeometry` 16×8, ljus ek-färg `#d4b896`, roterad −90°, position y=−1.6).
+- **Soffa** (förenklad: tre `BoxGeometry` — bas + ryggstöd + två armstöd, mörkgrå `#3a3f4a`, position framför nedre delen av väggen, skalad så den syns under duken).
+- **Sidobord + lampa** (cylinder + sfär, varmt ljus från sfären via `pointLight` med samma position → ger naturlig "rumsljus"-känsla).
+- **Tavelram-kant runt duken** (subtil kant via tunn `BoxGeometry`-frame om vi vill — hoppar över för att inte krocka med wrap-rendringen).
+- Allt ligger så långt bak/ner att duken förblir hjälte; rummet är bara kontext i bakgrunden.
 
-**5. Wrap-verifiering**
-- Lägg till en synlig "test-grid"-overlay i dev-läge (`import.meta.env.DEV`) som ritar röda linjer på textur-fraktionerna i ett stickprov, så vi kan visuellt bekräfta att fronten är exakt motivzonen och att hörnen är sömlösa.
-- Tas bort innan vi går vidare; bara för QA-pass.
+Aktiveras via en ny prop `scene?: "minimal" | "livingroom"` (default `"livingroom"` för canvas, `"minimal"` om vi vill behålla nuvarande look någon annanstans).
+
+**4. Bakgrundsfärgs-bug**
+
+Roten till problemet finns i hur 3D-tryckfilen genereras. Inspektera:
+- `MapPreview.tsx` (3D-läge) → vilken `printUrl` skickas till `Canvas3DPreview`?
+- `template-snapshot.ts` → används `livePosterBgColor`?
+- Om `printUrl` cachas i en ref/state utan `posterBgColor` i dependency → fix: lägg till `posterBgColor` i useEffect-deps som regenererar 3D-snapshot.
+
+Förmodad fix: i `MapPreview.tsx`s 3D-snapshot-effekt, lägg till `posterBgColor` (och `livePosterBgColor`) i dependency-arrayen så snapshot regenereras vid färgbyte. Verifierar exakt under implementationen.
 
 ### Filer
 
 | Fil | Ändring |
 |---|---|
-| `src/components/editor/Canvas3DPreview.tsx` | 3-punkts-ljus, Environment, dukväv-normal map, vägg-plan, damping, auto-rotate, dev-grid |
-| (ev.) `src/lib/canvas-weave-texture.ts` | NY: procedurell normal-map-generator (DataTexture, ingen fil-asset) |
-
-Inga nya beroenden — `@react-three/drei` har redan `Environment`, `ContactShadows`, `OrbitControls`.
+| `src/components/editor/Canvas3DPreview.tsx` | Ta bort mesh-rotation, aktivera autoRotate på OrbitControls, aktivera zoom, lägg till `LivingRoomScene`-komponent (golv + soffa + lampa + pointLight) |
+| `src/components/editor/MapPreview.tsx` | Lägg till `posterBgColor` i 3D-snapshot useEffect deps så bakgrundsfärg propagerar |
 
 ### Verifiering
 
-1. Öppna canvas-produkt i editorn → 3D-vyn visar duken framför en ljus vägg, mjuk skugga under, varm ljussättning från höger.
-2. Vid laddning: duken roterar långsamt ~4 s, stannar vid touch.
-3. Swipe på mobil: smidig rotation med damping, kan inte rotera till baksidan.
-4. Zooma in i webbläsaren: dukväven syns som mikro-relief på ytan när ljuset träffar i vinkel.
-5. Hörn mellan front och sidor: sömlösa, ingen pixel-glipa (samma snapshot-pipeline som tryckfilen).
-6. Inget regression i wrap-mappningen — fronten visar motivet, sidorna visar wrap-zonen, baksidan är neutral fabric.
-
-### Arbetsordning
-
-1. Lägg till Environment + 3-punkts-ljus → ta screenshot-jämförelse.
-2. Generera procedurell väv-normal-map → applicera på materialen.
-3. Lägg in vägg-plan + uppdaterade ContactShadows.
-4. Touch-damping + auto-rotate.
-5. Dev-grid QA-pass på 30×40, 50×70, 60×90 i både porträtt och landskap; ta bort grid.
+1. Öppna canvas-produkt → duken står still mitt i vyn, kameran cirklar runt långsamt i 4s.
+2. Scrolla med musen → zoom in/ut fungerar smidigt.
+3. Pinch på mobil → zoom fungerar.
+4. Drag → roterar runt duken, kan aldrig se in i väggen eller baksidan av duken.
+5. Bakgrundsmiljö: golv + soffa + lampa syns under/runt duken, varmt ljus från lampan på dukens högra sida.
+6. Ändra bakgrundsfärg i editorn → 3D-vyn uppdateras inom ~1s med ny färg på fronten och sidornas wrap.
+7. Inga regressioner i wrap-mappning eller mobilprestanda.
 
