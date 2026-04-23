@@ -200,7 +200,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   designSource: "map",
   photoFile: null,
   photoPreviewUrl: null,
+  originalPhotoUrl: null,
   aiPrintFileUrl: null,
+  shopifyVariantId: null,
+  shopifyVariantResolving: false,
 
   // legacy mirrors (initial values, replaced once a config is loaded)
   mapCenter: [18.0686, 59.3293],
