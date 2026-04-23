@@ -77,6 +77,20 @@ export const imageDefaultsSchema = z.object({
 });
 export type ImageDefaults = z.infer<typeof imageDefaultsSchema>;
 
+// Photo layer = a customer-fillable image placeholder. Distinct from `image`
+// (which is admin-static art). Shape is shared with the map shape vocabulary
+// + a plain rectangle.
+export const photoShapeSchema = z.enum(["rect", "circle", "heart", "star"]);
+export type PhotoShape = z.infer<typeof photoShapeSchema>;
+
+export const photoDefaultsSchema = z.object({
+  shape: photoShapeSchema,
+  fit: imageFitSchema,
+  /** Optional placeholder image URL the admin can supply for preview only. */
+  placeholderUrl: z.string().url().optional(),
+});
+export type PhotoDefaults = z.infer<typeof photoDefaultsSchema>;
+
 export const textDefaultsSchema = z.object({
   text: z.string(),
   font: z.string().min(1),
