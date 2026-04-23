@@ -115,12 +115,28 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
       gelato_sku_map: {} as unknown as never,
     });
 
-    setSaving(false);
+    // (don't reset saving yet — sync still pending)
     if (error) {
+      setSaving(false);
       toast.error("Kunde inte skapa", { description: error.message });
       return;
     }
-    toast.success("Mall skapad");
+
+    // Sync to Shopify (productCreate). Failure here doesn't block — admin can retry.
+    const { data: syncData, error: syncErr } = await supabase.functions.invoke(
+      "shopify-sync-template",
+      { body: { handle: handle.trim() } },
+    );
+    setSaving(false);
+    if (syncErr || !syncData?.ok) {
+      toast.warning("Mall skapad, men Shopify-synk misslyckades", {
+        description: syncErr?.message ?? syncData?.error ?? "Okänt fel — försök igen via Synka-knappen.",
+      });
+    } else {
+      toast.success("Mall skapad och Shopify-produkt synkad", {
+        description: `${syncData.results?.length ?? 0} produkt(er) uppdaterade`,
+      });
+    }
     onOpenChange(false);
     navigate(`/admin/designer/${handle.trim()}`);
   }
