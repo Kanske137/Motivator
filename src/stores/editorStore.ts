@@ -356,10 +356,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setLayerTextVisible: (id, v) => updateText(set, get, id, { visible: v }),
   setLayerPhotoShape: (id, s) => updatePhoto(set, get, id, { shape: s }),
   setLayerPhotoOffset: (id, x, y) =>
-    updatePhoto(set, get, id, {
-      offsetX: Math.max(-50, Math.min(50, x)),
-      offsetY: Math.max(-50, Math.min(50, y)),
-    }),
+    // Clamp is performed at the call site (PhotoLayerView) where natural
+    // image dimensions and container size are known. Store the raw value.
+    updatePhoto(set, get, id, { offsetX: x, offsetY: y }),
 
   // ---------- legacy globals → operate on first layer ----------
   setMapCenter: (c) => {
