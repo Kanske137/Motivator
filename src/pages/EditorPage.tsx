@@ -110,6 +110,12 @@ export default function EditorPage() {
       liveTextVisible: textVisible,
       wrapCm: isCanvas ? 2 : 0,
       bleedCm: isCanvas ? 0.3 : 0,
+      photoOverlayUrl:
+        designSource === "ai"
+          ? aiPrintFileUrl ?? undefined
+          : designSource === "photo"
+          ? useEditorStore.getState().photoPreviewUrl ?? undefined
+          : undefined,
     };
 
     setIsPreparing(true);
