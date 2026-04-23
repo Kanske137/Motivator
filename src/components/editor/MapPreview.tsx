@@ -505,6 +505,13 @@ function PhotoLayerView({
 
   const canPan = fit !== "contain" && draggable && (maxX > 0 || maxY > 0);
 
+  // Perfect-circle clip from measured pixel size (so non-square layers still
+  // render as a true circle, not an ellipse / cropped oval).
+  const clipPath =
+    shape === "circle" && box.w > 0 && box.h > 0
+      ? `circle(${Math.min(box.w, box.h) / 2}px at 50% 50%)`
+      : staticClipPath;
+
   return (
     <div
       ref={containerRef}
