@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import type { ProductConfig } from "@/lib/product-config";
 import type { AiStylePreset, ProductOptions } from "@/lib/template-schema";
 import { DEFAULT_PRODUCT_VARIANTS, mergeUnique } from "@/lib/product-defaults";
+import { hasGelatoSku } from "@/lib/gelato-catalog";
 import { DEFAULT_AI_STYLES } from "@/lib/ai-style-defaults";
 import { uploadCartPreview } from "@/lib/upload-preview";
 import { toast } from "sonner";
@@ -99,7 +100,25 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
     onChange({ ...value, [kind]: { ...block, [field]: nextList } });
   }
 
-  const showDefaultsBanner = configSizes.length === 0 || configVariantNames.length === 0;
+  // Banner only fires when an *enabled* combination lacks a Gelato SKU.
+  const missingSkus = useMemo(() => {
+    const out: { kind: Kind; size: string; variant: string }[] = [];
+    if (value.poster?.enabled) {
+      for (const s of value.poster.allowedSizes ?? []) {
+        for (const f of value.poster.allowedFrames ?? []) {
+          if (!hasGelatoSku("poster", s, f)) out.push({ kind: "poster", size: s, variant: f });
+        }
+      }
+    }
+    if (value.canvas?.enabled) {
+      for (const s of value.canvas.allowedSizes ?? []) {
+        for (const d of value.canvas.allowedDepths ?? []) {
+          if (!hasGelatoSku("canvas", s, d)) out.push({ kind: "canvas", size: s, variant: d });
+        }
+      }
+    }
+    return out;
+  }, [value]);
 
   return (
     <Card className="p-5 space-y-5">
@@ -110,12 +129,13 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
         </p>
       </div>
 
-      {showDefaultsBanner && (
+      {missingSkus.length > 0 && (
         <div className="flex items-start gap-2 rounded-md border border-dashed bg-muted/40 p-3 text-xs text-muted-foreground">
           <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
           <span>
-            Standardvarianter visas. Gelato-SKU saknas tills du fyller i <code className="font-mono">gelato_sku_map</code> —
-            publicering blockeras för storlekar utan SKU.
+            {missingSkus.length} variantkombination{missingSkus.length === 1 ? "" : "er"} saknar Gelato-SKU och
+            kommer hoppas över vid synk till Shopify (t.ex.{" "}
+            <code className="font-mono">{missingSkus[0].size} · {missingSkus[0].variant}</code>).
           </span>
         </div>
       )}
