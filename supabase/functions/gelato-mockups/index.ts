@@ -82,10 +82,41 @@ async function callGelatoMockups(
     .filter((x): x is MockupOut => !!x);
 }
 
+async function fetchSceneIds(productUid: string): Promise<any> {
+  const key = Deno.env.get("GELATO_API_KEY");
+  if (!key) throw new Error("GELATO_API_KEY missing");
+  // Try Gelato's product mockups discovery endpoints in order of likelihood.
+  const candidates = [
+    `https://product.gelatoapis.com/v3/products/${productUid}/mockups`,
+    `https://product.gelatoapis.com/v3/products/${productUid}/scenes`,
+    `https://product.gelatoapis.com/v3/products/${productUid}`,
+  ];
+  const results: any[] = [];
+  for (const url of candidates) {
+    try {
+      const r = await fetch(url, { headers: { "X-API-KEY": key } });
+      const t = await r.text();
+      results.push({ url, status: r.status, body: t.slice(0, 1500) });
+    } catch (e) {
+      results.push({ url, error: String(e) });
+    }
+  }
+  return results;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
+    const u = new URL(req.url);
+    if (u.searchParams.get("debug") === "scenes") {
+      const productUid = u.searchParams.get("productUid") ?? "";
+      const data = await fetchSceneIds(productUid);
+      return new Response(JSON.stringify(data, null, 2), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const body = await req.json().catch(() => ({}));
     const productUid: unknown = body?.productUid;
     const printFileUrl: unknown = body?.printFileUrl;
