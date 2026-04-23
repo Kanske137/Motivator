@@ -1,82 +1,110 @@
 
+Problemet är inte själva mall-logiken eller SKU-logiken längre. Det som fallerar är Shopify-autentiseringen i backend.
 
-## Fas 3 — Steg 1: Tryckfilen ska vara identisk med editor-vyn
+### Vad som faktiskt är fel
 
-### Problem (kritiskt)
+Det finns tydliga tecken på att `shopify-sync-template` använder fel autentiseringskälla för Shopify Admin API:
 
-`getPrintFileUrl()` i `src/lib/print-pipeline.ts` har tre grenar:
+1. `shopify-storefront` fungerar
+   - Storefront-anropen returnerar `200`.
+   - Det betyder att butikens domän och storefront-token fungerar.
 
-| Source | Vad som skickas till Gelato idag |
-|---|---|
-| `map` | ✅ Hi-res komposit av alla lager |
-| `photo` | ❌ Bara den uppladdade originalbilden |
-| `ai` | ❌ Bara AI-resultatet, ingen komposit |
+2. `shopify-sync-template` fallerar direkt med `401 Invalid API key or access token`
+   - Felet uppstår innan produktskapande/variantlogik hinner spela någon roll.
+   - Alltså är Admin API-token som edge functionen använder ogiltig eller inte rätt token för runtime.
 
-För `photo`/`ai` görs en **passthrough-uppladdning** — alla andra lager (kartor, text, bakgrund, shape-clip på fotot) ignoreras. Det är därför din senaste beställning bara fick AI-bilden i full storlek istället för hela posterdesignen.
+3. Nuvarande funktion hämtar token via `Deno.env`
+   - Den försöker läsa `SHOPIFY_ONLINE_ACCESS_TOKEN:user:*`
+   - annars fallback till `SHOPIFY_ACCESS_TOKEN`
+   - Men trots reconnect får vi fortfarande samma `401`, vilket visar att runtime-token som funktionen ser inte är användbar för Admin API.
 
-Cart-thumbnailen är korrekt eftersom den alltid kör genom `renderTemplateSnapshot()` som komponerar alla lager och redan tar emot `photoOverlayUrl` som målas in i fotolagrets shape-clippade rektangel.
+4. Din nuvarande chat-/tool-auktorisering och edge function-runtime är inte samma sak
+   - Jag kunde läsa att din användare är Shopify-auktoriserad i verktygen.
+   - Samtidigt finns inga tillgängliga connector-kopplingar för nuvarande användare i projektet.
+   - Det tyder på att appens edge function inte säkert delar samma auth-kanal som chat-verktygen.
 
-### Lösning
+5. Samma sårbarhet finns sannolikt även i `shopify-order-webhook`
+   - Den använder också `SHOPIFY_ACCESS_TOKEN` direkt.
+   - Den kan därför senare få samma typ av Admin API-problem.
 
-#### 1. `src/lib/print-pipeline.ts` — kör ALLTID hi-res-snapshot
+### Slutsats
 
-Ta bort passthrough-grenarna för `photo` och `ai`. Alla källor → `renderHiresTemplateSnapshotSafe(templateInput)` → upload till `print-files`-bucket. `templateInput.photoOverlayUrl` är redan korrekt satt av `EditorPage.handleAddToCart` så fotot/AI-resultatet hamnar inuti rätt fotolager med rätt shape-clip och pan-offset.
+Det uppenbara grundproblemet är:
+- Synk-knappen i appen går via en edge function som förlitar sig på en Shopify Admin-token i runtime-secrets.
+- Den token som funktionen faktiskt använder är fel, gammal eller inte korrekt exponerad till runtime.
+- Reconnect i chatten har därför inte löst det verkliga felet i appens backend-path.
 
-Behåll guarden som kräver att mallen har ett `photo`-lager när `source !== "map"`.
+## Plan för att lösa det
 
-Ny semantik:
-- `designSource` används bara för att avgöra om `photoOverlayUrl` ska sättas — själva print-renderingen är nu identisk för alla källor.
-- `photoFile` / `aiPrintFileUrl` behöver inte längre laddas upp separat innan tryck, men `aiPrintFileUrl` är fortfarande den URL som matas in i editor + snapshot.
+### 1. Gör Shopify-auth i backend deterministisk
+Refaktorera auth-hanteringen i `supabase/functions/shopify-sync-template/index.ts` så att den:
+- använder en enda tydlig tokenkälla i prioriterad ordning
+- loggar vilken tokenkälla som valdes, utan att exponera hemligheter
+- loggar vilken domän som används
+- slutar “gissa” genom att scanna miljön brett efter alla `SHOPIFY_ONLINE_ACCESS_TOKEN*`
 
-#### 2. `src/lib/template-snapshot.ts` — höj print-DPI
+Målet är att funktionen alltid använder en verifierad Admin-token, inte en opportunistisk fallback.
 
-Idag: `PX_PER_CM = 32` i hires-läge, max-px klamp `2000–3600` beroende på enhet. För en 21×30 cm poster ger det ~960×1370 px → ca 116 DPI. Gelato rekommenderar **300 DPI** för fotokvalitet (≈ 118 PX_PER_CM). Det är inte realistiskt att rendera 21×30 cm @ 300 DPI i webbläsaren (~2480×3540 px = OK), men 30×40 / 50×70 blir gigantiskt och WebGL-kontexten dör.
+### 2. Lägg till ett explicit Admin API-auth-test först
+Innan produktsynk körs ska funktionen göra ett litet test mot Admin API, t.ex. en enkel shop-query.
+Om auth fallerar ska svaret bli tydligt, t.ex.:
+- vilken auth-källa som användes
+- att Admin-token är ogiltig i backend
+- att ingen produktsynk försöktes
 
-Justering:
-- `PX_PER_CM` höjs till `48` i hires (motsvarar ~122 DPI), vilket Gelato accepterar för posters/canvas i de flesta storlekar.
-- `pickHiresMaxPx()`-tak höjs till `4800` på desktop, `2800` på mobil.
-- Lägg till `ctx.imageSmoothingEnabled = true` och `ctx.imageSmoothingQuality = "high"` innan `drawImage`-anropen i `drawPhotoLayer`, `drawImageLayer` och `drawMapLayer`.
-- Byt JPEG-kvalitet från `0.92` → `0.95` (fortfarande betydligt mindre fil än PNG).
+Det gör att vi kan skilja auth-fel från produkt-/variantfel direkt.
 
-För **stora** storlekar (50×70 / 70×100) håller automatisk-skalningen redan koll på maxpixel-budgeten — vi får då lägre faktisk DPI, men inte värre än idag.
+### 3. Centralisera Shopify-auth i en gemensam helper
+Skapa samma auth-upplägg för:
+- `shopify-sync-template`
+- `shopify-order-webhook`
 
-#### 3. `src/components/CartDrawer.tsx` — rensa cart-radens metadata
+Det minskar risken att synk fixas men att order-webhook senare fortfarande använder en gammal token.
 
-Kunden ser idag:
-- Produkttitel
-- Variant (storlek · ram)
-- **Alla** non-underscore-attribut (idag: `Orientation`, `Text` — och `Text` visar bara ena textrutan vilket är missvisande)
+### 4. Sluta bygga på antagandet att reconnect automatiskt uppdaterar edge runtime
+Nuvarande implementation antar i praktiken att en reconnect gör rätt token tillgänglig i `Deno.env`.
+Planen är att verifiera och koda för den faktiska backend-kanalen som finns i projektet, istället för att anta att reconnect räcker.
 
-Fix: visa endast storlek + ram + orientering. Konkret:
-- Ta bort `Orientation` och `Text` från `properties` i `EditorPage.handleAddToCart`. (Variantens namn `${size} · ${variant}` täcker storlek + ram, så vi lägger till orientering som en line-item-attribut: `Orientering: Stående`.)
-- Resten av designdatan ligger fortsatt i `_-prefixade` attribut för Shopify-webhooken, oförändrat.
-- `CartDrawer`s filter `a.key.startsWith("_")` fungerar då redan — bara `Orientering` visas under variant-raden.
+### 5. Om runtime-token fortfarande inte är giltig: byt integrationsstrategi
+Om verifieringen visar att Lovable-runtime inte får en fungerande Admin-token via env, behöver synken flyttas till den stödda Shopify-integrationen istället för att ske med ett manuellt env-tokenflöde.
 
-#### 4. `supabase/functions/shopify-order-webhook/index.ts`
+Det innebär att vi i nästa steg väljer en av dessa robusta vägar:
+- antingen säkrar en riktig permanent Admin-token som backend får tillgång till
+- eller flyttar Shopify-skapande/uppdatering till en stödd integrationsväg som inte beror på denna trasiga env-tokenmodell
 
-Ingen kod-ändring krävs här — webhooken läser redan `_print_file_url` från line item properties och skickar till Gelato. Eftersom URL:en nu pekar på en korrekt komposit-tryckfil löser det sig automatiskt.
+### 6. Förbättra felmeddelandet i admin-UI
+`DesignerPage` och `CreateTemplateDialog` ska visa ett mer exakt fel än bara “Shopify-synk misslyckades”, t.ex.:
+- “Backendens Shopify Admin-token är ogiltig”
+- istället för att det ser ut som att mall- eller variantdatan är fel
 
-Verifiera dock i loggen efter nästa testorder att:
-- `_print_file_url` pekar på en ny fil
-- `source=` rapporterar fortfarande "ai"/"photo" (för spårbarhet — men filen är nu en full komposit)
+## Filer som påverkas
 
-### Filer
+- `supabase/functions/shopify-sync-template/index.ts`
+  - auth-flöde
+  - auth-test
+  - tydligare loggning och felhantering
 
-| Fil | Ändring |
-|---|---|
-| `src/lib/print-pipeline.ts` | Ta bort `ai`/`photo` passthrough, alla källor → hi-res komposit |
-| `src/lib/template-snapshot.ts` | PX_PER_CM 32→48, max-px-tak höjs, smoothingQuality=high, JPEG 0.95 |
-| `src/pages/EditorPage.tsx` | Ta bort `Orientation` + `Text` från properties; lägg `Orientering: …` |
-| `src/components/CartDrawer.tsx` | Ingen ändring (filtret fungerar redan när vi tar bort attributen) |
+- `supabase/functions/shopify-order-webhook/index.ts`
+  - samma auth-helper / samma säkra tokenstrategi
 
-### Verifiering
+- eventuellt ny shared helper i `supabase/functions/_shared/...`
+  - gemensam Shopify Admin-auth
 
-1. Gör om beställningen (mall med 2 kartor + 3 texter + 1 AI-bild, 21×30 vit ram).
-2. Cart-raden visar: `Personlig karta poster · 21x30 · Vit · Orientering: Stående`. Ingen "Text"-attribut.
-3. Cart-thumbnailen oförändrad (visuellt identisk med editorn).
-4. `_print_file_url` i webhook-loggen pekar på en NY fil i `print-files/`.
-5. Öppna URL:en direkt i webbläsaren → bilden visar **hela kompositen** (bakgrund + båda kartor + alla texter + cirkulär AI-bild i sin shape).
-6. Filen är ≥ 2480×3540 px för 21×30 (≈ 300 DPI på kortsidan, ≈ 122 DPI faktisk efter klamp om enheten triggar maxpx-skalning).
-7. Gelato accepterar filen utan DPI-varning i admin (kontrollera nästa orderbekräftelse).
-8. Testa även `source=map` (utan AI/foto) → fortsatt korrekt, ingen regression.
+- `src/pages/admin/DesignerPage.tsx`
+  - bättre feltext i toast
 
+- `src/components/admin/CreateTemplateDialog.tsx`
+  - bättre feltext i toast
+
+## Verifiering efter fix
+
+1. Klick på “Synka till Shopify” ger inte längre `401`.
+2. Funktionen loggar tydligt vilken auth-källa som användes.
+3. En enkel Admin API test-query passerar innan produktsynk startar.
+4. Mallen “Mitt hjärta” skapar eller uppdaterar produkt(er) i Shopify.
+5. Samma auth-upplägg fungerar även för order-webhookens Admin-anrop.
+6. Om auth fortfarande saknas får du ett exakt, begripligt fel som pekar på backend-auth och inte på mallarna.
+
+## Kort sagt
+
+Det som inte stämmer är att appens Shopify-synk just nu körs med fel backend-authmodell. Din Shopify-anslutning verkar finnas på användar-/tool-nivå, men edge functionen använder fortfarande en ogiltig eller felaktigt exponerad Admin-token i runtime. Det är därför du får samma 401 om och om igen.
