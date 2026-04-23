@@ -33,7 +33,18 @@ export interface TextLayerValue {
   isCustom: boolean;
 }
 
-export type LayerValue = MapLayerValue | TextLayerValue;
+export type PhotoShape = "rect" | "circle" | "heart" | "star";
+
+export interface PhotoLayerValue {
+  kind: "photo";
+  shape: PhotoShape;
+  /** Pan offset within the layer's frame, in percent of layer width/height.
+   *  Range clamped to [-50, 50]. 0,0 = centered cover crop. */
+  offsetX: number;
+  offsetY: number;
+}
+
+export type LayerValue = MapLayerValue | TextLayerValue | PhotoLayerValue;
 
 interface EditorState {
   config: ProductConfig | null;
