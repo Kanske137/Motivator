@@ -31,6 +31,18 @@ export interface PrintPipelineArgs {
 export async function getPrintFileUrl(args: PrintPipelineArgs): Promise<string> {
   const { source, designId } = args;
 
+  if (source === "ai" || source === "photo") {
+    const layers = args.templateInput?.template.defaultLayout[
+      args.templateInput.orientation
+    ]?.layers;
+    const hasPhotoLayer = !!layers?.some((l) => l.type === "photo");
+    if (args.templateInput && !hasPhotoLayer) {
+      throw new Error(
+        "Mallen saknar bildplats — be admin lägga till ett bildlager.",
+      );
+    }
+  }
+
   if (source === "ai") {
     if (!args.aiPrintFileUrl) {
       throw new Error("AI source missing printFileUrl — apply an AI style first.");

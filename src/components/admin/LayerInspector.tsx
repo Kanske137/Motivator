@@ -308,6 +308,54 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
         </div>
       )}
 
+      {layer.type === "photo" && (
+        <div className="space-y-3 border-t pt-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Foto — defaults
+          </p>
+          <Field label="Form">
+            <Select
+              value={layer.defaults.shape}
+              onValueChange={(v) => updateDefaults({ shape: v as typeof layer.defaults.shape })}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="rect">Rektangel</SelectItem>
+                <SelectItem value="circle">Cirkel</SelectItem>
+                <SelectItem value="heart">Hjärta</SelectItem>
+                <SelectItem value="star">Stjärna</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Anpassning">
+            <Select
+              value={layer.defaults.fit}
+              onValueChange={(v) => updateDefaults({ fit: v as typeof layer.defaults.fit })}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cover">Fyll (cover)</SelectItem>
+                <SelectItem value="contain">Inrymd (contain)</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Placeholder-bild (URL, valfri)">
+            <Input
+              value={layer.defaults.placeholderUrl ?? ""}
+              placeholder="https://…"
+              onChange={(e) =>
+                updateDefaults({
+                  placeholderUrl: e.target.value.trim() ? e.target.value.trim() : undefined,
+                })
+              }
+            />
+          </Field>
+          <p className="text-[11px] text-muted-foreground -mt-1">
+            Visas i admin-canvas + kund-editor när inget kund-foto finns ännu.
+          </p>
+        </div>
+      )}
+
       {/* Locks */}
       <div className="space-y-2 border-t pt-4">
         <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">

@@ -408,6 +408,17 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
       } catch (e) {
         console.warn("[template-snapshot] image layer failed", e);
       }
+    } else if (layer.type === "photo") {
+      const url =
+        (input as TemplateSnapshotInput & { photoOverlayUrl?: string }).photoOverlayUrl ??
+        layer.defaults.placeholderUrl;
+      if (url) {
+        try {
+          await drawPhotoLayer(ctx, rect, url, layer.defaults.shape, layer.defaults.fit);
+        } catch (e) {
+          console.warn("[template-snapshot] photo layer failed", e);
+        }
+      }
     } else if (layer.type === "line") {
       drawLineLayer(ctx, rect, layer, pxPerMm);
     } else if (layer.type === "margin") {
