@@ -448,25 +448,47 @@ function PhotoLayerView({
       onPointerCancel={onPointerUp}
     >
       {src ? (
-        <img
-          ref={imgRef}
-          src={src}
-          alt=""
-          onLoad={(e) => {
-            const i = e.currentTarget;
-            setNatural({ w: i.naturalWidth, h: i.naturalHeight });
-          }}
-          className={`absolute inset-0 w-full h-full ${
-            fit === "contain" ? "object-contain" : "object-cover"
-          }`}
-          style={{
-            transform: `translate(${offsetX}%, ${offsetY}%)`,
-            transformOrigin: "center",
-            userSelect: "none",
-            pointerEvents: "none",
-          }}
-          draggable={false}
-        />
+        fit === "contain" || !natural || renderW === 0 ? (
+          <img
+            ref={imgRef}
+            src={src}
+            alt=""
+            onLoad={(e) => {
+              const i = e.currentTarget;
+              setNatural({ w: i.naturalWidth, h: i.naturalHeight });
+            }}
+            className={`absolute inset-0 w-full h-full ${
+              fit === "contain" ? "object-contain" : "object-cover"
+            }`}
+            style={{ userSelect: "none", pointerEvents: "none" }}
+            draggable={false}
+          />
+        ) : (
+          // Cover mode: render the image at its full scaled size and pan it
+          // within the container so the customer can reach the actual edges.
+          // offsetX/Y are percent of the layer (box) size; convert to pixels
+          // and add to the centered base position.
+          <img
+            ref={imgRef}
+            src={src}
+            alt=""
+            onLoad={(e) => {
+              const i = e.currentTarget;
+              setNatural({ w: i.naturalWidth, h: i.naturalHeight });
+            }}
+            style={{
+              position: "absolute",
+              width: `${renderW}px`,
+              height: `${renderH}px`,
+              left: `${(box.w - renderW) / 2 + (offsetX / 100) * box.w}px`,
+              top: `${(box.h - renderH) / 2 + (offsetY / 100) * box.h}px`,
+              userSelect: "none",
+              pointerEvents: "none",
+              maxWidth: "none",
+            }}
+            draggable={false}
+          />
+        )
       ) : (
         <div className="absolute inset-0 flex items-center justify-center bg-muted/40 border-2 border-dashed border-foreground/30 text-[11px] text-muted-foreground text-center px-2">
           Ladda upp en bild
