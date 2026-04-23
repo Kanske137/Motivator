@@ -309,3 +309,113 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
     </div>
   );
 }
+
+interface PhotoLayerViewProps {
+  layerId: string;
+  src: string | null;
+  fit: "cover" | "contain";
+  clipPath?: string;
+  offsetX: number;
+  offsetY: number;
+  draggable: boolean;
+}
+
+function PhotoLayerView({
+  layerId,
+  src,
+  fit,
+  clipPath,
+  offsetX,
+  offsetY,
+  draggable,
+}: PhotoLayerViewProps) {
+  const setLayerPhotoOffset = useEditorStore((s) => s.setLayerPhotoOffset);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const dragStateRef = useRef<{
+    startX: number;
+    startY: number;
+    baseX: number;
+    baseY: number;
+    width: number;
+    height: number;
+  } | null>(null);
+
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!draggable || fit === "contain") return;
+      const el = containerRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      dragStateRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        baseX: offsetX,
+        baseY: offsetY,
+        width: rect.width,
+        height: rect.height,
+      };
+      el.setPointerCapture(e.pointerId);
+      setDragging(true);
+    },
+    [draggable, fit, offsetX, offsetY],
+  );
+
+  const onPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const s = dragStateRef.current;
+      if (!s) return;
+      const dxPct = ((e.clientX - s.startX) / s.width) * 100;
+      const dyPct = ((e.clientY - s.startY) / s.height) * 100;
+      setLayerPhotoOffset(layerId, s.baseX + dxPct, s.baseY + dyPct);
+    },
+    [layerId, setLayerPhotoOffset],
+  );
+
+  const onPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const el = containerRef.current;
+      if (el && el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+      dragStateRef.current = null;
+      setDragging(false);
+    },
+    [],
+  );
+
+  return (
+    <div
+      ref={containerRef}
+      className="absolute inset-0 overflow-hidden"
+      style={{
+        clipPath,
+        cursor: draggable && fit !== "contain" ? (dragging ? "grabbing" : "grab") : "default",
+        touchAction: draggable && fit !== "contain" ? "none" : undefined,
+      }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+    >
+      {src ? (
+        <img
+          src={src}
+          alt=""
+          className={`absolute inset-0 w-full h-full ${
+            fit === "contain" ? "object-contain" : "object-cover"
+          }`}
+          style={{
+            transform: `translate(${offsetX}%, ${offsetY}%)`,
+            transformOrigin: "center",
+            userSelect: "none",
+            pointerEvents: "none",
+          }}
+          draggable={false}
+        />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center bg-muted/40 border-2 border-dashed border-foreground/30 text-[11px] text-muted-foreground text-center px-2">
+          Ladda upp en bild
+        </div>
+      )}
+    </div>
+  );
+}
