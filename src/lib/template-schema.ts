@@ -150,6 +150,10 @@ export const marginLayerSchema = layerBase.extend({
   type: z.literal("margin"),
   defaults: marginDefaultsSchema,
 });
+export const photoLayerSchema = layerBase.extend({
+  type: z.literal("photo"),
+  defaults: photoDefaultsSchema,
+});
 
 export const layerSchema = z.discriminatedUnion("type", [
   mapLayerSchema,
@@ -157,6 +161,7 @@ export const layerSchema = z.discriminatedUnion("type", [
   textLayerSchema,
   lineLayerSchema,
   marginLayerSchema,
+  photoLayerSchema,
 ]);
 export type TemplateLayer = z.infer<typeof layerSchema>;
 export type LayerType = TemplateLayer["type"];
