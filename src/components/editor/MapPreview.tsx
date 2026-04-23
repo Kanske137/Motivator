@@ -221,20 +221,31 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             ];
             const effectiveZoom = mv?.zoom ?? l.defaults.zoom;
             const effectiveLabels = mv?.showLabels ?? l.defaults.showLabels;
-            const clip = shapeClipPath(effectiveShape, heartIdRef.current, starIdRef.current);
+            const staticClip = shapeClipPath(
+              effectiveShape,
+              heartIdRef.current,
+              starIdRef.current,
+            );
             return (
-              <div key={l.id} style={wrapStyle}>
-                <MapLayerInstance
-                  layerId={l.id}
-                  shape={effectiveShape}
-                  styleId={effectiveStyleId}
-                  center={effectiveCenter}
-                  zoom={effectiveZoom}
-                  showLabels={effectiveLabels}
-                  interactive={!l.locks.position}
-                  clipPath={clip}
-                />
-              </div>
+              <MapLayerSlot
+                key={l.id}
+                wrapStyle={wrapStyle}
+                isCircle={effectiveShape === "circle"}
+                staticClip={staticClip}
+              >
+                {(clip) => (
+                  <MapLayerInstance
+                    layerId={l.id}
+                    shape={effectiveShape}
+                    styleId={effectiveStyleId}
+                    center={effectiveCenter}
+                    zoom={effectiveZoom}
+                    showLabels={effectiveLabels}
+                    interactive={!l.locks.position}
+                    clipPath={clip}
+                  />
+                )}
+              </MapLayerSlot>
             );
           }
 
@@ -248,7 +259,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
               | "star";
             const offsetX = pv?.offsetX ?? 0;
             const offsetY = pv?.offsetY ?? 0;
-            const clip = shapeClipPath(
+            const staticClip = shapeClipPath(
               effectiveShape,
               heartIdRef.current,
               starIdRef.current,
@@ -260,7 +271,8 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
                   layerId={l.id}
                   src={src}
                   fit={l.defaults.fit}
-                  clipPath={clip}
+                  shape={effectiveShape}
+                  staticClipPath={staticClip}
                   offsetX={offsetX}
                   offsetY={offsetY}
                   draggable={!!src}
