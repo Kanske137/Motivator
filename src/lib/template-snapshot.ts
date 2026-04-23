@@ -282,7 +282,43 @@ async function drawImageLayer(
   ctx.restore();
 }
 
-function drawLineLayer(
+async function drawPhotoLayer(
+  ctx: CanvasRenderingContext2D,
+  rect: { x: number; y: number; w: number; h: number },
+  url: string,
+  shape: "rect" | "circle" | "heart" | "star",
+  fit: "cover" | "contain",
+): Promise<void> {
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const i = new Image();
+    i.crossOrigin = "anonymous";
+    i.onload = () => resolve(i);
+    i.onerror = () => reject(new Error("Photo layer load failed"));
+    i.src = url;
+  });
+  ctx.save();
+  clipForShape(ctx, shape, rect.x, rect.y, rect.w, rect.h);
+  if (fit === "contain") {
+    const ar = img.width / img.height;
+    const rar = rect.w / rect.h;
+    let dw = rect.w;
+    let dh = rect.h;
+    if (ar > rar) dh = rect.w / ar;
+    else dw = rect.h * ar;
+    ctx.drawImage(img, rect.x + (rect.w - dw) / 2, rect.y + (rect.h - dh) / 2, dw, dh);
+  } else {
+    const ar = img.width / img.height;
+    const rar = rect.w / rect.h;
+    let sw = img.width;
+    let sh = img.height;
+    if (ar > rar) sw = img.height * rar;
+    else sh = img.width / rar;
+    const sx = (img.width - sw) / 2;
+    const sy = (img.height - sh) / 2;
+    ctx.drawImage(img, sx, sy, sw, sh, rect.x, rect.y, rect.w, rect.h);
+  }
+  ctx.restore();
+}
   ctx: CanvasRenderingContext2D,
   rect: { x: number; y: number; w: number; h: number },
   layer: Extract<TemplateLayer, { type: "line" }>,
