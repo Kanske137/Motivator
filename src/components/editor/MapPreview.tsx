@@ -71,9 +71,16 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
     posterBgColor,
     templateLayers,
     layerValues,
+    designSource,
+    photoPreviewUrl,
+    aiPrintFileUrl,
   } = useEditorStore();
 
   const layers = templateLayers();
+  // When the customer has uploaded a photo (or generated an AI image) we
+  // show that image inside every map layer's shape instead of Mapbox.
+  const photoOverlayUrl =
+    designSource === "ai" ? aiPrintFileUrl : designSource === "photo" ? photoPreviewUrl : null;
 
   // Outer poster/canvas frame
   const sizeCm = parseCm(size);
