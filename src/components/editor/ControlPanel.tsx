@@ -51,6 +51,7 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
   const layers = templateLayers();
   const mapLayers = layers.filter((l): l is Extract<TemplateLayer, { type: "map" }> => l.type === "map");
   const textLayers = layers.filter((l): l is Extract<TemplateLayer, { type: "text" }> => l.type === "text");
+  const photoLayers = layers.filter((l): l is Extract<TemplateLayer, { type: "photo" }> => l.type === "photo");
 
   // Hide map layers fully locked (no editable surface)
   const editableMaps = mapLayers.filter(
@@ -60,11 +61,11 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
     (l) => !l.locks.content || !l.locks.font || !l.locks.visibility,
   );
 
-  // Photo / AI sections only make sense when at least one map layer exists
-  // (the photo replaces the map area). AI section additionally requires presets.
-  const showImageSection = mapLayers.length > 0;
+  // Image section visible only when the template has at least one dedicated
+  // photo layer. AI presets nest inside the image section once a photo is up.
+  const showImageSection = photoLayers.length > 0;
   const aiStyles = productOptions?.aiStyles ?? [];
-  const showAiSection = mapLayers.length > 0 && !!photoFile && aiStyles.length > 0;
+  const showAiInsideImage = !!photoFile && aiStyles.length > 0;
 
   return (
     <Accordion type="single" collapsible defaultValue="plats" className="w-full space-y-3">
@@ -75,17 +76,14 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
           </AccordionTrigger>
           <AccordionContent className="pt-1 pb-4">
             <PhotoUploadSection />
-          </AccordionContent>
-        </AccordionItem>
-      )}
-
-      {showAiSection && (
-        <AccordionItem value="ai-stil" className={cn(cardClass, "border-b-0")}>
-          <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
-            AI-stil
-          </AccordionTrigger>
-          <AccordionContent className="pt-1 pb-4">
-            <AiStyleSection presets={aiStyles} />
+            {showAiInsideImage && (
+              <div className="mt-4 pt-4 border-t space-y-2">
+                <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                  AI-stil
+                </Label>
+                <AiStyleSection presets={aiStyles} />
+              </div>
+            )}
           </AccordionContent>
         </AccordionItem>
       )}
