@@ -394,7 +394,7 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
   const wCm = frontWcm + 2 * extraCm;
   const hCm = frontHcm + 2 * extraCm;
 
-  const PX_PER_CM = input.hires ? 32 : 24;
+  const PX_PER_CM = input.hires ? 48 : 24;
   const MAX_PX = input.maxPxOverride ?? (input.hires ? pickHiresMaxPx() : 1800);
   const longestPx = Math.max(wCm, hCm) * PX_PER_CM;
   const scale = longestPx > MAX_PX ? MAX_PX / longestPx : 1;
