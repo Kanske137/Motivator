@@ -172,9 +172,20 @@ const canvasOptionsSchema = z.object({
   allowedSizes: z.array(z.string()),
   allowedDepths: z.array(z.string()),
 });
+export const aiStylePresetSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  thumbnailUrl: z.string().url().optional(),
+  prompt: z.string().min(1),
+});
+export type AiStylePreset = z.infer<typeof aiStylePresetSchema>;
+
 export const productOptionsSchema = z.object({
   poster: posterOptionsSchema.optional(),
   canvas: canvasOptionsSchema.optional(),
+  /** Available AI style presets shown in the customer editor. Optional —
+   *  when missing/empty the AI section is hidden. */
+  aiStyles: z.array(aiStylePresetSchema).optional(),
 });
 export type ProductOptions = z.infer<typeof productOptionsSchema>;
 
