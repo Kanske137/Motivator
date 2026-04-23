@@ -1,9 +1,8 @@
 import { Suspense, useMemo, useRef, useState, useEffect } from "react";
-import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls, ContactShadows, Environment } from "@react-three/drei";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { OrbitControls, ContactShadows } from "@react-three/drei";
 import * as THREE from "three";
 import { Loader2, AlertCircle } from "lucide-react";
-import { getCanvasWeaveNormalMap } from "@/lib/canvas-weave-texture";
 
 interface Canvas3DPreviewProps {
   printUrl: string | null;
@@ -16,8 +15,6 @@ interface Canvas3DPreviewProps {
   depthCm: number;
   /** Bleed in cm per side outside the wrap zone (Gelato canvas = 0.3). */
   bleedCm?: number;
-  /** Background scene around the canvas. Default: livingroom. */
-  scene?: "minimal" | "livingroom";
 }
 
 /** Shared cache so each thumbnail doesn't re-download the same texture. */
@@ -39,24 +36,44 @@ function useTexture(url: string | null) {
   return tex;
 }
 
+/**
+ * Canvas mesh with Gelato-accurate wrap.
+ *
+ * The input texture is the FULL print file produced by `renderArtworkSnapshot`
+ * with `wrapCm` + `bleedCm`, laid out as:
+ *
+ *   [ bleed | wrap | FRONT (visible motif) | wrap | bleed ]   (per axis)
+ *
+ * Each face of the box samples its own UV-rect of that single texture so the
+ * front shows only the motif, sides show the wrap continuation, and corners
+ * are seamless because they share pixel boundaries with the front.
+ */
 function CanvasMesh({
-  texture, widthCm, heightCm, depthCm, bleedCm,
+  texture, widthCm, heightCm, depthCm, bleedCm, autoRotate,
 }: {
   texture: THREE.Texture;
   widthCm: number; heightCm: number; depthCm: number; bleedCm: number;
+  autoRotate: boolean;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const weaveMap = useMemo(() => getCanvasWeaveNormalMap(256), []);
 
   // Normalize box size so the largest visible-front dimension = 2 units.
+  // Depth is independent so 2cm vs 4cm look visually different.
   const maxCm = Math.max(widthCm, heightCm);
   const w = (widthCm / maxCm) * 2;
   const h = (heightCm / maxCm) * 2;
   const d = (depthCm / maxCm) * 2;
 
+  useFrame((_, dt) => {
+    if (autoRotate && meshRef.current) {
+      meshRef.current.rotation.y += dt * 0.15;
+    }
+  });
+
   // BoxGeometry material order: [+X, -X, +Y, -Y, +Z, -Z]
   // = right, left, top, bottom, front, back
   const materials = useMemo(() => {
+    // Texture-fraction layout (Gelato print file)
     const totalW = widthCm + 2 * depthCm + 2 * bleedCm;
     const totalH = heightCm + 2 * depthCm + 2 * bleedCm;
     const fFrontX = widthCm / totalW;
@@ -66,22 +83,13 @@ function CanvasMesh({
     const fBleedX = bleedCm / totalW;
     const fBleedY = bleedCm / totalH;
 
-    // Shared weave normal map clone-helper so each face can have its own
-    // repeat (matches the face's physical aspect for consistent thread density).
-    const cloneWeave = (repeatU: number, repeatV: number) => {
-      const n = weaveMap.clone();
-      n.needsUpdate = true;
-      n.wrapS = THREE.RepeatWrapping;
-      n.wrapT = THREE.RepeatWrapping;
-      n.repeat.set(repeatU, repeatV);
-      return n;
-    };
-
+    // Helper: clone texture and apply UV offset/repeat (and optional flip).
+    // Three.js UV origin: (0,0) = bottom-left of texture, (1,1) = top-right.
+    // Our snapshot is drawn with canvas 2D origin top-left → in UV space the
+    // top of the print is V=1, bottom is V=0.
     const make = (
       offsetX: number, offsetY: number,
       repeatX: number, repeatY: number,
-      faceWcm: number, faceHcm: number,
-      isWrap: boolean,
       flipX = false, flipY = false,
     ) => {
       const t = texture.clone();
@@ -90,198 +98,96 @@ function CanvasMesh({
       t.wrapT = THREE.ClampToEdgeWrapping;
       t.colorSpace = THREE.SRGBColorSpace;
       t.anisotropy = 8;
+      // Convert top-left-origin coordinates to UV (flip Y for the offset).
       const uvOffsetX = offsetX;
       const uvOffsetY = 1 - (offsetY + repeatY);
+      // For flips, compensate offset so the SAME UV window is sampled, just
+      // mirrored. Using texture.center would pivot around the whole texture
+      // and shift the strip onto the wrong region (front face bleed).
       t.offset.set(
         flipX ? uvOffsetX + repeatX : uvOffsetX,
         flipY ? uvOffsetY + repeatY : uvOffsetY,
       );
       t.repeat.set(flipX ? -repeatX : repeatX, flipY ? -repeatY : repeatY);
-
-      // ~1 weave repeat per cm visible
-      const repU = Math.max(1, Math.round(faceWcm));
-      const repV = Math.max(1, Math.round(faceHcm));
-      const normalMap = cloneWeave(repU, repV);
-
-      return new THREE.MeshStandardMaterial({
-        map: t,
-        normalMap,
-        normalScale: new THREE.Vector2(0.18, 0.18),
-        roughness: isWrap ? 0.92 : 0.86,
-        metalness: 0,
-      });
+      return new THREE.MeshStandardMaterial({ map: t, roughness: 0.85, metalness: 0 });
     };
 
-    const front  = make(fBleedX + fWrapX,         fBleedY + fWrapY,         fFrontX, fFrontY, widthCm, heightCm, false);
-    const right  = make(fBleedX + fWrapX + fFrontX, fBleedY + fWrapY,       fWrapX,  fFrontY, depthCm, heightCm, true);
-    const left   = make(fBleedX,                  fBleedY + fWrapY,         fWrapX,  fFrontY, depthCm, heightCm, true,  true,  false);
-    const top    = make(fBleedX + fWrapX,         fBleedY,                  fFrontX, fWrapY,  widthCm, depthCm,  true,  false, true);
-    const bottom = make(fBleedX + fWrapX,         fBleedY + fWrapY + fFrontY, fFrontX, fWrapY, widthCm, depthCm, true,  false, true);
+    // FRONT (+Z): inner motif zone, no wrap, no bleed.
+    const front = make(
+      fBleedX + fWrapX, fBleedY + fWrapY,
+      fFrontX, fFrontY,
+    );
 
-    const back = new THREE.MeshStandardMaterial({
-      color: "#e8e4dc",
-      roughness: 0.95,
-      normalMap: cloneWeave(Math.round(widthCm), Math.round(heightCm)),
-      normalScale: new THREE.Vector2(0.25, 0.25),
-    });
+    // RIGHT (+X): wrap strip immediately to the right of the front.
+    // Box-face UVs run U along Z (depth) and V along Y (height).
+    // We need the strip's pixel column nearest the front to land at U=1
+    // (the edge that meets the front face). Texture column nearest front is
+    // its leftmost pixel → no flip needed if we map width=fWrapX directly,
+    // because default Box UV gives U=0 at back-of-box, U=1 at front-of-box.
+    const right = make(
+      fBleedX + fWrapX + fFrontX, fBleedY + fWrapY,
+      fWrapX, fFrontY,
+    );
+
+    // LEFT (-X): wrap strip immediately to the left of the front.
+    // Default Box UV for -X: U=0 at front, U=1 at back → texture's rightmost
+    // pixel (closest to front) must sit at U=0 → flip X.
+    const left = make(
+      fBleedX, fBleedY + fWrapY,
+      fWrapX, fFrontY,
+      true, false,
+    );
+
+    // TOP (+Y): wrap strip immediately above the front.
+    // Box-face UVs: U along X (width), V along Z (depth).
+    // Default +Y: V=0 at back, V=1 at front. Texture strip's bottom row
+    // (closest to front in the print file) must land at V=1 → flip Y.
+    const top = make(
+      fBleedX + fWrapX, fBleedY,
+      fFrontX, fWrapY,
+      false, true,
+    );
+
+    // BOTTOM (-Y): wrap strip immediately below the front.
+    // Default -Y: V=0 at front, V=1 at back. Texture strip's top row
+    // (closest to front in print file) must sit at V=0 → flip Y.
+    const bottom = make(
+      fBleedX + fWrapX, fBleedY + fWrapY + fFrontY,
+      fFrontX, fWrapY,
+      false, true,
+    );
+
+    // BACK (-Z): canvas back is plain stretched fabric. Solid neutral.
+    const back = new THREE.MeshStandardMaterial({ color: "#e8e4dc", roughness: 0.95 });
 
     return [right, left, top, bottom, front, back];
-  }, [texture, widthCm, heightCm, depthCm, bleedCm, weaveMap]);
+  }, [texture, widthCm, heightCm, depthCm, bleedCm]);
 
   return (
-    <mesh
-      ref={meshRef}
-      castShadow
-      receiveShadow
-      material={materials}
-      position={[0, 0, 0]}
-    >
+    <mesh ref={meshRef} castShadow receiveShadow material={materials}>
       <boxGeometry args={[w, h, d]} />
     </mesh>
   );
 }
 
-/** Stor bakvägg så skuggor + miljö landar naturligt. */
-function Wall() {
-  return (
-    <mesh position={[0, 0, -1.6]} receiveShadow>
-      <planeGeometry args={[16, 10]} />
-      <meshStandardMaterial color="#ece7df" roughness={1} metalness={0} />
-    </mesh>
-  );
-}
-
-/** Vardagsrumsmiljö: golv, soffa, sidobord + lampa. Allt enkelt low-poly. */
-function LivingRoomScene() {
-  return (
-    <group>
-      {/* Golv */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.6, 0]} receiveShadow>
-        <planeGeometry args={[18, 10]} />
-        <meshStandardMaterial color="#d4b896" roughness={0.85} />
-      </mesh>
-
-      {/* Soffa — bas */}
-      <mesh position={[0, -1.05, -0.45]} castShadow receiveShadow>
-        <boxGeometry args={[3.2, 0.45, 1.0]} />
-        <meshStandardMaterial color="#3a3f4a" roughness={0.8} />
-      </mesh>
-      {/* Soffa — ryggstöd */}
-      <mesh position={[0, -0.55, -0.85]} castShadow receiveShadow>
-        <boxGeometry args={[3.2, 0.7, 0.25]} />
-        <meshStandardMaterial color="#3a3f4a" roughness={0.8} />
-      </mesh>
-      {/* Soffa — vänster armstöd */}
-      <mesh position={[-1.5, -0.75, -0.45]} castShadow receiveShadow>
-        <boxGeometry args={[0.25, 0.5, 1.0]} />
-        <meshStandardMaterial color="#3a3f4a" roughness={0.8} />
-      </mesh>
-      {/* Soffa — höger armstöd */}
-      <mesh position={[1.5, -0.75, -0.45]} castShadow receiveShadow>
-        <boxGeometry args={[0.25, 0.5, 1.0]} />
-        <meshStandardMaterial color="#3a3f4a" roughness={0.8} />
-      </mesh>
-
-      {/* Sidobord (cylinder) */}
-      <mesh position={[2.4, -1.15, -0.35]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.28, 0.28, 0.9, 24]} />
-        <meshStandardMaterial color="#8a6a48" roughness={0.7} />
-      </mesh>
-      {/* Lampa — fot */}
-      <mesh position={[2.4, -0.6, -0.35]} castShadow>
-        <cylinderGeometry args={[0.04, 0.06, 0.5, 16]} />
-        <meshStandardMaterial color="#2a2a2a" roughness={0.6} />
-      </mesh>
-      {/* Lampskärm/glödlampa */}
-      <mesh position={[2.4, -0.25, -0.35]}>
-        <sphereGeometry args={[0.18, 24, 24]} />
-        <meshStandardMaterial
-          color="#fff2c8"
-          emissive="#ffd28a"
-          emissiveIntensity={1.4}
-          roughness={0.4}
-        />
-      </mesh>
-      {/* Varmt rumsljus från lampan */}
-      <pointLight
-        position={[2.4, -0.25, -0.35]}
-        intensity={1.6}
-        color="#ffcb85"
-        distance={6}
-        decay={2}
-      />
-
-      {/* Liten växt på andra sidan för balans */}
-      <mesh position={[-2.6, -1.2, -0.35]} castShadow>
-        <cylinderGeometry args={[0.22, 0.18, 0.35, 16]} />
-        <meshStandardMaterial color="#8a4a32" roughness={0.9} />
-      </mesh>
-      <mesh position={[-2.6, -0.85, -0.35]} castShadow>
-        <sphereGeometry args={[0.32, 16, 16]} />
-        <meshStandardMaterial color="#3f6b3a" roughness={0.95} />
-      </mesh>
-    </group>
-  );
-}
-
-function InteractionTracker({ onInteract }: { onInteract: () => void }) {
-  const { gl } = useThree();
-  useEffect(() => {
-    const el = gl.domElement;
-    const handler = () => onInteract();
-    el.addEventListener("pointerdown", handler, { passive: true });
-    el.addEventListener("touchstart", handler, { passive: true });
-    return () => {
-      el.removeEventListener("pointerdown", handler);
-      el.removeEventListener("touchstart", handler);
-    };
-  }, [gl, onInteract]);
-  return null;
-}
-
 function Scene({
-  printUrl, widthCm, heightCm, depthCm, bleedCm, scene,
+  printUrl, widthCm, heightCm, depthCm, bleedCm,
 }: {
   printUrl: string;
   widthCm: number; heightCm: number; depthCm: number; bleedCm: number;
-  scene: "minimal" | "livingroom";
 }) {
   const tex = useTexture(printUrl);
-  const [autoRotate, setAutoRotate] = useState(true);
-
-  // Stoppa auto-rotate efter 4s om användaren inte interagerat.
-  useEffect(() => {
-    const t = setTimeout(() => setAutoRotate(false), 4000);
-    return () => clearTimeout(t);
-  }, []);
-
-  const stopAutoRotate = () => setAutoRotate(false);
-
   return (
     <>
-      {/* 3-punkts-belysning */}
-      <ambientLight intensity={0.35} />
-      {/* Key — varm framifrån-höger */}
+      <ambientLight intensity={0.65} />
       <directionalLight
-        position={[3.5, 3, 4]}
-        intensity={1.15}
-        color="#fff4e6"
+        position={[3, 4, 5]}
+        intensity={1.2}
         castShadow
         shadow-mapSize-width={1024}
         shadow-mapSize-height={1024}
-        shadow-bias={-0.0005}
       />
-      {/* Fill — sval vänster */}
-      <directionalLight position={[-3, 1.5, 3]} intensity={0.45} color="#dde8ff" />
-      {/* Rim — bakifrån för kantljus */}
-      <directionalLight position={[0, 2, -4]} intensity={0.6} color="#ffffff" />
-
-      <Environment preset="apartment" />
-      <Wall />
-      {scene === "livingroom" && <LivingRoomScene />}
-
-      <InteractionTracker onInteract={stopAutoRotate} />
-
+      <directionalLight position={[-3, 2, 2]} intensity={0.3} />
       {tex && (
         <CanvasMesh
           texture={tex}
@@ -289,19 +195,13 @@ function Scene({
           heightCm={heightCm}
           depthCm={depthCm}
           bleedCm={bleedCm}
+          autoRotate={false}
         />
       )}
-      <ContactShadows position={[0, -1.35, 0]} opacity={0.45} scale={6} blur={3.2} far={2.2} />
+      <ContactShadows position={[0, -1.4, 0]} opacity={0.35} scale={6} blur={2.4} far={2} />
       <OrbitControls
         enablePan={false}
-        enableZoom
-        zoomSpeed={0.6}
-        minDistance={2.5}
-        maxDistance={5.5}
-        enableDamping
-        dampingFactor={0.08}
-        autoRotate={autoRotate}
-        autoRotateSpeed={0.8}
+        enableZoom={false}
         minPolarAngle={Math.PI / 2 - Math.PI / 4}
         maxPolarAngle={Math.PI / 2 + Math.PI / 4}
         minAzimuthAngle={-Math.PI / 4}
@@ -313,7 +213,6 @@ function Scene({
 
 export function Canvas3DPreview({
   printUrl, loading, error, widthCm, heightCm, depthCm, bleedCm = 0.3,
-  scene = "livingroom",
 }: Canvas3DPreviewProps) {
   return (
     <div className="border-t bg-[hsl(var(--paper))]">
@@ -322,12 +221,8 @@ export function Canvas3DPreview({
           3D-förhandsvisning
         </h3>
         <div
-          className="w-full rounded-2xl overflow-hidden border relative"
-          style={{
-            height: "min(60vh, 520px)",
-            background:
-              "radial-gradient(ellipse at center, #f7f3ec 0%, #e8e2d6 100%)",
-          }}
+          className="w-full rounded-2xl overflow-hidden bg-card border relative"
+          style={{ height: "min(60vh, 520px)" }}
         >
           {loading || !printUrl ? (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/40 animate-pulse">
@@ -347,6 +242,7 @@ export function Canvas3DPreview({
               camera={{ position: [0, 0, 3.6], fov: 35 }}
               gl={{ preserveDrawingBuffer: false, antialias: true }}
             >
+              <color attach="background" args={["#f5f2ec"]} />
               <Suspense fallback={null}>
                 <Scene
                   printUrl={printUrl}
@@ -354,7 +250,6 @@ export function Canvas3DPreview({
                   heightCm={heightCm}
                   depthCm={depthCm}
                   bleedCm={bleedCm}
-                  scene={scene}
                 />
               </Suspense>
             </Canvas>

@@ -1,61 +1,106 @@
 
 
-## Steg 4b: 3D-Canvas Polish — fixar & vardagsrumsscen
+## Steg 3: Gelato Mockup API-integration
 
-### Problem att lösa
+### Bakgrund
 
-1. **Auto-rotate krockar in i väggen** → duken roterar och försvinner in i vägg-planet bakom.
-2. **Zoom avstängd** → `enableZoom={false}` blockerar både scroll-zoom på desktop och pinch-zoom på mobil.
-3. **Bakgrundsfärgsändringar syns inte i 3D** → tryckfilen som genereras till 3D-vyn cachar/regenererar inte när `posterBgColor` ändras.
-4. **Saknas vardagsrumskontext** → idag bara en platt vägg.
+Idag genereras alla mockup-bilder klient-side: vi tar snapshot av tryckfilen och komponerar in den i statiska scen-bilder via canvas (`mockup-composite.ts`). Det fungerar men ser “klistrat” ut, saknar äkta belysning/skuggor och har bara 4–6 rumsmiljöer.
+
+Gelato har ett **Mockup Generator API** som tar emot en print-fil + product UID och returnerar fotorealistiska mockups (samma bilder som syns i deras egna butiker). Vi har redan allt på plats för att koppla in det:
+
+- `GELATO_API_KEY` finns som secret.
+- `gelato-fetch-uids` edge function visar redan hur Gelato-API:et anropas.
+- `getPrintFileUrl()` ger en publik URL till tryckfilen i `print-files`-bucket.
+- `cart-previews` bucket kan återanvändas för cache.
+
+### Varför tidigare försök fastnade
+
+Gelato Mockup API kräver att vi skickar **både** ett `productUid` (för att veta vilken mockup-mall som ska användas) **och** en publik URL till tryckfilen. När detta försöktes tidigare fanns ingen stabil publik tryckfil-URL ännu (uppladdningen till `print-files` byggdes senare som del av cart-flödet) och UID-mappningen var ofullständig. Båda problemen är nu lösta — `print-files`-bucket är public och `gelato-sku-map.json` täcker alla varianter.
 
 ### Lösning
 
-**1. Statisk duk + orbiterande kamera**
-- Ta bort `meshRef.current.rotation.y += dt * 0.25` helt. Duken står still.
-- Aktivera `OrbitControls.autoRotate={true}` + `autoRotateSpeed={0.8}` i 4 sekunder vid mount, stoppas vid första interaktion.
-- Kameran roterar då runt duken istället för att duken roterar in i väggen.
-- Behåll `min/maxAzimuthAngle ±45°` så användaren aldrig ser baksidan eller in i väggen.
+#### 1. Ny edge function `gelato-mockups`
 
-**2. Återaktivera zoom**
-- `enableZoom={true}` på `OrbitControls` (fungerar för både scroll och pinch).
-- Sätt `minDistance={2.5}` och `maxDistance={5.5}` så användaren inte kan zooma in i duken eller ut till tomheten.
-- `zoomSpeed={0.6}` för mjukare scroll-känsla.
+`supabase/functions/gelato-mockups/index.ts`
 
-**3. Vardagsrumsscen**
-Bygg en enkel low-poly miljö i Three.js (inga externa GLB-filer):
-- **Vägg bakom duken** (befintlig, men gjord större: 16×10).
-- **Golv** under duken (`PlaneGeometry` 16×8, ljus ek-färg `#d4b896`, roterad −90°, position y=−1.6).
-- **Soffa** (förenklad: tre `BoxGeometry` — bas + ryggstöd + två armstöd, mörkgrå `#3a3f4a`, position framför nedre delen av väggen, skalad så den syns under duken).
-- **Sidobord + lampa** (cylinder + sfär, varmt ljus från sfären via `pointLight` med samma position → ger naturlig "rumsljus"-känsla).
-- **Tavelram-kant runt duken** (subtil kant via tunn `BoxGeometry`-frame om vi vill — hoppar över för att inte krocka med wrap-rendringen).
-- Allt ligger så långt bak/ner att duken förblir hjälte; rummet är bara kontext i bakgrunden.
+**Input** (POST JSON):
+```ts
+{
+  productUid: string,        // från resolveProductUid()
+  printFileUrl: string,      // public URL i print-files-bucket
+  designId: string,          // för cache-key
+}
+```
 
-Aktiveras via en ny prop `scene?: "minimal" | "livingroom"` (default `"livingroom"` för canvas, `"minimal"` om vi vill behålla nuvarande look någon annanstans).
+**Flöde:**
+1. Validera input (Zod).
+2. Cache-check: kolla `mockup-cache`-bucket på path `${designId}/${md5(productUid)}.json`. Om finns → returnera cachad lista direkt.
+3. Anropa Gelato:
+   - `POST https://order.gelatoapis.com/v4/mockups` (eller motsv. mockup-endpoint, vi verifierar exakt path mot deras docs i implementationsfasen) med body `{ productUid, printFileUrl, mockupTypes: ["default", "in-room", "lifestyle"] }`.
+   - Polla status om async, eller läs URLs direkt om sync.
+4. Spara JSON-array `[{ id, label, url }]` i cache-bucket.
+5. Returnera samma lista till klienten.
 
-**4. Bakgrundsfärgs-bug**
+**Felhantering:** vid Gelato-fel → returnera `{ ok: false, error }` med 502; klienten faller tillbaka till lokal komposit (befintlig `compositeMockup`).
 
-Roten till problemet finns i hur 3D-tryckfilen genereras. Inspektera:
-- `MapPreview.tsx` (3D-läge) → vilken `printUrl` skickas till `Canvas3DPreview`?
-- `template-snapshot.ts` → används `livePosterBgColor`?
-- Om `printUrl` cachas i en ref/state utan `posterBgColor` i dependency → fix: lägg till `posterBgColor` i useEffect-deps som regenererar 3D-snapshot.
+#### 2. Ny storage-bucket `mockup-cache` (public, read-only via signed-not-needed eftersom URLs redan är publika hos Gelato)
 
-Förmodad fix: i `MapPreview.tsx`s 3D-snapshot-effekt, lägg till `posterBgColor` (och `livePosterBgColor`) i dependency-arrayen så snapshot regenereras vid färgbyte. Verifierar exakt under implementationen.
+```sql
+insert into storage.buckets (id, name, public)
+values ('mockup-cache', 'mockup-cache', true);
+
+-- Public read; service-role write
+create policy "Public read mockup-cache"
+on storage.objects for select
+to public
+using (bucket_id = 'mockup-cache');
+```
+
+(Skrivning sker bara från edge function via service-role, ingen insert-policy behövs.)
+
+#### 3. Klient-integration i `MockupGallery.tsx`
+
+Refaktorera `useEffect` så den först:
+1. Producerar `printFileUrl` via befintliga `getPrintFileUrl()` (samma som cart använder).
+2. Resolver `productUid` via befintliga `resolveProductUid()`.
+3. Anropar `supabase.functions.invoke("gelato-mockups", { body: { productUid, printFileUrl, designId } })`.
+4. Om svaret innehåller `urls.length > 0` → visa Gelato-bilderna i karusellen.
+5. Om edge function failar eller returnerar tom lista → fall tillbaka på dagens `compositeMockup` så vi aldrig visar en tom galleri.
+
+För canvas: behåll 3D-previewen som primär, men **lägg till** Gelato-mockups under (canvas-på-vägg-renders från Gelato är riktigt bra).
+
+#### 4. Debounce + request invalidation
+
+Behåll dagens `reqIdRef`-mönster — Gelato-anropet kan ta 2–5 s, så att avbryta in-flight requests när användaren ändrar något är kritiskt. Edge function-anropet wrappas i samma `myReq`-check.
+
+#### 5. Cache-invalidation
+
+Cache-keyn bygger på `designId` (UUID per komposit-state) — eftersom `designId` regenereras vid `handleAddToCart`, men inom editor-sessionen är `designId` stabilt **per design-state**. Vi behöver alltså generera en deterministisk hash av `printFileUrl` + `productUid` istället, så att samma design + samma produkt ger samma cache-träff. Använd `crypto.subtle.digest("SHA-1", ...)` i edge function.
 
 ### Filer
 
 | Fil | Ändring |
 |---|---|
-| `src/components/editor/Canvas3DPreview.tsx` | Ta bort mesh-rotation, aktivera autoRotate på OrbitControls, aktivera zoom, lägg till `LivingRoomScene`-komponent (golv + soffa + lampa + pointLight) |
-| `src/components/editor/MapPreview.tsx` | Lägg till `posterBgColor` i 3D-snapshot useEffect deps så bakgrundsfärg propagerar |
+| `supabase/functions/gelato-mockups/index.ts` | NY edge function |
+| `supabase/migrations/<ts>_mockup_cache_bucket.sql` | NY: skapa `mockup-cache` bucket + RLS |
+| `src/components/editor/MockupGallery.tsx` | Anropa nya edge function först, fall tillbaka på lokal composite |
+| `src/lib/mockup-gelato.ts` | NY liten helper som wrappar `supabase.functions.invoke` + resolve UID |
 
 ### Verifiering
 
-1. Öppna canvas-produkt → duken står still mitt i vyn, kameran cirklar runt långsamt i 4s.
-2. Scrolla med musen → zoom in/ut fungerar smidigt.
-3. Pinch på mobil → zoom fungerar.
-4. Drag → roterar runt duken, kan aldrig se in i väggen eller baksidan av duken.
-5. Bakgrundsmiljö: golv + soffa + lampa syns under/runt duken, varmt ljus från lampan på dukens högra sida.
-6. Ändra bakgrundsfärg i editorn → 3D-vyn uppdateras inom ~1s med ny färg på fronten och sidornas wrap.
-7. Inga regressioner i wrap-mappning eller mobilprestanda.
+1. Öppna editorn, designa en poster → Gelato-mockups laddas i galleriet (loading spinner ~3 s, sen 3–5 fotorealistiska bilder).
+2. Klicka på bild → lightbox öppnas precis som idag.
+3. Stäng nätverket / blockera Gelato → fallback till lokal composite, inga tomma slots.
+4. Ändra mapZoom → ny `printFileUrl` → ny mockup-uppsättning hämtas (med debounce).
+5. Samma design + samma produkt två gånger → andra anropet träffar cache (< 200 ms).
+6. Canvas-produkt: 3D-preview kvarstår överst, Gelato-canvas-mockups visas under.
+7. Gelato 4xx/5xx → fallback aktiveras, toast loggas i console (ingen användar-toast eftersom fallbacken levererar fungerande bilder).
+
+### Arbetsordning
+
+1. Skapa `mockup-cache`-bucket via migration.
+2. Bygg `gelato-mockups` edge function — börja med ett minimalt anrop till Gelatos endpoint för att verifiera exakt request/response-form (testa via `curl_edge_functions` direkt).
+3. Lägg till caching.
+4. Bygg klient-helpern + integrera i `MockupGallery`.
+5. Bekräfta fallback-vägen genom att tillfälligt stänga av edge function.
 
