@@ -137,6 +137,18 @@ export function createLayer(type: LayerType, existing: TemplateLayer[]): Templat
         name: `Marginal ${countOfType(existing, "margin") + 1}`,
         defaults: { thicknessMm: 5, color: "#FFFFFF" },
       };
+    case "photo":
+      return {
+        ...base,
+        xPct: 20,
+        yPct: 20,
+        wPct: 60,
+        hPct: 60,
+        type: "photo",
+        name: `Foto ${countOfType(existing, "photo") + 1}`,
+        defaults: { shape: "rect", fit: "cover" },
+        locks: defaultLocks({ content: false, shape: false }),
+      };
   }
 }
 
