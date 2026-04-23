@@ -24,6 +24,7 @@ const typeLabel: Record<TemplateLayer["type"], string> = {
   map: "Karta",
   text: "Text",
   image: "Bild",
+  photo: "Foto",
   line: "Linje",
   margin: "Marginal",
 };

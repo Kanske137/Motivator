@@ -191,27 +191,48 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             const clip = shapeClipPath(effectiveShape, heartIdRef.current, starIdRef.current);
             return (
               <div key={l.id} style={wrapStyle}>
-                {photoOverlayUrl ? (
-                  <div className="absolute inset-0 overflow-hidden" style={{ clipPath: clip }}>
+                <MapLayerInstance
+                  layerId={l.id}
+                  shape={effectiveShape}
+                  styleId={effectiveStyleId}
+                  center={effectiveCenter}
+                  zoom={effectiveZoom}
+                  showLabels={effectiveLabels}
+                  interactive={!l.locks.position}
+                  clipPath={clip}
+                />
+              </div>
+            );
+          }
+
+          if (l.type === "photo") {
+            const clip = shapeClipPath(
+              l.defaults.shape,
+              heartIdRef.current,
+              starIdRef.current,
+            );
+            const src = photoOverlayUrl ?? l.defaults.placeholderUrl ?? null;
+            return (
+              <div key={l.id} style={wrapStyle}>
+                <div
+                  className="absolute inset-0 overflow-hidden"
+                  style={{ clipPath: clip }}
+                >
+                  {src ? (
                     <img
-                      src={photoOverlayUrl}
+                      src={src}
                       alt=""
-                      className="absolute inset-0 w-full h-full object-cover"
+                      className={`absolute inset-0 w-full h-full ${
+                        l.defaults.fit === "contain" ? "object-contain" : "object-cover"
+                      }`}
                       draggable={false}
                     />
-                  </div>
-                ) : (
-                  <MapLayerInstance
-                    layerId={l.id}
-                    shape={effectiveShape}
-                    styleId={effectiveStyleId}
-                    center={effectiveCenter}
-                    zoom={effectiveZoom}
-                    showLabels={effectiveLabels}
-                    interactive={!l.locks.position}
-                    clipPath={clip}
-                  />
-                )}
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center bg-muted/40 border-2 border-dashed border-foreground/30 text-[11px] text-muted-foreground text-center px-2">
+                      Ladda upp en bild
+                    </div>
+                  )}
+                </div>
               </div>
             );
           }

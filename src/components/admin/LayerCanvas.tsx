@@ -133,6 +133,29 @@ export default function LayerCanvas({
             }}
           />
         );
+      case "photo": {
+        const clipPath =
+          layer.defaults.shape === "circle" ? "circle(50% at 50% 50%)" : undefined;
+        const src = layer.defaults.placeholderUrl;
+        return (
+          <div className="absolute inset-0 overflow-hidden" style={{ clipPath }}>
+            {src ? (
+              <img
+                src={src}
+                alt=""
+                className={`w-full h-full ${
+                  layer.defaults.fit === "contain" ? "object-contain" : "object-cover"
+                }`}
+                draggable={false}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground bg-muted/60 border border-dashed border-foreground/30 text-center px-1">
+                📷 Bildplats
+              </div>
+            )}
+          </div>
+        );
+      }
       default:
         return null;
     }
