@@ -173,7 +173,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
           if (l.type === "map") {
             const v = layerValues[l.id];
             const mv = v && v.kind === "map" ? v : null;
-            const effectiveShape = mv?.shape ?? (l.defaults.shape as "rect" | "square" | "circle" | "heart");
+            const effectiveShape = (mv?.shape ?? l.defaults.shape) as "circle" | "heart" | "star";
             const effectiveStyleId = mv?.styleId ?? l.defaults.styleId;
             const effectiveCenter: [number, number] = mv?.center ?? [
               l.defaults.center[0]!,
@@ -181,7 +181,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             ];
             const effectiveZoom = mv?.zoom ?? l.defaults.zoom;
             const effectiveLabels = mv?.showLabels ?? l.defaults.showLabels;
-            const clip = shapeClipPath(effectiveShape, heartIdRef.current);
+            const clip = shapeClipPath(effectiveShape, heartIdRef.current, starIdRef.current);
             return (
               <div key={l.id} style={wrapStyle}>
                 <MapLayerInstance

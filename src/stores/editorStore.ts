@@ -11,7 +11,7 @@ interface ApplyPlaceArgs {
   country?: string;
 }
 
-export type MapShape = "rect" | "square" | "circle" | "heart";
+export type MapShape = "circle" | "heart" | "star";
 
 export interface MapLayerValue {
   kind: "map";
@@ -163,7 +163,7 @@ function mirrorLegacy(state: Pick<EditorState, "template" | "orientation" | "lay
     mapCenter: m?.center ?? ([18.0686, 59.3293] as [number, number]),
     mapZoom: m?.zoom ?? 12,
     mapStyleId: m?.styleId ?? "light-v11",
-    mapShape: m?.shape ?? ("rect" as MapShape),
+    mapShape: m?.shape ?? ("circle" as MapShape),
     showLabels: m?.showLabels ?? false,
     placeName: m?.placeName ?? "",
     city: m?.city,
@@ -194,7 +194,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   mapCenter: [18.0686, 59.3293],
   mapZoom: 12,
   mapStyleId: "light-v11",
-  mapShape: "rect",
+  mapShape: "circle",
   showLabels: false,
   placeName: "",
   city: undefined,
