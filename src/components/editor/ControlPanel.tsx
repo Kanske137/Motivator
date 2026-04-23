@@ -457,7 +457,58 @@ function TextLayerSection({
   );
 }
 
-function stylePreviewBg(styleId: string): string {
+function PhotoShapeSection({
+  layer,
+  value,
+  heading,
+}: {
+  layer: Extract<TemplateLayer, { type: "photo" }>;
+  value: PhotoLayerValue | null;
+  heading: string | null;
+}) {
+  const setLayerPhotoShape = useEditorStore((s) => s.setLayerPhotoShape);
+  const shape = value?.shape ?? layer.defaults.shape;
+  const options = [
+    { id: "rect", label: "Rektangel", Icon: Square },
+    { id: "circle", label: "Cirkel", Icon: Circle },
+    { id: "heart", label: "Hjärta", Icon: Heart },
+    { id: "star", label: "Stjärna", Icon: Star },
+  ] as const;
+
+  return (
+    <div className="space-y-2">
+      {heading && (
+        <h4 className="text-[11px] font-semibold uppercase tracking-wider text-foreground">
+          {heading}
+        </h4>
+      )}
+      <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
+        Bildens form
+      </Label>
+      <div className="grid grid-cols-4 gap-2">
+        {options.map(({ id, label, Icon }) => {
+          const selected = shape === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setLayerPhotoShape(layer.id, id as PhotoShape)}
+              className={cn(
+                "flex flex-col items-center justify-center gap-1.5 aspect-square rounded-xl transition",
+                selected
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-background ring-1 ring-border hover:bg-accent/50",
+              )}
+            >
+              <Icon className="h-5 w-5" />
+              <span className="text-[10px] font-medium">{label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
   switch (styleId) {
     case "light-v11":
       return "linear-gradient(135deg, #f5f5f0, #e8e8e0)";
