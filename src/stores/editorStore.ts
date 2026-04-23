@@ -317,6 +317,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       // Switching photo invalidates AI result + cached upload URL.
       aiPrintFileUrl: file ? null : get().aiPrintFileUrl,
       originalPhotoUrl: file ? null : get().originalPhotoUrl,
+      // Reset pan offsets so a freshly-uploaded photo starts centered.
+      layerValues: resetPhotoOffsets(get().layerValues),
     });
   },
   setOriginalPhotoUrl: (url) => set({ originalPhotoUrl: url }),
@@ -330,6 +332,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       photoPreviewUrl: null,
       originalPhotoUrl: null,
       aiPrintFileUrl: null,
+      layerValues: resetPhotoOffsets(get().layerValues),
     }),
   setShopifyVariantId: (shopifyVariantId) => set({ shopifyVariantId }),
   setShopifyVariantResolving: (shopifyVariantResolving) => set({ shopifyVariantResolving }),
