@@ -9,7 +9,7 @@ import { ControlPanel } from "@/components/editor/ControlPanel";
 import { MockupGallery } from "@/components/editor/MockupGallery";
 import { useCartStore } from "@/stores/cartStore";
 import { CartDrawer } from "@/components/CartDrawer";
-import { renderArtworkSnapshot } from "@/lib/editor-snapshot";
+import { renderTemplateSnapshot } from "@/lib/template-snapshot";
 import { uploadCartPreview } from "@/lib/upload-preview";
 import { getPrintFileUrl } from "@/lib/print-pipeline";
 import { toast } from "sonner";
@@ -29,7 +29,7 @@ export default function EditorPage() {
   const [configs, setConfigs] = useState<ProductConfig[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const { config, setConfig, currentPrice, currentLayout, mapStyleId, mapCenter, mapZoom, text, textFont, textVisible, showLabels, mapShape, orientation, size, variant, posterBgColor, designSource, photoFile, aiPrintFileUrl } =
+  const { config, template, layerValues, setConfig, currentPrice, currentLayout, mapStyleId, mapCenter, mapZoom, text, textFont, textVisible, showLabels, mapShape, orientation, size, variant, posterBgColor, designSource, photoFile, aiPrintFileUrl } =
     useEditorStore();
   const addItem = useCartStore((s) => s.addItem);
   const isAdding = useCartStore((s) => s.isLoading);
@@ -70,22 +70,23 @@ export default function EditorPage() {
     const inIframe = window.self !== window.top;
     const designId = (crypto as any)?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
-    const baseInput = {
-      mapStyleId,
-      mapCenter,
-      mapZoom,
-      showLabels,
-      mapShape,
-      posterBgColor,
-      text,
-      textFont,
-      textVisible,
-      size,
+    if (!template) return;
+    const baseTemplateInput = {
+      template,
       orientation,
-      layout: currentLayout(),
-      frameColor: !isCanvas ? frameColor : "",
-      frameWidthCm: !isCanvas ? FRAME_WIDTH_CM : 0,
-      canvasWrap: isCanvas,
+      size,
+      layerValues,
+      livePosterBgColor: posterBgColor,
+      liveMapCenter: mapCenter,
+      liveMapZoom: mapZoom,
+      liveMapStyleId: mapStyleId,
+      liveMapShape: mapShape,
+      liveShowLabels: showLabels,
+      liveText: text,
+      liveTextFont: textFont,
+      liveTextVisible: textVisible,
+      wrapCm: isCanvas ? 2 : 0,
+      bleedCm: isCanvas ? 0.3 : 0,
     };
 
     setIsPreparing(true);
@@ -96,14 +97,19 @@ export default function EditorPage() {
       printFileUrl = await getPrintFileUrl({
         source: designSource,
         designId,
-        mapInput: baseInput,
+        templateInput: baseTemplateInput,
         photoFile: photoFile ?? undefined,
         aiPrintFileUrl: aiPrintFileUrl ?? undefined,
       });
 
-      // 2) Thumbnail for cart display — always derived from the editor's
-      //    composited view so the preview matches what the customer designed.
-      const thumbDataUrl = await renderArtworkSnapshot(baseInput);
+      // 2) Thumbnail for cart display — multi-layer snapshot WITH frame/wrap
+      //    overlay so the cart preview matches the editor exactly.
+      const thumbDataUrl = await renderTemplateSnapshot({
+        ...baseTemplateInput,
+        frameColor: !isCanvas ? frameColor : undefined,
+        frameWidthCm: !isCanvas ? FRAME_WIDTH_CM : undefined,
+        canvasWrap: isCanvas,
+      });
       previewUrl = await uploadCartPreview(thumbDataUrl, designId);
     } catch (err) {
       console.error("[print-pipeline] failed", err);

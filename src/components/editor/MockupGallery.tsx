@@ -6,7 +6,7 @@ import { compositeMockup } from "@/lib/mockup-composite";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Canvas3DPreview } from "./Canvas3DPreview";
-import { renderArtworkSnapshot } from "@/lib/editor-snapshot";
+import { renderTemplateSnapshot } from "@/lib/template-snapshot";
 
 interface MockupSlot {
   scene: MockupScene;
@@ -17,13 +17,12 @@ interface MockupSlot {
 
 export function MockupGallery() {
   const {
-    config, size, variant, orientation,
+    config, template, size, variant, orientation,
     mapStyleId, mapCenter, mapZoom,
     text, textFont, textVisible,
     showLabels, mapShape, posterBgColor,
-    currentLayout,
+    layerValues,
   } = useEditorStore();
-  const layout = currentLayout();
   const [slots, setSlots] = useState<MockupSlot[]>([]);
   const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null);
   const [snapshotLoading, setSnapshotLoading] = useState(false);
@@ -42,7 +41,7 @@ export function MockupGallery() {
   const BLEED_CM = 0.3; // Gelato canvas bleed per side
 
   useEffect(() => {
-    if (!config || !size) return;
+    if (!config || !size || !template) return;
     // Invalidate any in-flight render synchronously so stale results never overwrite.
     reqIdRef.current++;
     const scenes = isCanvas ? [] : getScenesFor(config.product_type);
@@ -54,14 +53,22 @@ export function MockupGallery() {
     debounceRef.current = window.setTimeout(async () => {
       const myReq = ++reqIdRef.current;
       try {
-        // Single source of truth: snapshot the editor artwork directly.
-        // For canvas, render the FULL print area (front + wrap + bleed) so the
-        // 3D preview can sample sides exactly like Gelato's print file.
-        const newSnapshot = await renderArtworkSnapshot({
-          mapStyleId, mapCenter, mapZoom,
-          showLabels, mapShape, posterBgColor,
-          text, textFont, textVisible,
-          size, orientation, layout,
+        // Multi-layer snapshot: walks template layers (all maps + texts + lines
+        // + margins + images) using per-layer values from the store.
+        const newSnapshot = await renderTemplateSnapshot({
+          template,
+          orientation,
+          size,
+          layerValues,
+          livePosterBgColor: posterBgColor,
+          liveMapCenter: mapCenter,
+          liveMapZoom: mapZoom,
+          liveMapStyleId: mapStyleId,
+          liveMapShape: mapShape,
+          liveShowLabels: showLabels,
+          liveText: text,
+          liveTextFont: textFont,
+          liveTextVisible: textVisible,
           wrapCm: isCanvas ? canvasDepthCm : 0,
           bleedCm: isCanvas ? BLEED_CM : 0,
         });
@@ -118,10 +125,10 @@ export function MockupGallery() {
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
     };
   }, [
-    config, size, variant, orientation, isCanvas, layout,
-    mapStyleId, mapCenter, mapZoom,
+    config, template, size, variant, orientation, isCanvas, canvasDepthCm,
+    layerValues, posterBgColor,
+    mapStyleId, mapCenter, mapZoom, showLabels, mapShape,
     text, textFont, textVisible,
-    showLabels, mapShape, posterBgColor,
   ]);
 
   if (!config) return null;
