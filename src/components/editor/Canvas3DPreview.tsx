@@ -1,5 +1,5 @@
 import { Suspense, useMemo, useRef, useState, useEffect } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, ContactShadows, Environment } from "@react-three/drei";
 import * as THREE from "three";
 import { Loader2, AlertCircle } from "lucide-react";
@@ -16,6 +16,8 @@ interface Canvas3DPreviewProps {
   depthCm: number;
   /** Bleed in cm per side outside the wrap zone (Gelato canvas = 0.3). */
   bleedCm?: number;
+  /** Background scene around the canvas. Default: livingroom. */
+  scene?: "minimal" | "livingroom";
 }
 
 /** Shared cache so each thumbnail doesn't re-download the same texture. */
