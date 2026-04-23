@@ -355,17 +355,17 @@ function PhotoLayerView({
     setNatural(null);
   }, [src]);
 
-  // Compute max pan offsets in percent of layer (cover overflow / 2).
-  const { maxX, maxY } = (() => {
+  // Compute scaled image render size (cover) and max pan in percent of layer.
+  const { maxX, maxY, renderW, renderH } = (() => {
     if (fit === "contain" || !natural || box.w === 0 || box.h === 0) {
-      return { maxX: 0, maxY: 0 };
+      return { maxX: 0, maxY: 0, renderW: 0, renderH: 0 };
     }
     const scale = Math.max(box.w / natural.w, box.h / natural.h);
-    const scaledW = natural.w * scale;
-    const scaledH = natural.h * scale;
-    const overflowXPct = ((scaledW - box.w) / box.w) * 100;
-    const overflowYPct = ((scaledH - box.h) / box.h) * 100;
-    return { maxX: overflowXPct / 2, maxY: overflowYPct / 2 };
+    const rW = natural.w * scale;
+    const rH = natural.h * scale;
+    const overflowXPct = ((rW - box.w) / box.w) * 100;
+    const overflowYPct = ((rH - box.h) / box.h) * 100;
+    return { maxX: overflowXPct / 2, maxY: overflowYPct / 2, renderW: rW, renderH: rH };
   })();
 
   const dragStateRef = useRef<{
