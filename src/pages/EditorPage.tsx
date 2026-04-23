@@ -122,13 +122,11 @@ export default function EditorPage() {
     let previewUrl = "";
     let printFileUrl = "";
     try {
-      // 1) Print file via dispatcher (map / photo / ai). Hard-fail if missing.
+      // 1) Print file via dispatcher (always full multi-layer composite).
       printFileUrl = await getPrintFileUrl({
         source: designSource,
         designId,
         templateInput: baseTemplateInput,
-        photoFile: photoFile ?? undefined,
-        aiPrintFileUrl: aiPrintFileUrl ?? undefined,
       });
 
       // 2) Thumbnail for cart display — multi-layer snapshot WITH frame/wrap
