@@ -149,8 +149,7 @@ export default function EditorPage() {
     }
 
     const properties: Record<string, string> = {
-      Orientation: orientation === "portrait" ? "Stående" : "Liggande",
-      Text: text,
+      Orientering: orientation === "portrait" ? "Stående" : "Liggande",
       _map_style: mapStyleId,
       _map_center: `${mapCenter[1].toFixed(6)},${mapCenter[0].toFixed(6)}`,
       _map_zoom: mapZoom.toFixed(2),
@@ -164,6 +163,7 @@ export default function EditorPage() {
       _show_labels: showLabels ? "true" : "false",
       _text_visible: textVisible ? "true" : "false",
       _text_font: textFont,
+      _text: text,
       _design_source: designSource,
       _preview_image: previewUrl,
       _print_file_url: printFileUrl,
