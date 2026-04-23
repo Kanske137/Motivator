@@ -30,8 +30,11 @@ export default function MapLayerPreview({ defaults, width, height }: Props) {
   const starId = useMemo(() => `star-${Math.random().toString(36).slice(2)}`, []);
   const clipPath = (() => {
     switch (defaults.shape) {
-      case "circle":
-        return "circle(50% at 50% 50%)";
+      case "circle": {
+        // Perfect circle: diameter = min(width, height), centered.
+        const r = Math.max(0, Math.min(width, height) / 2);
+        return `circle(${r}px at 50% 50%)`;
+      }
       case "heart":
         return `url(#${clipId})`;
       case "star":
