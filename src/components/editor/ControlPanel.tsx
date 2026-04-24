@@ -322,9 +322,16 @@ function MapStyleLayerSection({
   const setLayerMapStyle = useEditorStore((s) => s.setLayerMapStyle);
   const setLayerShowLabels = useEditorStore((s) => s.setLayerShowLabels);
   const setLayerMapShape = useEditorStore((s) => s.setLayerMapShape);
+  const productOptions = useEditorStore((s) => s.productOptions);
   const styleId = value?.styleId ?? layer.defaults.styleId;
   const showLabels = value?.showLabels ?? layer.defaults.showLabels;
   const shape = value?.shape ?? layer.defaults.shape;
+
+  // Per-template enabled list (Alt B), with legacy fallback.
+  const enabledStyleIds = getEnabledMapStyleIds(
+    productOptions ? { productOptions } : null,
+    config.map_styles,
+  );
 
   const shapeOptions = ([
     { id: "circle", label: "Cirkel", Icon: Circle },
@@ -341,7 +348,7 @@ function MapStyleLayerSection({
       )}
       {!layer.locks.style && (
         <div className="grid grid-cols-3 gap-2">
-          {config.map_styles.map((s) => (
+          {enabledStyleIds.map((s) => (
             <button
               key={s}
               onClick={() => setLayerMapStyle(layer.id, s)}
@@ -350,9 +357,9 @@ function MapStyleLayerSection({
                 s === styleId ? "ring-2 ring-primary" : "ring-1 ring-border",
               )}
             >
-              <div className="absolute inset-0" style={{ background: stylePreviewBg(s) }} />
+              <div className="absolute inset-0" style={{ background: mapStylePreviewBg(s) }} />
               <span className="absolute bottom-0 left-0 right-0 bg-background/85 backdrop-blur-sm text-[10px] py-1 font-medium">
-                {MAPBOX_STYLE_LABELS[s] ?? s}
+                {mapStyleLabel(s)}
               </span>
             </button>
           ))}
