@@ -211,8 +211,8 @@ const PRODUCT_VARIANTS_BULK_DELETE = `
 
 const PUBLICATIONS_QUERY = `
   query publications {
-    publications(first: 25) {
-      nodes { id name }
+    publications(first: 50) {
+      nodes { id name catalog { ... on AppCatalog { app { handle } } } }
     }
   }`;
 
@@ -222,6 +222,27 @@ const PUBLISHABLE_PUBLISH = `
       userErrors { field message }
     }
   }`;
+
+const GET_PRODUCT_FULL = `
+  query getProductFull($id: ID!) {
+    product(id: $id) {
+      id
+      title
+      descriptionHtml
+      tags
+      status
+      seo { title description }
+      category { id }
+    }
+  }`;
+
+// Shopify Standard Product Taxonomy GIDs.
+// Posters: gid://shopify/TaxonomyCategory/ap-2-1-3 ("Posters")
+// Canvas:  gid://shopify/TaxonomyCategory/ap-2-1-1 ("Decorative Paintings")
+const DEFAULT_CATEGORY_GID: Record<"poster" | "canvas", string> = {
+  poster: "gid://shopify/TaxonomyCategory/ap-2-1-3",
+  canvas: "gid://shopify/TaxonomyCategory/ap-2-1-1",
+};
 
 function buildVariantInput(
   group: PlannedGroup,
