@@ -28,10 +28,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { ProductConfig } from "@/lib/product-config";
-import type { AiStylePreset, ProductOptions } from "@/lib/template-schema";
+import type { AiStylePreset, MapStylePreset, ProductOptions } from "@/lib/template-schema";
 import { DEFAULT_PRODUCT_VARIANTS, mergeUnique } from "@/lib/product-defaults";
 import { hasGelatoSku } from "@/lib/gelato-catalog";
 import { DEFAULT_AI_STYLES } from "@/lib/ai-style-defaults";
+import { MAP_STYLE_CATALOG } from "@/lib/map-style-catalog";
 import { uploadCartPreview } from "@/lib/upload-preview";
 import { toast } from "sonner";
 
@@ -208,12 +209,97 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
         </div>
       </Card>
 
+      {/* Map Styles — collapsible, per-template enabling */}
+      <MapStylesEditor
+        config={config}
+        value={value.mapStyles}
+        onChange={(mapStyles) => onChange({ ...value, mapStyles })}
+      />
+
       {/* AI Styles — separate collapsible card */}
       <AiStylesEditor
         value={value.aiStyles ?? []}
         onChange={(aiStyles) => onChange({ ...value, aiStyles })}
       />
     </div>
+  );
+}
+
+function MapStylesEditor({
+  config,
+  value,
+  onChange,
+}: {
+  config: ProductConfig;
+  value: MapStylePreset[] | undefined;
+  onChange: (next: MapStylePreset[]) => void;
+}) {
+  // Build the working list: catalog order, with `enabled` resolved from
+  // (1) explicit template entry, (2) legacy config.map_styles, (3) default true.
+  const legacy = config.map_styles ?? [];
+  const explicit = new Map((value ?? []).map((m) => [m.id, m.enabled !== false]));
+  const presets: MapStylePreset[] = MAP_STYLE_CATALOG.map((s) => {
+    const enabled = explicit.has(s.id)
+      ? explicit.get(s.id)!
+      : value && value.length > 0
+        ? false // explicit list provided but this style not in it → disabled
+        : legacy.length > 0
+          ? legacy.includes(s.id)
+          : true;
+    return { id: s.id, enabled };
+  });
+  const enabledCount = presets.filter((p) => p.enabled).length;
+
+  const toggle = (id: string, enabled: boolean) => {
+    const next = presets.map((p) => (p.id === id ? { ...p, enabled } : p));
+    onChange(next);
+  };
+
+  return (
+    <Card className="p-0 overflow-hidden">
+      <Accordion type="single" collapsible defaultValue="">
+        <AccordionItem value="map-styles" className="border-0">
+          <AccordionTrigger className="px-5 py-4 hover:no-underline">
+            <div className="text-left">
+              <h2 className="text-base font-semibold">Kartstilar</h2>
+              <p className="text-xs text-muted-foreground font-normal">
+                {enabledCount} av {presets.length} aktiverade. Stilar kunden kan välja för kartlagret.
+              </p>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-5 pb-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {MAP_STYLE_CATALOG.map((s) => {
+                const enabled = presets.find((p) => p.id === s.id)?.enabled ?? true;
+                return (
+                  <div
+                    key={s.id}
+                    className="flex items-center gap-3 rounded-md border bg-background p-2"
+                  >
+                    <div
+                      className="h-10 w-10 shrink-0 rounded-md border"
+                      style={{ background: s.previewBg }}
+                      aria-hidden
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium ${enabled ? "" : "text-muted-foreground line-through"}`}>
+                        {s.label}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground font-mono truncate">{s.id}</p>
+                    </div>
+                    <Switch
+                      checked={enabled}
+                      onCheckedChange={(c) => toggle(s.id, c)}
+                      aria-label={`Aktivera ${s.label}`}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    </Card>
   );
 }
 
