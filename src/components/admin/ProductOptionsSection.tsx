@@ -219,7 +219,7 @@ function AiStylesEditor({
   const removeAt = (idx: number) => onChange(presets.filter((_, i) => i !== idx));
   const addPreset = () => {
     const id = `style-${Date.now().toString(36)}`;
-    onChange([...presets, { id, label: "Ny stil", prompt: "Describe the artistic style here." }]);
+    onChange([...presets, { id, label: "Ny stil", enabled: true, prompt: "Describe the artistic style here." }]);
   };
   const seedDefaults = () => onChange([...DEFAULT_AI_STYLES]);
 

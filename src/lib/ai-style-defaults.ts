@@ -9,7 +9,6 @@ export const DEFAULT_AI_STYLES: AiStylePreset[] = [
     id: "watercolor",
     label: "Akvarell",
     enabled: true,
-    enabled: true,
     prompt:
       "Transform this photo into a soft watercolor painting with delicate brush strokes, gentle pastel washes, and visible paper texture. Preserve the composition and main subject.",
   },
