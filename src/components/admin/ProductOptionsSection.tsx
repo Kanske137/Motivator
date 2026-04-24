@@ -223,6 +223,7 @@ function AiStylesEditor({
   onChange: (next: AiStylePreset[]) => void;
 }) {
   const presets = value.length === 0 ? DEFAULT_AI_STYLES : value;
+  const enabledCount = presets.filter((p) => p.enabled !== false).length;
 
   const updateAt = (idx: number, patch: Partial<AiStylePreset>) => {
     const next = presets.map((p, i) => (i === idx ? { ...p, ...patch } : p));
@@ -236,41 +237,47 @@ function AiStylesEditor({
   const seedDefaults = () => onChange([...DEFAULT_AI_STYLES]);
 
   return (
-    <div className="space-y-3 rounded-md border p-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <Label className="text-sm font-medium">AI-stilar</Label>
-          <p className="text-xs text-muted-foreground">
-            Stilar som kunden kan tillämpa på sin uppladdade bild.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {value.length === 0 && (
-            <Button type="button" variant="outline" size="sm" onClick={seedDefaults}>
-              Använd standard
-            </Button>
-          )}
-          <Button type="button" variant="outline" size="sm" onClick={addPreset}>
-            <Plus className="h-3.5 w-3.5 mr-1" />
-            Lägg till
-          </Button>
-        </div>
-      </div>
+    <Card className="p-0 overflow-hidden">
+      <Accordion type="single" collapsible defaultValue="">
+        <AccordionItem value="ai-styles" className="border-0">
+          <AccordionTrigger className="px-5 py-4 hover:no-underline">
+            <div className="text-left">
+              <h2 className="text-base font-semibold">AI-stilar</h2>
+              <p className="text-xs text-muted-foreground font-normal">
+                {enabledCount} av {presets.length} aktiverade. Stilar som kunden kan tillämpa på sin uppladdade bild.
+              </p>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-5 pb-5 space-y-3">
+            <div className="flex justify-end gap-2">
+              {value.length === 0 && (
+                <Button type="button" variant="outline" size="sm" onClick={seedDefaults}>
+                  Använd standard
+                </Button>
+              )}
+              <Button type="button" variant="outline" size="sm" onClick={addPreset}>
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Lägg till
+              </Button>
+            </div>
 
-      <div className="space-y-3">
-        {presets.map((p, i) => (
-          <AiStyleRow
-            key={p.id + i}
-            preset={p}
-            onChange={(patch) => updateAt(i, patch)}
-            onRemove={() => removeAt(i)}
-          />
-        ))}
-        {presets.length === 0 && (
-          <p className="text-xs text-muted-foreground">Inga AI-stilar konfigurerade.</p>
-        )}
-      </div>
-    </div>
+            <Accordion type="single" collapsible className="space-y-2">
+              {presets.map((p, i) => (
+                <AiStyleRow
+                  key={p.id + i}
+                  preset={p}
+                  onChange={(patch) => updateAt(i, patch)}
+                  onRemove={() => removeAt(i)}
+                />
+              ))}
+            </Accordion>
+            {presets.length === 0 && (
+              <p className="text-xs text-muted-foreground">Inga AI-stilar konfigurerade.</p>
+            )}
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    </Card>
   );
 }
 
@@ -285,6 +292,7 @@ function AiStyleRow({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const enabled = preset.enabled !== false;
 
   const handleUpload = async (file: File | undefined) => {
     if (!file) return;
@@ -308,58 +316,82 @@ function AiStyleRow({
   };
 
   return (
-    <div className="flex gap-3 rounded-md border bg-background p-3">
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        className="relative h-16 w-16 shrink-0 rounded-md overflow-hidden border bg-muted flex items-center justify-center"
-        aria-label="Ladda upp thumbnail"
-      >
-        {preset.thumbnailUrl ? (
-          <img src={preset.thumbnailUrl} alt={preset.label} className="h-full w-full object-cover" />
-        ) : (
-          <Upload className="h-4 w-4 text-muted-foreground" />
-        )}
-        {uploading && (
-          <div className="absolute inset-0 bg-background/70 flex items-center justify-center">
-            <Loader2 className="h-4 w-4 animate-spin" />
-          </div>
-        )}
-      </button>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        className="hidden"
-        onChange={(e) => handleUpload(e.target.files?.[0])}
-      />
-      <div className="flex-1 space-y-2 min-w-0">
-        <div className="flex items-center gap-2">
-          <Input
-            value={preset.label}
-            onChange={(e) => onChange({ label: e.target.value })}
-            placeholder="Etikett"
-            className="h-8 text-sm"
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-destructive shrink-0"
-            onClick={onRemove}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-        <Textarea
-          value={preset.prompt}
-          onChange={(e) => onChange({ prompt: e.target.value })}
-          rows={2}
-          placeholder="Prompt till AI-modellen…"
-          className="text-xs"
+    <AccordionItem value={preset.id} className="rounded-md border bg-background px-3">
+      <div className="flex items-center gap-2 py-1">
+        <Switch
+          checked={enabled}
+          onCheckedChange={(c) => onChange({ enabled: c })}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Aktivera ${preset.label}`}
         />
+        <AccordionTrigger className="flex-1 py-2 hover:no-underline">
+          <span className={`text-sm font-medium ${enabled ? "" : "text-muted-foreground line-through"}`}>
+            {preset.label}
+          </span>
+        </AccordionTrigger>
       </div>
-    </div>
+      <AccordionContent className="pb-3">
+        <div className="flex gap-3">
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => inputRef.current?.click()}
+                  className="relative h-16 w-16 shrink-0 rounded-md overflow-hidden border bg-muted flex items-center justify-center"
+                  aria-label="Ladda upp thumbnail"
+                >
+                  {preset.thumbnailUrl ? (
+                    <img src={preset.thumbnailUrl} alt={preset.label} className="h-full w-full object-cover" />
+                  ) : (
+                    <Upload className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  {uploading && (
+                    <div className="absolute inset-0 bg-background/70 flex items-center justify-center">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    </div>
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Thumbnail som visas för kunden i stilväljaren.</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(e) => handleUpload(e.target.files?.[0])}
+          />
+          <div className="flex-1 space-y-2 min-w-0">
+            <div className="flex items-center gap-2">
+              <Input
+                value={preset.label}
+                onChange={(e) => onChange({ label: e.target.value })}
+                placeholder="Etikett"
+                className="h-8 text-sm"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-destructive shrink-0"
+                onClick={onRemove}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <Textarea
+              value={preset.prompt}
+              onChange={(e) => onChange({ prompt: e.target.value })}
+              rows={2}
+              placeholder="Prompt till AI-modellen…"
+              className="text-xs"
+            />
+          </div>
+        </div>
+      </AccordionContent>
+    </AccordionItem>
   );
 }
 
