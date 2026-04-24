@@ -28,13 +28,14 @@ Deno.serve(async (req) => {
 
   try {
     const clientId = Deno.env.get("SHOPIFY_APP_CLIENT_ID");
-    const scopes = Deno.env.get("SHOPIFY_APP_SCOPES");
-    if (!clientId || !scopes) {
+    const scopesRaw = Deno.env.get("SHOPIFY_APP_SCOPES");
+    if (!clientId || !scopesRaw) {
       return new Response(
         JSON.stringify({ error: "SHOPIFY_APP_CLIENT_ID eller SHOPIFY_APP_SCOPES saknas i backend-secrets." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+    const scopes = scopesRaw.split(",").map((s) => s.trim()).filter(Boolean).join(",");
 
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const url = new URL(req.url);
