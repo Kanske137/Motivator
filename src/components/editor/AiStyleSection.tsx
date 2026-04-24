@@ -96,6 +96,9 @@ export function AiStyleSection({ presets }: Props) {
     );
   }
 
+  const visiblePresets = presets.filter((p) => p.enabled !== false);
+  if (visiblePresets.length === 0) return null;
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-muted-foreground">
@@ -103,7 +106,7 @@ export function AiStyleSection({ presets }: Props) {
         Välj stil
       </div>
       <div className="grid grid-cols-3 gap-2">
-        {presets.map((p) => {
+        {visiblePresets.map((p) => {
           const busy = busyId === p.id;
           return (
             <button
