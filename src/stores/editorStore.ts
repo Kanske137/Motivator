@@ -411,9 +411,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   // ---------- computed ----------
   currentPrice: () => {
-    const { config, size, variant } = get();
+    const { config, productOptions, size, variant } = get();
     if (!config || !size || !variant) return 0;
-    const sizeDef = config.sizes.find((s) => s.size === size);
+    const effective = getEffectiveSizes(config, productOptions);
+    const sizeDef = effective.find((s) => s.size === size);
     return sizeDef?.variants.find((v) => v.name === variant)?.price ?? 0;
   },
   currentLayout: () => {
