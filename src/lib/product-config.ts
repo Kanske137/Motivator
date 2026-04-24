@@ -73,7 +73,10 @@ export function resolveConfigForHandle(
     const preferred = matches.find((c) => c.product_type === preferredType);
     if (preferred) return preferred;
   }
-  return matches[0];
+  // Stable default: posters before canvas so an ambiguous template-slug link
+  // always lands on the poster variant.
+  const poster = matches.find((c) => c.product_type === "posters");
+  return poster ?? matches[0];
 }
 
 export async function loadConfig(handle: string): Promise<ProductConfig | null> {
