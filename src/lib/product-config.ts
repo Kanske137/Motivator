@@ -101,6 +101,50 @@ export async function loadAllConfigs(): Promise<ProductConfig[]> {
   return (data ?? []) as unknown as ProductConfig[];
 }
 
+// ---- Effective sizes/variants helpers --------------------------------------
+// When `config.sizes` is empty (new admin-built templates) we derive the size
+// list from the template's productOptions × the static pricing tables. This
+// gives the customer editor real sizes/prices without requiring the admin to
+// duplicate pricing into the legacy `sizes` jsonb.
+import {
+  POSTER_PRICES,
+  CANVAS_PRICES,
+} from "@/lib/pricing";
+
+interface ProductOptionsLike {
+  poster?: { enabled?: boolean; allowedSizes?: string[]; allowedFrames?: string[] };
+  canvas?: { enabled?: boolean; allowedSizes?: string[]; allowedDepths?: string[] };
+}
+
+/** Build a SizeDef[] for a config from its template's productOptions when
+ *  the legacy `sizes` array is empty. Falls through to config.sizes otherwise.
+ *  Variants/sizes that lack a price are skipped. */
+export function getEffectiveSizes(
+  config: Pick<ProductConfig, "product_type" | "sizes">,
+  productOptions: ProductOptionsLike | null | undefined,
+): SizeDef[] {
+  if (config.sizes && config.sizes.length > 0) return config.sizes;
+  if (!productOptions) return [];
+  const isCanvas = config.product_type === "canvas";
+  const block = isCanvas ? productOptions.canvas : productOptions.poster;
+  if (!block?.enabled) return [];
+  const sizes = block.allowedSizes ?? [];
+  const variantNames = isCanvas
+    ? (productOptions.canvas?.allowedDepths ?? [])
+    : (productOptions.poster?.allowedFrames ?? []);
+  const priceTable = isCanvas ? CANVAS_PRICES : POSTER_PRICES;
+  const out: SizeDef[] = [];
+  for (const size of sizes) {
+    const variants: SizeVariant[] = [];
+    for (const name of variantNames) {
+      const price = priceTable[size]?.[name];
+      if (typeof price === "number") variants.push({ name, price });
+    }
+    if (variants.length > 0) out.push({ size, variants });
+  }
+  return out;
+}
+
 // Style metadata for UI
 export const MAPBOX_STYLE_LABELS: Record<string, string> = {
   "light-v11": "Ljus",
