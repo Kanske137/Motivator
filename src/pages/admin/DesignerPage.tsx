@@ -201,6 +201,13 @@ export default function DesignerPage() {
     }
 
     setSaving(true);
+    // Sync legacy `map_styles` column from new productOptions.mapStyles so
+    // older code paths (Shopify sync, customer editor fallback) stay in sync.
+    const enabledMapStyleIds = (finalTemplate.productOptions?.mapStyles ?? [])
+      .filter((s) => s.enabled !== false)
+      .map((s) => s.id);
+
+    // Write to current row first (template + Shopify-meta belong to this product)
     const { error } = await supabase
       .from("product_configs")
       .update({
@@ -212,8 +219,24 @@ export default function DesignerPage() {
         description_html: config.description_html ?? null,
         seo_title: config.seo_title ?? null,
         seo_description: config.seo_description ?? null,
+        map_styles: enabledMapStyleIds.length > 0 ? (enabledMapStyleIds as unknown as never) : ([] as unknown as never),
       })
       .eq("shopify_handle", handle);
+
+    // Propagate the shared template (incl. productOptions.mapStyles) + legacy
+    // map_styles to sibling rows with the same template_slug (poster ↔ canvas)
+    // so toggling on one variant affects the other in the customer editor.
+    const slug = config.template_slug;
+    if (!error && slug) {
+      await supabase
+        .from("product_configs")
+        .update({
+          template: finalTemplate as unknown as never,
+          map_styles: enabledMapStyleIds.length > 0 ? (enabledMapStyleIds as unknown as never) : ([] as unknown as never),
+        })
+        .eq("template_slug", slug)
+        .neq("shopify_handle", handle);
+    }
     setSaving(false);
 
     if (error) {
