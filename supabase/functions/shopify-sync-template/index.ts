@@ -495,16 +495,23 @@ Deno.serve(async (req) => {
         // we try to add variants that reference them.
         await syncProductOptions(productId, existing, group);
 
-        // Reconcile variants by SKU.
-        const existingBySku = new Map(
-          existing.variants.nodes.map((n) => [n.sku, n] as const),
+        // Reconcile variants by option-key (Storlek|Ram or Storlek|Djup).
+        // Matching by SKU breaks when SKUs change; option-key is what
+        // Shopify itself uses to detect uniqueness ("variant already exists").
+        const existingByKey = new Map<string, typeof existing.variants.nodes[number]>();
+        for (const n of existing.variants.nodes) {
+          const k = optionKeyFromSelected(n.selectedOptions, group.variantOptionName);
+          if (k) existingByKey.set(k, n);
+        }
+        const desiredKeys = new Set(
+          group.variants.map((v) => `${v.size}|${v.variant}`),
         );
-        const desiredSkus = new Set(group.variants.map((v) => v.sku));
 
         const toCreate: VariantInput[] = [];
         const toUpdate: (VariantInput & { id: string })[] = [];
         for (const v of group.variants) {
-          const ex = existingBySku.get(v.sku);
+          const key = `${v.size}|${v.variant}`;
+          const ex = existingByKey.get(key);
           const input = buildVariantInput(group, v);
           if (ex) {
             toUpdate.push({ ...input, id: ex.id });
@@ -513,7 +520,10 @@ Deno.serve(async (req) => {
           }
         }
         const toDelete = existing.variants.nodes
-          .filter((n) => n.sku && !desiredSkus.has(n.sku))
+          .filter((n) => {
+            const k = optionKeyFromSelected(n.selectedOptions, group.variantOptionName);
+            return k !== null && !desiredKeys.has(k);
+          })
           .map((n) => n.id);
 
         if (toCreate.length) {
