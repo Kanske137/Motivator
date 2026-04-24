@@ -57,9 +57,7 @@ interface SyncBody {
 interface VariantInput {
   optionValues: { optionName: string; name: string }[];
   price: string;
-  sku: string;
-  barcode: string;
-  inventoryItem: { tracked: boolean };
+  inventoryItem: { sku: string; tracked: boolean };
   inventoryPolicy: "CONTINUE";
 }
 
