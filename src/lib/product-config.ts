@@ -37,6 +37,9 @@ export interface TextConfig {
 export interface ProductConfig {
   id: string;
   shopify_handle: string;
+  /** Groups poster + canvas variants of the same template. Falls back to
+   *  shopify_handle stripped of -poster/-canvas suffix. */
+  template_slug?: string;
   title: string;
   product_type: ProductType;
   layouts: { portrait: LayoutDef; landscape: LayoutDef };
@@ -44,6 +47,33 @@ export interface ProductConfig {
   text_config: TextConfig;
   sizes: SizeDef[];
   gelato_sku_map: Record<string, Record<string, string>>;
+}
+
+/** Strip -poster / -canvas suffix to get the template-grouping slug. */
+export function deriveTemplateSlug(handleOrSlug: string): string {
+  return handleOrSlug.replace(/-(poster|posters|canvas)$/i, "");
+}
+
+/** Resolve a config by either its real handle OR its template_slug. When
+ *  given a slug, prefers the requested product type, falling back to the
+ *  first match. */
+export function resolveConfigForHandle(
+  configs: ProductConfig[],
+  handleOrSlug: string,
+  preferredType?: ProductType,
+): ProductConfig | null {
+  const direct = configs.find((c) => c.shopify_handle === handleOrSlug);
+  if (direct) return direct;
+  const slug = deriveTemplateSlug(handleOrSlug);
+  const matches = configs.filter(
+    (c) => (c.template_slug ?? deriveTemplateSlug(c.shopify_handle)) === slug,
+  );
+  if (matches.length === 0) return null;
+  if (preferredType) {
+    const preferred = matches.find((c) => c.product_type === preferredType);
+    if (preferred) return preferred;
+  }
+  return matches[0];
 }
 
 export async function loadConfig(handle: string): Promise<ProductConfig | null> {
