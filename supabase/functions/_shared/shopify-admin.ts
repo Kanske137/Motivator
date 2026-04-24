@@ -109,7 +109,7 @@ let preflightOk: { source: string; domain: string } | null = null;
 
 export async function ensureShopifyAuth(): Promise<{ source: string; domain: string }> {
   if (preflightOk) return preflightOk;
-  const { token, source } = pickShopifyToken();
+  const { token, source } = await pickShopifyToken();
   const domain = getShopifyDomain();
   console.log(`[shopify-auth] preflight using source=${source} domain=${domain}`);
 
@@ -169,7 +169,7 @@ export async function shopifyAdmin<T>(
   variables: Record<string, unknown> = {},
 ): Promise<T> {
   const { domain } = await ensureShopifyAuth();
-  const { token } = pickShopifyToken();
+  const { token } = await pickShopifyToken();
 
   const r = await fetch(
     `https://${domain}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`,
