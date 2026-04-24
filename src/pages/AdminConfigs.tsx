@@ -105,19 +105,46 @@ export default function AdminConfigs() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h1 className="text-xl font-bold">Produktkonfigurationer</h1>
-            <p className="text-sm text-muted-foreground">Layouter, kartstilar, storlekar och Gelato-mappning</p>
+        <div className="max-w-5xl mx-auto px-4 py-4 space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h1 className="text-xl font-bold">Produktkonfigurationer</h1>
+              <p className="text-sm text-muted-foreground">Layouter, kartstilar, storlekar och Gelato-mappning</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setCreateOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Skapa ny mall
+              </Button>
+              <Button onClick={syncToShopify} disabled={syncing || !installStatus?.installed}>
+                {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
+                Synka till Shopify
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Skapa ny mall
-            </Button>
-            <Button onClick={syncToShopify} disabled={syncing}>
-              {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
-              Synka till Shopify
+
+          {/* Shopify app install status */}
+          <div className="flex items-center justify-between gap-3 flex-wrap rounded-md border bg-muted/30 px-3 py-2 text-sm">
+            <div className="flex items-center gap-2 min-w-0">
+              {installStatus?.installed ? (
+                <>
+                  <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                  <span className="truncate">
+                    Shopify-app installerad på <span className="font-mono">{installStatus.shop}</span>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="h-4 w-4 text-destructive shrink-0" />
+                  <span className="truncate">
+                    Shopify-app ej installerad{installStatus?.shop ? <> på <span className="font-mono">{installStatus.shop}</span></> : null} — synkning är inaktiverad tills appen är installerad.
+                  </span>
+                </>
+              )}
+            </div>
+            <Button size="sm" variant={installStatus?.installed ? "outline" : "default"} onClick={startInstall} disabled={installing}>
+              {installing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
+              {installStatus?.installed ? "Installera om" : "Installera Shopify-app"}
             </Button>
           </div>
         </div>
