@@ -23,6 +23,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { ProductConfig, ProductStatus } from "@/lib/product-config";
 
 interface Props {
@@ -171,28 +172,76 @@ export default function ShopifyPublishingSection({ config, onChange }: Props) {
             </div>
 
             {/* SEO */}
-            <div className="space-y-1.5">
-              <Label className="text-xs">SEO-titel (max 60 tecken)</Label>
-              <Input
-                value={config.seo_title ?? ""}
-                onChange={(e) => onChange({ seo_title: e.target.value })}
-                placeholder={config.title}
-                maxLength={60}
-                className="h-9"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">SEO-beskrivning (max 160 tecken)</Label>
-              <Textarea
-                value={config.seo_description ?? ""}
-                onChange={(e) => onChange({ seo_description: e.target.value })}
-                maxLength={160}
-                className="min-h-[60px]"
-              />
-            </div>
+            <SeoField
+              label="SEO-titel"
+              max={60}
+              value={config.seo_title ?? ""}
+              placeholder={config.title}
+              onChange={(v) => onChange({ seo_title: v })}
+              multiline={false}
+            />
+            <SeoField
+              label="SEO-beskrivning"
+              max={160}
+              value={config.seo_description ?? ""}
+              onChange={(v) => onChange({ seo_description: v })}
+              multiline
+            />
           </AccordionContent>
         </AccordionItem>
       </Accordion>
     </Card>
+  );
+}
+
+function SeoField({
+  label,
+  max,
+  value,
+  placeholder,
+  onChange,
+  multiline,
+}: {
+  label: string;
+  max: number;
+  value: string;
+  placeholder?: string;
+  onChange: (v: string) => void;
+  multiline: boolean;
+}) {
+  const count = value.length;
+  const warn = count >= Math.floor(max * 0.9);
+  const over = count >= max;
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs">{label}</Label>
+        <span
+          className={cn(
+            "text-[10px] tabular-nums text-muted-foreground",
+            warn && "text-amber-600",
+            over && "text-destructive font-medium",
+          )}
+        >
+          {count}/{max}
+        </span>
+      </div>
+      {multiline ? (
+        <Textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          maxLength={max}
+          className="min-h-[60px]"
+        />
+      ) : (
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          maxLength={max}
+          className="h-9"
+        />
+      )}
+    </div>
   );
 }
