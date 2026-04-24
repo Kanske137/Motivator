@@ -201,12 +201,22 @@ export const aiStylePresetSchema = z.object({
 });
 export type AiStylePreset = z.infer<typeof aiStylePresetSchema>;
 
+export const mapStylePresetSchema = z.object({
+  id: z.string().min(1),
+  /** Per-template visibility toggle. Defaults to true for backwards-compat. */
+  enabled: z.boolean().optional().default(true),
+});
+export type MapStylePreset = z.infer<typeof mapStylePresetSchema>;
+
 export const productOptionsSchema = z.object({
   poster: posterOptionsSchema.optional(),
   canvas: canvasOptionsSchema.optional(),
   /** Available AI style presets shown in the customer editor. Optional —
    *  when missing/empty the AI section is hidden. */
   aiStyles: z.array(aiStylePresetSchema).optional(),
+  /** Per-template enabled map styles. When missing the editor falls back to
+   *  the legacy `config.map_styles` column, then to the full catalog. */
+  mapStyles: z.array(mapStylePresetSchema).optional(),
 });
 export type ProductOptions = z.infer<typeof productOptionsSchema>;
 
