@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { deriveTemplateSlug, type ProductConfig } from "@/lib/product-config";
+import { deriveTemplateSlug, getEffectiveSizes, type ProductConfig } from "@/lib/product-config";
 import { FrameOption } from "./FrameOption";
 import frameWhite from "@/assets/frames/frame-white.jpg";
 import frameOak from "@/assets/frames/frame-oak.jpg";
@@ -82,10 +82,14 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
     ? productOptions?.canvas?.allowedDepths
     : productOptions?.poster?.allowedFrames;
 
-  const visibleSizes = config.sizes.filter(
+  // Effective sizes: legacy `config.sizes` if populated, otherwise derived
+  // from productOptions × pricing tables. Then filtered to the admin-allowed
+  // subset.
+  const effectiveSizes = getEffectiveSizes(config, productOptions);
+  const visibleSizes = effectiveSizes.filter(
     (s) => !allowedSizes || allowedSizes.length === 0 || allowedSizes.includes(s.size),
   );
-  const sizeDef = visibleSizes.find((s) => s.size === size) ?? config.sizes.find((s) => s.size === size);
+  const sizeDef = visibleSizes.find((s) => s.size === size) ?? effectiveSizes.find((s) => s.size === size);
   const visibleVariants = (sizeDef?.variants ?? []).filter(
     (v) => !allowedVariants || allowedVariants.length === 0 || allowedVariants.includes(v.name),
   );

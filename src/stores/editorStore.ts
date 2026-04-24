@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { Orientation, ProductConfig } from "@/lib/product-config";
+import { getEffectiveSizes } from "@/lib/product-config";
 import type { DesignSource } from "@/lib/print-pipeline";
 import type { ProductOptions, Template, TemplateLayer } from "@/lib/template-schema";
 import { resolveTemplate } from "@/lib/template-migrate";
@@ -247,16 +248,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { template } = resolveTemplate(config, rawTemplate);
     const productOptions = template.productOptions;
 
+    // Effective sizes (legacy `config.sizes` if present, otherwise derived
+    // from productOptions × pricing tables) — keeps newly-built admin
+    // templates working even when their legacy `sizes` jsonb is empty.
+    const effectiveSizes = getEffectiveSizes(config, productOptions);
+
     const allowedSizesForType =
       config.product_type === "canvas"
         ? productOptions.canvas?.allowedSizes ?? []
         : productOptions.poster?.allowedSizes ?? [];
-    const allowedFiltered = config.sizes.filter(
+    const allowedFiltered = effectiveSizes.filter(
       (s) => allowedSizesForType.length === 0 || allowedSizesForType.includes(s.size),
     );
     const sizeStillValid = prevSize && allowedFiltered.find((s) => s.size === prevSize);
-    const nextSize = sizeStillValid ? prevSize : allowedFiltered[0]?.size ?? config.sizes[0]?.size ?? null;
-    const nextSizeDef = config.sizes.find((s) => s.size === nextSize);
+    const nextSize = sizeStillValid ? prevSize : allowedFiltered[0]?.size ?? effectiveSizes[0]?.size ?? null;
+    const nextSizeDef = effectiveSizes.find((s) => s.size === nextSize);
 
     const allowedVariantsForType =
       config.product_type === "canvas"
@@ -291,9 +297,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setPosterBgColor: (posterBgColor) => set({ posterBgColor }),
   setSize: (size) => {
-    const config = get().config;
+    const { config, productOptions } = get();
     if (!config) return set({ size });
-    const sizeDef = config.sizes.find((s) => s.size === size);
+    const effective = getEffectiveSizes(config, productOptions);
+    const sizeDef = effective.find((s) => s.size === size);
     const currentVariant = get().variant;
     const variantStillValid = sizeDef?.variants.find((v) => v.name === currentVariant);
     set({
@@ -404,9 +411,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   // ---------- computed ----------
   currentPrice: () => {
-    const { config, size, variant } = get();
+    const { config, productOptions, size, variant } = get();
     if (!config || !size || !variant) return 0;
-    const sizeDef = config.sizes.find((s) => s.size === size);
+    const effective = getEffectiveSizes(config, productOptions);
+    const sizeDef = effective.find((s) => s.size === size);
     return sizeDef?.variants.find((v) => v.name === variant)?.price ?? 0;
   },
   currentLayout: () => {

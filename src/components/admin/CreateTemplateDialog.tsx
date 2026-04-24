@@ -96,63 +96,85 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
       return;
     }
     setSaving(true);
-    const template = buildSeedTemplate(kind);
-    const productType = kind === "canvas" ? "canvas" : "posters";
 
     // template_slug groups poster + canvas variants under one template.
     const trimmedHandle = handle.trim();
     const templateSlug = trimmedHandle.replace(/-(poster|posters|canvas)$/i, "");
 
-    const { error } = await supabase.from("product_configs").insert({
-      title: title.trim(),
-      shopify_handle: trimmedHandle,
-      template_slug: templateSlug,
-      product_type: productType,
-      template: template as unknown as never,
-      layouts: {} as unknown as never,
-      map_styles: ["light-v11", "dark-v11", "outdoors-v12", "satellite-v9"] as unknown as never,
-      text_config: {
-        fonts: ["Inter", "Playfair Display"],
-        maxChars: 24,
-        defaultFont: "Inter",
-      } as unknown as never,
-      sizes: [] as unknown as never,
-      gelato_sku_map: {} as unknown as never,
-    });
-
-    // (don't reset saving yet — sync still pending)
-    if (error) {
-      setSaving(false);
-      toast.error("Kunde inte skapa", { description: error.message });
-      return;
+    // Decide which config rows to create. "Båda" → two rows sharing slug.
+    type Row = { kind: "poster" | "canvas"; handle: string; productType: "posters" | "canvas"; titleSuffix: string };
+    const rows: Row[] = [];
+    if (kind === "poster" || kind === "both") {
+      rows.push({
+        kind: "poster",
+        handle: `${templateSlug}-poster`,
+        productType: "posters",
+        titleSuffix: kind === "both" ? " - Poster" : "",
+      });
+    }
+    if (kind === "canvas" || kind === "both") {
+      rows.push({
+        kind: "canvas",
+        handle: `${templateSlug}-canvas`,
+        productType: "canvas",
+        titleSuffix: kind === "both" ? " - Canvas" : "",
+      });
     }
 
-    // Sync to Shopify (productCreate). Failure here doesn't block — admin can retry.
-    const { data: syncData, error: syncErr } = await supabase.functions.invoke(
-      "shopify-sync-template",
-      { body: { handle: handle.trim() } },
-    );
+    const baseTextConfig = {
+      fonts: ["Inter", "Playfair Display"],
+      maxChars: 24,
+      defaultFont: "Inter",
+    } as unknown as never;
+    const baseStyles = ["light-v11", "dark-v11", "outdoors-v12", "satellite-v9"] as unknown as never;
+
+    for (const r of rows) {
+      // Each row gets its own template enabling ONLY its product type — keeps
+      // the customer-side Format toggle clean and editor-state deterministic.
+      const tpl = buildSeedTemplate(r.kind);
+      const { error } = await supabase.from("product_configs").insert({
+        title: title.trim() + r.titleSuffix,
+        shopify_handle: r.handle,
+        template_slug: templateSlug,
+        product_type: r.productType,
+        template: tpl as unknown as never,
+        layouts: {} as unknown as never,
+        map_styles: baseStyles,
+        text_config: baseTextConfig,
+        sizes: [] as unknown as never,
+        gelato_sku_map: {} as unknown as never,
+      });
+      if (error) {
+        setSaving(false);
+        toast.error("Kunde inte skapa", { description: error.message });
+        return;
+      }
+    }
+
+    // Sync each new row to Shopify (best-effort). Failure here doesn't block.
+    let syncFailures = 0;
+    for (const r of rows) {
+      const { data: syncData, error: syncErr } = await supabase.functions.invoke(
+        "shopify-sync-template",
+        { body: { handle: r.handle } },
+      );
+      if (syncErr || !syncData?.ok) syncFailures += 1;
+    }
     setSaving(false);
-    if (syncErr || !syncData?.ok) {
-      const code = (syncData as { code?: string } | null)?.code;
-      const isAuth = code === "invalid_token" || code === "no_token" || code === "missing_scope";
+    if (syncFailures > 0) {
       toast.warning(
-        isAuth
-          ? "Mall skapad — men Shopify-anslutningen är ogiltig"
-          : "Mall skapad, men Shopify-synk misslyckades",
-        {
-          description: isAuth
-            ? "Återanslut Shopify-integrationen i Lovable och kör Synka-knappen igen."
-            : (syncErr?.message ?? syncData?.error ?? "Okänt fel — försök igen via Synka-knappen."),
-        },
+        `Mall(ar) skapade — Shopify-synk misslyckades för ${syncFailures}/${rows.length}`,
+        { description: "Återanslut Shopify-integrationen i Lovable och kör Synka igen." },
       );
     } else {
-      toast.success("Mall skapad och Shopify-produkt synkad", {
-        description: `${syncData.results?.length ?? 0} produkt(er) uppdaterade`,
+      toast.success("Mall skapad och synkad till Shopify", {
+        description: `${rows.length} produkt(er) uppdaterade`,
       });
     }
     onOpenChange(false);
-    navigate(`/admin/designer/${handle.trim()}`);
+    // Open the poster row in the designer (or the only row if single-kind).
+    const openHandle = rows.find((r) => r.kind === "poster")?.handle ?? rows[0].handle;
+    navigate(`/admin/designer/${openHandle}`);
   }
 
   return (
