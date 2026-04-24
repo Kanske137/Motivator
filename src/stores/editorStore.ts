@@ -248,16 +248,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { template } = resolveTemplate(config, rawTemplate);
     const productOptions = template.productOptions;
 
+    // Effective sizes (legacy `config.sizes` if present, otherwise derived
+    // from productOptions × pricing tables) — keeps newly-built admin
+    // templates working even when their legacy `sizes` jsonb is empty.
+    const effectiveSizes = getEffectiveSizes(config, productOptions);
+
     const allowedSizesForType =
       config.product_type === "canvas"
         ? productOptions.canvas?.allowedSizes ?? []
         : productOptions.poster?.allowedSizes ?? [];
-    const allowedFiltered = config.sizes.filter(
+    const allowedFiltered = effectiveSizes.filter(
       (s) => allowedSizesForType.length === 0 || allowedSizesForType.includes(s.size),
     );
     const sizeStillValid = prevSize && allowedFiltered.find((s) => s.size === prevSize);
-    const nextSize = sizeStillValid ? prevSize : allowedFiltered[0]?.size ?? config.sizes[0]?.size ?? null;
-    const nextSizeDef = config.sizes.find((s) => s.size === nextSize);
+    const nextSize = sizeStillValid ? prevSize : allowedFiltered[0]?.size ?? effectiveSizes[0]?.size ?? null;
+    const nextSizeDef = effectiveSizes.find((s) => s.size === nextSize);
 
     const allowedVariantsForType =
       config.product_type === "canvas"
