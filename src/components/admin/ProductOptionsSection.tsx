@@ -133,85 +133,87 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
   }, [value]);
 
   return (
-    <Card className="p-5 space-y-5">
-      <div>
-        <h2 className="text-base font-semibold">Produkt & varianter</h2>
-        <p className="text-xs text-muted-foreground">
-          Välj vilka produkter, storlekar och varianter den här mallen säljs som.
-        </p>
-      </div>
-
-      {missingSkus.length > 0 && (
-        <div className="flex items-start gap-2 rounded-md border border-dashed bg-muted/40 p-3 text-xs text-muted-foreground">
-          <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-          <span>
-            {missingSkus.length} variantkombination{missingSkus.length === 1 ? "" : "er"} saknar Gelato-SKU och
-            kommer hoppas över vid synk till Shopify (t.ex.{" "}
-            <code className="font-mono">{missingSkus[0].size} · {missingSkus[0].variant}</code>).
-          </span>
+    <div className="space-y-5">
+      <Card className="p-5 space-y-5">
+        <div>
+          <h2 className="text-base font-semibold">Produkt & varianter</h2>
+          <p className="text-xs text-muted-foreground">
+            Välj vilka produkter, storlekar och varianter den här mallen säljs som.
+          </p>
         </div>
-      )}
 
-      {/* Poster */}
-      <div className="space-y-3 rounded-md border p-4">
-        <div className="flex items-center justify-between">
-          <Label className="text-sm font-medium">Poster</Label>
-          <Switch
-            checked={value.poster?.enabled ?? false}
-            onCheckedChange={(c) => toggleEnabled("poster", c)}
-          />
-        </div>
-        {value.poster?.enabled && (
-          <div className="grid gap-4 md:grid-cols-2">
-            <ChecklistGroup
-              title="Tillåtna storlekar"
-              all={posterSizes}
-              selected={value.poster.allowedSizes}
-              onToggle={(item, c) => toggleListItem("poster", "allowedSizes", item, c)}
-            />
-            <ChecklistGroup
-              title="Tillåtna ramar"
-              all={posterFrames}
-              selected={value.poster.allowedFrames}
-              onToggle={(item, c) => toggleListItem("poster", "allowedFrames", item, c)}
-            />
+        {missingSkus.length > 0 && (
+          <div className="flex items-start gap-2 rounded-md border border-dashed bg-muted/40 p-3 text-xs text-muted-foreground">
+            <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+            <span>
+              {missingSkus.length} variantkombination{missingSkus.length === 1 ? "" : "er"} saknar Gelato-SKU och
+              kommer hoppas över vid synk till Shopify (t.ex.{" "}
+              <code className="font-mono">{missingSkus[0].size} · {missingSkus[0].variant}</code>).
+            </span>
           </div>
         )}
-      </div>
 
-      {/* Canvas */}
-      <div className="space-y-3 rounded-md border p-4">
-        <div className="flex items-center justify-between">
-          <Label className="text-sm font-medium">Canvas</Label>
-          <Switch
-            checked={value.canvas?.enabled ?? false}
-            onCheckedChange={(c) => toggleEnabled("canvas", c)}
-          />
-        </div>
-        {value.canvas?.enabled && (
-          <div className="grid gap-4 md:grid-cols-2">
-            <ChecklistGroup
-              title="Tillåtna storlekar"
-              all={canvasSizes}
-              selected={value.canvas.allowedSizes}
-              onToggle={(item, c) => toggleListItem("canvas", "allowedSizes", item, c)}
-            />
-            <ChecklistGroup
-              title="Tillåtna djup"
-              all={canvasDepths}
-              selected={value.canvas.allowedDepths}
-              onToggle={(item, c) => toggleListItem("canvas", "allowedDepths", item, c)}
+        {/* Poster */}
+        <div className="space-y-3 rounded-md border p-4">
+          <div className="flex items-center justify-between">
+            <Label className="text-sm font-medium">Poster</Label>
+            <Switch
+              checked={value.poster?.enabled ?? false}
+              onCheckedChange={(c) => toggleEnabled("poster", c)}
             />
           </div>
-        )}
-      </div>
+          {value.poster?.enabled && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <ChecklistGroup
+                title="Tillåtna storlekar"
+                all={posterSizes}
+                selected={value.poster.allowedSizes}
+                onToggle={(item, c) => toggleListItem("poster", "allowedSizes", item, c)}
+              />
+              <ChecklistGroup
+                title="Tillåtna ramar"
+                all={posterFrames}
+                selected={value.poster.allowedFrames}
+                onToggle={(item, c) => toggleListItem("poster", "allowedFrames", item, c)}
+              />
+            </div>
+          )}
+        </div>
 
-      {/* AI Styles */}
+        {/* Canvas */}
+        <div className="space-y-3 rounded-md border p-4">
+          <div className="flex items-center justify-between">
+            <Label className="text-sm font-medium">Canvas</Label>
+            <Switch
+              checked={value.canvas?.enabled ?? false}
+              onCheckedChange={(c) => toggleEnabled("canvas", c)}
+            />
+          </div>
+          {value.canvas?.enabled && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <ChecklistGroup
+                title="Tillåtna storlekar"
+                all={canvasSizes}
+                selected={value.canvas.allowedSizes}
+                onToggle={(item, c) => toggleListItem("canvas", "allowedSizes", item, c)}
+              />
+              <ChecklistGroup
+                title="Tillåtna djup"
+                all={canvasDepths}
+                selected={value.canvas.allowedDepths}
+                onToggle={(item, c) => toggleListItem("canvas", "allowedDepths", item, c)}
+              />
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* AI Styles — separate collapsible card */}
       <AiStylesEditor
         value={value.aiStyles ?? []}
         onChange={(aiStyles) => onChange({ ...value, aiStyles })}
       />
-    </Card>
+    </div>
   );
 }
 
