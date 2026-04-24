@@ -219,7 +219,7 @@ function SeoField({
         <span
           className={cn(
             "text-[10px] tabular-nums text-muted-foreground",
-            warn && "text-amber-600",
+            warn && "text-foreground",
             over && "text-destructive font-medium",
           )}
         >
