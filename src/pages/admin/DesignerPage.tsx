@@ -182,8 +182,13 @@ export default function DesignerPage() {
   }
 
   // ---------- persist ----------
+  function updateConfigMeta(patch: Partial<ProductConfig>) {
+    if (!config) return;
+    setConfig({ ...config, ...patch });
+  }
+
   async function persistTemplate(opts: { publish: boolean }) {
-    if (!handle || !template) return;
+    if (!handle || !template || !config) return;
     const finalTemplate: Template = opts.publish
       ? { ...template, publishedAt: new Date().toISOString() }
       : template;
@@ -198,7 +203,16 @@ export default function DesignerPage() {
     setSaving(true);
     const { error } = await supabase
       .from("product_configs")
-      .update({ template: finalTemplate as unknown as never })
+      .update({
+        template: finalTemplate as unknown as never,
+        tags: config.tags ?? [],
+        category_gid: config.category_gid ?? null,
+        status: config.status ?? "DRAFT",
+        sales_channels: config.sales_channels ?? ["online_store"],
+        description_html: config.description_html ?? null,
+        seo_title: config.seo_title ?? null,
+        seo_description: config.seo_description ?? null,
+      })
       .eq("shopify_handle", handle);
     setSaving(false);
 
