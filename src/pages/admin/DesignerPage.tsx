@@ -58,9 +58,33 @@ export default function DesignerPage() {
           : (error?.message ?? data?.error ?? "Okänt fel"),
       });
     } else {
-      toast.success("Synkad till Shopify", {
-        description: `${data.results?.length ?? 0} produkt(er) uppdaterade`,
-      });
+      // Invalidate the variant resolver cache so the editor picks up newly
+      // created variants on the next add-to-cart (within the same session).
+      const { clearVariantResolverCache } = await import("@/lib/shopify-variant-resolver");
+      clearVariantResolverCache();
+
+      const results = (data.results ?? []) as Array<{
+        kind: string;
+        plannedVariants: number;
+        variantsCreated: number;
+        variantsUpdated: number;
+        variantsDeleted: number;
+        publishedToOnlineStore: boolean;
+        skipped: { size: string; variant: string; reason: string }[];
+      }>;
+      const totalCreated = results.reduce((n, r) => n + (r.variantsCreated ?? 0), 0);
+      const totalUpdated = results.reduce((n, r) => n + (r.variantsUpdated ?? 0), 0);
+      const totalSkipped = results.reduce((n, r) => n + (r.skipped?.length ?? 0), 0);
+      const allPublished = results.every((r) => r.publishedToOnlineStore);
+      const parts: string[] = [];
+      parts.push(`${results.length} produkt(er)`);
+      if (totalCreated) parts.push(`${totalCreated} nya varianter`);
+      if (totalUpdated) parts.push(`${totalUpdated} uppdaterade`);
+      if (totalSkipped) parts.push(`${totalSkipped} hoppades över`);
+      parts.push(
+        allPublished ? "publicerade i Online Store" : "OBS: ej publicerade i Online Store",
+      );
+      toast.success("Synkad till Shopify", { description: parts.join(" · ") });
     }
   }
 
