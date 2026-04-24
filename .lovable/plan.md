@@ -1,110 +1,185 @@
+# Plan: fixa kritiska problem med mallgruppering, format-väljaren och fel produkt i kundvagn
 
-Problemet är inte själva mall-logiken eller SKU-logiken längre. Det som fallerar är Shopify-autentiseringen i backend.
+## Vad som är fel nu
 
-### Vad som faktiskt är fel
+Jag förstår problemen, och de hänger ihop:
 
-Det finns tydliga tecken på att `shopify-sync-template` använder fel autentiseringskälla för Shopify Admin API:
+1. **Format visar fel produkter**
+   - Databasen har idag bara dessa config-rader:
+     - `personlig-karta-canvas`
+     - `personlig-karta-poster`
+     - `mitt-hjarta`
+   - Det finns alltså **ingen separat `mitt-hjarta`-canvas config-rad**.
+   - Samtidigt är `mitt-hjarta` en legacy-rad utan `-poster`-suffix, vilket gör att editorn blandar ihop mallgrupperna.
 
-1. `shopify-storefront` fungerar
-   - Storefront-anropen returnerar `200`.
-   - Det betyder att butikens domän och storefront-token fungerar.
+2. **Fel produkt öppnas i editorn**
+   - `EditorPage` löser idag config via `handle` eller `template_slug`, men fallback-logiken gör att den kan landa på fel typ när en mall saknar sitt “syskon” eller använder legacy-handle.
+   - Därför kan `mitt-hjarta` öppna canvas trots att du öppnade poster.
 
-2. `shopify-sync-template` fallerar direkt med `401 Invalid API key or access token`
-   - Felet uppstår innan produktskapande/variantlogik hinner spela någon roll.
-   - Alltså är Admin API-token som edge functionen använder ogiltig eller inte rätt token för runtime.
+3. **Fel produkt hamnar i kundvagn**
+   - Kundvagnen visar numera titel/bild från Shopify korrekt, men själva variant-resolving bygger fortfarande på att rätt config/handle redan är aktiv.
+   - Om editorn har laddat fel config från början, resolve:as också fel Shopify-variant.
 
-3. Nuvarande funktion hämtar token via `Deno.env`
-   - Den försöker läsa `SHOPIFY_ONLINE_ACCESS_TOKEN:user:*`
-   - annars fallback till `SHOPIFY_ACCESS_TOKEN`
-   - Men trots reconnect får vi fortfarande samma `401`, vilket visar att runtime-token som funktionen ser inte är användbar för Admin API.
+4. **Tomma storlekar/ramar på en av posterna**
+   - Det är ett symptom på att UI:t kan växla till en config som inte egentligen hör till aktuell mall/kombination.
+   - Då filtreras size/variant-listor mot fel `productOptions`, vilket ger tomt resultat.
 
-4. Din nuvarande chat-/tool-auktorisering och edge function-runtime är inte samma sak
-   - Jag kunde läsa att din användare är Shopify-auktoriserad i verktygen.
-   - Samtidigt finns inga tillgängliga connector-kopplingar för nuvarande användare i projektet.
-   - Det tyder på att appens edge function inte säkert delar samma auth-kanal som chat-verktygen.
+5. **Försäljningskanal och kategori saknas fortfarande**
+   - Publicering mot Online Store finns i edge-funktionen men verkar inte träffa rätt publication i alla fall.
+   - Produktkategori sätts inte alls i syncen idag.
 
-5. Samma sårbarhet finns sannolikt även i `shopify-order-webhook`
-   - Den använder också `SHOPIFY_ACCESS_TOKEN` direkt.
-   - Den kan därför senare få samma typ av Admin API-problem.
+## Vad som ska byggas
 
-### Slutsats
+### 1) Normalisera mallmodellen så varje mall har en config per produkttyp
 
-Det uppenbara grundproblemet är:
-- Synk-knappen i appen går via en edge function som förlitar sig på en Shopify Admin-token i runtime-secrets.
-- Den token som funktionen faktiskt använder är fel, gammal eller inte korrekt exponerad till runtime.
-- Reconnect i chatten har därför inte löst det verkliga felet i appens backend-path.
+Gör `product_configs` till den tydliga sanningskällan:
+- En mallgrupp identifieras av `template_slug`
+- Varje produkttyp får en egen config-rad
+  - ex:
+    - `mitt-hjarta-poster`
+    - `mitt-hjarta-canvas`
+  - båda med `template_slug = 'mitt-hjarta'`
 
-## Plan för att lösa det
+Detta ersätter dagens blandning där en legacy-rad (`mitt-hjarta`) försöker representera flera typer.
 
-### 1. Gör Shopify-auth i backend deterministisk
-Refaktorera auth-hanteringen i `supabase/functions/shopify-sync-template/index.ts` så att den:
-- använder en enda tydlig tokenkälla i prioriterad ordning
-- loggar vilken tokenkälla som valdes, utan att exponera hemligheter
-- loggar vilken domän som används
-- slutar “gissa” genom att scanna miljön brett efter alla `SHOPIFY_ONLINE_ACCESS_TOKEN*`
+### 2) Backfill/migrera befintliga mallar till rätt struktur
 
-Målet är att funktionen alltid använder en verifierad Admin-token, inte en opportunistisk fallback.
+Implementera en säker datamigrering för befintliga configs:
+- Identifiera legacy-rader utan suffix
+- Om mallen har både poster och canvas aktiverat i `template.productOptions`:
+  - behåll/konvertera legacy-raden till `-poster`
+  - skapa en separat `-canvas`-rad med samma template och samma `template_slug`
+- Om mallen bara har en typ aktiverad:
+  - normalisera handle till typ-suffix ändå för konsekvens, eller håll kvar legacy-handle men mappa den explicit som alias
 
-### 2. Lägg till ett explicit Admin API-auth-test först
-Innan produktsynk körs ska funktionen göra ett litet test mot Admin API, t.ex. en enkel shop-query.
-Om auth fallerar ska svaret bli tydligt, t.ex.:
-- vilken auth-källa som användes
-- att Admin-token är ogiltig i backend
-- att ingen produktsynk försöktes
+Rekommenderad väg: **normalisera allt till suffixade handles** för skalbarhet.
 
-Det gör att vi kan skilja auth-fel från produkt-/variantfel direkt.
+### 3) Uppdatera admin-flödet så nya mallar alltid skapas korrekt
 
-### 3. Centralisera Shopify-auth i en gemensam helper
-Skapa samma auth-upplägg för:
-- `shopify-sync-template`
-- `shopify-order-webhook`
+`CreateTemplateDialog` ska inte längre skapa bara en rad när man väljer “Båda”.
 
-Det minskar risken att synk fixas men att order-webhook senare fortfarande använder en gammal token.
+I stället:
+- `Poster` skapar `slug-poster`
+- `Canvas` skapar `slug-canvas`
+- `Båda` skapar **två config-rader direkt**
+- båda delar samma:
+  - `template_slug`
+  - template-innehåll
+  - titelbas
 
-### 4. Sluta bygga på antagandet att reconnect automatiskt uppdaterar edge runtime
-Nuvarande implementation antar i praktiken att en reconnect gör rätt token tillgänglig i `Deno.env`.
-Planen är att verifiera och koda för den faktiska backend-kanalen som finns i projektet, istället för att anta att reconnect räcker.
+Designer-vyn ska öppna rätt config-handle direkt.
 
-### 5. Om runtime-token fortfarande inte är giltig: byt integrationsstrategi
-Om verifieringen visar att Lovable-runtime inte får en fungerande Admin-token via env, behöver synken flyttas till den stödda Shopify-integrationen istället för att ske med ett manuellt env-tokenflöde.
+### 4) Lås editorns produktväxling till aktuell mallgrupp
 
-Det innebär att vi i nästa steg väljer en av dessa robusta vägar:
-- antingen säkrar en riktig permanent Admin-token som backend får tillgång till
-- eller flyttar Shopify-skapande/uppdatering till en stödd integrationsväg som inte beror på denna trasiga env-tokenmodell
+`EditorPage` + `FormatSection` ska ändras så att produktväljaren enbart byggs från:
+- aktuell `template_slug`
+- faktiskt existerande configs för den mallen
+- endast aktiverade produktOptions för respektive config
 
-### 6. Förbättra felmeddelandet i admin-UI
-`DesignerPage` och `CreateTemplateDialog` ska visa ett mer exakt fel än bara “Shopify-synk misslyckades”, t.ex.:
-- “Backendens Shopify Admin-token är ogiltig”
-- istället för att det ser ut som att mall- eller variantdatan är fel
+Målet:
+- öppnar du “Mitt hjärta” ska du bara se dess egna produkttyper
+- aldrig någon annan malls poster/canvas
+- inga dubbletter
+- inga “spökposter”-val
 
-## Filer som påverkas
+Format-väljaren ska dessutom drivas av en stabil sorterad lista per mallgrupp, inte av “första matchande config”.
 
-- `supabase/functions/shopify-sync-template/index.ts`
-  - auth-flöde
-  - auth-test
-  - tydligare loggning och felhantering
+### 5) Gör route-resolution deterministisk
 
-- `supabase/functions/shopify-order-webhook/index.ts`
-  - samma auth-helper / samma säkra tokenstrategi
+`EditorPage` ska sluta falla tillbaka tvetydigt.
 
-- eventuellt ny shared helper i `supabase/functions/_shared/...`
-  - gemensam Shopify Admin-auth
+Ny regel:
+- `handle` matchar exakt config först
+- om URL innehåller legacy-handle eller `template_slug`, krävs tydlig typupplösning
+- om flera configs finns i samma mallgrupp men `type` saknas:
+  - välj poster som default endast om det är definierat som primär typ
+  - annars välj explicit första typ enligt stabil ordning
+- när användaren växlar format uppdateras URL alltid till exakt config-handle
 
-- `src/pages/admin/DesignerPage.tsx`
-  - bättre feltext i toast
+Detta gör att “öppna mitt-hjarta-poster” alltid landar på rätt editor-config.
 
+### 6) Nollställ invalid state när produkt byts
+
+När man byter mellan produkttyper inom samma mall ska state uppdateras säkert:
+- size/variant måste revalideras mot nya configens tillåtna kombinationer
+- om tidigare val inte finns i nya configen ska första giltiga val väljas
+- variant-resolver-cache ska använda rätt handle och inte återanvända gammalt resultat
+
+Detta eliminerar tomma dropdowns och felaktiga add-to-cart-val.
+
+### 7) Säkerställ att kundvagn alltid använder aktiv config, inte “senast matchad mall”
+
+Verifiera och justera add-to-cart-flödet så att det alltid använder:
+- aktiv config-handle
+- variant resolvad för just den configen
+- properties som inkluderar rätt `_product_handle` och mallmetadata
+
+Om det behövs läggs extra guard in före `addItem()`:
+- stoppa add-to-cart om aktiv config och resolvad variant inte hör ihop
+- logga tydligt fel om variant hittas för annan handle än den aktiva
+
+### 8) Slutför Shopify-metadata: försäljningskanal och kategori
+
+`shopify-sync-template` uppdateras också för att:
+- publicera mot rätt Online Store-publication robustare
+- returnera tydligare status om publication inte hittas
+- sätta produktkategori enligt produkttyp
+  - Poster → poster/print-art-liknande kategori
+  - Canvas → canvas wall art-liknande kategori
+
+Om Shopify kräver annan kategori-representation i 2025-07 anpassas mutationen därefter.
+
+## Teknisk implementation
+
+### Filer som kommer att ändras
 - `src/components/admin/CreateTemplateDialog.tsx`
-  - bättre feltext i toast
+- `src/pages/admin/DesignerPage.tsx`
+- `src/pages/EditorPage.tsx`
+- `src/components/editor/FormatSection.tsx`
+- `src/stores/editorStore.ts`
+- `src/lib/product-config.ts`
+- `src/lib/shopify-variant-resolver.ts`
+- `src/stores/cartStore.ts` (bara om guard/felsäkring behövs)
+- `supabase/functions/shopify-sync-template/index.ts`
+- eventuell DB-migration för datanormalisering om struktur behöver kompletteras
 
-## Verifiering efter fix
+### Datamodell efter fix
+```text
+template_slug = mitt-hjarta
+  ├─ mitt-hjarta-poster   (product_type=posters)
+  └─ mitt-hjarta-canvas   (product_type=canvas)
 
-1. Klick på “Synka till Shopify” ger inte längre `401`.
-2. Funktionen loggar tydligt vilken auth-källa som användes.
-3. En enkel Admin API test-query passerar innan produktsynk startar.
-4. Mallen “Mitt hjärta” skapar eller uppdaterar produkt(er) i Shopify.
-5. Samma auth-upplägg fungerar även för order-webhookens Admin-anrop.
-6. Om auth fortfarande saknas får du ett exakt, begripligt fel som pekar på backend-auth och inte på mallarna.
+template_slug = personlig-karta
+  ├─ personlig-karta-poster
+  └─ personlig-karta-canvas
+```
 
-## Kort sagt
+### Princip för skalbarhet
+Detta byggs inte hårdkodat för poster/canvas idag, utan som en mallgrupp + produkttyp-modell som kan utökas senare med fler typer.
 
-Det som inte stämmer är att appens Shopify-synk just nu körs med fel backend-authmodell. Din Shopify-anslutning verkar finnas på användar-/tool-nivå, men edge functionen använder fortfarande en ogiltig eller felaktigt exponerad Admin-token i runtime. Det är därför du får samma 401 om och om igen.
+## Verifiering efter implementation
+
+1. Öppna `mitt-hjarta-poster`
+   - editorn laddar poster, inte canvas
+2. Format visar exakt två val för Mitt hjärta
+   - Poster
+   - Canvas
+3. Växling mellan dessa stannar inom `template_slug = mitt-hjarta`
+4. Inga produkter från `personlig-karta` visas i Mitt hjärta-flödet
+5. Storlek och ram/djup visas korrekt för båda typerna
+6. Lägg `Mitt hjärta canvas` i kundvagn
+   - rätt Shopify-produkt och rätt variant hamnar i cart
+7. Synka till Shopify
+   - kategori sätts
+   - publicering mot försäljningskanal verifieras
+
+## Resultat
+
+Efter detta ska systemet bete sig så här:
+- varje mall har sina egna produkttyper
+- format-väljaren visar bara produkter från samma mall
+- poster öppnar poster och canvas öppnar canvas
+- kundvagnen får rätt produkt
+- lösningen är skalbar för ett stort mallbibliotek
+
+Godkänn planen så implementerar jag den i helhet.
