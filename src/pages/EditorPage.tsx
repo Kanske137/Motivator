@@ -102,6 +102,9 @@ export default function EditorPage() {
     const next = configs.find((c) => c.shopify_handle === newHandle);
     if (!next) return;
     const nextType: "poster" | "canvas" = next.product_type === "canvas" ? "canvas" : "poster";
+    // Clear the resolved variant immediately — prevents an in-flight resolve
+    // from a previous handle being used in add-to-cart while we switch.
+    setShopifyVariantId(null);
     setParams({ handle: newHandle, type: nextType }, { replace: true });
     setConfig(next);
   };
