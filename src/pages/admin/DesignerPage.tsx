@@ -72,10 +72,15 @@ export default function DesignerPage() {
         variantsDeleted: number;
         publishedToOnlineStore: boolean;
         skipped: { size: string; variant: string; reason: string }[];
+        skippedFields?: { field: string; reason: string }[];
       }>;
       const totalCreated = results.reduce((n, r) => n + (r.variantsCreated ?? 0), 0);
       const totalUpdated = results.reduce((n, r) => n + (r.variantsUpdated ?? 0), 0);
       const totalSkipped = results.reduce((n, r) => n + (r.skipped?.length ?? 0), 0);
+      const totalSkippedFields = results.reduce(
+        (n, r) => n + (r.skippedFields?.length ?? 0),
+        0,
+      );
       const allPublished = results.every((r) => r.publishedToOnlineStore);
       const parts: string[] = [];
       parts.push(`${results.length} produkt(er)`);
@@ -86,6 +91,16 @@ export default function DesignerPage() {
         allPublished ? "publicerade i Online Store" : "OBS: ej publicerade i Online Store",
       );
       toast.success("Synkad till Shopify", { description: parts.join(" · ") });
+      if (totalSkippedFields > 0) {
+        const sample = results
+          .flatMap((r) => r.skippedFields ?? [])
+          .slice(0, 5)
+          .map((f) => `${f.field} (${f.reason})`)
+          .join(", ");
+        toast.warning(`${totalSkippedFields} fält hoppades över — ändrade i Shopify`, {
+          description: sample,
+        });
+      }
     }
   }
 
