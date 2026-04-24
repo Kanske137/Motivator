@@ -392,7 +392,9 @@ Deno.serve(async (req) => {
 
     const { data: cfg, error } = await supabase
       .from("product_configs")
-      .select("title,shopify_handle,template_slug,template")
+      .select(
+        "id,title,shopify_handle,template_slug,template,tags,category_gid,status,sales_channels,description_html,seo_title,seo_description",
+      )
       .eq("shopify_handle", body.handle)
       .maybeSingle();
     if (error || !cfg) {
