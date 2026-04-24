@@ -25,6 +25,7 @@ import type {
 } from "@/lib/template-schema";
 import { geocode, type GeocodeResult } from "@/lib/mapbox";
 import { applyAdminPlaceToLinkedTexts } from "@/lib/template-migrate";
+import { MAP_STYLE_CATALOG } from "@/lib/map-style-catalog";
 
 interface Props {
   config: ProductConfig;
@@ -175,8 +176,8 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {config.map_styles.map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                {MAP_STYLE_CATALOG.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

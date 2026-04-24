@@ -13,7 +13,8 @@ import { Circle, Heart, Star, Square } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useEditorStore, type MapLayerValue, type TextLayerValue, type PhotoLayerValue, type PhotoShape } from "@/stores/editorStore";
 import { geocode, type GeocodeResult } from "@/lib/mapbox";
-import { MAPBOX_STYLE_LABELS, type ProductConfig } from "@/lib/product-config";
+import { type ProductConfig } from "@/lib/product-config";
+import { getEnabledMapStyleIds, mapStyleLabel, mapStylePreviewBg } from "@/lib/map-style-catalog";
 import { FormatSection } from "./FormatSection";
 import { PhotoUploadSection } from "./PhotoUploadSection";
 import { AiStyleSection } from "./AiStyleSection";
@@ -321,9 +322,16 @@ function MapStyleLayerSection({
   const setLayerMapStyle = useEditorStore((s) => s.setLayerMapStyle);
   const setLayerShowLabels = useEditorStore((s) => s.setLayerShowLabels);
   const setLayerMapShape = useEditorStore((s) => s.setLayerMapShape);
+  const productOptions = useEditorStore((s) => s.productOptions);
   const styleId = value?.styleId ?? layer.defaults.styleId;
   const showLabels = value?.showLabels ?? layer.defaults.showLabels;
   const shape = value?.shape ?? layer.defaults.shape;
+
+  // Per-template enabled list (Alt B), with legacy fallback.
+  const enabledStyleIds = getEnabledMapStyleIds(
+    productOptions ? { productOptions } : null,
+    config.map_styles,
+  );
 
   const shapeOptions = ([
     { id: "circle", label: "Cirkel", Icon: Circle },
@@ -340,7 +348,7 @@ function MapStyleLayerSection({
       )}
       {!layer.locks.style && (
         <div className="grid grid-cols-3 gap-2">
-          {config.map_styles.map((s) => (
+          {enabledStyleIds.map((s) => (
             <button
               key={s}
               onClick={() => setLayerMapStyle(layer.id, s)}
@@ -349,9 +357,9 @@ function MapStyleLayerSection({
                 s === styleId ? "ring-2 ring-primary" : "ring-1 ring-border",
               )}
             >
-              <div className="absolute inset-0" style={{ background: stylePreviewBg(s) }} />
+              <div className="absolute inset-0" style={{ background: mapStylePreviewBg(s) }} />
               <span className="absolute bottom-0 left-0 right-0 bg-background/85 backdrop-blur-sm text-[10px] py-1 font-medium">
-                {MAPBOX_STYLE_LABELS[s] ?? s}
+                {mapStyleLabel(s)}
               </span>
             </button>
           ))}
@@ -508,23 +516,4 @@ function PhotoShapeSection({
       </div>
     </div>
   );
-}
-
-function stylePreviewBg(styleId: string): string {
-  switch (styleId) {
-    case "light-v11":
-      return "linear-gradient(135deg, #f5f5f0, #e8e8e0)";
-    case "dark-v11":
-      return "linear-gradient(135deg, #1a1a2e, #16213e)";
-    case "outdoors-v12":
-      return "linear-gradient(135deg, #c8d99e, #8aa867)";
-    case "satellite-v9":
-      return "linear-gradient(135deg, #2d3a2e, #4a5d3f)";
-    case "streets-v12":
-      return "linear-gradient(135deg, #f0e8d8, #d4c89e)";
-    case "navigation-night-v1":
-      return "linear-gradient(135deg, #0a1929, #1c3a5c)";
-    default:
-      return "#888";
-  }
 }
