@@ -297,9 +297,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setPosterBgColor: (posterBgColor) => set({ posterBgColor }),
   setSize: (size) => {
-    const config = get().config;
+    const { config, productOptions } = get();
     if (!config) return set({ size });
-    const sizeDef = config.sizes.find((s) => s.size === size);
+    const effective = getEffectiveSizes(config, productOptions);
+    const sizeDef = effective.find((s) => s.size === size);
     const currentVariant = get().variant;
     const variantStillValid = sizeDef?.variants.find((v) => v.name === currentVariant);
     set({
