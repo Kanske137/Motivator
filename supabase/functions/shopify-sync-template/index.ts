@@ -285,7 +285,14 @@ async function publishToOnlineStore(productId: string): Promise<boolean> {
  *  is not allowed". */
 async function syncProductOptions(
   productId: string,
-  existing: { options: { id: string; name: string; values: string[] }[] },
+  existing: {
+    options: {
+      id: string;
+      name: string;
+      values: string[];
+      optionValues?: { id: string; name: string }[];
+    }[];
+  },
   group: PlannedGroup,
 ) {
   const desiredByOption: Record<string, string[]> = {
@@ -299,7 +306,11 @@ async function syncProductOptions(
     const existingOpt = existing.options.find((o) => o.name === optionName);
     if (!existingOpt) continue; // brand-new options would need productOptionsCreate; skip for now
     const desired = desiredByOption[optionName];
-    const missing = desired.filter((v) => !existingOpt.values.includes(v));
+    const existingValues = existingOpt.values ?? [];
+    const missing = desired.filter((v) => !existingValues.includes(v));
+    // Only add — never auto-delete option-values here. Removing values
+    // would orphan variants and is a destructive action better left to
+    // the explicit variant-delete step below.
     if (missing.length === 0) continue;
     try {
       const r = await shopifyAdmin<{
@@ -310,16 +321,28 @@ async function syncProductOptions(
         optionValuesToAdd: missing.map((name) => ({ name })),
         variantStrategy: "LEAVE_AS_IS",
       });
-      if (r.productOptionUpdate.userErrors.length) {
-        console.warn(
-          `productOptionUpdate(${optionName}) userErrors`,
-          r.productOptionUpdate.userErrors,
-        );
+      const errs = r.productOptionUpdate.userErrors.filter(
+        (e) => e.code !== "OPTION_VALUE_ALREADY_EXISTS",
+      );
+      if (errs.length) {
+        console.warn(`productOptionUpdate(${optionName}) userErrors`, errs);
       }
     } catch (e) {
       console.warn(`productOptionUpdate(${optionName}) failed`, e);
     }
   }
+}
+
+/** Build a stable key from a variant's selectedOptions (Storlek + Ram/Djup),
+ *  independent of order. */
+function optionKeyFromSelected(
+  selected: { name: string; value: string }[],
+  variantOptionName: string,
+): string | null {
+  const size = selected.find((s) => s.name === "Storlek")?.value;
+  const variant = selected.find((s) => s.name === variantOptionName)?.value;
+  if (!size || !variant) return null;
+  return `${size}|${variant}`;
 }
 
 Deno.serve(async (req) => {
