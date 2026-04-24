@@ -57,9 +57,7 @@ interface SyncBody {
 interface VariantInput {
   optionValues: { optionName: string; name: string }[];
   price: string;
-  sku: string;
-  barcode: string;
-  inventoryItem: { tracked: boolean };
+  inventoryItem: { sku: string; tracked: boolean };
   inventoryPolicy: "CONTINUE";
 }
 
@@ -191,15 +189,18 @@ function buildVariantInput(
   group: PlannedGroup,
   v: PlannedVariant,
 ): VariantInput {
+  // Shopify Admin API 2025-07: sku/barcode/tracked all live inside inventoryItem.
+  // Top-level sku/barcode were removed from ProductVariantsBulkInput.
   return {
     optionValues: [
       { optionName: "Storlek", name: v.size },
       { optionName: group.variantOptionName, name: v.variant },
     ],
     price: v.price.toFixed(2),
-    sku: v.sku,
-    barcode: v.sku,
-    inventoryItem: { tracked: false },
+    inventoryItem: {
+      sku: v.sku,
+      tracked: false,
+    },
     inventoryPolicy: "CONTINUE",
   };
 }
