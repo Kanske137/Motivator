@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { Orientation, ProductConfig } from "@/lib/product-config";
+import { getEffectiveSizes } from "@/lib/product-config";
 import type { DesignSource } from "@/lib/print-pipeline";
 import type { ProductOptions, Template, TemplateLayer } from "@/lib/template-schema";
 import { resolveTemplate } from "@/lib/template-migrate";
