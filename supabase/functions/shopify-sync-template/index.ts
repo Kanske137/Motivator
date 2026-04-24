@@ -285,7 +285,14 @@ async function publishToOnlineStore(productId: string): Promise<boolean> {
  *  is not allowed". */
 async function syncProductOptions(
   productId: string,
-  existing: { options: { id: string; name: string; values: string[] }[] },
+  existing: {
+    options: {
+      id: string;
+      name: string;
+      values: string[];
+      optionValues?: { id: string; name: string }[];
+    }[];
+  },
   group: PlannedGroup,
 ) {
   const desiredByOption: Record<string, string[]> = {
@@ -299,7 +306,11 @@ async function syncProductOptions(
     const existingOpt = existing.options.find((o) => o.name === optionName);
     if (!existingOpt) continue; // brand-new options would need productOptionsCreate; skip for now
     const desired = desiredByOption[optionName];
-    const missing = desired.filter((v) => !existingOpt.values.includes(v));
+    const existingValues = existingOpt.values ?? [];
+    const missing = desired.filter((v) => !existingValues.includes(v));
+    // Only add — never auto-delete option-values here. Removing values
+    // would orphan variants and is a destructive action better left to
+    // the explicit variant-delete step below.
     if (missing.length === 0) continue;
     try {
       const r = await shopifyAdmin<{
@@ -310,16 +321,28 @@ async function syncProductOptions(
         optionValuesToAdd: missing.map((name) => ({ name })),
         variantStrategy: "LEAVE_AS_IS",
       });
-      if (r.productOptionUpdate.userErrors.length) {
-        console.warn(
-          `productOptionUpdate(${optionName}) userErrors`,
-          r.productOptionUpdate.userErrors,
-        );
+      const errs = r.productOptionUpdate.userErrors.filter(
+        (e) => e.code !== "OPTION_VALUE_ALREADY_EXISTS",
+      );
+      if (errs.length) {
+        console.warn(`productOptionUpdate(${optionName}) userErrors`, errs);
       }
     } catch (e) {
       console.warn(`productOptionUpdate(${optionName}) failed`, e);
     }
   }
+}
+
+/** Build a stable key from a variant's selectedOptions (Storlek + Ram/Djup),
+ *  independent of order. */
+function optionKeyFromSelected(
+  selected: { name: string; value: string }[],
+  variantOptionName: string,
+): string | null {
+  const size = selected.find((s) => s.name === "Storlek")?.value;
+  const variant = selected.find((s) => s.name === variantOptionName)?.value;
+  if (!size || !variant) return null;
+  return `${size}|${variant}`;
 }
 
 Deno.serve(async (req) => {
@@ -472,16 +495,23 @@ Deno.serve(async (req) => {
         // we try to add variants that reference them.
         await syncProductOptions(productId, existing, group);
 
-        // Reconcile variants by SKU.
-        const existingBySku = new Map(
-          existing.variants.nodes.map((n) => [n.sku, n] as const),
+        // Reconcile variants by option-key (Storlek|Ram or Storlek|Djup).
+        // Matching by SKU breaks when SKUs change; option-key is what
+        // Shopify itself uses to detect uniqueness ("variant already exists").
+        const existingByKey = new Map<string, typeof existing.variants.nodes[number]>();
+        for (const n of existing.variants.nodes) {
+          const k = optionKeyFromSelected(n.selectedOptions, group.variantOptionName);
+          if (k) existingByKey.set(k, n);
+        }
+        const desiredKeys = new Set(
+          group.variants.map((v) => `${v.size}|${v.variant}`),
         );
-        const desiredSkus = new Set(group.variants.map((v) => v.sku));
 
         const toCreate: VariantInput[] = [];
         const toUpdate: (VariantInput & { id: string })[] = [];
         for (const v of group.variants) {
-          const ex = existingBySku.get(v.sku);
+          const key = `${v.size}|${v.variant}`;
+          const ex = existingByKey.get(key);
           const input = buildVariantInput(group, v);
           if (ex) {
             toUpdate.push({ ...input, id: ex.id });
@@ -490,7 +520,10 @@ Deno.serve(async (req) => {
           }
         }
         const toDelete = existing.variants.nodes
-          .filter((n) => n.sku && !desiredSkus.has(n.sku))
+          .filter((n) => {
+            const k = optionKeyFromSelected(n.selectedOptions, group.variantOptionName);
+            return k !== null && !desiredKeys.has(k);
+          })
           .map((n) => n.id);
 
         if (toCreate.length) {
