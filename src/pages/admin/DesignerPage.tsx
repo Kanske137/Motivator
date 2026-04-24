@@ -28,6 +28,7 @@ import {
 import { createDefaultLayout, createLayer, moveLayer, normaliseZIndex } from "@/lib/layer-utils";
 import { Sparkles } from "lucide-react";
 import ProductOptionsSection from "@/components/admin/ProductOptionsSection";
+import ShopifyPublishingSection from "@/components/admin/ShopifyPublishingSection";
 import LayerCanvas from "@/components/admin/LayerCanvas";
 import LayerList, { toggleAllLocks } from "@/components/admin/LayerList";
 import LayerInspector from "@/components/admin/LayerInspector";
@@ -71,10 +72,15 @@ export default function DesignerPage() {
         variantsDeleted: number;
         publishedToOnlineStore: boolean;
         skipped: { size: string; variant: string; reason: string }[];
+        skippedFields?: { field: string; reason: string }[];
       }>;
       const totalCreated = results.reduce((n, r) => n + (r.variantsCreated ?? 0), 0);
       const totalUpdated = results.reduce((n, r) => n + (r.variantsUpdated ?? 0), 0);
       const totalSkipped = results.reduce((n, r) => n + (r.skipped?.length ?? 0), 0);
+      const totalSkippedFields = results.reduce(
+        (n, r) => n + (r.skippedFields?.length ?? 0),
+        0,
+      );
       const allPublished = results.every((r) => r.publishedToOnlineStore);
       const parts: string[] = [];
       parts.push(`${results.length} produkt(er)`);
@@ -85,6 +91,16 @@ export default function DesignerPage() {
         allPublished ? "publicerade i Online Store" : "OBS: ej publicerade i Online Store",
       );
       toast.success("Synkad till Shopify", { description: parts.join(" · ") });
+      if (totalSkippedFields > 0) {
+        const sample = results
+          .flatMap((r) => r.skippedFields ?? [])
+          .slice(0, 5)
+          .map((f) => `${f.field} (${f.reason})`)
+          .join(", ");
+        toast.warning(`${totalSkippedFields} fält hoppades över — ändrade i Shopify`, {
+          description: sample,
+        });
+      }
     }
   }
 
@@ -166,8 +182,13 @@ export default function DesignerPage() {
   }
 
   // ---------- persist ----------
+  function updateConfigMeta(patch: Partial<ProductConfig>) {
+    if (!config) return;
+    setConfig({ ...config, ...patch });
+  }
+
   async function persistTemplate(opts: { publish: boolean }) {
-    if (!handle || !template) return;
+    if (!handle || !template || !config) return;
     const finalTemplate: Template = opts.publish
       ? { ...template, publishedAt: new Date().toISOString() }
       : template;
@@ -182,7 +203,16 @@ export default function DesignerPage() {
     setSaving(true);
     const { error } = await supabase
       .from("product_configs")
-      .update({ template: finalTemplate as unknown as never })
+      .update({
+        template: finalTemplate as unknown as never,
+        tags: config.tags ?? [],
+        category_gid: config.category_gid ?? null,
+        status: config.status ?? "DRAFT",
+        sales_channels: config.sales_channels ?? ["online_store"],
+        description_html: config.description_html ?? null,
+        seo_title: config.seo_title ?? null,
+        seo_description: config.seo_description ?? null,
+      })
       .eq("shopify_handle", handle);
     setSaving(false);
 
@@ -278,6 +308,8 @@ export default function DesignerPage() {
           value={template.productOptions}
           onChange={(productOptions) => setTemplate({ ...template, productOptions })}
         />
+
+        <ShopifyPublishingSection config={config} onChange={updateConfigMeta} />
 
         <Card className="p-5 space-y-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">

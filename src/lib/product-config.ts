@@ -34,6 +34,8 @@ export interface TextConfig {
   defaultFont: string;
 }
 
+export type ProductStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
+
 export interface ProductConfig {
   id: string;
   shopify_handle: string;
@@ -47,6 +49,14 @@ export interface ProductConfig {
   text_config: TextConfig;
   sizes: SizeDef[];
   gelato_sku_map: Record<string, Record<string, string>>;
+  // Shopify publishing metadata (Fas 3)
+  tags?: string[];
+  category_gid?: string | null;
+  status?: ProductStatus;
+  sales_channels?: string[];
+  description_html?: string | null;
+  seo_title?: string | null;
+  seo_description?: string | null;
 }
 
 /** Strip -poster / -canvas suffix to get the template-grouping slug. */

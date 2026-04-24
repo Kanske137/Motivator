@@ -211,8 +211,8 @@ const PRODUCT_VARIANTS_BULK_DELETE = `
 
 const PUBLICATIONS_QUERY = `
   query publications {
-    publications(first: 25) {
-      nodes { id name }
+    publications(first: 50) {
+      nodes { id name catalog { ... on AppCatalog { app { handle } } } }
     }
   }`;
 
@@ -222,6 +222,27 @@ const PUBLISHABLE_PUBLISH = `
       userErrors { field message }
     }
   }`;
+
+const GET_PRODUCT_FULL = `
+  query getProductFull($id: ID!) {
+    product(id: $id) {
+      id
+      title
+      descriptionHtml
+      tags
+      status
+      seo { title description }
+      category { id }
+    }
+  }`;
+
+// Shopify Standard Product Taxonomy GIDs.
+// Posters: gid://shopify/TaxonomyCategory/ap-2-1-3 ("Posters")
+// Canvas:  gid://shopify/TaxonomyCategory/ap-2-1-1 ("Decorative Paintings")
+const DEFAULT_CATEGORY_GID: Record<"poster" | "canvas", string> = {
+  poster: "gid://shopify/TaxonomyCategory/ap-2-1-3",
+  canvas: "gid://shopify/TaxonomyCategory/ap-2-1-1",
+};
 
 function buildVariantInput(
   group: PlannedGroup,
@@ -247,12 +268,17 @@ let cachedOnlineStorePublicationId: string | null = null;
 async function getOnlineStorePublicationId(): Promise<string | null> {
   if (cachedOnlineStorePublicationId) return cachedOnlineStorePublicationId;
   try {
-    const r = await shopifyAdmin<{ publications: { nodes: { id: string; name: string }[] } }>(
-      PUBLICATIONS_QUERY,
+    const r = await shopifyAdmin<{
+      publications: {
+        nodes: { id: string; name: string; catalog?: { app?: { handle?: string } } }[];
+      };
+    }>(PUBLICATIONS_QUERY);
+    // Prefer match by app handle (locale-independent), fall back to name regex.
+    const byHandle = r.publications.nodes.find(
+      (p) => p.catalog?.app?.handle === "online_store",
     );
-    const onlineStore = r.publications.nodes.find((p) =>
-      /online store/i.test(p.name)
-    ) ?? r.publications.nodes[0];
+    const byName = r.publications.nodes.find((p) => /online store|nätbutik|webbshop/i.test(p.name));
+    const onlineStore = byHandle ?? byName ?? r.publications.nodes[0];
     cachedOnlineStorePublicationId = onlineStore?.id ?? null;
     return cachedOnlineStorePublicationId;
   } catch (e) {
@@ -366,7 +392,9 @@ Deno.serve(async (req) => {
 
     const { data: cfg, error } = await supabase
       .from("product_configs")
-      .select("title,shopify_handle,template_slug,template")
+      .select(
+        "id,title,shopify_handle,template_slug,template,tags,category_gid,status,sales_channels,description_html,seo_title,seo_description",
+      )
       .eq("shopify_handle", body.handle)
       .maybeSingle();
     if (error || !cfg) {
@@ -398,13 +426,33 @@ Deno.serve(async (req) => {
       );
     }
 
+    const cfgMeta = cfg as {
+      id: string;
+      tags?: string[];
+      category_gid?: string | null;
+      status?: string;
+      sales_channels?: string[];
+      description_html?: string | null;
+      seo_title?: string | null;
+      seo_description?: string | null;
+    };
+
+    // Load sync state (one row per product_config). Used for diff-protection
+    // so we don't overwrite fields the merchant changed manually in Shopify.
+    const { data: syncStateRow } = await supabase
+      .from("shopify_sync_state")
+      .select("id,last_synced_payload")
+      .eq("product_config_id", cfgMeta.id)
+      .maybeSingle();
+    const lastSynced = (syncStateRow?.last_synced_payload ?? {}) as Record<
+      string,
+      Record<string, unknown>
+    >;
+
     const results: any[] = [];
+    const nextSyncedPayload: Record<string, Record<string, unknown>> = {};
+
     for (const group of groups) {
-      // Always suffix the handle with the kind so poster + canvas stay
-      // separate products (Shopify cannot host them under one product
-      // because we'd hit the 3-option-axis limit when adding more axes
-      // later). Backwards-compat: if there's only one group AND the
-      // existing handle has no suffix, keep it unsuffixed.
       const baseHandleHasNoSuffix = !/-(poster|posters|canvas)$/i.test(cfg.shopify_handle);
       const handleForKind = groups.length === 1 && baseHandleHasNoSuffix
         ? cfg.shopify_handle
@@ -412,7 +460,22 @@ Deno.serve(async (req) => {
       const titleForKind =
         groups.length === 1 ? cfg.title : `${cfg.title} – ${group.productType}`;
 
-      const tags = [templateSlug, group.kind, "personalized", "print-on-demand"];
+      // Effective metadata (config values + sensible defaults).
+      const tags = [
+        ...new Set([
+          templateSlug,
+          group.kind,
+          "personalized",
+          "print-on-demand",
+          ...(cfgMeta.tags ?? []),
+        ]),
+      ];
+      const categoryGid = cfgMeta.category_gid ?? DEFAULT_CATEGORY_GID[group.kind];
+      const status = (cfgMeta.status ?? "DRAFT").toUpperCase();
+      const descriptionHtml =
+        cfgMeta.description_html ?? "<p>Personlig design — skapas i editorn.</p>";
+      const seoTitle = cfgMeta.seo_title ?? titleForKind;
+      const seoDescription = cfgMeta.seo_description ?? null;
 
       const existing = (await shopifyAdmin<{
         productByHandle: null | {
@@ -427,8 +490,10 @@ Deno.serve(async (req) => {
       let variantsCreated = 0;
       let variantsUpdated = 0;
       let variantsDeleted = 0;
+      const skippedFields: { field: string; reason: string }[] = [];
 
       if (!existing) {
+        // CREATE — write everything from config.
         const created = await shopifyAdmin<{
           productCreate: { product: { id: string }; userErrors: { message: string }[] };
         }>(PRODUCT_CREATE, {
@@ -436,9 +501,11 @@ Deno.serve(async (req) => {
             title: titleForKind,
             handle: handleForKind,
             productType: group.productType,
-            status: "DRAFT",
+            status,
             tags,
-            descriptionHtml: "<p>Personlig design — skapas i editorn.</p>",
+            descriptionHtml,
+            category: categoryGid,
+            seo: { title: seoTitle, description: seoDescription },
             productOptions: [
               {
                 name: "Storlek",
@@ -469,8 +536,6 @@ Deno.serve(async (req) => {
           };
         }>(PRODUCT_VARIANTS_BULK_CREATE, { productId, variants: inputs });
         if (bulk.productVariantsBulkCreate.userErrors.length) {
-          // Hard-fail: previously these errors were swallowed silently and the
-          // product ended up with zero / a single default variant.
           throw new Error(
             `bulkCreate userErrors: ${bulk.productVariantsBulkCreate.userErrors
               .map((e) => `${(e.field ?? []).join(".")} ${e.message}`)
@@ -482,30 +547,87 @@ Deno.serve(async (req) => {
         productId = existing.id;
         mode = "update";
 
+        // Diff-protect text fields. Pull current Shopify state and compare to
+        // last_synced_payload; if Shopify diverged, the merchant edited the
+        // field in Shopify Admin and we must not overwrite it.
+        const currentResp = await shopifyAdmin<{
+          product: {
+            title: string;
+            descriptionHtml: string;
+            tags: string[];
+            status: string;
+            seo: { title: string | null; description: string | null };
+            category: { id: string } | null;
+          } | null;
+        }>(GET_PRODUCT_FULL, { id: productId });
+        const current = currentResp.product;
+        const last = (lastSynced[group.kind] ?? {}) as Record<string, unknown>;
+        const isFirstSync = Object.keys(last).length === 0;
+
+        function protectedValue<T>(field: string, desired: T, currentVal: T): T {
+          if (isFirstSync) {
+            // Seed: keep whatever Shopify currently has, don't overwrite.
+            skippedFields.push({ field, reason: "first sync — seeded from Shopify" });
+            return currentVal;
+          }
+          const lastVal = last[field];
+          // If Shopify's current value differs from what we last sent, merchant edited it.
+          if (
+            lastVal !== undefined &&
+            JSON.stringify(currentVal) !== JSON.stringify(lastVal)
+          ) {
+            skippedFields.push({ field, reason: "modified in Shopify" });
+            return currentVal;
+          }
+          return desired;
+        }
+
+        const safeTitle = protectedValue("title", titleForKind, current?.title ?? titleForKind);
+        const safeDescription = protectedValue(
+          "descriptionHtml",
+          descriptionHtml,
+          current?.descriptionHtml ?? descriptionHtml,
+        );
+        const safeTags = protectedValue("tags", tags, current?.tags ?? tags);
+        const safeStatus = protectedValue("status", status, current?.status ?? status);
+        const safeSeoTitle = protectedValue(
+          "seo.title",
+          seoTitle,
+          current?.seo?.title ?? seoTitle,
+        );
+        const safeSeoDescription = protectedValue(
+          "seo.description",
+          seoDescription,
+          current?.seo?.description ?? seoDescription,
+        );
+        const safeCategory = protectedValue(
+          "category",
+          categoryGid,
+          current?.category?.id ?? categoryGid,
+        );
+
         await shopifyAdmin(PRODUCT_UPDATE, {
           input: {
             id: productId,
-            title: titleForKind,
+            title: safeTitle,
             productType: group.productType,
-            tags,
+            tags: safeTags,
+            status: safeStatus,
+            descriptionHtml: safeDescription,
+            category: safeCategory,
+            seo: { title: safeSeoTitle, description: safeSeoDescription },
           },
         });
 
-        // Sync option-values FIRST so missing sizes/frames/depths exist before
-        // we try to add variants that reference them.
+        // Variants/options/SKU are ALWAYS source-of-truth from Lovable.
         await syncProductOptions(productId, existing, group);
 
-        // Reconcile variants by option-key (Storlek|Ram or Storlek|Djup).
-        // Matching by SKU breaks when SKUs change; option-key is what
-        // Shopify itself uses to detect uniqueness ("variant already exists").
         const existingByKey = new Map<string, typeof existing.variants.nodes[number]>();
         for (const n of existing.variants.nodes) {
           const k = optionKeyFromSelected(n.selectedOptions, group.variantOptionName);
           if (k) existingByKey.set(k, n);
         }
-        const desiredKeys = new Set(
-          group.variants.map((v) => `${v.size}|${v.variant}`),
-        );
+        const desiredKeys = new Set(group.variants.map((v) => `${v.size}|${v.variant}`));
 
         const toCreate: VariantInput[] = [];
         const toUpdate: (VariantInput & { id: string })[] = [];
@@ -513,11 +635,8 @@ Deno.serve(async (req) => {
           const key = `${v.size}|${v.variant}`;
           const ex = existingByKey.get(key);
           const input = buildVariantInput(group, v);
-          if (ex) {
-            toUpdate.push({ ...input, id: ex.id });
-          } else {
-            toCreate.push(input);
-          }
+          if (ex) toUpdate.push({ ...input, id: ex.id });
+          else toCreate.push(input);
         }
         const toDelete = existing.variants.nodes
           .filter((n) => {
@@ -566,8 +685,22 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Publish to Online Store sales channel (idempotent).
-      const published = await publishToOnlineStore(productId);
+      // Publish to configured sales channels (currently: online_store).
+      const wantsOnlineStore = (cfgMeta.sales_channels ?? ["online_store"]).includes(
+        "online_store",
+      );
+      const published = wantsOnlineStore ? await publishToOnlineStore(productId) : false;
+
+      // Snapshot what we just sent — this is what next sync will compare against.
+      nextSyncedPayload[group.kind] = {
+        title: titleForKind,
+        descriptionHtml,
+        tags,
+        status,
+        "seo.title": seoTitle,
+        "seo.description": seoDescription,
+        category: categoryGid,
+      };
 
       results.push({
         kind: group.kind,
@@ -580,6 +713,24 @@ Deno.serve(async (req) => {
         variantsDeleted,
         publishedToOnlineStore: published,
         skipped: group.skipped,
+        skippedFields,
+      });
+    }
+
+    // Persist sync state (upsert).
+    if (syncStateRow) {
+      await supabase
+        .from("shopify_sync_state")
+        .update({
+          last_synced_at: new Date().toISOString(),
+          last_synced_payload: nextSyncedPayload,
+        })
+        .eq("id", syncStateRow.id);
+    } else {
+      await supabase.from("shopify_sync_state").insert({
+        product_config_id: cfgMeta.id,
+        last_synced_at: new Date().toISOString(),
+        last_synced_payload: nextSyncedPayload,
       });
     }
 

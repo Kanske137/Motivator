@@ -52,14 +52,21 @@ export type Database = {
       }
       product_configs: {
         Row: {
+          category_gid: string | null
           created_at: string
+          description_html: string | null
           gelato_sku_map: Json
           id: string
           layouts: Json
           map_styles: Json
           product_type: string
+          sales_channels: string[]
+          seo_description: string | null
+          seo_title: string | null
           shopify_handle: string
           sizes: Json
+          status: string
+          tags: string[]
           template: Json
           template_slug: string | null
           text_config: Json
@@ -67,14 +74,21 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          category_gid?: string | null
           created_at?: string
+          description_html?: string | null
           gelato_sku_map?: Json
           id?: string
           layouts?: Json
           map_styles?: Json
           product_type: string
+          sales_channels?: string[]
+          seo_description?: string | null
+          seo_title?: string | null
           shopify_handle: string
           sizes?: Json
+          status?: string
+          tags?: string[]
           template?: Json
           template_slug?: string | null
           text_config?: Json
@@ -82,14 +96,21 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          category_gid?: string | null
           created_at?: string
+          description_html?: string | null
           gelato_sku_map?: Json
           id?: string
           layouts?: Json
           map_styles?: Json
           product_type?: string
+          sales_channels?: string[]
+          seo_description?: string | null
+          seo_title?: string | null
           shopify_handle?: string
           sizes?: Json
+          status?: string
+          tags?: string[]
           template?: Json
           template_slug?: string | null
           text_config?: Json
@@ -124,6 +145,44 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      shopify_sync_state: {
+        Row: {
+          created_at: string
+          id: string
+          last_synced_at: string | null
+          last_synced_payload: Json
+          product_config_id: string
+          shopify_product_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_synced_at?: string | null
+          last_synced_payload?: Json
+          product_config_id: string
+          shopify_product_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_synced_at?: string | null
+          last_synced_payload?: Json
+          product_config_id?: string
+          shopify_product_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopify_sync_state_product_config_id_fkey"
+            columns: ["product_config_id"]
+            isOneToOne: true
+            referencedRelation: "product_configs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
