@@ -517,22 +517,3 @@ function PhotoShapeSection({
     </div>
   );
 }
-
-function stylePreviewBg(styleId: string): string {
-  switch (styleId) {
-    case "light-v11":
-      return "linear-gradient(135deg, #f5f5f0, #e8e8e0)";
-    case "dark-v11":
-      return "linear-gradient(135deg, #1a1a2e, #16213e)";
-    case "outdoors-v12":
-      return "linear-gradient(135deg, #c8d99e, #8aa867)";
-    case "satellite-v9":
-      return "linear-gradient(135deg, #2d3a2e, #4a5d3f)";
-    case "streets-v12":
-      return "linear-gradient(135deg, #f0e8d8, #d4c89e)";
-    case "navigation-night-v1":
-      return "linear-gradient(135deg, #0a1929, #1c3a5c)";
-    default:
-      return "#888";
-  }
-}
