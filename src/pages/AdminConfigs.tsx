@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { loadAllConfigs, type ProductConfig } from "@/lib/product-config";
-import { Loader2, ExternalLink, Zap, Pencil, Plus } from "lucide-react";
+import { Loader2, ExternalLink, Zap, Pencil, Plus, CheckCircle2, AlertCircle, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { resolveTemplate } from "@/lib/template-migrate";
@@ -15,11 +15,26 @@ interface ConfigWithTemplate extends ProductConfig {
   __template: Template;
 }
 
+interface InstallStatus {
+  shop: string;
+  installed: boolean;
+  scopes: string | null;
+  installedAt: string | null;
+}
+
 export default function AdminConfigs() {
   const [configs, setConfigs] = useState<ConfigWithTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [installing, setInstalling] = useState(false);
+  const [installStatus, setInstallStatus] = useState<InstallStatus | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [searchParams] = useSearchParams();
+
+  const refreshInstallStatus = async () => {
+    const { data, error } = await supabase.functions.invoke("shopify-oauth-status");
+    if (!error && data) setInstallStatus(data as InstallStatus);
+  };
 
   useEffect(() => {
     (async () => {
@@ -32,7 +47,36 @@ export default function AdminConfigs() {
       setConfigs(enriched);
       setLoading(false);
     })();
+    refreshInstallStatus();
   }, []);
+
+  useEffect(() => {
+    if (searchParams.get("installed") === "1") {
+      toast.success("Shopify-app installerad ✓");
+      refreshInstallStatus();
+    }
+  }, [searchParams]);
+
+  const startInstall = async () => {
+    setInstalling(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("shopify-oauth-install", {
+        body: {},
+      });
+      if (error || !data?.installUrl) {
+        toast.error("Kunde inte starta installationen", {
+          description: error?.message ?? data?.error ?? "okänt fel",
+        });
+        return;
+      }
+      window.open(data.installUrl as string, "_blank", "noopener,noreferrer");
+      toast.info("Installationsfönster öppnat", {
+        description: "Godkänn appen i Shopify-fliken — sidan uppdateras automatiskt vid retur.",
+      });
+    } finally {
+      setInstalling(false);
+    }
+  };
 
   const syncToShopify = async () => {
     setSyncing(true);
