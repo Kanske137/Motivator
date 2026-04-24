@@ -309,6 +309,8 @@ export default function DesignerPage() {
           onChange={(productOptions) => setTemplate({ ...template, productOptions })}
         />
 
+        <ShopifyPublishingSection config={config} onChange={updateConfigMeta} />
+
         <Card className="p-5 space-y-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
