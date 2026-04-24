@@ -61,6 +61,7 @@ export type Database = {
           shopify_handle: string
           sizes: Json
           template: Json
+          template_slug: string | null
           text_config: Json
           title: string
           updated_at: string
@@ -75,6 +76,7 @@ export type Database = {
           shopify_handle: string
           sizes?: Json
           template?: Json
+          template_slug?: string | null
           text_config?: Json
           title: string
           updated_at?: string
@@ -89,6 +91,7 @@ export type Database = {
           shopify_handle?: string
           sizes?: Json
           template?: Json
+          template_slug?: string | null
           text_config?: Json
           title?: string
           updated_at?: string

@@ -1,9 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Loader2, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEditorStore } from "@/stores/editorStore";
-import { loadAllConfigs, type ProductConfig } from "@/lib/product-config";
+import {
+  loadAllConfigs,
+  resolveConfigForHandle,
+  deriveTemplateSlug,
+  type ProductConfig,
+  type ProductType,
+} from "@/lib/product-config";
 import { MapPreview } from "@/components/editor/MapPreview";
 import { ControlPanel } from "@/components/editor/ControlPanel";
 import { MockupGallery } from "@/components/editor/MockupGallery";
@@ -24,9 +30,18 @@ const FRAME_COLORS: Record<string, string> = {
 };
 const FRAME_WIDTH_CM = 1.2; // matchar Gelato frp_w12xt22-mm (12mm front)
 
+function normalizeType(raw: string | null): ProductType | undefined {
+  if (!raw) return undefined;
+  const v = raw.toLowerCase();
+  if (v === "poster" || v === "posters") return "posters";
+  if (v === "canvas") return "canvas";
+  return undefined;
+}
+
 export default function EditorPage() {
   const [params, setParams] = useSearchParams();
-  const handle = params.get("handle") ?? "personlig-karta-poster";
+  const handleParam = params.get("handle") ?? "personlig-karta-poster";
+  const typeParam = normalizeType(params.get("type"));
   const [configs, setConfigs] = useState<ProductConfig[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -36,8 +51,18 @@ export default function EditorPage() {
   const isAdding = useCartStore((s) => s.isLoading);
   const [isPreparing, setIsPreparing] = useState(false);
 
+  // All configs that belong to the same template (same template_slug). Passed
+  // down so FormatSection can render its poster/canvas toggle without having
+  // to re-derive the relationship.
+  const sameTemplateConfigs = useMemo(() => {
+    if (!config) return [] as ProductConfig[];
+    const slug = config.template_slug ?? deriveTemplateSlug(config.shopify_handle);
+    return configs.filter(
+      (c) => (c.template_slug ?? deriveTemplateSlug(c.shopify_handle)) === slug,
+    );
+  }, [configs, config]);
+
   // Resolve real Shopify variant ID whenever handle/size/variant changes.
-  // The fake `preview-${size}-${variant}` placeholder no longer hits cart.
   useEffect(() => {
     if (!config || !size || !variant) {
       setShopifyVariantId(null);
@@ -63,16 +88,21 @@ export default function EditorPage() {
       setLoading(true);
       const all = await loadAllConfigs();
       setConfigs(all);
-      const active = all.find((c) => c.shopify_handle === handle) ?? all[0];
+      // Resolve via handle OR template_slug, with optional ?type= preference.
+      // This makes both legacy direct-handle links AND new "open template"
+      // links work, including links from Shopify product pages where the
+      // handle has a -poster/-canvas suffix.
+      const active = resolveConfigForHandle(all, handleParam, typeParam) ?? all[0];
       if (active) setConfig(active);
       setLoading(false);
     })();
-  }, [handle, setConfig]);
+  }, [handleParam, typeParam, setConfig]);
 
   const onProductChange = (newHandle: string) => {
     const next = configs.find((c) => c.shopify_handle === newHandle);
     if (!next) return;
-    setParams({ handle: newHandle }, { replace: true });
+    const nextType: "poster" | "canvas" = next.product_type === "canvas" ? "canvas" : "poster";
+    setParams({ handle: newHandle, type: nextType }, { replace: true });
     setConfig(next);
   };
 

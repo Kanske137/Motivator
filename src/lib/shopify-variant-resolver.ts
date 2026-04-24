@@ -44,6 +44,12 @@ function cacheKey(handle: string, size: string, variant: string) {
   return `${handle}|${size}|${variant}`;
 }
 
+/** Invalidate the resolver cache — call after a template sync so newly
+ *  created variants become visible without a hard reload. */
+export function clearVariantResolverCache() {
+  cache.clear();
+}
+
 /**
  * Find a variant whose selectedOptions match BOTH size and variant value
  * (variant = frame name for posters / depth for canvas). Matching is case-

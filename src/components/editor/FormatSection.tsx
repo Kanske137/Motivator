@@ -1,6 +1,5 @@
-import { forwardRef } from "react";
+import { forwardRef, useMemo } from "react";
 import { useEditorStore } from "@/stores/editorStore";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -9,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { ProductConfig } from "@/lib/product-config";
+import { deriveTemplateSlug, type ProductConfig } from "@/lib/product-config";
 import { FrameOption } from "./FrameOption";
 import frameWhite from "@/assets/frames/frame-white.jpg";
 import frameOak from "@/assets/frames/frame-oak.jpg";
@@ -55,6 +54,21 @@ DepthIcon.displayName = "DepthIcon";
 export function FormatSection({ configs, activeHandle, onProductChange }: Props) {
   const { config, productOptions, size, variant, orientation, setSize, setVariant, setOrientation } = useEditorStore();
 
+  // Group configs by template_slug → only the configs from the SAME template
+  // appear in the Poster/Canvas toggle. This is what fixes the "third Poster
+  // option" bug: multiple templates no longer show up here.
+  const templateSlug = useMemo(
+    () => (config ? config.template_slug ?? deriveTemplateSlug(config.shopify_handle) : ""),
+    [config],
+  );
+
+  const sameTemplateConfigs = useMemo(() => {
+    if (!templateSlug) return [] as ProductConfig[];
+    return configs.filter(
+      (c) => (c.template_slug ?? deriveTemplateSlug(c.shopify_handle)) === templateSlug,
+    );
+  }, [configs, templateSlug]);
+
   if (!config) return null;
 
   const isCanvas = config.product_type === "canvas";
@@ -78,15 +92,26 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
 
   const currentVariantPrice = sizeDef?.variants.find((v) => v.name === variant)?.price ?? 0;
 
-  // Only show product types that are enabled in their template's productOptions.
-  // Fallback: always show the config's own product type.
-  const visibleConfigs = configs.filter((c) => {
-    const raw = (c as unknown as { template?: { productOptions?: { poster?: { enabled?: boolean }; canvas?: { enabled?: boolean } } } }).template;
-    const opts = raw?.productOptions;
-    if (!opts) return true; // legacy / no template
-    if (c.product_type === "canvas") return opts.canvas?.enabled !== false;
-    return opts.poster?.enabled !== false;
-  });
+  // Build a stable Poster/Canvas toggle from the template group (each kind
+  // shows up at most once even if multiple configs leak in).
+  type Kind = "poster" | "canvas";
+  const kindToConfig = new Map<Kind, ProductConfig>();
+  for (const c of sameTemplateConfigs) {
+    const k: Kind = c.product_type === "canvas" ? "canvas" : "poster";
+    if (!kindToConfig.has(k)) kindToConfig.set(k, c);
+  }
+
+  const toggleEntries: { kind: Kind; label: string; handle: string; active: boolean }[] = [];
+  for (const k of ["poster", "canvas"] as Kind[]) {
+    const c = kindToConfig.get(k);
+    if (!c) continue;
+    toggleEntries.push({
+      kind: k,
+      label: k === "poster" ? "Poster" : "Canvas",
+      handle: c.shopify_handle,
+      active: c.shopify_handle === activeHandle,
+    });
+  }
 
   // size price diffs use the current variant name (or first variant) for fair comparison
   const variantNameForCompare = variant ?? visibleVariants[0]?.name ?? sizeDef?.variants[0]?.name;
@@ -95,27 +120,25 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
 
   return (
     <div className="space-y-5">
-      {/* Produkt — segmented pill toggle. Hidden when only one product type is available. */}
-      {visibleConfigs.length > 1 && (
+      {/* Produkt — segmented pill toggle. Only renders when this template
+          actually has both a poster + canvas variant available. */}
+      {toggleEntries.length > 1 && (
         <div className="space-y-2">
           <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Produkt</Label>
           <div className="flex p-1 bg-muted rounded-full">
-            {visibleConfigs.map((c) => {
-              const active = c.shopify_handle === activeHandle;
-              return (
-                <button
-                  key={c.shopify_handle}
-                  onClick={() => onProductChange(c.shopify_handle)}
-                  className={`flex-1 h-10 rounded-full text-sm font-medium transition ${
-                    active
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-foreground/70 hover:text-foreground"
-                  }`}
-                >
-                  {c.product_type === "posters" ? "Poster" : "Canvas"}
-                </button>
-              );
-            })}
+            {toggleEntries.map((e) => (
+              <button
+                key={e.kind}
+                onClick={() => onProductChange(e.handle)}
+                className={`flex-1 h-10 rounded-full text-sm font-medium transition ${
+                  e.active
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-foreground/70 hover:text-foreground"
+                }`}
+              >
+                {e.label}
+              </button>
+            ))}
           </div>
         </div>
       )}

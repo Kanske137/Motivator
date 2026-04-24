@@ -1,12 +1,17 @@
 // Creates or updates a Shopify product to match a template stored in
 // product_configs. Uses the Shopify Admin GraphQL API.
 //
-// Input: { handle: string }
-// - handle = product_configs.shopify_handle
-// - We create/update a Shopify product with the same handle.
-// - Variants are the cartesian product of allowedSizes × (allowedFrames | allowedDepths)
-//   for each enabled product type. SKU = Gelato UID (portrait orientation).
-// - Prices come from the same tables used by the published Personlig Karta products.
+// Behaviour:
+// - One Shopify product per (template, product_type). Handles get a -poster
+//   or -canvas suffix when both kinds are enabled (so they remain separate
+//   products with their own variants — Shopify's 3-option-axis limit makes
+//   merging poster+canvas under one product impractical anyway).
+// - Variants are the cartesian product of allowedSizes × (allowedFrames|allowedDepths).
+//   SKU = Gelato UID (portrait orientation).
+// - Status: DRAFT. Vendor: empty. Tags: [template_slug, product_type, "personalized", "print-on-demand"].
+// - Online Store sales channel: published via publishablePublish.
+// - On update we sync productOptions (so newly-added sizes/frames actually
+//   become valid option-values BEFORE we try to bulk-create variants for them).
 import { corsHeaders } from "https://esm.sh/@supabase/supabase-js@2.95.0/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import skuMap from "../_shared/gelato-sku-map.json" with { type: "json" };
@@ -138,7 +143,7 @@ const GET_PRODUCT_BY_HANDLE = `
       id
       handle
       title
-      options { id name position values }
+      options { id name position values optionValues { id name } }
       variants(first: 100) {
         nodes { id sku title selectedOptions { name value } }
       }
@@ -158,6 +163,25 @@ const PRODUCT_UPDATE = `
     productUpdate(input: $input) {
       product { id handle }
       userErrors { field message }
+    }
+  }`;
+
+const PRODUCT_OPTION_UPDATE = `
+  mutation productOptionUpdate(
+    $productId: ID!
+    $option: OptionUpdateInput!
+    $optionValuesToAdd: [OptionValueCreateInput!]
+    $optionValuesToDelete: [ID!]
+    $variantStrategy: ProductOptionUpdateVariantStrategy
+  ) {
+    productOptionUpdate(
+      productId: $productId
+      option: $option
+      optionValuesToAdd: $optionValuesToAdd
+      optionValuesToDelete: $optionValuesToDelete
+      variantStrategy: $variantStrategy
+    ) {
+      userErrors { field message code }
     }
   }`;
 
@@ -185,12 +209,25 @@ const PRODUCT_VARIANTS_BULK_DELETE = `
     }
   }`;
 
+const PUBLICATIONS_QUERY = `
+  query publications {
+    publications(first: 25) {
+      nodes { id name }
+    }
+  }`;
+
+const PUBLISHABLE_PUBLISH = `
+  mutation publishablePublish($id: ID!, $input: [PublicationInput!]!) {
+    publishablePublish(id: $id, input: $input) {
+      userErrors { field message }
+    }
+  }`;
+
 function buildVariantInput(
   group: PlannedGroup,
   v: PlannedVariant,
 ): VariantInput {
   // Shopify Admin API 2025-07: sku/barcode/tracked all live inside inventoryItem.
-  // Top-level sku/barcode were removed from ProductVariantsBulkInput.
   return {
     optionValues: [
       { optionName: "Storlek", name: v.size },
@@ -205,6 +242,86 @@ function buildVariantInput(
   };
 }
 
+let cachedOnlineStorePublicationId: string | null = null;
+
+async function getOnlineStorePublicationId(): Promise<string | null> {
+  if (cachedOnlineStorePublicationId) return cachedOnlineStorePublicationId;
+  try {
+    const r = await shopifyAdmin<{ publications: { nodes: { id: string; name: string }[] } }>(
+      PUBLICATIONS_QUERY,
+    );
+    const onlineStore = r.publications.nodes.find((p) =>
+      /online store/i.test(p.name)
+    ) ?? r.publications.nodes[0];
+    cachedOnlineStorePublicationId = onlineStore?.id ?? null;
+    return cachedOnlineStorePublicationId;
+  } catch (e) {
+    console.warn("publications query failed", e);
+    return null;
+  }
+}
+
+async function publishToOnlineStore(productId: string): Promise<boolean> {
+  const pubId = await getOnlineStorePublicationId();
+  if (!pubId) return false;
+  try {
+    const r = await shopifyAdmin<{
+      publishablePublish: { userErrors: { message: string }[] };
+    }>(PUBLISHABLE_PUBLISH, { id: productId, input: [{ publicationId: pubId }] });
+    if (r.publishablePublish.userErrors.length) {
+      console.warn("publishablePublish errors", r.publishablePublish.userErrors);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.warn("publishablePublish failed", e);
+    return false;
+  }
+}
+
+/** Sync existing product's options so all desired sizes/frames exist as
+ *  option-values BEFORE we try to bulk-create variants that reference them.
+ *  Without this, productVariantsBulkCreate fails with "Option value 'Vit'
+ *  is not allowed". */
+async function syncProductOptions(
+  productId: string,
+  existing: { options: { id: string; name: string; values: string[] }[] },
+  group: PlannedGroup,
+) {
+  const desiredByOption: Record<string, string[]> = {
+    Storlek: [...new Set(group.variants.map((v) => v.size))],
+    [group.variantOptionName]: [
+      ...new Set(group.variants.map((v) => v.variant)),
+    ],
+  };
+
+  for (const optionName of Object.keys(desiredByOption)) {
+    const existingOpt = existing.options.find((o) => o.name === optionName);
+    if (!existingOpt) continue; // brand-new options would need productOptionsCreate; skip for now
+    const desired = desiredByOption[optionName];
+    const missing = desired.filter((v) => !existingOpt.values.includes(v));
+    if (missing.length === 0) continue;
+    try {
+      const r = await shopifyAdmin<{
+        productOptionUpdate: { userErrors: { message: string; code?: string }[] };
+      }>(PRODUCT_OPTION_UPDATE, {
+        productId,
+        option: { id: existingOpt.id },
+        optionValuesToAdd: missing.map((name) => ({ name })),
+        variantStrategy: "LEAVE_AS_IS",
+      });
+      if (r.productOptionUpdate.userErrors.length) {
+        console.warn(
+          `productOptionUpdate(${optionName}) userErrors`,
+          r.productOptionUpdate.userErrors,
+        );
+      }
+    } catch (e) {
+      console.warn(`productOptionUpdate(${optionName}) failed`, e);
+    }
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -217,7 +334,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Preflight: fail fast with a clear auth error before doing any work.
     await ensureShopifyAuth();
 
     const supabase = createClient(
@@ -227,7 +343,7 @@ Deno.serve(async (req) => {
 
     const { data: cfg, error } = await supabase
       .from("product_configs")
-      .select("title,shopify_handle,template")
+      .select("title,shopify_handle,template_slug,template")
       .eq("shopify_handle", body.handle)
       .maybeSingle();
     if (error || !cfg) {
@@ -236,6 +352,11 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // template_slug = mall-id som binder ihop poster+canvas-varianter
+    const templateSlug: string =
+      (cfg as { template_slug?: string }).template_slug ??
+      cfg.shopify_handle.replace(/-(poster|posters|canvas)$/i, "");
 
     const groups = plan(cfg.template);
     const totalVariants = groups.reduce((n, g) => n + g.variants.length, 0);
@@ -254,14 +375,21 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Multi-product-type templates: we create one Shopify product per kind so
-    // option-axes stay clean (Storlek+Ram for poster, Storlek+Djup for canvas).
     const results: any[] = [];
     for (const group of groups) {
-      const handleForKind =
-        groups.length === 1 ? cfg.shopify_handle : `${cfg.shopify_handle}-${group.kind}`;
+      // Always suffix the handle with the kind so poster + canvas stay
+      // separate products (Shopify cannot host them under one product
+      // because we'd hit the 3-option-axis limit when adding more axes
+      // later). Backwards-compat: if there's only one group AND the
+      // existing handle has no suffix, keep it unsuffixed.
+      const baseHandleHasNoSuffix = !/-(poster|posters|canvas)$/i.test(cfg.shopify_handle);
+      const handleForKind = groups.length === 1 && baseHandleHasNoSuffix
+        ? cfg.shopify_handle
+        : `${templateSlug}-${group.kind}`;
       const titleForKind =
         groups.length === 1 ? cfg.title : `${cfg.title} – ${group.productType}`;
+
+      const tags = [templateSlug, group.kind, "personalized", "print-on-demand"];
 
       const existing = (await shopifyAdmin<{
         productByHandle: null | {
@@ -273,6 +401,9 @@ Deno.serve(async (req) => {
 
       let productId: string;
       let mode: "create" | "update";
+      let variantsCreated = 0;
+      let variantsUpdated = 0;
+      let variantsDeleted = 0;
 
       if (!existing) {
         const created = await shopifyAdmin<{
@@ -283,6 +414,7 @@ Deno.serve(async (req) => {
             handle: handleForKind,
             productType: group.productType,
             status: "DRAFT",
+            tags,
             descriptionHtml: "<p>Personlig design — skapas i editorn.</p>",
             productOptions: [
               {
@@ -306,29 +438,39 @@ Deno.serve(async (req) => {
         productId = created.productCreate.product.id;
         mode = "create";
 
-        // Bulk-create the variants.
         const inputs = group.variants.map((v) => buildVariantInput(group, v));
         const bulk = await shopifyAdmin<{
           productVariantsBulkCreate: {
             productVariants: { id: string }[];
-            userErrors: { message: string }[];
+            userErrors: { message: string; field?: string[] }[];
           };
         }>(PRODUCT_VARIANTS_BULK_CREATE, { productId, variants: inputs });
         if (bulk.productVariantsBulkCreate.userErrors.length) {
+          // Hard-fail: previously these errors were swallowed silently and the
+          // product ended up with zero / a single default variant.
           throw new Error(
             `bulkCreate userErrors: ${bulk.productVariantsBulkCreate.userErrors
-              .map((e) => e.message)
+              .map((e) => `${(e.field ?? []).join(".")} ${e.message}`)
               .join("; ")}`,
           );
         }
+        variantsCreated = bulk.productVariantsBulkCreate.productVariants.length;
       } else {
         productId = existing.id;
         mode = "update";
 
-        // Update title in case it changed.
         await shopifyAdmin(PRODUCT_UPDATE, {
-          input: { id: productId, title: titleForKind, productType: group.productType },
+          input: {
+            id: productId,
+            title: titleForKind,
+            productType: group.productType,
+            tags,
+          },
         });
+
+        // Sync option-values FIRST so missing sizes/frames/depths exist before
+        // we try to add variants that reference them.
+        await syncProductOptions(productId, existing, group);
 
         // Reconcile variants by SKU.
         const existingBySku = new Map(
@@ -353,44 +495,63 @@ Deno.serve(async (req) => {
 
         if (toCreate.length) {
           const r = await shopifyAdmin<{
-            productVariantsBulkCreate: { userErrors: { message: string }[] };
+            productVariantsBulkCreate: {
+              productVariants: { id: string }[];
+              userErrors: { message: string; field?: string[] }[];
+            };
           }>(PRODUCT_VARIANTS_BULK_CREATE, { productId, variants: toCreate });
           if (r.productVariantsBulkCreate.userErrors.length) {
-            console.error("bulkCreate errors", r.productVariantsBulkCreate.userErrors);
+            throw new Error(
+              `bulkCreate(update) userErrors: ${r.productVariantsBulkCreate.userErrors
+                .map((e) => `${(e.field ?? []).join(".")} ${e.message}`)
+                .join("; ")}`,
+            );
           }
+          variantsCreated = r.productVariantsBulkCreate.productVariants.length;
         }
         if (toUpdate.length) {
           const r = await shopifyAdmin<{
-            productVariantsBulkUpdate: { userErrors: { message: string }[] };
+            productVariantsBulkUpdate: {
+              productVariants: { id: string }[];
+              userErrors: { message: string; field?: string[] }[];
+            };
           }>(PRODUCT_VARIANTS_BULK_UPDATE, { productId, variants: toUpdate });
           if (r.productVariantsBulkUpdate.userErrors.length) {
             console.error("bulkUpdate errors", r.productVariantsBulkUpdate.userErrors);
           }
+          variantsUpdated = r.productVariantsBulkUpdate.productVariants.length;
         }
         if (toDelete.length) {
-          // Avoid deleting the last remaining variant (Shopify requires ≥1).
           const remaining = existing.variants.nodes.length - toDelete.length + toCreate.length;
           if (remaining >= 1) {
             await shopifyAdmin(PRODUCT_VARIANTS_BULK_DELETE, {
               productId,
               variantsIds: toDelete,
             });
+            variantsDeleted = toDelete.length;
           }
         }
       }
+
+      // Publish to Online Store sales channel (idempotent).
+      const published = await publishToOnlineStore(productId);
 
       results.push({
         kind: group.kind,
         handle: handleForKind,
         productId,
         mode,
-        variants: group.variants.length,
+        plannedVariants: group.variants.length,
+        variantsCreated,
+        variantsUpdated,
+        variantsDeleted,
+        publishedToOnlineStore: published,
         skipped: group.skipped,
       });
     }
 
     return new Response(
-      JSON.stringify({ ok: true, results, skipped: allSkipped }),
+      JSON.stringify({ ok: true, templateSlug, results, skipped: allSkipped }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {

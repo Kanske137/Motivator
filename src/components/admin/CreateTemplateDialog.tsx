@@ -99,9 +99,14 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
     const template = buildSeedTemplate(kind);
     const productType = kind === "canvas" ? "canvas" : "posters";
 
+    // template_slug groups poster + canvas variants under one template.
+    const trimmedHandle = handle.trim();
+    const templateSlug = trimmedHandle.replace(/-(poster|posters|canvas)$/i, "");
+
     const { error } = await supabase.from("product_configs").insert({
       title: title.trim(),
-      shopify_handle: handle.trim(),
+      shopify_handle: trimmedHandle,
+      template_slug: templateSlug,
       product_type: productType,
       template: template as unknown as never,
       layouts: {} as unknown as never,
