@@ -28,6 +28,7 @@ import {
 import { createDefaultLayout, createLayer, moveLayer, normaliseZIndex } from "@/lib/layer-utils";
 import { Sparkles } from "lucide-react";
 import ProductOptionsSection from "@/components/admin/ProductOptionsSection";
+import ShopifyPublishingSection from "@/components/admin/ShopifyPublishingSection";
 import LayerCanvas from "@/components/admin/LayerCanvas";
 import LayerList, { toggleAllLocks } from "@/components/admin/LayerList";
 import LayerInspector from "@/components/admin/LayerInspector";
