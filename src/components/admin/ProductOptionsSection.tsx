@@ -15,6 +15,18 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { ProductConfig } from "@/lib/product-config";
 import type { AiStylePreset, ProductOptions } from "@/lib/template-schema";
 import { DEFAULT_PRODUCT_VARIANTS, mergeUnique } from "@/lib/product-defaults";
@@ -121,85 +133,87 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
   }, [value]);
 
   return (
-    <Card className="p-5 space-y-5">
-      <div>
-        <h2 className="text-base font-semibold">Produkt & varianter</h2>
-        <p className="text-xs text-muted-foreground">
-          Välj vilka produkter, storlekar och varianter den här mallen säljs som.
-        </p>
-      </div>
-
-      {missingSkus.length > 0 && (
-        <div className="flex items-start gap-2 rounded-md border border-dashed bg-muted/40 p-3 text-xs text-muted-foreground">
-          <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-          <span>
-            {missingSkus.length} variantkombination{missingSkus.length === 1 ? "" : "er"} saknar Gelato-SKU och
-            kommer hoppas över vid synk till Shopify (t.ex.{" "}
-            <code className="font-mono">{missingSkus[0].size} · {missingSkus[0].variant}</code>).
-          </span>
+    <div className="space-y-5">
+      <Card className="p-5 space-y-5">
+        <div>
+          <h2 className="text-base font-semibold">Produkt & varianter</h2>
+          <p className="text-xs text-muted-foreground">
+            Välj vilka produkter, storlekar och varianter den här mallen säljs som.
+          </p>
         </div>
-      )}
 
-      {/* Poster */}
-      <div className="space-y-3 rounded-md border p-4">
-        <div className="flex items-center justify-between">
-          <Label className="text-sm font-medium">Poster</Label>
-          <Switch
-            checked={value.poster?.enabled ?? false}
-            onCheckedChange={(c) => toggleEnabled("poster", c)}
-          />
-        </div>
-        {value.poster?.enabled && (
-          <div className="grid gap-4 md:grid-cols-2">
-            <ChecklistGroup
-              title="Tillåtna storlekar"
-              all={posterSizes}
-              selected={value.poster.allowedSizes}
-              onToggle={(item, c) => toggleListItem("poster", "allowedSizes", item, c)}
-            />
-            <ChecklistGroup
-              title="Tillåtna ramar"
-              all={posterFrames}
-              selected={value.poster.allowedFrames}
-              onToggle={(item, c) => toggleListItem("poster", "allowedFrames", item, c)}
-            />
+        {missingSkus.length > 0 && (
+          <div className="flex items-start gap-2 rounded-md border border-dashed bg-muted/40 p-3 text-xs text-muted-foreground">
+            <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+            <span>
+              {missingSkus.length} variantkombination{missingSkus.length === 1 ? "" : "er"} saknar Gelato-SKU och
+              kommer hoppas över vid synk till Shopify (t.ex.{" "}
+              <code className="font-mono">{missingSkus[0].size} · {missingSkus[0].variant}</code>).
+            </span>
           </div>
         )}
-      </div>
 
-      {/* Canvas */}
-      <div className="space-y-3 rounded-md border p-4">
-        <div className="flex items-center justify-between">
-          <Label className="text-sm font-medium">Canvas</Label>
-          <Switch
-            checked={value.canvas?.enabled ?? false}
-            onCheckedChange={(c) => toggleEnabled("canvas", c)}
-          />
-        </div>
-        {value.canvas?.enabled && (
-          <div className="grid gap-4 md:grid-cols-2">
-            <ChecklistGroup
-              title="Tillåtna storlekar"
-              all={canvasSizes}
-              selected={value.canvas.allowedSizes}
-              onToggle={(item, c) => toggleListItem("canvas", "allowedSizes", item, c)}
-            />
-            <ChecklistGroup
-              title="Tillåtna djup"
-              all={canvasDepths}
-              selected={value.canvas.allowedDepths}
-              onToggle={(item, c) => toggleListItem("canvas", "allowedDepths", item, c)}
+        {/* Poster */}
+        <div className="space-y-3 rounded-md border p-4">
+          <div className="flex items-center justify-between">
+            <Label className="text-sm font-medium">Poster</Label>
+            <Switch
+              checked={value.poster?.enabled ?? false}
+              onCheckedChange={(c) => toggleEnabled("poster", c)}
             />
           </div>
-        )}
-      </div>
+          {value.poster?.enabled && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <ChecklistGroup
+                title="Tillåtna storlekar"
+                all={posterSizes}
+                selected={value.poster.allowedSizes}
+                onToggle={(item, c) => toggleListItem("poster", "allowedSizes", item, c)}
+              />
+              <ChecklistGroup
+                title="Tillåtna ramar"
+                all={posterFrames}
+                selected={value.poster.allowedFrames}
+                onToggle={(item, c) => toggleListItem("poster", "allowedFrames", item, c)}
+              />
+            </div>
+          )}
+        </div>
 
-      {/* AI Styles */}
+        {/* Canvas */}
+        <div className="space-y-3 rounded-md border p-4">
+          <div className="flex items-center justify-between">
+            <Label className="text-sm font-medium">Canvas</Label>
+            <Switch
+              checked={value.canvas?.enabled ?? false}
+              onCheckedChange={(c) => toggleEnabled("canvas", c)}
+            />
+          </div>
+          {value.canvas?.enabled && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <ChecklistGroup
+                title="Tillåtna storlekar"
+                all={canvasSizes}
+                selected={value.canvas.allowedSizes}
+                onToggle={(item, c) => toggleListItem("canvas", "allowedSizes", item, c)}
+              />
+              <ChecklistGroup
+                title="Tillåtna djup"
+                all={canvasDepths}
+                selected={value.canvas.allowedDepths}
+                onToggle={(item, c) => toggleListItem("canvas", "allowedDepths", item, c)}
+              />
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* AI Styles — separate collapsible card */}
       <AiStylesEditor
         value={value.aiStyles ?? []}
         onChange={(aiStyles) => onChange({ ...value, aiStyles })}
       />
-    </Card>
+    </div>
   );
 }
 
@@ -211,6 +225,7 @@ function AiStylesEditor({
   onChange: (next: AiStylePreset[]) => void;
 }) {
   const presets = value.length === 0 ? DEFAULT_AI_STYLES : value;
+  const enabledCount = presets.filter((p) => p.enabled !== false).length;
 
   const updateAt = (idx: number, patch: Partial<AiStylePreset>) => {
     const next = presets.map((p, i) => (i === idx ? { ...p, ...patch } : p));
@@ -219,46 +234,52 @@ function AiStylesEditor({
   const removeAt = (idx: number) => onChange(presets.filter((_, i) => i !== idx));
   const addPreset = () => {
     const id = `style-${Date.now().toString(36)}`;
-    onChange([...presets, { id, label: "Ny stil", prompt: "Describe the artistic style here." }]);
+    onChange([...presets, { id, label: "Ny stil", enabled: true, prompt: "Describe the artistic style here." }]);
   };
   const seedDefaults = () => onChange([...DEFAULT_AI_STYLES]);
 
   return (
-    <div className="space-y-3 rounded-md border p-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <Label className="text-sm font-medium">AI-stilar</Label>
-          <p className="text-xs text-muted-foreground">
-            Stilar som kunden kan tillämpa på sin uppladdade bild.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {value.length === 0 && (
-            <Button type="button" variant="outline" size="sm" onClick={seedDefaults}>
-              Använd standard
-            </Button>
-          )}
-          <Button type="button" variant="outline" size="sm" onClick={addPreset}>
-            <Plus className="h-3.5 w-3.5 mr-1" />
-            Lägg till
-          </Button>
-        </div>
-      </div>
+    <Card className="p-0 overflow-hidden">
+      <Accordion type="single" collapsible defaultValue="">
+        <AccordionItem value="ai-styles" className="border-0">
+          <AccordionTrigger className="px-5 py-4 hover:no-underline">
+            <div className="text-left">
+              <h2 className="text-base font-semibold">AI-stilar</h2>
+              <p className="text-xs text-muted-foreground font-normal">
+                {enabledCount} av {presets.length} aktiverade. Stilar som kunden kan tillämpa på sin uppladdade bild.
+              </p>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-5 pb-5 space-y-3">
+            <div className="flex justify-end gap-2">
+              {value.length === 0 && (
+                <Button type="button" variant="outline" size="sm" onClick={seedDefaults}>
+                  Använd standard
+                </Button>
+              )}
+              <Button type="button" variant="outline" size="sm" onClick={addPreset}>
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Lägg till
+              </Button>
+            </div>
 
-      <div className="space-y-3">
-        {presets.map((p, i) => (
-          <AiStyleRow
-            key={p.id + i}
-            preset={p}
-            onChange={(patch) => updateAt(i, patch)}
-            onRemove={() => removeAt(i)}
-          />
-        ))}
-        {presets.length === 0 && (
-          <p className="text-xs text-muted-foreground">Inga AI-stilar konfigurerade.</p>
-        )}
-      </div>
-    </div>
+            <Accordion type="single" collapsible className="space-y-2">
+              {presets.map((p, i) => (
+                <AiStyleRow
+                  key={p.id + i}
+                  preset={p}
+                  onChange={(patch) => updateAt(i, patch)}
+                  onRemove={() => removeAt(i)}
+                />
+              ))}
+            </Accordion>
+            {presets.length === 0 && (
+              <p className="text-xs text-muted-foreground">Inga AI-stilar konfigurerade.</p>
+            )}
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    </Card>
   );
 }
 
@@ -273,6 +294,7 @@ function AiStyleRow({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const enabled = preset.enabled !== false;
 
   const handleUpload = async (file: File | undefined) => {
     if (!file) return;
@@ -296,58 +318,82 @@ function AiStyleRow({
   };
 
   return (
-    <div className="flex gap-3 rounded-md border bg-background p-3">
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        className="relative h-16 w-16 shrink-0 rounded-md overflow-hidden border bg-muted flex items-center justify-center"
-        aria-label="Ladda upp thumbnail"
-      >
-        {preset.thumbnailUrl ? (
-          <img src={preset.thumbnailUrl} alt={preset.label} className="h-full w-full object-cover" />
-        ) : (
-          <Upload className="h-4 w-4 text-muted-foreground" />
-        )}
-        {uploading && (
-          <div className="absolute inset-0 bg-background/70 flex items-center justify-center">
-            <Loader2 className="h-4 w-4 animate-spin" />
-          </div>
-        )}
-      </button>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        className="hidden"
-        onChange={(e) => handleUpload(e.target.files?.[0])}
-      />
-      <div className="flex-1 space-y-2 min-w-0">
-        <div className="flex items-center gap-2">
-          <Input
-            value={preset.label}
-            onChange={(e) => onChange({ label: e.target.value })}
-            placeholder="Etikett"
-            className="h-8 text-sm"
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-destructive shrink-0"
-            onClick={onRemove}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-        <Textarea
-          value={preset.prompt}
-          onChange={(e) => onChange({ prompt: e.target.value })}
-          rows={2}
-          placeholder="Prompt till AI-modellen…"
-          className="text-xs"
+    <AccordionItem value={preset.id} className="rounded-md border bg-background px-3">
+      <div className="flex items-center gap-2 py-1">
+        <Switch
+          checked={enabled}
+          onCheckedChange={(c) => onChange({ enabled: c })}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Aktivera ${preset.label}`}
         />
+        <AccordionTrigger className="flex-1 py-2 hover:no-underline">
+          <span className={`text-sm font-medium ${enabled ? "" : "text-muted-foreground line-through"}`}>
+            {preset.label}
+          </span>
+        </AccordionTrigger>
       </div>
-    </div>
+      <AccordionContent className="pb-3">
+        <div className="flex gap-3">
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => inputRef.current?.click()}
+                  className="relative h-16 w-16 shrink-0 rounded-md overflow-hidden border bg-muted flex items-center justify-center"
+                  aria-label="Ladda upp thumbnail"
+                >
+                  {preset.thumbnailUrl ? (
+                    <img src={preset.thumbnailUrl} alt={preset.label} className="h-full w-full object-cover" />
+                  ) : (
+                    <Upload className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  {uploading && (
+                    <div className="absolute inset-0 bg-background/70 flex items-center justify-center">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    </div>
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Thumbnail som visas för kunden i stilväljaren.</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(e) => handleUpload(e.target.files?.[0])}
+          />
+          <div className="flex-1 space-y-2 min-w-0">
+            <div className="flex items-center gap-2">
+              <Input
+                value={preset.label}
+                onChange={(e) => onChange({ label: e.target.value })}
+                placeholder="Etikett"
+                className="h-8 text-sm"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-destructive shrink-0"
+                onClick={onRemove}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <Textarea
+              value={preset.prompt}
+              onChange={(e) => onChange({ prompt: e.target.value })}
+              rows={2}
+              placeholder="Prompt till AI-modellen…"
+              className="text-xs"
+            />
+          </div>
+        </div>
+      </AccordionContent>
+    </AccordionItem>
   );
 }
 

@@ -196,6 +196,8 @@ export const aiStylePresetSchema = z.object({
   label: z.string().min(1),
   thumbnailUrl: z.string().url().optional(),
   prompt: z.string().min(1),
+  /** Per-template visibility toggle. Defaults to true for backwards-compat. */
+  enabled: z.boolean().optional().default(true),
 });
 export type AiStylePreset = z.infer<typeof aiStylePresetSchema>;
 
