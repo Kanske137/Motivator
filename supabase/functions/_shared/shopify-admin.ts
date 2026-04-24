@@ -2,12 +2,15 @@
 //
 // Token resolution order (deterministic, with logging of source name only,
 // never the value):
-//   1. SHOPIFY_ONLINE_ACCESS_TOKEN:user:<uid>  (Lovable Shopify integration)
-//   2. SHOPIFY_ADMIN_ACCESS_TOKEN              (manually-provisioned admin token)
-//   3. SHOPIFY_ACCESS_TOKEN                    (legacy fallback)
+//   1. shopify_app_installations DB row for the active shop  (Dev Dashboard OAuth install)
+//   2. SHOPIFY_ONLINE_ACCESS_TOKEN:user:<uid>                (Lovable Shopify integration)
+//   3. SHOPIFY_ADMIN_ACCESS_TOKEN                            (manually-provisioned admin token)
+//   4. SHOPIFY_ACCESS_TOKEN                                  (legacy fallback)
 //
 // On the first call per cold start, we run a tiny `{ shop { name } }` query to
 // verify auth. The result is cached in-memory so subsequent calls are cheap.
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 
 export const SHOPIFY_API_VERSION = "2025-07";
 
@@ -42,24 +45,63 @@ interface TokenPick {
   source: string;
 }
 
-export function pickShopifyToken(): TokenPick {
-  // 1. Online token from the Lovable Shopify integration.
+let dbTokenCache: { token: string; source: string; ts: number } | null = null;
+const DB_TOKEN_TTL_MS = 5 * 60 * 1000;
+
+async function tryDbToken(domain: string): Promise<TokenPick | null> {
+  if (dbTokenCache && Date.now() - dbTokenCache.ts < DB_TOKEN_TTL_MS) {
+    return { token: dbTokenCache.token, source: dbTokenCache.source };
+  }
+  const url = Deno.env.get("SUPABASE_URL");
+  const srk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !srk) return null;
+
+  try {
+    const supabase = createClient(url, srk);
+    const { data, error } = await supabase
+      .from("shopify_app_installations")
+      .select("access_token")
+      .eq("shop_domain", domain)
+      .maybeSingle();
+    if (error || !data?.access_token) return null;
+    const source = `shopify_app_installations:${domain}`;
+    dbTokenCache = { token: data.access_token, source, ts: Date.now() };
+    return { token: data.access_token, source };
+  } catch (e) {
+    console.warn("[shopify-auth] db token lookup failed", e);
+    return null;
+  }
+}
+
+function pickEnvToken(): TokenPick | null {
+  // 2. Online token from the Lovable Shopify integration.
   for (const [k, v] of Object.entries(Deno.env.toObject())) {
     if (k.startsWith("SHOPIFY_ONLINE_ACCESS_TOKEN") && v) {
       return { token: v, source: k };
     }
   }
-  // 2. Manually-provisioned admin token.
+  // 3. Manually-provisioned admin token.
   const admin = Deno.env.get("SHOPIFY_ADMIN_ACCESS_TOKEN");
   if (admin) return { token: admin, source: "SHOPIFY_ADMIN_ACCESS_TOKEN" };
-  // 3. Legacy fallback.
+  // 4. Legacy fallback.
   const legacy = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
   if (legacy) return { token: legacy, source: "SHOPIFY_ACCESS_TOKEN" };
+  return null;
+}
+
+export async function pickShopifyToken(): Promise<TokenPick> {
+  const domain = getShopifyDomain();
+  // 1. DB-stored token from Dev Dashboard OAuth install.
+  const dbTok = await tryDbToken(domain);
+  if (dbTok) return dbTok;
+
+  const envTok = pickEnvToken();
+  if (envTok) return envTok;
 
   throw makeAuthError(
     "no_token",
-    "Ingen Shopify Admin-token hittades i backend-secrets. " +
-      "Återanslut Shopify-integrationen eller lägg till SHOPIFY_ADMIN_ACCESS_TOKEN.",
+    "Ingen Shopify Admin-token hittades. Installera Shopify-appen via 'Installera Shopify-app' i admin, " +
+      "eller lägg till SHOPIFY_ADMIN_ACCESS_TOKEN.",
   );
 }
 
@@ -67,7 +109,7 @@ let preflightOk: { source: string; domain: string } | null = null;
 
 export async function ensureShopifyAuth(): Promise<{ source: string; domain: string }> {
   if (preflightOk) return preflightOk;
-  const { token, source } = pickShopifyToken();
+  const { token, source } = await pickShopifyToken();
   const domain = getShopifyDomain();
   console.log(`[shopify-auth] preflight using source=${source} domain=${domain}`);
 
@@ -127,7 +169,7 @@ export async function shopifyAdmin<T>(
   variables: Record<string, unknown> = {},
 ): Promise<T> {
   const { domain } = await ensureShopifyAuth();
-  const { token } = pickShopifyToken();
+  const { token } = await pickShopifyToken();
 
   const r = await fetch(
     `https://${domain}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`,

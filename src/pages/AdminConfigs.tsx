@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { loadAllConfigs, type ProductConfig } from "@/lib/product-config";
-import { Loader2, ExternalLink, Zap, Pencil, Plus } from "lucide-react";
+import { Loader2, ExternalLink, Zap, Pencil, Plus, CheckCircle2, AlertCircle, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { resolveTemplate } from "@/lib/template-migrate";
@@ -15,11 +15,26 @@ interface ConfigWithTemplate extends ProductConfig {
   __template: Template;
 }
 
+interface InstallStatus {
+  shop: string;
+  installed: boolean;
+  scopes: string | null;
+  installedAt: string | null;
+}
+
 export default function AdminConfigs() {
   const [configs, setConfigs] = useState<ConfigWithTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [installing, setInstalling] = useState(false);
+  const [installStatus, setInstallStatus] = useState<InstallStatus | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [searchParams] = useSearchParams();
+
+  const refreshInstallStatus = async () => {
+    const { data, error } = await supabase.functions.invoke("shopify-oauth-status");
+    if (!error && data) setInstallStatus(data as InstallStatus);
+  };
 
   useEffect(() => {
     (async () => {
@@ -32,7 +47,36 @@ export default function AdminConfigs() {
       setConfigs(enriched);
       setLoading(false);
     })();
+    refreshInstallStatus();
   }, []);
+
+  useEffect(() => {
+    if (searchParams.get("installed") === "1") {
+      toast.success("Shopify-app installerad ✓");
+      refreshInstallStatus();
+    }
+  }, [searchParams]);
+
+  const startInstall = async () => {
+    setInstalling(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("shopify-oauth-install", {
+        body: {},
+      });
+      if (error || !data?.installUrl) {
+        toast.error("Kunde inte starta installationen", {
+          description: error?.message ?? data?.error ?? "okänt fel",
+        });
+        return;
+      }
+      window.open(data.installUrl as string, "_blank", "noopener,noreferrer");
+      toast.info("Installationsfönster öppnat", {
+        description: "Godkänn appen i Shopify-fliken — sidan uppdateras automatiskt vid retur.",
+      });
+    } finally {
+      setInstalling(false);
+    }
+  };
 
   const syncToShopify = async () => {
     setSyncing(true);
@@ -61,19 +105,46 @@ export default function AdminConfigs() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h1 className="text-xl font-bold">Produktkonfigurationer</h1>
-            <p className="text-sm text-muted-foreground">Layouter, kartstilar, storlekar och Gelato-mappning</p>
+        <div className="max-w-5xl mx-auto px-4 py-4 space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h1 className="text-xl font-bold">Produktkonfigurationer</h1>
+              <p className="text-sm text-muted-foreground">Layouter, kartstilar, storlekar och Gelato-mappning</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setCreateOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Skapa ny mall
+              </Button>
+              <Button onClick={syncToShopify} disabled={syncing || !installStatus?.installed}>
+                {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
+                Synka till Shopify
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Skapa ny mall
-            </Button>
-            <Button onClick={syncToShopify} disabled={syncing}>
-              {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
-              Synka till Shopify
+
+          {/* Shopify app install status */}
+          <div className="flex items-center justify-between gap-3 flex-wrap rounded-md border bg-muted/30 px-3 py-2 text-sm">
+            <div className="flex items-center gap-2 min-w-0">
+              {installStatus?.installed ? (
+                <>
+                  <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                  <span className="truncate">
+                    Shopify-app installerad på <span className="font-mono">{installStatus.shop}</span>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="h-4 w-4 text-destructive shrink-0" />
+                  <span className="truncate">
+                    Shopify-app ej installerad{installStatus?.shop ? <> på <span className="font-mono">{installStatus.shop}</span></> : null} — synkning är inaktiverad tills appen är installerad.
+                  </span>
+                </>
+              )}
+            </div>
+            <Button size="sm" variant={installStatus?.installed ? "outline" : "default"} onClick={startInstall} disabled={installing}>
+              {installing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
+              {installStatus?.installed ? "Installera om" : "Installera Shopify-app"}
             </Button>
           </div>
         </div>
