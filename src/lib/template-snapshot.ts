@@ -491,7 +491,11 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
     } else if (layer.type === "line") {
       drawLineLayer(ctx, rect, layer, pxPerMm);
     } else if (layer.type === "margin") {
-      drawMarginLayer(ctx, rect, layer, pxPerMm);
+      // Margin always covers the FULL canvas (incl. bleed/wrap) regardless of
+      // the layer's stored xy/wh. Thickness is % of the canvas short side.
+      const fullRect = { x: 0, y: 0, w, h };
+      const shortPx = Math.min(w, h);
+      drawMarginLayer(ctx, fullRect, layer, pxPerMm, shortPx);
     }
   }
 
