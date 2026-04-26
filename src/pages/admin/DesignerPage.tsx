@@ -43,6 +43,46 @@ export default function DesignerPage() {
   const [orientation, setOrientation] = useState<Orientation>("portrait");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  // Session-only undo stack: snapshots of `template` before each mutation.
+  // Cleared on page reload (intentional — user explicitly asked).
+  const historyRef = useRef<Template[]>([]);
+  const [canUndo, setCanUndo] = useState(false);
+
+  // Wrap setTemplate so every mutating call records the previous state.
+  function commitTemplate(next: Template) {
+    setTemplate((prev) => {
+      if (prev) {
+        historyRef.current.push(prev);
+        if (historyRef.current.length > 50) historyRef.current.shift();
+        setCanUndo(true);
+      }
+      return next;
+    });
+  }
+
+  function undo() {
+    const prev = historyRef.current.pop();
+    if (!prev) return;
+    setTemplate(prev);
+    setCanUndo(historyRef.current.length > 0);
+    setSelectedId(null);
+  }
+
+  // Cmd/Ctrl+Z keyboard shortcut
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   async function syncToShopify() {
     if (!handle) return;
     setSyncing(true);
