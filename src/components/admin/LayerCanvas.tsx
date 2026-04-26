@@ -12,7 +12,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Rnd } from "react-rnd";
 import type { Aspect, TemplateLayer } from "@/lib/template-schema";
-import { clampLayerBounds, snapPct } from "@/lib/layer-utils";
+import {
+  clampLayerBounds,
+  snapPct,
+  snapLineToOtherLines,
+  extendLineToMeetCorners,
+} from "@/lib/layer-utils";
 import AlignmentGuides from "./AlignmentGuides";
 import MapLayerPreview from "./MapLayerPreview";
 import TextLayerPreview from "./TextLayerPreview";
