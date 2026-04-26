@@ -306,8 +306,8 @@ export default function LayerCanvas({
               className={
                 isSelected
                   ? "ring-2 ring-primary ring-offset-1"
-                  : isMargin
-                  ? "" // no ring for margin (would draw across the whole canvas)
+                  : isMargin || isShapeFrame
+                  ? "" // no ring for margin / frame shapes — Rnd is pointer-events:none so :hover never fires; selection is shown via the stroke itself + name tag
                   : "ring-1 ring-border/60 hover:ring-primary/50"
               }
             >
