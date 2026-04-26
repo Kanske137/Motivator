@@ -487,7 +487,7 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
         }
       }
     } else if (layer.type === "line") {
-      drawLineLayer(ctx, rect, layer, pxPerMm);
+      drawLineLayer(ctx, rect, layer, pxPerMm, Math.min(frontPxW, frontPxH));
     } else if (layer.type === "margin") {
       // Margin frames the FRONT zone only — never the wrap/bleed band. This
       // matches the editor's dashed "Synlig framsida" rectangle and keeps the
