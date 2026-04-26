@@ -196,11 +196,21 @@ export default function LayerCanvas({
           //   along the LENGTH axis (thickness is set via Inspector).
           const isMargin = layer.type === "margin";
           const isLine = layer.type === "line";
+          const isShape = layer.type === "shape";
+          const shapeKind = isShape
+            ? (layer as Extract<TemplateLayer, { type: "shape" }>).defaults.kind
+            : null;
+          const shapeIsLineH = shapeKind === "line-horizontal";
+          const shapeIsLineV = shapeKind === "line-vertical";
           const lineHorizontal =
-            isLine && (layer as Extract<TemplateLayer, { type: "line" }>).defaults.orientation === "horizontal";
-          const lineVertical = isLine && !lineHorizontal;
+            (isLine && (layer as Extract<TemplateLayer, { type: "line" }>).defaults.orientation === "horizontal") ||
+            shapeIsLineH;
+          const lineVertical =
+            (isLine && !((layer as Extract<TemplateLayer, { type: "line" }>).defaults.orientation === "horizontal")) ||
+            shapeIsLineV;
+          const isThinLine = isLine || shapeIsLineH || shapeIsLineV;
 
-          const enableResizing = isLine
+          const enableResizing = isThinLine
             ? {
                 top: lineVertical,
                 bottom: lineVertical,
@@ -216,8 +226,8 @@ export default function LayerCanvas({
           const rndStyle: React.CSSProperties = {
             zIndex: layer.zIndex + 1,
             ...(isMargin ? { pointerEvents: "none" as const } : {}),
-            ...(isLine && lineHorizontal ? { minHeight: 24 } : {}),
-            ...(isLine && lineVertical ? { minWidth: 24 } : {}),
+            ...(isThinLine && lineHorizontal ? { minHeight: 24 } : {}),
+            ...(isThinLine && lineVertical ? { minWidth: 24 } : {}),
           };
 
           return (
