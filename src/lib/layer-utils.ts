@@ -344,6 +344,31 @@ export function createLayer(type: LayerType, existing: TemplateLayer[]): Templat
         defaults: { shape: "rect", fit: "cover" },
         locks: defaultLocks({ content: false, shape: false }),
       };
+    case "shape":
+      return {
+        ...base,
+        xPct: 10,
+        yPct: 10,
+        wPct: 80,
+        hPct: 80,
+        type: "shape",
+        name: `Figur ${countOfType(existing, "shape") + 1}`,
+        defaults: {
+          kind: "frame-rect",
+          strokeMm: 2,
+          color: "#1A1A1A",
+        },
+        // Admin-only — fully locked from the customer.
+        locks: defaultLocks({
+          position: true,
+          size: true,
+          shape: true,
+          content: true,
+          font: true,
+          visibility: true,
+          style: true,
+        }),
+      };
   }
 }
 
