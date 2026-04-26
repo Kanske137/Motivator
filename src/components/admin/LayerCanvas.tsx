@@ -128,7 +128,7 @@ export default function LayerCanvas({
           </div>
         );
       case "line":
-        return <LineLayerView layer={layer} />;
+        return <LineLayerView layer={layer} thicknessPx={lineThicknessPxFromCanvas(layer, Math.min(size.w, size.h))} />;
       case "margin":
         return <MarginLayerView layer={layer} />;
       case "photo": {
