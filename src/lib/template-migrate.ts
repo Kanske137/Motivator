@@ -160,7 +160,11 @@ export function resolveTemplate(
   if (isEmptyTemplate(rawTemplate)) {
     return { template: migrateTemplate(buildTemplateFromLegacy(config)), fellBack: true };
   }
-  const parsed = parseTemplate(rawTemplate);
+  // Coerce legacy margin (thicknessMm → thicknessPct) before parsing.
+  const preCoerced = coerceLegacyMargin(
+    typeof rawTemplate === "object" ? JSON.parse(JSON.stringify(rawTemplate)) : rawTemplate,
+  );
+  const parsed = parseTemplate(preCoerced);
   if (parsed.ok === true) {
     return { template: migrateTemplate(parsed.template), fellBack: false };
   }
