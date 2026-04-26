@@ -202,6 +202,12 @@ export default function DesignerPage() {
     setSelectedId(nextLayer.id);
   }
 
+  function addShape(kind: ShapeKind) {
+    const nextLayer = createShapeLayer(kind, layers);
+    setLayers(normaliseZIndex([...layers, nextLayer]));
+    setSelectedId(nextLayer.id);
+  }
+
   function updateLayer(updated: TemplateLayer) {
     setLayers(layers.map((l) => (l.id === updated.id ? updated : l)));
   }
@@ -460,10 +466,38 @@ export default function DesignerPage() {
                 <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
                 Lägg till bild
               </Button>
-              <Button size="sm" variant="outline" onClick={() => addLayer("line")}>
-                <Minus className="h-3.5 w-3.5 mr-1.5" />
-                Lägg till linje
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline">
+                    <Shapes className="h-3.5 w-3.5 mr-1.5" />
+                    Lägg till figur
+                    <ChevronDown className="h-3 w-3 ml-1 opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => addShape("line-horizontal")}>
+                    <Minus className="h-3.5 w-3.5 mr-2" /> Horisontell linje
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => addShape("line-vertical")}>
+                    <Minus className="h-3.5 w-3.5 mr-2 rotate-90" /> Vertikal linje
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => addShape("frame-rect")}>
+                    <Square className="h-3.5 w-3.5 mr-2" /> Rektangulär ram
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => addShape("frame-oval")}>
+                    <Square className="h-3.5 w-3.5 mr-2 rounded-full" /> Oval ram
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => addShape("frame-rounded")}>
+                    <Square className="h-3.5 w-3.5 mr-2" /> Rundad ram
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => addShape("frame-double")}>
+                    <Square className="h-3.5 w-3.5 mr-2" /> Dubbel ram
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => addShape("frame-corners")}>
+                    <Square className="h-3.5 w-3.5 mr-2" /> Hörn-dekoration
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button size="sm" variant="outline" onClick={() => addLayer("margin")}>
                 <Square className="h-3.5 w-3.5 mr-1.5" />
                 Lägg till marginal
