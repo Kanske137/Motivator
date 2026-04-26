@@ -132,6 +132,8 @@ export default function LayerCanvas({
         return <LineLayerView layer={layer} thicknessPx={lineThicknessPxFromCanvas(layer, Math.min(size.w, size.h))} />;
       case "margin":
         return <MarginLayerView layer={layer} />;
+      case "shape":
+        return <ShapeLayerView layer={layer} canvasShortPx={Math.min(size.w, size.h)} />;
       case "photo": {
         const clipPath =
           layer.defaults.shape === "circle" ? "circle(50% at 50% 50%)" : undefined;
