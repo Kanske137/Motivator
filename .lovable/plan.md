@@ -1,67 +1,52 @@
 
-# Vit marginal + linjer — admin-only
+# Fix: marginal stjäl klick + linjer går inte att flytta
 
-Ja, jag förstår precis. Två nya admin-styrda designelement som blir en del av mallen — kunden ser dem men kan aldrig röra dem.
+Två separata buggar i admin-canvasen, båda orsakade av hur Rnd-wrappers och layer-renderare hanterar pointer-events.
 
-## Vad som finns idag (snabb status)
+## Problem 1 — Marginal blockerar klick på kartan
 
-- `margin` och `line` finns redan som lagertyper i schemat (`template-schema.ts`) och renderas i kund-vyn via `StaticLayers.tsx`. ✅
-- `LayerInspector` har **ingen** redigeringspanel för dessa två typer ännu — de kan skapas men inte konfigureras. ❌
-- Print-pipelinen (edge function `generate-print-file`) ritar **inte** marginal/linje på den slutliga tryckfilen. ❌
-- Modellen för marginaltjocklek är `thicknessMm` (millimeter) — vilket inte ger samma visuella tjocklek på 30×40 vs 50×70. Du vill ha **procent**, så att den skalar symmetriskt med motivet.
+**Orsak**: Marginal-lagret har `xPct/yPct/wPct/hPct = 0,0,100,100` och dess Rnd-wrapper ligger överst (högst zIndex). Hela ytan — inklusive den **transparenta mitten** mellan de fyra vita kanterna — fångar pointer-events. När admin (eller kund) försöker dra/zooma kartan under hamnar klicken på marginal-lagret istället.
 
-## Designbeslut
+**Lösning** (admin + kund):
 
-**Vit marginal** (en per mall, men tekniskt får man lägga flera):
-- Tjocklek anges i **% av kortaste sidan** → garanterar identiskt avstånd på alla fyra kanter oavsett aspekt (3:4, 4:3, 1:1).
-- Färg: standard `#FFFFFF`, men valbar (du kan vilja ha svart marginal nån gång).
-- Position låst till `0,0,100,100` (täcker hela motivet) — användaren behöver bara välja tjocklek + färg.
-- Renderas **ovanpå** allt annat innehåll (högst zIndex), så det "klipper" motivet visuellt.
+1. **Kund-vy (`StaticLayers.tsx` → `MarginLayerView`)**: Sätt `pointer-events: none` på hela container-diven. Marginalen är ren visuell dekor för kunden och ska aldrig ta emot klick.
 
-**Linjer** (fri placering):
-- Tjocklek i **mm** (behålls — linjer är typiskt tunna detaljer där absolut tjocklek matters).
-- Längd + position styrs via vanliga `xPct/yPct/wPct/hPct` — exakt som vilket lager som helst.
-- Orientering: horisontell / vertikal.
-- Färg: standard `#000000` (ändrar default från nuvarande `#1A1A1A`).
+2. **Admin-vy (`LayerCanvas.tsx`)**: När `layer.type === "margin"` ska Rnd-wrappern bara fånga events på de fyra vita kantremsorna, inte i mitten. Två rimliga vägar:
+   - **A (enklast)**: Wrappa `Rnd` i logik som sätter `style={{ pointerEvents: "none" }}` på själva Rnd-elementet för margin-lager, men `pointer-events: auto` på de fyra inre kantremsorna. Selection sker då genom att klicka på själva kanten (vilket är intuitivt — det är ju där marginalen ligger).
+   - **B (alternativ)**: Behåll Rnd som vanligt men lägg en separat "selection hit-area" bara på kanterna. Mer kod, ingen tydlig vinst.
+   
+   → Går på **A**.
 
-**Kund-låsning**: alla locks (`position`, `size`, `shape`, `content`, `style`, `visibility`) sätts till `true` som default vid skapande. Kund-editorn rör redan inte `margin`/`line` lager — de ritas bara ut. Vi behöver bara säkerställa att admin inte råkar låsa upp dem.
+3. **`renderLayerContent` för margin**: De fyra fyllda div:arna inuti `MarginLayerView` får `pointer-events: auto` så att admin fortfarande kan klicka för att selecta marginalen via dess synliga kant.
 
-## Implementation (ordning)
+## Problem 2 — Linjer går bara att resiza, inte flytta
 
-### 1. Schema (`src/lib/template-schema.ts`)
-- Byt `marginDefaultsSchema.thicknessMm` → `thicknessPct` (number, 0–25).
-- Behåll `lineDefaultsSchema.thicknessMm` som det är.
-- Lägg till en migrering i `template-migrate.ts` som konverterar gamla `thicknessMm` → `thicknessPct` (anta ~5% som default vid läsning av gamla mallar).
+**Orsak**: En horisontell linje med `hPct ≈ 1` blir bara ~5–8px hög i admin-canvasen. Hela den ytan täcks av Rnd:s resize-handles (top/bottom edges + corners), så det finns ingen "mitt" kvar att greppa för drag.
 
-### 2. Factories (`src/lib/layer-utils.ts`)
-- Margin-default: `{ thicknessPct: 5, color: "#FFFFFF" }`, alla locks `true`.
-- Line-default: ändra färg till `#000000`, alla locks `true`.
+**Lösning** (`LayerCanvas.tsx`):
 
-### 3. Renderer (`src/components/editor/layers/StaticLayers.tsx`)
-- `MarginLayerView`: rita fyra rektanglar (top/right/bottom/left) eller en `box-shadow inset` där tjockleken = `thicknessPct%` av canvas-kortsidan. Detta måste lyftas en nivå upp eftersom komponenten idag bara ser sin egen `inset:0`-box, inte vilken sida som är kortast. Lösning: skicka in `canvasShortSidePx` som prop från `MapPreview` och räkna ut tjockleken där.
-- `LineLayerView`: oförändrad logik, men säkerställ att färg appliceras korrekt.
+1. **Osynlig hit-area runt linjen**: För `layer.type === "line"`, rendera en transparent "padding-zon" på ~10–12px runt själva linjen inuti Rnd-boxen. Själva Rnd-boxen får en minsta interaktiv höjd/bredd (`minHeight: 24px` för horisontell, `minWidth: 24px` för vertikal) **men endast visuellt för admin** — det sparade `hPct/wPct`-värdet ändras inte.
 
-### 4. Inspector (`src/components/admin/LayerInspector.tsx`)
-- Lägg till två nya redigeringsblock som visas när `layer.type === "margin"` resp. `"line"`:
-  - **Margin**: Slider för `thicknessPct` (0–25%), färgväljare (`<input type="color">`), info-text "Marginalen är låst till motivets kant och rörs inte av kunden."
-  - **Line**: Select för orientering (horisontell/vertikal), number-input för `thicknessMm` (0.5–20), färgväljare. Position/storlek redigeras redan via befintliga fält.
-- Dölj lock-toggles för dessa två typer (de är alltid låsta för kunden) — eller visa dem som info-tags ("Alltid låst").
+   Konkret: ge Rnd en `style={{ minHeight: layer.type === "line" && layer.defaults.orientation === "horizontal" ? 24 : undefined, minWidth: layer.type === "line" && layer.defaults.orientation === "vertical" ? 24 : undefined }}`. Linjen själv (`LineLayerView`) renderas centrerat inuti, och resten är transparent drag-yta.
 
-### 5. Print-pipeline (`supabase/functions/generate-print-file/index.ts`)
-- Lägg till två nya rendering-grenar i layer-loopen:
-  - **margin**: rita en ifylld ram i angiven färg, tjocklek = `thicknessPct/100 * min(canvasW, canvasH)`. Ritas **sist** så den ligger överst.
-  - **line**: rita en fylld rektangel med beräknade px-mått, tjocklek = `thicknessMm * pxPerMm`.
-- Båda måste respektera kanvas-bleed precis som befintliga lager.
+2. **Begränsa resize-handles för linjer**: 
+   - Horisontell linje → bara `left` + `right` handles (tjocklek styrs via `thicknessMm` i Inspector, inte via drag).
+   - Vertikal linje → bara `top` + `bottom` handles.
+   - Sätts via Rnd:s `enableResizing={{ left: true, right: true, top: false, ... }}`-prop.
+   
+   Det här gör att resten av hit-arean (mitten + de inaktiva sidorna) reserveras för **drag**, vilket är exakt det användaren vill.
 
-### 6. Admin-canvas (`src/components/admin/LayerCanvas.tsx`)
-- Visa marginal/linje med samma renderare som kund-vyn (snyggast: importera `MarginLayerView`/`LineLayerView`). Idag visas de bara som en label-platshållare.
+3. **Cursor-feedback**: `cursor: move` på drag-zonen, `cursor: ew-resize`/`ns-resize` på de aktiva handles (Rnd sköter det redan men värt att verifiera).
 
-## Kund-säkerhet
+## Sammanfattning av ändringar
 
-Inget UI behöver byggas på kundsidan — `ControlPanel` och `MapPreview` itererar redan layers och hoppar över allt utom `map`/`text`/`photo` när det gäller redigeringskontroller. Marginal/linje renderas bara visuellt. Locks är "bälte och hängslen".
+| Fil | Ändring |
+|---|---|
+| `src/components/editor/layers/StaticLayers.tsx` | `MarginLayerView`: `pointer-events: none` på containern. |
+| `src/components/admin/LayerCanvas.tsx` | För `margin`: Rnd får `pointerEvents: none`, kanterna `pointerEvents: auto`. För `line`: minsta hit-area 24px + begränsade resize-handles (bara längd-axeln). |
 
-## Frågor innan jag kör
+Inget i print-pipelinen, schemat eller kund-editorns kontrollpanel påverkas. Kunden kan ändå inte interagera med marginal/linje (locks är `true`) — fixen för marginalen i kund-vyn handlar bara om att inte blockera klick på kartan under.
 
-1. **Marginal-tjocklek max 25%** — räcker det, eller vill du kunna gå ända till 40% för retro-look-ramar?
-2. **Endast en marginal per mall, eller får admin lägga flera** (t.ex. dubbel ram)? Jag föreslår att tillåta flera (enkelt schemamässigt) men inte bygga någon special-UI för det.
-3. **Migrering av befintliga marginal-lager**: Finns det idag några sparade marginal-lager i databasen vi behöver konvertera, eller är funktionen oanvänd? (Jag kan kolla med en read-query om du säger till.)
+## Frågor
+
+Inga — beteendet är entydigt utifrån din beskrivning. Säg **kör** så implementerar jag.

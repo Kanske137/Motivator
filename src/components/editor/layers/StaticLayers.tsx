@@ -61,11 +61,15 @@ export function MarginLayerView({
   const common: React.CSSProperties = {
     position: "absolute",
     background: d.color,
+    pointerEvents: "auto",
   };
   return (
+    // Container is pointer-events:none so the transparent middle never steals
+    // clicks/drags from layers underneath (e.g. map). Only the four filled
+    // edge strips opt back in via pointer-events:auto.
     <div
-      className="absolute inset-0 pointer-events-none"
-      style={{ containerType: "size" }}
+      className="absolute inset-0"
+      style={{ containerType: "size", pointerEvents: "none" }}
     >
       <div style={{ ...common, top: 0, left: 0, right: 0, height: thick }} />
       <div style={{ ...common, bottom: 0, left: 0, right: 0, height: thick }} />
