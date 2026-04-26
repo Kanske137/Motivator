@@ -41,7 +41,7 @@ export function ShapeLayerView({ layer, canvasShortPx }: Props) {
   const H = box.h;
 
   return (
-    <div ref={ref} className="absolute inset-0 pointer-events-none">
+    <div ref={ref} className="absolute inset-0" style={{ pointerEvents: "none" }}>
       {(() => {
         if (d.kind === "line-horizontal") {
           return (
