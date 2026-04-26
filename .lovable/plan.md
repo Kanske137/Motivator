@@ -1,44 +1,29 @@
-## Problemet (root cause)
+## Problem
+Shape-lager (ramar: rect, oval, rounded, double, corners + linjer) ligger ofta ovanpå karta/text. `Rnd`-wrappern runt shape-lagret fångar alla klick/drag i hela bounding-boxen — även i den tomma mitten av en ram — vilket gör att man inte kan markera kart- eller textlager innuti ramen.
 
-I databasen finns två rader för "Mitt hjärta": `mitt-hjarta-poster` (product_type=`posters`) och `mitt-hjarta-canvas` (product_type=`canvas`). Båda har samma `template_slug=mitt-hjarta`.
+Margin-lagret är redan löst på samma sätt: `Rnd` får `pointerEvents: "none"` och bara de fyllda kant-stripes har `pointerEvents: "auto"`.
 
-I `src/pages/admin/DesignerPage.tsx` (`persistTemplate`) propagerar vi **hela** `template`-objektet — inklusive `productOptions` — till syskonraden via `template_slug`. Det betyder:
+## Lösning
+Tillämpa samma mönster på `shape`-lager:
 
-- När du på canvas-raden disablar `poster` och enablar `canvas`, sparas `productOptions = { poster: { enabled: false, allowedSizes: [] }, canvas: { enabled: true, ... } }`.
-- Den raden propageras sedan **över** poster-raden, så även poster-produkten får `poster.enabled: false`.
-- I `src/components/editor/FormatSection.tsx` används `productOptions.poster` (om `product_type === 'posters'`) eller `productOptions.canvas` för att beräkna `visibleSizes`/`visibleVariants`. Om blocket är `enabled: false` eller har tomma `allowedSizes`, blir hela editorn tom — ingen storlek, ingen ram, inget pris, inget mockup-galleri.
+### 1. `src/components/admin/LayerCanvas.tsx`
+- Sätt `pointerEvents: "none"` på `Rnd` när `layer.type === "shape"` OCH formen är en RAM-typ (`frame-rect`, `frame-oval`, `frame-rounded`, `frame-double`, `frame-corners`).
+- Linjeformer (`line-horizontal`, `line-vertical`) ska behålla normal pointer-events (de är redan smala och har `minHeight/minWidth: 24` som hit-area, precis som `line`-lager).
+- Behåll `cursor-move` på den inre wrappern bara där den är klickbar.
 
-DB bekräftar detta: `mitt-hjarta-poster` har just nu `poster.enabled: true` med 6 storlekar OCH `canvas.enabled: true` med 8 storlekar — alltså en delad konfig som matchar exakt vad du beskriver. När du gjorde din senaste ändring på canvas-raden gick poster-raden tom.
+### 2. `src/components/editor/layers/ShapeLayerView.tsx`
+- För ram-formerna (rect/oval/rounded/double/corners): byt ytterdiven från `pointer-events-none` till `pointer-events: none` på containern och sätt `pointer-events: auto` på själva SVG-strecken / DOM-elementen som ritar ramen. Det gör att admin kan klicka på ramens linjer för att markera den, men inte i den tomma mitten.
+- För linje-formerna (`line-horizontal`/`line-vertical`): behåll `pointer-events: auto` på själva linjen (Rnd-wrappern släpper igenom som ovan, men 24px hit-area finns kvar via Rnd's `minHeight/minWidth` — vi behöver också justera så linjeformer inte får `pointerEvents: none` på Rnd).
 
-## Lösningen
+### 3. Inramnings-konsekvens
+- Ringen som visar selection runt en shape (`ring-1 ring-border/60 hover:ring-primary/50`) ritas idag på `Rnd`-elementet. När `Rnd` blir pointer-events:none försvinner `:hover`-effekten. Lösning: behandla shape-ramar som `margin` redan gör — ta bort hover-ringen på ram-shapes (kommentar förklarar varför) och visa istället markering visuellt via stroke-färgen + name-tag när hovrad/vald.
 
-`productOptions` är **per-produkt** (en posters-rad äger `poster`-blocket; en canvas-rad äger `canvas`-blocket). Den ska inte propageras blint mellan syskon. Det enda som faktiskt ska delas är layout + dekor + AI-/karta-stilar.
+## Filer som ändras
+- `src/components/admin/LayerCanvas.tsx` — lägg till `isShapeFrame`-flagga, applicera `pointerEvents: "none"` på Rnd, hoppa över hover-ring för ram-shapes.
+- `src/components/editor/layers/ShapeLayerView.tsx` — sätt `pointer-events: auto` på SVG-element / line-divs så att själva ramens streck fortfarande är klickbara; container förblir genomsläpplig.
 
-### Ändringar
-
-1. **`src/pages/admin/DesignerPage.tsx` — `persistTemplate`**
-   - När vi skriver till syskonraden: bygg en `siblingTemplate` som behåller syskonets **egna** `productOptions` men tar resten (`layouts`, `orientations`, `aiStyles`-listan, `mapStyles`-listan, dekor, etc.) från det aktuella templatet.
-   - Konkret: läs syskonradens nuvarande template innan update, slå ihop `{ ...finalTemplate, productOptions: sibling.template.productOptions }`, skriv tillbaka.
-
-2. **`src/pages/admin/DesignerPage.tsx` — UI för ProductOptionsSection**
-   - Visa bara det relevanta produktblocket per rad: en posters-rad ska bara visa "Poster"-sektionen, en canvas-rad bara "Canvas"-sektionen. Det är vad användaren förväntar sig — den andra produkten redigeras på sin egen rad.
-   - Detta görs genom att skicka in `config.product_type` till `ProductOptionsSection` och dölja motsatt block (`poster` resp. `canvas`). Inget skrivs då in i fel block och vi undviker att admin av misstag skapar dubletter av produktinställningar.
-
-3. **Engångs-DB-fix för "Mitt hjärta"-raderna (migration)**
-   - `mitt-hjarta-poster.template.productOptions.canvas.enabled = false` (samt `allowedSizes/allowedDepths` rensas), och `poster.enabled = true` med korrekta storlekar/ramar.
-   - `mitt-hjarta-canvas.template.productOptions.poster.enabled = false` (rensa allowedSizes/allowedFrames), `canvas.enabled = true` med korrekta storlekar/djup.
-   - Detta återställer produkterna till "ren" delad/icke-delad form direkt så du slipper rensa manuellt i admin.
-
-4. **Säkerhetsnät i `FormatSection` (UX)**
-   - Om `visibleSizes.length === 0` (alltså admin har inte enablat något för den här produkttypen), visa en tydlig text i editorn: *"Den här produkten har inga aktiva storlekar konfigurerade."* istället för en tom panel utan mockups. Förhindrar framtida "tomma sidor" om någon glömmer enable-knappen.
-
-### Filer som påverkas
-- `src/pages/admin/DesignerPage.tsx` — per-rad propagering + skicka `product_type` vidare.
-- `src/components/admin/ProductOptionsSection.tsx` — dölj motsatt block (poster på canvas-rad, canvas på poster-rad).
-- `src/components/editor/FormatSection.tsx` — placeholder vid tom konfiguration.
-- Ny migration — fixar `mitt-hjarta-poster`/`mitt-hjarta-canvas`.
-
-### Resultat
-- Du kan ha poster- och canvas-produkter som separata Shopify-produkter utan att de skriver över varandras storlekar/ramar/djup.
-- Admin-UIt visar bara det block som är relevant för respektive rad.
-- Sparar du ändringar på canvas påverkar det inte poster-radens storlekar längre — bara delade saker (layout, dekor, AI-stilar, kartstilar) syncas.
+## Resultat
+- Klick i mitten av en ram (där det är tomt) går igenom till lager under (karta, text, foto).
+- Klick på själva ramens streck markerar fortfarande shape-lagret.
+- Linje-shapes fungerar oförändrat (drag/select via 24px hit-area).
+- Margin- och ram-lager beter sig nu konsekvent.

@@ -202,6 +202,14 @@ export default function LayerCanvas({
             : null;
           const shapeIsLineH = shapeKind === "line-horizontal";
           const shapeIsLineV = shapeKind === "line-vertical";
+          // A "frame" shape (rect/oval/rounded/double/corners) has a hollow
+          // middle. Treat it like `margin`: the Rnd box becomes pointer-
+          // events:none so clicks in the empty centre fall through to layers
+          // underneath. Only the actual stroke pixels (set to pointer-events:
+          // auto inside ShapeLayerView) catch clicks. Line-shapes are NOT
+          // frames and keep normal hit behaviour.
+          const isShapeFrame =
+            isShape && !shapeIsLineH && !shapeIsLineV;
           const lineHorizontal =
             (isLine && (layer as Extract<TemplateLayer, { type: "line" }>).defaults.orientation === "horizontal") ||
             shapeIsLineH;
@@ -225,7 +233,7 @@ export default function LayerCanvas({
 
           const rndStyle: React.CSSProperties = {
             zIndex: layer.zIndex + 1,
-            ...(isMargin ? { pointerEvents: "none" as const } : {}),
+            ...(isMargin || isShapeFrame ? { pointerEvents: "none" as const } : {}),
             ...(isThinLine && lineHorizontal ? { minHeight: 24 } : {}),
             ...(isThinLine && lineVertical ? { minWidth: 24 } : {}),
           };
@@ -298,8 +306,8 @@ export default function LayerCanvas({
               className={
                 isSelected
                   ? "ring-2 ring-primary ring-offset-1"
-                  : isMargin
-                  ? "" // no ring for margin (would draw across the whole canvas)
+                  : isMargin || isShapeFrame
+                  ? "" // no ring for margin / frame shapes — Rnd is pointer-events:none so :hover never fires; selection is shown via the stroke itself + name tag
                   : "ring-1 ring-border/60 hover:ring-primary/50"
               }
             >
