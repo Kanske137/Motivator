@@ -362,6 +362,14 @@ export default function DesignerPage() {
                 <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
                 Lägg till bild
               </Button>
+              <Button size="sm" variant="outline" onClick={() => addLayer("line")}>
+                <Minus className="h-3.5 w-3.5 mr-1.5" />
+                Lägg till linje
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => addLayer("margin")}>
+                <Square className="h-3.5 w-3.5 mr-1.5" />
+                Lägg till marginal
+              </Button>
             </div>
           </div>
 
