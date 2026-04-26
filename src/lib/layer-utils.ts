@@ -41,7 +41,13 @@ export function clampLayerBounds<T extends TemplateLayer>(layer: T): T {
 //    that line's thickness so the corner is flush.
 
 export const EDGE_SNAP_TOLERANCE_PCT = 2;
-const LINE_THICKNESS_SCALE = 0.5; // matches LineLayerView's `thicknessMm * 0.5` cqw/cqh
+// % of the canvas SHORT side that 1mm of line thickness represents in the
+// editor + customer preview. Chosen so a typical poster (≈300mm short side)
+// gets a 1mm line at ~0.33% of the canvas — readable but accurate-ish; the
+// print pipeline always uses the EXACT mm. This single constant keeps
+// LineLayerView's pixel size in lockstep with snapLineToOtherLines so corner
+// snapping actually meets the visible edge.
+export const LINE_THICKNESS_MM_TO_SHORT_SIDE_PCT = 0.5;
 
 type LineLayer = Extract<TemplateLayer, { type: "line" }>;
 
@@ -51,7 +57,13 @@ function isLine(l: TemplateLayer): l is LineLayer {
 
 /** Thickness as a % of the canvas short side, matching what's rendered. */
 export function lineThicknessPct(line: LineLayer): number {
-  return Math.max(0.1, line.defaults.thicknessMm * LINE_THICKNESS_SCALE);
+  return Math.max(0.1, line.defaults.thicknessMm * LINE_THICKNESS_MM_TO_SHORT_SIDE_PCT);
+}
+
+/** Pixel thickness for a given canvas short-side (in px). Used by editor +
+ *  customer preview to render lines flush against snap targets. */
+export function lineThicknessPxFromCanvas(line: LineLayer, canvasShortPx: number): number {
+  return Math.max(1, (line.defaults.thicknessMm * LINE_THICKNESS_MM_TO_SHORT_SIDE_PCT / 100) * canvasShortPx);
 }
 
 export function snapLineToOtherLines(
