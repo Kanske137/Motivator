@@ -394,3 +394,45 @@ export function createDefaultLayout(): TemplateLayer[] {
   text.hPct = 12;
   return normaliseZIndex([map, text]);
 }
+
+/** Build a shape layer of a specific kind. Wraps `createLayer("shape")`
+ *  and overrides defaults + sane initial dimensions per shape kind. */
+export function createShapeLayer(
+  kind: import("@/lib/template-schema").ShapeKind,
+  existing: TemplateLayer[],
+): TemplateLayer {
+  const base = createLayer("shape", existing) as Extract<TemplateLayer, { type: "shape" }>;
+  if (kind === "line-horizontal") {
+    return {
+      ...base,
+      xPct: 10, yPct: 50, wPct: 80, hPct: 2,
+      defaults: { kind, strokeMm: 2, color: "#1A1A1A" },
+    };
+  }
+  if (kind === "line-vertical") {
+    return {
+      ...base,
+      xPct: 50, yPct: 10, wPct: 2, hPct: 80,
+      defaults: { kind, strokeMm: 2, color: "#1A1A1A" },
+    };
+  }
+  if (kind === "frame-rounded") {
+    return {
+      ...base,
+      defaults: { kind, strokeMm: 2, color: "#1A1A1A", cornerRadiusPct: 6 },
+    };
+  }
+  if (kind === "frame-double") {
+    return {
+      ...base,
+      defaults: { kind, strokeMm: 1.5, color: "#1A1A1A", gapMm: 4 },
+    };
+  }
+  if (kind === "frame-corners") {
+    return {
+      ...base,
+      defaults: { kind, strokeMm: 2, color: "#1A1A1A", cornerStyle: "bracket" },
+    };
+  }
+  return { ...base, defaults: { kind, strokeMm: 2, color: "#1A1A1A" } };
+}
