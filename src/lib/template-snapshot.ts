@@ -367,14 +367,22 @@ function drawMarginLayer(
   ctx: CanvasRenderingContext2D,
   rect: { x: number; y: number; w: number; h: number },
   layer: Extract<TemplateLayer, { type: "margin" }>,
-  pxPerMm: number,
+  _pxPerMm: number,
+  canvasShortPx: number,
 ): void {
   const d = layer.defaults;
-  const thick = Math.max(1, d.thicknessMm * pxPerMm);
+  // thicknessPct is % of the canvas SHORT side → symmetric on all 4 sides.
+  const thick = Math.max(1, Math.round((d.thicknessPct / 100) * canvasShortPx));
   ctx.save();
-  ctx.strokeStyle = d.color;
-  ctx.lineWidth = thick;
-  ctx.strokeRect(rect.x + thick / 2, rect.y + thick / 2, rect.w - thick, rect.h - thick);
+  ctx.fillStyle = d.color;
+  // Top
+  ctx.fillRect(rect.x, rect.y, rect.w, thick);
+  // Bottom
+  ctx.fillRect(rect.x, rect.y + rect.h - thick, rect.w, thick);
+  // Left
+  ctx.fillRect(rect.x, rect.y, thick, rect.h);
+  // Right
+  ctx.fillRect(rect.x + rect.w - thick, rect.y, thick, rect.h);
   ctx.restore();
 }
 
