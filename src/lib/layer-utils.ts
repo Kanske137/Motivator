@@ -148,10 +148,15 @@ export function snapLineToOtherLines(
   return clampLayerBounds(next);
 }
 
+// Strict tolerance — snap has already placed ends near the kant; here we
+// only need to absorb float drift. Using the wider snap tolerance caused
+// repeat-clicks to keep extending the line by one thickness each time.
+export const EXTEND_TOLERANCE_PCT = 0.3;
+
 export function extendLineToMeetCorners(
   line: LineLayer,
   allLayers: TemplateLayer[],
-  tolerance = EDGE_SNAP_TOLERANCE_PCT,
+  tolerance = EXTEND_TOLERANCE_PCT,
 ): LineLayer {
   const perp = allLayers
     .filter(isLine)
@@ -174,12 +179,17 @@ export function extendLineToMeetCorners(
       if (!overlapsY) continue;
 
       const pRight = p.xPct + pThick;
-      if (Math.abs(next.xPct - pRight) <= tolerance) {
+      const myRight = next.xPct + next.wPct;
+      // Only extend if end is at the FAR edge of perp AND not already
+      // sitting inside perp's body (which is the post-extend state).
+      const endInsidePerp = (pos: number) =>
+        pos > p.xPct + tolerance && pos < pRight - tolerance;
+
+      if (Math.abs(next.xPct - pRight) <= tolerance && !endInsidePerp(next.xPct)) {
         next.xPct = p.xPct;
         next.wPct = next.wPct + pThick;
       }
-      const myRight = next.xPct + next.wPct;
-      if (Math.abs(myRight - p.xPct) <= tolerance) {
+      if (Math.abs(myRight - p.xPct) <= tolerance && !endInsidePerp(myRight)) {
         next.wPct = next.wPct + pThick;
       }
     } else {
@@ -189,12 +199,15 @@ export function extendLineToMeetCorners(
       if (!overlapsX) continue;
 
       const pBottom = p.yPct + pThick;
-      if (Math.abs(next.yPct - pBottom) <= tolerance) {
+      const myBottom = next.yPct + next.hPct;
+      const endInsidePerp = (pos: number) =>
+        pos > p.yPct + tolerance && pos < pBottom - tolerance;
+
+      if (Math.abs(next.yPct - pBottom) <= tolerance && !endInsidePerp(next.yPct)) {
         next.yPct = p.yPct;
         next.hPct = next.hPct + pThick;
       }
-      const myBottom = next.yPct + next.hPct;
-      if (Math.abs(myBottom - p.yPct) <= tolerance) {
+      if (Math.abs(myBottom - p.yPct) <= tolerance && !endInsidePerp(myBottom)) {
         next.hPct = next.hPct + pThick;
       }
     }

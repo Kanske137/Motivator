@@ -308,13 +308,14 @@ export default function LayerCanvas({
                 onClick={(e) => {
                   e.stopPropagation();
                   onSelect(layer.id);
-                  // Re-snap & corner-fill on click for lines opened from a
-                  // saved template — fixes lines that were stored just before
-                  // snap helpers existed (or with sub-% drift).
+                  // Re-snap on click for lines opened from a saved template
+                  // — fixes sub-% drift. We deliberately do NOT run
+                  // extendLineToMeetCorners here: extend should only fire on
+                  // an explicit drag/resize-stop, otherwise repeated clicks
+                  // could grow the line by one thickness each time.
                   if (isLine) {
                     let next = clampLayerBounds(layer);
                     next = snapLineToOtherLines(next as Extract<TemplateLayer, { type: "line" }>, layers);
-                    next = extendLineToMeetCorners(next as Extract<TemplateLayer, { type: "line" }>, layers);
                     if (
                       next.xPct !== layer.xPct ||
                       next.yPct !== layer.yPct ||
