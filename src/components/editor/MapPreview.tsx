@@ -139,12 +139,13 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
     const el = frameRef.current;
     if (!el) return;
     const compute = () => {
+      const rect = el.getBoundingClientRect();
+      const shortPx = Math.min(rect.width, rect.height);
+      setFrameShortPx(shortPx);
       if (!frameColor || !sizeCm) {
         setBorderPx(0);
         return;
       }
-      const rect = el.getBoundingClientRect();
-      const shortPx = Math.min(rect.width, rect.height);
       const shortCm = Math.min(sizeCm.w, sizeCm.h);
       const px = Math.round((frameWidthCm / shortCm) * shortPx);
       setBorderPx(px);
