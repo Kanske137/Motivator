@@ -16,6 +16,7 @@ import { clampLayerBounds, snapPct } from "@/lib/layer-utils";
 import AlignmentGuides from "./AlignmentGuides";
 import MapLayerPreview from "./MapLayerPreview";
 import TextLayerPreview from "./TextLayerPreview";
+import { LineLayerView, MarginLayerView } from "@/components/editor/layers/StaticLayers";
 
 const SNAP_PCT = 5;
 const GUIDE_TOLERANCE_PCT = 1.5;
