@@ -298,19 +298,41 @@ export default function DesignerPage() {
       })
       .eq("shopify_handle", handle);
 
-    // Propagate the shared template (incl. productOptions.mapStyles) + legacy
-    // map_styles to sibling rows with the same template_slug (poster ↔ canvas)
-    // so toggling on one variant affects the other in the customer editor.
+    // Propagate the shared template (layouts, dekor, AI-/karta-stilar) to
+    // sibling rows with the same template_slug — but PRESERVE each sibling's
+    // own `productOptions.poster` / `productOptions.canvas` (per-rad).
+    // Annars skriver canvas-radens disable av poster-blocket över
+    // poster-radens egna storlekar/ramar och vice versa.
     const slug = config.template_slug;
     if (!error && slug) {
-      await supabase
+      const { data: siblings } = await supabase
         .from("product_configs")
-        .update({
-          template: finalTemplate as unknown as never,
-          map_styles: enabledMapStyleIds.length > 0 ? (enabledMapStyleIds as unknown as never) : ([] as unknown as never),
-        })
+        .select("shopify_handle, template")
         .eq("template_slug", slug)
         .neq("shopify_handle", handle);
+
+      if (siblings && siblings.length > 0) {
+        await Promise.all(
+          siblings.map((s) => {
+            const sibTemplate = (s.template ?? {}) as Template;
+            const mergedSibling: Template = {
+              ...finalTemplate,
+              productOptions: {
+                ...(finalTemplate.productOptions ?? {}),
+                poster: sibTemplate.productOptions?.poster ?? finalTemplate.productOptions?.poster,
+                canvas: sibTemplate.productOptions?.canvas ?? finalTemplate.productOptions?.canvas,
+              },
+            };
+            return supabase
+              .from("product_configs")
+              .update({
+                template: mergedSibling as unknown as never,
+                map_styles: enabledMapStyleIds.length > 0 ? (enabledMapStyleIds as unknown as never) : ([] as unknown as never),
+              })
+              .eq("shopify_handle", s.shopify_handle);
+          }),
+        );
+      }
     }
     setSaving(false);
 

@@ -154,59 +154,64 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
           </div>
         )}
 
-        {/* Poster */}
-        <div className="space-y-3 rounded-md border p-4">
-          <div className="flex items-center justify-between">
-            <Label className="text-sm font-medium">Poster</Label>
-            <Switch
-              checked={value.poster?.enabled ?? false}
-              onCheckedChange={(c) => toggleEnabled("poster", c)}
-            />
-          </div>
-          {value.poster?.enabled && (
-            <div className="grid gap-4 md:grid-cols-2">
-              <ChecklistGroup
-                title="Tillåtna storlekar"
-                all={posterSizes}
-                selected={value.poster.allowedSizes}
-                onToggle={(item, c) => toggleListItem("poster", "allowedSizes", item, c)}
-              />
-              <ChecklistGroup
-                title="Tillåtna ramar"
-                all={posterFrames}
-                selected={value.poster.allowedFrames}
-                onToggle={(item, c) => toggleListItem("poster", "allowedFrames", item, c)}
+        {/* Per-rad: visa bara det produktblock som hör till den här raden.
+            Poster-raden äger `poster`-blocket; canvas-raden äger `canvas`-blocket.
+            Detta förhindrar att admin av misstag ändrar fel sidas konfiguration. */}
+        {config.product_type === "posters" && (
+          <div className="space-y-3 rounded-md border p-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">Poster</Label>
+              <Switch
+                checked={value.poster?.enabled ?? false}
+                onCheckedChange={(c) => toggleEnabled("poster", c)}
               />
             </div>
-          )}
-        </div>
+            {value.poster?.enabled && (
+              <div className="grid gap-4 md:grid-cols-2">
+                <ChecklistGroup
+                  title="Tillåtna storlekar"
+                  all={posterSizes}
+                  selected={value.poster.allowedSizes}
+                  onToggle={(item, c) => toggleListItem("poster", "allowedSizes", item, c)}
+                />
+                <ChecklistGroup
+                  title="Tillåtna ramar"
+                  all={posterFrames}
+                  selected={value.poster.allowedFrames}
+                  onToggle={(item, c) => toggleListItem("poster", "allowedFrames", item, c)}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
-        {/* Canvas */}
-        <div className="space-y-3 rounded-md border p-4">
-          <div className="flex items-center justify-between">
-            <Label className="text-sm font-medium">Canvas</Label>
-            <Switch
-              checked={value.canvas?.enabled ?? false}
-              onCheckedChange={(c) => toggleEnabled("canvas", c)}
-            />
-          </div>
-          {value.canvas?.enabled && (
-            <div className="grid gap-4 md:grid-cols-2">
-              <ChecklistGroup
-                title="Tillåtna storlekar"
-                all={canvasSizes}
-                selected={value.canvas.allowedSizes}
-                onToggle={(item, c) => toggleListItem("canvas", "allowedSizes", item, c)}
-              />
-              <ChecklistGroup
-                title="Tillåtna djup"
-                all={canvasDepths}
-                selected={value.canvas.allowedDepths}
-                onToggle={(item, c) => toggleListItem("canvas", "allowedDepths", item, c)}
+        {config.product_type === "canvas" && (
+          <div className="space-y-3 rounded-md border p-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">Canvas</Label>
+              <Switch
+                checked={value.canvas?.enabled ?? false}
+                onCheckedChange={(c) => toggleEnabled("canvas", c)}
               />
             </div>
-          )}
-        </div>
+            {value.canvas?.enabled && (
+              <div className="grid gap-4 md:grid-cols-2">
+                <ChecklistGroup
+                  title="Tillåtna storlekar"
+                  all={canvasSizes}
+                  selected={value.canvas.allowedSizes}
+                  onToggle={(item, c) => toggleListItem("canvas", "allowedSizes", item, c)}
+                />
+                <ChecklistGroup
+                  title="Tillåtna djup"
+                  all={canvasDepths}
+                  selected={value.canvas.allowedDepths}
+                  onToggle={(item, c) => toggleListItem("canvas", "allowedDepths", item, c)}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </Card>
 
       {/* Map Styles — collapsible, per-template enabling */}

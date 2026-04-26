@@ -133,6 +133,13 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
 
   return (
     <div className="space-y-5">
+      {/* Tomt-tillstånd: ingen storlek aktiverad i admin för den här produkttypen. */}
+      {visibleSizes.length === 0 && (
+        <div className="rounded-2xl border border-dashed bg-muted/40 p-4 text-sm text-muted-foreground">
+          Den här produkten har inga aktiva storlekar konfigurerade ännu.
+        </div>
+      )}
+
       {/* Produkt — segmented pill toggle. Only renders when this template
           actually has both a poster + canvas variant available. */}
       {toggleEntries.length > 1 && (
