@@ -15,6 +15,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { loadConfig, type ProductConfig } from "@/lib/product-config";
 import { resolveTemplate } from "@/lib/template-migrate";
@@ -221,6 +223,26 @@ export default function DesignerPage() {
     updateLayer(toggleAllLocks(target));
   }
 
+  function toggleOrientationEnabled(o: Orientation, enabled: boolean) {
+    if (!template) return;
+    const current = template.orientations;
+    const set = new Set(current);
+    if (enabled) set.add(o);
+    else set.delete(o);
+    if (set.size === 0) {
+      toast.error("Minst en orientering måste vara aktiv");
+      return;
+    }
+    const nextOrients: Orientation[] = (["portrait", "landscape"] as Orientation[]).filter(
+      (k) => set.has(k),
+    );
+    commitTemplate({ ...template, orientations: nextOrients });
+    if (!set.has(orientation)) {
+      const fallback = nextOrients[0];
+      if (fallback) setOrientation(fallback);
+    }
+  }
+
   // ---------- persist ----------
   function updateConfigMeta(patch: Partial<ProductConfig>) {
     if (!config) return;
@@ -392,14 +414,33 @@ export default function DesignerPage() {
                 Drag & drop · 5% snap · alignment-guides under drag.
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Tabs value={orientation} onValueChange={(v) => setOrientation(v as Orientation)}>
                 <TabsList>
-                  <TabsTrigger value="portrait">Stående</TabsTrigger>
-                  <TabsTrigger value="landscape">Liggande</TabsTrigger>
+                  <TabsTrigger value="portrait" disabled={!template.orientations.includes("portrait")}>
+                    Stående
+                  </TabsTrigger>
+                  <TabsTrigger value="landscape" disabled={!template.orientations.includes("landscape")}>
+                    Liggande
+                  </TabsTrigger>
                 </TabsList>
               </Tabs>
-              <div className="h-6 w-px bg-border" />
+              <div className="flex items-center gap-3 px-2 border-l border-r h-9">
+                <Label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                  <Switch
+                    checked={template.orientations.includes("portrait")}
+                    onCheckedChange={(c) => toggleOrientationEnabled("portrait", c)}
+                  />
+                  Aktiv stående
+                </Label>
+                <Label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                  <Switch
+                    checked={template.orientations.includes("landscape")}
+                    onCheckedChange={(c) => toggleOrientationEnabled("landscape", c)}
+                  />
+                  Aktiv liggande
+                </Label>
+              </div>
               <Button size="sm" variant="outline" onClick={() => addLayer("map")}>
                 <MapPin className="h-3.5 w-3.5 mr-1.5" />
                 Lägg till karta

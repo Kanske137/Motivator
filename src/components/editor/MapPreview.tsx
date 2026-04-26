@@ -4,6 +4,7 @@ import { useEditorStore, type PhotoLayerValue } from "@/stores/editorStore";
 import type { TemplateLayer } from "@/lib/template-schema";
 import { MapLayerInstance } from "./layers/MapLayerInstance";
 import { ImageLayerView, LineLayerView, MarginLayerView } from "./layers/StaticLayers";
+import { lineThicknessPxFromCanvas } from "@/lib/layer-utils";
 
 interface Props {
   frameColor?: string;
@@ -95,6 +96,7 @@ function useCircleClip(enabled: boolean): {
 export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm = 0 }: Props) {
   const frameRef = useRef<HTMLDivElement>(null);
   const [borderPx, setBorderPx] = useState(0);
+  const [frameShortPx, setFrameShortPx] = useState(0);
   const heartIdRef = useRef(`heart-${Math.random().toString(36).slice(2)}`);
   const starIdRef = useRef(`star-${Math.random().toString(36).slice(2)}`);
 
@@ -137,12 +139,13 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
     const el = frameRef.current;
     if (!el) return;
     const compute = () => {
+      const rect = el.getBoundingClientRect();
+      const shortPx = Math.min(rect.width, rect.height);
+      setFrameShortPx(shortPx);
       if (!frameColor || !sizeCm) {
         setBorderPx(0);
         return;
       }
-      const rect = el.getBoundingClientRect();
-      const shortPx = Math.min(rect.width, rect.height);
       const shortCm = Math.min(sizeCm.w, sizeCm.h);
       const px = Math.round((frameWidthCm / shortCm) * shortPx);
       setBorderPx(px);
@@ -324,7 +327,10 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             // pass through the wrapper to layers underneath.
             return (
               <div key={l.id} style={{ ...wrapStyle, pointerEvents: "none" }}>
-                <LineLayerView layer={l} />
+                <LineLayerView
+                  layer={l}
+                  thicknessPx={lineThicknessPxFromCanvas(l, frameShortPx)}
+                />
               </div>
             );
           }

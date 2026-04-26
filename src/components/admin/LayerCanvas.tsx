@@ -17,6 +17,7 @@ import {
   snapPct,
   snapLineToOtherLines,
   extendLineToMeetCorners,
+  lineThicknessPxFromCanvas,
 } from "@/lib/layer-utils";
 import AlignmentGuides from "./AlignmentGuides";
 import MapLayerPreview from "./MapLayerPreview";
@@ -127,7 +128,7 @@ export default function LayerCanvas({
           </div>
         );
       case "line":
-        return <LineLayerView layer={layer} />;
+        return <LineLayerView layer={layer} thicknessPx={lineThicknessPxFromCanvas(layer, Math.min(size.w, size.h))} />;
       case "margin":
         return <MarginLayerView layer={layer} />;
       case "photo": {

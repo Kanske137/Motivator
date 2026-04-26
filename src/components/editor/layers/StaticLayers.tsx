@@ -36,14 +36,23 @@ export function ImageLayerView({
 
 export function LineLayerView({
   layer,
+  thicknessPx,
 }: {
   layer: Extract<TemplateLayer, { type: "line" }>;
+  /** Optional explicit pixel thickness (computed from the canvas short side
+   *  in mm) — when provided the line renders at the EXACT same size as the
+   *  print pipeline. Falls back to a relative cqw/cqh approximation when the
+   *  caller hasn't measured the canvas. */
+  thicknessPx?: number;
 }) {
   const d = layer.defaults;
-  // Thickness scales with the canvas (container-query units) so two lines with
-  // the same thicknessMm always render the exact same pixel size at any zoom
-  // — required for seamless corner meets with auto-extend.
-  const thick = `min(${d.thicknessMm * 0.5}cqw, ${d.thicknessMm * 0.5}cqh)`;
+  // Prefer pixel thickness so editor + customer preview match the print file
+  // 1:1 (which uses thicknessMm * pxPerMm). This is what makes corner snap
+  // tolerances meaningful — the visual edges line up with the snap targets.
+  const thick =
+    typeof thicknessPx === "number" && thicknessPx > 0
+      ? `${Math.max(1, thicknessPx)}px`
+      : `min(${d.thicknessMm * 0.5}cqw, ${d.thicknessMm * 0.5}cqh)`;
   // Render the visible line flush against ONE edge of the layer box (no
   // translate(-50%) — eliminates subpixel rounding) so corners are pixel
   // perfect and 90° sharp. The drag hit-area is provided by Rnd's

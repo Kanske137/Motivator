@@ -342,24 +342,22 @@ function drawLineLayer(
   ctx: CanvasRenderingContext2D,
   rect: { x: number; y: number; w: number; h: number },
   layer: Extract<TemplateLayer, { type: "line" }>,
-  pxPerMm: number,
+  _pxPerMm: number,
+  frontShortPx: number,
 ): void {
   const d = layer.defaults;
-  const thick = Math.max(1, d.thicknessMm * pxPerMm);
+  // Same formula as editor + customer preview (LINE_THICKNESS_MM_TO_SHORT_SIDE_PCT
+  // = 0.5 → thickness = thicknessMm * 0.5% of front short side). Renders the
+  // line FLUSH against one edge of its bounding rect so corners meet pixel-
+  // perfectly when extendLineToMeetCorners has run in the admin.
+  const thick = Math.max(1, (d.thicknessMm * 0.5 / 100) * frontShortPx);
   ctx.save();
-  ctx.strokeStyle = d.color;
-  ctx.lineWidth = thick;
-  ctx.beginPath();
+  ctx.fillStyle = d.color;
   if (d.orientation === "horizontal") {
-    const y = rect.y + rect.h / 2;
-    ctx.moveTo(rect.x, y);
-    ctx.lineTo(rect.x + rect.w, y);
+    ctx.fillRect(rect.x, rect.y, rect.w, thick);
   } else {
-    const x = rect.x + rect.w / 2;
-    ctx.moveTo(x, rect.y);
-    ctx.lineTo(x, rect.y + rect.h);
+    ctx.fillRect(rect.x, rect.y, thick, rect.h);
   }
-  ctx.stroke();
   ctx.restore();
 }
 
@@ -489,13 +487,14 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
         }
       }
     } else if (layer.type === "line") {
-      drawLineLayer(ctx, rect, layer, pxPerMm);
+      drawLineLayer(ctx, rect, layer, pxPerMm, Math.min(frontPxW, frontPxH));
     } else if (layer.type === "margin") {
-      // Margin always covers the FULL canvas (incl. bleed/wrap) regardless of
-      // the layer's stored xy/wh. Thickness is % of the canvas short side.
-      const fullRect = { x: 0, y: 0, w, h };
-      const shortPx = Math.min(w, h);
-      drawMarginLayer(ctx, fullRect, layer, pxPerMm, shortPx);
+      // Margin frames the FRONT zone only — never the wrap/bleed band. This
+      // matches the editor's dashed "Synlig framsida" rectangle and keeps the
+      // 3D canvas wrap symmetric (motif extends out into the wrap unchanged).
+      const frontRect = { x: frontPxX, y: frontPxY, w: frontPxW, h: frontPxH };
+      const shortPx = Math.min(frontPxW, frontPxH);
+      drawMarginLayer(ctx, frontRect, layer, pxPerMm, shortPx);
     }
   }
 
