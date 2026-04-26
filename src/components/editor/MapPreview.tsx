@@ -96,6 +96,7 @@ function useCircleClip(enabled: boolean): {
 export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm = 0 }: Props) {
   const frameRef = useRef<HTMLDivElement>(null);
   const [borderPx, setBorderPx] = useState(0);
+  const [frameShortPx, setFrameShortPx] = useState(0);
   const heartIdRef = useRef(`heart-${Math.random().toString(36).slice(2)}`);
   const starIdRef = useRef(`star-${Math.random().toString(36).slice(2)}`);
 
