@@ -228,41 +228,55 @@ export default function LayerCanvas({
               enableResizing={enableResizing}
               onDragStart={() => onSelect(layer.id)}
               onDrag={(_e, d) => {
-                const next = clampLayerBounds({
+                let next = clampLayerBounds({
                   ...layer,
                   xPct: snapPct(pxToPct(d.x, "x")),
                   yPct: snapPct(pxToPct(d.y, "y")),
                 });
+                if (isLine) {
+                  next = snapLineToOtherLines(next as Extract<TemplateLayer, { type: "line" }>, layers);
+                }
                 setGuides(computeGuides(next));
               }}
               onDragStop={(_e, d) => {
-                const next = clampLayerBounds({
+                let next = clampLayerBounds({
                   ...layer,
                   xPct: snapPct(pxToPct(d.x, "x")),
                   yPct: snapPct(pxToPct(d.y, "y")),
                 });
+                if (isLine) {
+                  next = snapLineToOtherLines(next as Extract<TemplateLayer, { type: "line" }>, layers);
+                  next = extendLineToMeetCorners(next as Extract<TemplateLayer, { type: "line" }>, layers);
+                }
                 setGuides({ v: [], h: [] });
                 onChange(next);
               }}
               onResizeStart={() => onSelect(layer.id)}
               onResize={(_e, _dir, ref, _delta, position) => {
-                const next = clampLayerBounds({
+                let next = clampLayerBounds({
                   ...layer,
                   wPct: snapPct(pxToPct(ref.offsetWidth, "x")),
                   hPct: snapPct(pxToPct(ref.offsetHeight, "y")),
                   xPct: snapPct(pxToPct(position.x, "x")),
                   yPct: snapPct(pxToPct(position.y, "y")),
                 });
+                if (isLine) {
+                  next = snapLineToOtherLines(next as Extract<TemplateLayer, { type: "line" }>, layers);
+                }
                 setGuides(computeGuides(next));
               }}
               onResizeStop={(_e, _dir, ref, _delta, position) => {
-                const next = clampLayerBounds({
+                let next = clampLayerBounds({
                   ...layer,
                   wPct: snapPct(pxToPct(ref.offsetWidth, "x")),
                   hPct: snapPct(pxToPct(ref.offsetHeight, "y")),
                   xPct: snapPct(pxToPct(position.x, "x")),
                   yPct: snapPct(pxToPct(position.y, "y")),
                 });
+                if (isLine) {
+                  next = snapLineToOtherLines(next as Extract<TemplateLayer, { type: "line" }>, layers);
+                  next = extendLineToMeetCorners(next as Extract<TemplateLayer, { type: "line" }>, layers);
+                }
                 setGuides({ v: [], h: [] });
                 onChange(next);
               }}
