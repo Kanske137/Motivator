@@ -8,9 +8,9 @@
 //
 // All template state lives here. Saving writes the whole `template` jsonb to
 // product_configs. Publish stamps `publishedAt` and runs zod validation.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Eye, Image as ImageIcon, Loader2, MapPin, Minus, Save, Send, Square, Type, Zap } from "lucide-react";
+import { ArrowLeft, Eye, Image as ImageIcon, Loader2, MapPin, Minus, Save, Send, Square, Type, Undo2, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -43,6 +43,46 @@ export default function DesignerPage() {
   const [orientation, setOrientation] = useState<Orientation>("portrait");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  // Session-only undo stack: snapshots of `template` before each mutation.
+  // Cleared on page reload (intentional — user explicitly asked).
+  const historyRef = useRef<Template[]>([]);
+  const [canUndo, setCanUndo] = useState(false);
+
+  // Wrap setTemplate so every mutating call records the previous state.
+  function commitTemplate(next: Template) {
+    setTemplate((prev) => {
+      if (prev) {
+        historyRef.current.push(prev);
+        if (historyRef.current.length > 50) historyRef.current.shift();
+        setCanUndo(true);
+      }
+      return next;
+    });
+  }
+
+  function undo() {
+    const prev = historyRef.current.pop();
+    if (!prev) return;
+    setTemplate(prev);
+    setCanUndo(historyRef.current.length > 0);
+    setSelectedId(null);
+  }
+
+  // Cmd/Ctrl+Z keyboard shortcut
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   async function syncToShopify() {
     if (!handle) return;
     setSyncing(true);
@@ -138,7 +178,7 @@ export default function DesignerPage() {
   // ---------- mutators ----------
   function setLayers(next: TemplateLayer[]) {
     if (!template) return;
-    setTemplate({
+    commitTemplate({
       ...template,
       defaultLayout: {
         ...template.defaultLayout,
@@ -296,6 +336,16 @@ export default function DesignerPage() {
               </a>
             </Button>
             <Button
+              variant="ghost"
+              size="sm"
+              onClick={undo}
+              disabled={!canUndo}
+              title="Ångra (Cmd/Ctrl+Z)"
+            >
+              <Undo2 className="h-4 w-4 mr-2" />
+              Ångra
+            </Button>
+            <Button
               variant="outline"
               size="sm"
               onClick={() => persistTemplate({ publish: false })}
@@ -329,7 +379,7 @@ export default function DesignerPage() {
         <ProductOptionsSection
           config={config}
           value={template.productOptions}
-          onChange={(productOptions) => setTemplate({ ...template, productOptions })}
+          onChange={(productOptions) => commitTemplate({ ...template, productOptions })}
         />
 
         <ShopifyPublishingSection config={config} onChange={updateConfigMeta} />

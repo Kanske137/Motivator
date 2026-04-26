@@ -400,9 +400,28 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
           <Field label="Orientering">
             <Select
               value={layer.defaults.orientation}
-              onValueChange={(v) =>
-                updateDefaults({ orientation: v as typeof layer.defaults.orientation })
-              }
+              onValueChange={(v) => {
+                const nextOrientation = v as typeof layer.defaults.orientation;
+                if (nextOrientation === layer.defaults.orientation) return;
+                // Swap width/height so the line keeps its length when rotating,
+                // and re-centre so it doesn't visually jump.
+                const newW = layer.hPct;
+                const newH = layer.wPct;
+                const cx = layer.xPct + layer.wPct / 2;
+                const cy = layer.yPct + layer.hPct / 2;
+                const clamp = (n: number, min: number, max: number) =>
+                  Math.max(min, Math.min(max, n));
+                const newX = clamp(cx - newW / 2, 0, Math.max(0, 100 - newW));
+                const newY = clamp(cy - newH / 2, 0, Math.max(0, 100 - newH));
+                onChange({
+                  ...layer,
+                  xPct: newX,
+                  yPct: newY,
+                  wPct: newW,
+                  hPct: newH,
+                  defaults: { ...layer.defaults, orientation: nextOrientation },
+                });
+              }}
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
