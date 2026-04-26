@@ -40,16 +40,36 @@ export function LineLayerView({
   layer: Extract<TemplateLayer, { type: "line" }>;
 }) {
   const d = layer.defaults;
-  const thick = `${Math.max(1, d.thicknessMm)}px`;
-  // Render the visible line centred inside the layer box so the surrounding
-  // area can be used as a drag hit-zone in the admin canvas (transparent for
-  // the customer either way — locks prevent interaction).
+  // Thickness scales with the canvas (container-query units) so two lines with
+  // the same thicknessMm always render the exact same pixel size at any zoom
+  // — required for seamless corner meets with auto-extend.
+  const thick = `min(${d.thicknessMm * 0.5}cqw, ${d.thicknessMm * 0.5}cqh)`;
+  // Render the visible line flush against ONE edge of the layer box (no
+  // translate(-50%) — eliminates subpixel rounding) so corners are pixel
+  // perfect and 90° sharp. The drag hit-area is provided by Rnd's
+  // minHeight/minWidth in LayerCanvas, not by this element.
   const lineStyle: React.CSSProperties =
     d.orientation === "horizontal"
-      ? { position: "absolute", left: 0, right: 0, top: "50%", transform: "translateY(-50%)", height: thick, background: d.color }
-      : { position: "absolute", top: 0, bottom: 0, left: "50%", transform: "translateX(-50%)", width: thick, background: d.color };
+      ? {
+          position: "absolute",
+          left: 0,
+          right: 0,
+          top: 0,
+          height: thick,
+          background: d.color,
+          borderRadius: 0,
+        }
+      : {
+          position: "absolute",
+          top: 0,
+          bottom: 0,
+          left: 0,
+          width: thick,
+          background: d.color,
+          borderRadius: 0,
+        };
   return (
-    <div className="absolute inset-0">
+    <div className="absolute inset-0" style={{ containerType: "size" }}>
       <div style={lineStyle} />
     </div>
   );
