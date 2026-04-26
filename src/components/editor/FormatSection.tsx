@@ -52,7 +52,16 @@ const DepthIcon = forwardRef<SVGSVGElement, { depth: string }>(({ depth }, ref) 
 DepthIcon.displayName = "DepthIcon";
 
 export function FormatSection({ configs, activeHandle, onProductChange }: Props) {
-  const { config, productOptions, size, variant, orientation, setSize, setVariant, setOrientation } = useEditorStore();
+  const { config, productOptions, template, size, variant, orientation, setSize, setVariant, setOrientation } = useEditorStore();
+
+  const allowedOrientations = template?.orientations ?? ["portrait", "landscape"];
+
+  // Auto-switch to a valid orientation if the current one is disabled by admin.
+  useMemo(() => {
+    if (!allowedOrientations.includes(orientation) && allowedOrientations[0]) {
+      setOrientation(allowedOrientations[0]);
+    }
+  }, [allowedOrientations, orientation, setOrientation]);
 
   // Group configs by template_slug → only the configs from the SAME template
   // appear in the Poster/Canvas toggle. This is what fixes the "third Poster
