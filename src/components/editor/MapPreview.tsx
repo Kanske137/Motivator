@@ -327,7 +327,10 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             // pass through the wrapper to layers underneath.
             return (
               <div key={l.id} style={{ ...wrapStyle, pointerEvents: "none" }}>
-                <LineLayerView layer={l} />
+                <LineLayerView
+                  layer={l}
+                  thicknessPx={lineThicknessPxFromCanvas(l, frameShortPx)}
+                />
               </div>
             );
           }
