@@ -40,12 +40,19 @@ export function LineLayerView({
   layer: Extract<TemplateLayer, { type: "line" }>;
 }) {
   const d = layer.defaults;
-  // thicknessMm rendered as % of layer's short side — close enough for preview
-  const style: React.CSSProperties =
+  const thick = `${Math.max(1, d.thicknessMm)}px`;
+  // Render the visible line centred inside the layer box so the surrounding
+  // area can be used as a drag hit-zone in the admin canvas (transparent for
+  // the customer either way — locks prevent interaction).
+  const lineStyle: React.CSSProperties =
     d.orientation === "horizontal"
-      ? { width: "100%", height: "100%", borderTop: `${Math.max(1, d.thicknessMm)}px solid ${d.color}` }
-      : { width: "100%", height: "100%", borderLeft: `${Math.max(1, d.thicknessMm)}px solid ${d.color}` };
-  return <div className="absolute inset-0" style={style} />;
+      ? { position: "absolute", left: 0, right: 0, top: "50%", transform: "translateY(-50%)", height: thick, background: d.color }
+      : { position: "absolute", top: 0, bottom: 0, left: "50%", transform: "translateX(-50%)", width: thick, background: d.color };
+  return (
+    <div className="absolute inset-0">
+      <div style={lineStyle} />
+    </div>
+  );
 }
 
 export function MarginLayerView({
@@ -61,11 +68,15 @@ export function MarginLayerView({
   const common: React.CSSProperties = {
     position: "absolute",
     background: d.color,
+    pointerEvents: "auto",
   };
   return (
+    // Container is pointer-events:none so the transparent middle never steals
+    // clicks/drags from layers underneath (e.g. map). Only the four filled
+    // edge strips opt back in via pointer-events:auto.
     <div
-      className="absolute inset-0 pointer-events-none"
-      style={{ containerType: "size" }}
+      className="absolute inset-0"
+      style={{ containerType: "size", pointerEvents: "none" }}
     >
       <div style={{ ...common, top: 0, left: 0, right: 0, height: thick }} />
       <div style={{ ...common, bottom: 0, left: 0, right: 0, height: thick }} />

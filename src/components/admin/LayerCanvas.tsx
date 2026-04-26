@@ -176,6 +176,41 @@ export default function LayerCanvas({
         {sortedLayers.map((layer) => {
           const isSelected = selectedId === layer.id;
           const showName = isSelected || hoverId === layer.id;
+
+          // Per-type interaction tweaks:
+          // - margin: Rnd itself is pointer-events:none so the transparent
+          //   middle never blocks clicks on layers underneath. The four
+          //   visible edge strips inside MarginLayerView re-enable events,
+          //   so admins can still click an edge to select the margin.
+          // - line: give the Rnd box a minimum hit-area (24px on the thin
+          //   axis) so there's a draggable middle, and only allow resizing
+          //   along the LENGTH axis (thickness is set via Inspector).
+          const isMargin = layer.type === "margin";
+          const isLine = layer.type === "line";
+          const lineHorizontal =
+            isLine && (layer as Extract<TemplateLayer, { type: "line" }>).defaults.orientation === "horizontal";
+          const lineVertical = isLine && !lineHorizontal;
+
+          const enableResizing = isLine
+            ? {
+                top: lineVertical,
+                bottom: lineVertical,
+                left: lineHorizontal,
+                right: lineHorizontal,
+                topLeft: false,
+                topRight: false,
+                bottomLeft: false,
+                bottomRight: false,
+              }
+            : undefined; // default = all enabled
+
+          const rndStyle: React.CSSProperties = {
+            zIndex: layer.zIndex + 1,
+            ...(isMargin ? { pointerEvents: "none" as const } : {}),
+            ...(isLine && lineHorizontal ? { minHeight: 24 } : {}),
+            ...(isLine && lineVertical ? { minWidth: 24 } : {}),
+          };
+
           return (
             <Rnd
               key={layer.id}
@@ -185,6 +220,7 @@ export default function LayerCanvas({
                 x: (layer.xPct / 100) * size.w,
                 y: (layer.yPct / 100) * size.h,
               }}
+              enableResizing={enableResizing}
               onDragStart={() => onSelect(layer.id)}
               onDrag={(_e, d) => {
                 const next = clampLayerBounds({
@@ -225,10 +261,12 @@ export default function LayerCanvas({
                 setGuides({ v: [], h: [] });
                 onChange(next);
               }}
-              style={{ zIndex: layer.zIndex + 1 }}
+              style={rndStyle}
               className={
                 isSelected
                   ? "ring-2 ring-primary ring-offset-1"
+                  : isMargin
+                  ? "" // no ring for margin (would draw across the whole canvas)
                   : "ring-1 ring-border/60 hover:ring-primary/50"
               }
             >
