@@ -208,31 +208,35 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
         </div>
       </div>
 
-      {/* Orientering — segmented pill */}
-      <div className="space-y-2">
-        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Orientering</Label>
-        <div className="flex p-1 bg-muted rounded-full">
-          {([
-            { id: "portrait", label: "Stående" },
-            { id: "landscape", label: "Liggande" },
-          ] as const).map(({ id, label }) => {
-            const active = orientation === id;
-            return (
-              <button
-                key={id}
-                onClick={() => setOrientation(id)}
-                className={`flex-1 h-10 rounded-full text-sm font-medium transition ${
-                  active
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-foreground/70 hover:text-foreground"
-                }`}
-              >
-                {label}
-              </button>
-            );
-          })}
+      {/* Orientering — segmented pill (hidden when only one orientation is allowed) */}
+      {allowedOrientations.length > 1 && (
+        <div className="space-y-2">
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Orientering</Label>
+          <div className="flex p-1 bg-muted rounded-full">
+            {([
+              { id: "portrait", label: "Stående" },
+              { id: "landscape", label: "Liggande" },
+            ] as const)
+              .filter(({ id }) => allowedOrientations.includes(id))
+              .map(({ id, label }) => {
+                const active = orientation === id;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => setOrientation(id)}
+                    className={`flex-1 h-10 rounded-full text-sm font-medium transition ${
+                      active
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-foreground/70 hover:text-foreground"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
