@@ -10,8 +10,14 @@
 // product_configs. Publish stamps `publishedAt` and runs zod validation.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Eye, Image as ImageIcon, Loader2, MapPin, Minus, Save, Send, Square, Type, Undo2, Zap } from "lucide-react";
+import { ArrowLeft, ChevronDown, Eye, Image as ImageIcon, Loader2, MapPin, Minus, Save, Send, Shapes, Square, Type, Undo2, Zap } from "lucide-react";
 import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -27,7 +33,8 @@ import {
   type Template,
   type TemplateLayer,
 } from "@/lib/template-schema";
-import { createDefaultLayout, createLayer, moveLayer, normaliseZIndex } from "@/lib/layer-utils";
+import { createDefaultLayout, createLayer, createShapeLayer, moveLayer, normaliseZIndex } from "@/lib/layer-utils";
+import type { ShapeKind } from "@/lib/template-schema";
 import { Sparkles } from "lucide-react";
 import ProductOptionsSection from "@/components/admin/ProductOptionsSection";
 import ShopifyPublishingSection from "@/components/admin/ShopifyPublishingSection";
