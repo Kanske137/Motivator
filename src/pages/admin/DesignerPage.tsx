@@ -223,6 +223,26 @@ export default function DesignerPage() {
     updateLayer(toggleAllLocks(target));
   }
 
+  function toggleOrientationEnabled(o: Orientation, enabled: boolean) {
+    if (!template) return;
+    const current = template.orientations;
+    const set = new Set(current);
+    if (enabled) set.add(o);
+    else set.delete(o);
+    if (set.size === 0) {
+      toast.error("Minst en orientering måste vara aktiv");
+      return;
+    }
+    const nextOrients: Orientation[] = (["portrait", "landscape"] as Orientation[]).filter(
+      (k) => set.has(k),
+    );
+    commitTemplate({ ...template, orientations: nextOrients });
+    if (!set.has(orientation)) {
+      const fallback = nextOrients[0];
+      if (fallback) setOrientation(fallback);
+    }
+  }
+
   // ---------- persist ----------
   function updateConfigMeta(patch: Partial<ProductConfig>) {
     if (!config) return;
