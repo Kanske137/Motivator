@@ -17,6 +17,7 @@ import {
   snapPct,
   snapLineToOtherLines,
   extendLineToMeetCorners,
+  lineThicknessPxFromCanvas,
 } from "@/lib/layer-utils";
 import AlignmentGuides from "./AlignmentGuides";
 import MapLayerPreview from "./MapLayerPreview";
