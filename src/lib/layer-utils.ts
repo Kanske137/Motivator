@@ -153,6 +153,10 @@ export function snapLineToOtherLines(
 // repeat-clicks to keep extending the line by one thickness each time.
 export const EXTEND_TOLERANCE_PCT = 0.3;
 
+function touchesBand(pos: number, start: number, end: number, tolerance: number): boolean {
+  return pos >= start - tolerance && pos <= end + tolerance;
+}
+
 export function extendLineToMeetCorners(
   line: LineLayer,
   allLayers: TemplateLayer[],
@@ -169,48 +173,47 @@ export function extendLineToMeetCorners(
   const thisCrossPos = horizontal ? next.yPct : next.xPct;
   const thisThick = lineThicknessPct(next);
 
-  for (const p of perp) {
-    const pThick = lineThicknessPct(p);
+  if (horizontal) {
+    let left = next.xPct;
+    let right = next.xPct + next.wPct;
 
-    if (horizontal) {
+    for (const p of perp) {
+      const pThick = lineThicknessPct(p);
+      const pLeft = p.xPct;
+      const pRight = p.xPct + pThick;
       const overlapsY =
         thisCrossPos + thisThick >= p.yPct - tolerance &&
         thisCrossPos <= p.yPct + p.hPct + tolerance;
       if (!overlapsY) continue;
 
-      const pRight = p.xPct + pThick;
-      const myRight = next.xPct + next.wPct;
-      // Only extend if end is at the FAR edge of perp AND not already
-      // sitting inside perp's body (which is the post-extend state).
-      const endInsidePerp = (pos: number) =>
-        pos > p.xPct + tolerance && pos < pRight - tolerance;
+      // Idempotent corner-fill: set exact outer edges instead of adding
+      // thickness. This prevents the bottom/right corner from accumulating
+      // a tiny protruding overlap when snap chooses the inner edge first.
+      if (touchesBand(left, pLeft, pRight, tolerance)) left = pLeft;
+      if (touchesBand(right, pLeft, pRight, tolerance)) right = pRight;
+    }
 
-      if (Math.abs(next.xPct - pRight) <= tolerance && !endInsidePerp(next.xPct)) {
-        next.xPct = p.xPct;
-        next.wPct = next.wPct + pThick;
-      }
-      if (Math.abs(myRight - p.xPct) <= tolerance && !endInsidePerp(myRight)) {
-        next.wPct = next.wPct + pThick;
-      }
-    } else {
+    next.xPct = left;
+    next.wPct = Math.max(1, right - left);
+  } else {
+    let top = next.yPct;
+    let bottom = next.yPct + next.hPct;
+
+    for (const p of perp) {
+      const pThick = lineThicknessPct(p);
+      const pTop = p.yPct;
+      const pBottom = p.yPct + pThick;
       const overlapsX =
         thisCrossPos + thisThick >= p.xPct - tolerance &&
         thisCrossPos <= p.xPct + p.wPct + tolerance;
       if (!overlapsX) continue;
 
-      const pBottom = p.yPct + pThick;
-      const myBottom = next.yPct + next.hPct;
-      const endInsidePerp = (pos: number) =>
-        pos > p.yPct + tolerance && pos < pBottom - tolerance;
-
-      if (Math.abs(next.yPct - pBottom) <= tolerance && !endInsidePerp(next.yPct)) {
-        next.yPct = p.yPct;
-        next.hPct = next.hPct + pThick;
-      }
-      if (Math.abs(myBottom - p.yPct) <= tolerance && !endInsidePerp(myBottom)) {
-        next.hPct = next.hPct + pThick;
-      }
+      if (touchesBand(top, pTop, pBottom, tolerance)) top = pTop;
+      if (touchesBand(bottom, pTop, pBottom, tolerance)) bottom = pBottom;
     }
+
+    next.yPct = top;
+    next.hPct = Math.max(1, bottom - top);
   }
 
   return clampLayerBounds(next);
