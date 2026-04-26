@@ -69,12 +69,14 @@ export default function TemplateThumbnail({ template, width = 120, height = 160 
           );
         }
         if (layer.type === "margin") {
+          // Thumbnail is a tiny preview — render border thickness as % of width.
+          const pct = layer.defaults.thicknessPct;
           return (
             <div
               key={layer.id}
               style={{
                 ...style,
-                border: `${Math.max(1, layer.defaults.thicknessMm / 2)}px solid ${layer.defaults.color}`,
+                border: `${Math.max(1, pct / 4)}px solid ${layer.defaults.color}`,
                 background: "transparent",
               }}
             />

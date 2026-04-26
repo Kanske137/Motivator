@@ -124,7 +124,17 @@ export function createLayer(type: LayerType, existing: TemplateLayer[]): Templat
         hPct: 1,
         type: "line",
         name: `Linje ${countOfType(existing, "line") + 1}`,
-        defaults: { orientation: "horizontal", thicknessMm: 2, color: "#1A1A1A" },
+        defaults: { orientation: "horizontal", thicknessMm: 2, color: "#000000" },
+        // Lines are admin-only — fully locked from customer.
+        locks: defaultLocks({
+          position: true,
+          size: true,
+          shape: true,
+          content: true,
+          font: true,
+          visibility: true,
+          style: true,
+        }),
       };
     case "margin":
       return {
@@ -135,7 +145,17 @@ export function createLayer(type: LayerType, existing: TemplateLayer[]): Templat
         hPct: 100,
         type: "margin",
         name: `Marginal ${countOfType(existing, "margin") + 1}`,
-        defaults: { thicknessMm: 5, color: "#FFFFFF" },
+        defaults: { thicknessPct: 5, color: "#FFFFFF" },
+        // Margin is admin-only — fully locked from customer.
+        locks: defaultLocks({
+          position: true,
+          size: true,
+          shape: true,
+          content: true,
+          font: true,
+          visibility: true,
+          style: true,
+        }),
       };
     case "photo":
       return {

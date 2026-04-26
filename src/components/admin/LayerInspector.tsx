@@ -357,26 +357,102 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
         </div>
       )}
 
-      {/* Locks */}
-      <div className="space-y-2 border-t pt-4">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Lås per egenskap
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Olåsta egenskaper kan kunden ändra i editorn.
-        </p>
-        <div className="grid grid-cols-2 gap-2 pt-2">
-          {LOCK_LABELS.map(({ key, label }) => (
-            <label key={key} className="flex items-center justify-between gap-2 text-sm">
-              <span>{label}</span>
-              <Switch
-                checked={layer.locks[key]}
-                onCheckedChange={(c) => updateLock(key, c)}
-              />
-            </label>
-          ))}
+      {layer.type === "margin" && (
+        <div className="space-y-3 border-t pt-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Marginal — defaults
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            Symmetrisk marginal runt hela motivet. Tjockleken är samma åt alla
+            sidor oavsett orientering. Kunden kan inte ändra detta.
+          </p>
+          <Field label={`Tjocklek: ${layer.defaults.thicknessPct}% av kortsidan`}>
+            <Input
+              type="number"
+              min={0}
+              max={40}
+              step={0.5}
+              value={layer.defaults.thicknessPct}
+              onChange={(e) =>
+                updateDefaults({ thicknessPct: Math.max(0, Math.min(40, Number(e.target.value))) })
+              }
+            />
+          </Field>
+          <Field label="Färg">
+            <Input
+              type="color"
+              value={layer.defaults.color}
+              onChange={(e) => updateDefaults({ color: e.target.value })}
+            />
+          </Field>
         </div>
-      </div>
+      )}
+
+      {layer.type === "line" && (
+        <div className="space-y-3 border-t pt-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Linje — defaults
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            Position och längd styrs via X/Y/Bredd/Höjd ovan. Kunden kan inte
+            ändra linjen.
+          </p>
+          <Field label="Orientering">
+            <Select
+              value={layer.defaults.orientation}
+              onValueChange={(v) =>
+                updateDefaults({ orientation: v as typeof layer.defaults.orientation })
+              }
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="horizontal">Horisontell</SelectItem>
+                <SelectItem value="vertical">Vertikal</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Tjocklek (mm)">
+            <Input
+              type="number"
+              min={0.5}
+              max={20}
+              step={0.5}
+              value={layer.defaults.thicknessMm}
+              onChange={(e) => updateDefaults({ thicknessMm: Number(e.target.value) })}
+            />
+          </Field>
+          <Field label="Färg">
+            <Input
+              type="color"
+              value={layer.defaults.color}
+              onChange={(e) => updateDefaults({ color: e.target.value })}
+            />
+          </Field>
+        </div>
+      )}
+
+      {/* Locks — hidden for admin-only layer types (margin/line) */}
+      {layer.type !== "margin" && layer.type !== "line" && (
+        <div className="space-y-2 border-t pt-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Lås per egenskap
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Olåsta egenskaper kan kunden ändra i editorn.
+          </p>
+          <div className="grid grid-cols-2 gap-2 pt-2">
+            {LOCK_LABELS.map(({ key, label }) => (
+              <label key={key} className="flex items-center justify-between gap-2 text-sm">
+                <span>{label}</span>
+                <Switch
+                  checked={layer.locks[key]}
+                  onCheckedChange={(c) => updateLock(key, c)}
+                />
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

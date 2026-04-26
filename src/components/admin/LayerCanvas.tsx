@@ -16,6 +16,7 @@ import { clampLayerBounds, snapPct } from "@/lib/layer-utils";
 import AlignmentGuides from "./AlignmentGuides";
 import MapLayerPreview from "./MapLayerPreview";
 import TextLayerPreview from "./TextLayerPreview";
+import { LineLayerView, MarginLayerView } from "@/components/editor/layers/StaticLayers";
 
 const SNAP_PCT = 5;
 const GUIDE_TOLERANCE_PCT = 1.5;
@@ -121,18 +122,9 @@ export default function LayerCanvas({
           </div>
         );
       case "line":
-        return (
-          <div className="w-full h-full" style={{ background: layer.defaults.color }} />
-        );
+        return <LineLayerView layer={layer} />;
       case "margin":
-        return (
-          <div
-            className="w-full h-full"
-            style={{
-              border: `${Math.max(1, layer.defaults.thicknessMm)}px solid ${layer.defaults.color}`,
-            }}
-          />
-        );
+        return <MarginLayerView layer={layer} />;
       case "photo": {
         const clipPath =
           layer.defaults.shape === "circle" ? "circle(50% at 50% 50%)" : undefined;

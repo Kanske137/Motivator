@@ -112,7 +112,8 @@ export const lineDefaultsSchema = z.object({
 export type LineDefaults = z.infer<typeof lineDefaultsSchema>;
 
 export const marginDefaultsSchema = z.object({
-  thicknessMm: z.number().positive().max(100),
+  /** Margin thickness as % of the canvas SHORT side. Symmetric on all sides. */
+  thicknessPct: z.number().min(0).max(40),
   color: hexColorSchema,
 });
 export type MarginDefaults = z.infer<typeof marginDefaultsSchema>;

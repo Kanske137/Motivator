@@ -74,6 +74,29 @@ function migrateLayer(layer: TemplateLayer): TemplateLayer {
   return layer;
 }
 
+/** Pre-parse coercion for legacy margin: thicknessMm → thicknessPct (~5%). */
+function coerceLegacyMargin(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object") return raw;
+  const orients = ["portrait", "landscape"] as const;
+  const root = raw as { defaultLayout?: Record<string, { layers?: Array<Record<string, unknown>> }> };
+  for (const o of orients) {
+    const layout = root?.defaultLayout?.[o];
+    if (!layout?.layers) continue;
+    for (const l of layout.layers) {
+      if (l?.type === "margin") {
+        const d = (l.defaults ?? {}) as Record<string, unknown>;
+        if (d.thicknessPct == null) {
+          // Fallback: ~5% of short side covers most legacy intents.
+          d.thicknessPct = 5;
+          delete d.thicknessMm;
+          l.defaults = d;
+        }
+      }
+    }
+  }
+  return raw;
+}
+
 /** If exactly 1 map + 1 text and the text has no link → auto-link. */
 function autoLinkSingleLayerTemplate(template: Template): Template {
   const orientations: Array<keyof Template["defaultLayout"]> = ["portrait", "landscape"];
@@ -137,7 +160,11 @@ export function resolveTemplate(
   if (isEmptyTemplate(rawTemplate)) {
     return { template: migrateTemplate(buildTemplateFromLegacy(config)), fellBack: true };
   }
-  const parsed = parseTemplate(rawTemplate);
+  // Coerce legacy margin (thicknessMm → thicknessPct) before parsing.
+  const preCoerced = coerceLegacyMargin(
+    typeof rawTemplate === "object" ? JSON.parse(JSON.stringify(rawTemplate)) : rawTemplate,
+  );
+  const parsed = parseTemplate(preCoerced);
   if (parsed.ok === true) {
     return { template: migrateTemplate(parsed.template), fellBack: false };
   }
