@@ -491,11 +491,12 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
     } else if (layer.type === "line") {
       drawLineLayer(ctx, rect, layer, pxPerMm);
     } else if (layer.type === "margin") {
-      // Margin always covers the FULL canvas (incl. bleed/wrap) regardless of
-      // the layer's stored xy/wh. Thickness is % of the canvas short side.
-      const fullRect = { x: 0, y: 0, w, h };
-      const shortPx = Math.min(w, h);
-      drawMarginLayer(ctx, fullRect, layer, pxPerMm, shortPx);
+      // Margin frames the FRONT zone only — never the wrap/bleed band. This
+      // matches the editor's dashed "Synlig framsida" rectangle and keeps the
+      // 3D canvas wrap symmetric (motif extends out into the wrap unchanged).
+      const frontRect = { x: frontPxX, y: frontPxY, w: frontPxW, h: frontPxH };
+      const shortPx = Math.min(frontPxW, frontPxH);
+      drawMarginLayer(ctx, frontRect, layer, pxPerMm, shortPx);
     }
   }
 
