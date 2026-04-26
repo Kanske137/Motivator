@@ -4,6 +4,7 @@ import { useEditorStore, type PhotoLayerValue } from "@/stores/editorStore";
 import type { TemplateLayer } from "@/lib/template-schema";
 import { MapLayerInstance } from "./layers/MapLayerInstance";
 import { ImageLayerView, LineLayerView, MarginLayerView } from "./layers/StaticLayers";
+import { lineThicknessPxFromCanvas } from "@/lib/layer-utils";
 
 interface Props {
   frameColor?: string;
