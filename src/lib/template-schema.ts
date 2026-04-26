@@ -118,6 +118,36 @@ export const marginDefaultsSchema = z.object({
 });
 export type MarginDefaults = z.infer<typeof marginDefaultsSchema>;
 
+// ---------- shape layer ----------
+// Generic admin-only decoration: lines (h/v) and frames (rect, oval, double,
+// rounded, decorative-corners). Strokes are in mm just like the legacy line
+// layer so print + editor + 3D match exactly.
+export const shapeKindSchema = z.enum([
+  "line-horizontal",
+  "line-vertical",
+  "frame-rect",
+  "frame-oval",
+  "frame-double",
+  "frame-rounded",
+  "frame-corners",
+]);
+export type ShapeKind = z.infer<typeof shapeKindSchema>;
+
+export const shapeDefaultsSchema = z.object({
+  kind: shapeKindSchema,
+  /** Stroke thickness in mm — true print measurement, identical formula
+   *  to legacy line.thicknessMm so the editor visualises 1:1 with print. */
+  strokeMm: z.number().positive().max(50),
+  color: hexColorSchema,
+  /** frame-rounded: corner radius as % of the shape's short side. */
+  cornerRadiusPct: z.number().min(0).max(50).optional(),
+  /** frame-double: gap (mm) between inner and outer stroke. */
+  gapMm: z.number().min(0).max(50).optional(),
+  /** frame-corners: which corner motif to draw. */
+  cornerStyle: z.enum(["bracket", "art-deco", "floral"]).optional(),
+});
+export type ShapeDefaults = z.infer<typeof shapeDefaultsSchema>;
+
 // ---------- layer base + discriminated union ----------
 const layerBase = z.object({
   id: z.string().min(1),
@@ -155,6 +185,10 @@ export const photoLayerSchema = layerBase.extend({
   type: z.literal("photo"),
   defaults: photoDefaultsSchema,
 });
+export const shapeLayerSchema = layerBase.extend({
+  type: z.literal("shape"),
+  defaults: shapeDefaultsSchema,
+});
 
 export const layerSchema = z.discriminatedUnion("type", [
   mapLayerSchema,
@@ -163,6 +197,7 @@ export const layerSchema = z.discriminatedUnion("type", [
   lineLayerSchema,
   marginLayerSchema,
   photoLayerSchema,
+  shapeLayerSchema,
 ]);
 export type TemplateLayer = z.infer<typeof layerSchema>;
 export type LayerType = TemplateLayer["type"];

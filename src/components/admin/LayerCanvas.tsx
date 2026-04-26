@@ -23,6 +23,7 @@ import AlignmentGuides from "./AlignmentGuides";
 import MapLayerPreview from "./MapLayerPreview";
 import TextLayerPreview from "./TextLayerPreview";
 import { LineLayerView, MarginLayerView } from "@/components/editor/layers/StaticLayers";
+import { ShapeLayerView } from "@/components/editor/layers/ShapeLayerView";
 
 const SNAP_PCT = 5;
 const GUIDE_TOLERANCE_PCT = 1.5;
@@ -131,6 +132,8 @@ export default function LayerCanvas({
         return <LineLayerView layer={layer} thicknessPx={lineThicknessPxFromCanvas(layer, Math.min(size.w, size.h))} />;
       case "margin":
         return <MarginLayerView layer={layer} />;
+      case "shape":
+        return <ShapeLayerView layer={layer} canvasShortPx={Math.min(size.w, size.h)} />;
       case "photo": {
         const clipPath =
           layer.defaults.shape === "circle" ? "circle(50% at 50% 50%)" : undefined;
@@ -193,11 +196,21 @@ export default function LayerCanvas({
           //   along the LENGTH axis (thickness is set via Inspector).
           const isMargin = layer.type === "margin";
           const isLine = layer.type === "line";
+          const isShape = layer.type === "shape";
+          const shapeKind = isShape
+            ? (layer as Extract<TemplateLayer, { type: "shape" }>).defaults.kind
+            : null;
+          const shapeIsLineH = shapeKind === "line-horizontal";
+          const shapeIsLineV = shapeKind === "line-vertical";
           const lineHorizontal =
-            isLine && (layer as Extract<TemplateLayer, { type: "line" }>).defaults.orientation === "horizontal";
-          const lineVertical = isLine && !lineHorizontal;
+            (isLine && (layer as Extract<TemplateLayer, { type: "line" }>).defaults.orientation === "horizontal") ||
+            shapeIsLineH;
+          const lineVertical =
+            (isLine && !((layer as Extract<TemplateLayer, { type: "line" }>).defaults.orientation === "horizontal")) ||
+            shapeIsLineV;
+          const isThinLine = isLine || shapeIsLineH || shapeIsLineV;
 
-          const enableResizing = isLine
+          const enableResizing = isThinLine
             ? {
                 top: lineVertical,
                 bottom: lineVertical,
@@ -213,8 +226,8 @@ export default function LayerCanvas({
           const rndStyle: React.CSSProperties = {
             zIndex: layer.zIndex + 1,
             ...(isMargin ? { pointerEvents: "none" as const } : {}),
-            ...(isLine && lineHorizontal ? { minHeight: 24 } : {}),
-            ...(isLine && lineVertical ? { minWidth: 24 } : {}),
+            ...(isThinLine && lineHorizontal ? { minHeight: 24 } : {}),
+            ...(isThinLine && lineVertical ? { minWidth: 24 } : {}),
           };
 
           return (
@@ -295,6 +308,22 @@ export default function LayerCanvas({
                 onClick={(e) => {
                   e.stopPropagation();
                   onSelect(layer.id);
+                  // Re-snap & corner-fill on click for lines opened from a
+                  // saved template — fixes lines that were stored just before
+                  // snap helpers existed (or with sub-% drift).
+                  if (isLine) {
+                    let next = clampLayerBounds(layer);
+                    next = snapLineToOtherLines(next as Extract<TemplateLayer, { type: "line" }>, layers);
+                    next = extendLineToMeetCorners(next as Extract<TemplateLayer, { type: "line" }>, layers);
+                    if (
+                      next.xPct !== layer.xPct ||
+                      next.yPct !== layer.yPct ||
+                      next.wPct !== layer.wPct ||
+                      next.hPct !== layer.hPct
+                    ) {
+                      onChange(next);
+                    }
+                  }
                 }}
                 onMouseEnter={() => setHoverId(layer.id)}
                 onMouseLeave={() => setHoverId((h) => (h === layer.id ? null : h))}
@@ -307,6 +336,7 @@ export default function LayerCanvas({
                     {layer.type === "image" && "🖼 "}
                     {layer.type === "line" && "▬ "}
                     {layer.type === "margin" && "▢ "}
+                    {layer.type === "shape" && "◇ "}
                     {layer.name}
                   </span>
                 )}

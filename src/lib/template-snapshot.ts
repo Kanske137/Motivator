@@ -384,6 +384,89 @@ function drawMarginLayer(
   ctx.restore();
 }
 
+function drawShapeLayer(
+  ctx: CanvasRenderingContext2D,
+  rect: { x: number; y: number; w: number; h: number },
+  layer: Extract<TemplateLayer, { type: "shape" }>,
+  frontShortPx: number,
+): void {
+  const d = layer.defaults;
+  // Same mm-to-px formula as line/Shape view.
+  const sw = Math.max(1, (d.strokeMm * 0.5 / 100) * frontShortPx);
+  ctx.save();
+  ctx.strokeStyle = d.color;
+  ctx.fillStyle = d.color;
+  ctx.lineWidth = sw;
+  ctx.lineCap = "square";
+  ctx.lineJoin = "miter";
+
+  if (d.kind === "line-horizontal") {
+    ctx.fillRect(rect.x, rect.y, rect.w, sw);
+  } else if (d.kind === "line-vertical") {
+    ctx.fillRect(rect.x, rect.y, sw, rect.h);
+  } else if (d.kind === "frame-rect") {
+    ctx.strokeRect(rect.x + sw / 2, rect.y + sw / 2, rect.w - sw, rect.h - sw);
+  } else if (d.kind === "frame-oval") {
+    ctx.beginPath();
+    ctx.ellipse(
+      rect.x + rect.w / 2, rect.y + rect.h / 2,
+      Math.max(0, (rect.w - sw) / 2), Math.max(0, (rect.h - sw) / 2),
+      0, 0, Math.PI * 2,
+    );
+    ctx.stroke();
+  } else if (d.kind === "frame-rounded") {
+    const r = ((d.cornerRadiusPct ?? 5) / 100) * Math.min(rect.w, rect.h);
+    const x = rect.x + sw / 2;
+    const y = rect.y + sw / 2;
+    const w = rect.w - sw;
+    const h = rect.h - sw;
+    ctx.beginPath();
+    if (typeof (ctx as unknown as { roundRect?: unknown }).roundRect === "function") {
+      (ctx as unknown as { roundRect: (x: number, y: number, w: number, h: number, r: number) => void })
+        .roundRect(x, y, w, h, r);
+    } else {
+      // Manual fallback
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+    }
+    ctx.stroke();
+  } else if (d.kind === "frame-double") {
+    const gap = Math.max(1, ((d.gapMm ?? 4) * 0.5 / 100) * frontShortPx);
+    ctx.strokeRect(rect.x + sw / 2, rect.y + sw / 2, rect.w - sw, rect.h - sw);
+    const inset = sw + gap + sw / 2;
+    const innerW = Math.max(0, rect.w - inset * 2);
+    const innerH = Math.max(0, rect.h - inset * 2);
+    if (innerW > 0 && innerH > 0) ctx.strokeRect(rect.x + inset, rect.y + inset, innerW, innerH);
+  } else if (d.kind === "frame-corners") {
+    const len = Math.min(rect.w, rect.h) * 0.15;
+    const o = sw / 2;
+    const x1 = rect.x + o, y1 = rect.y + o;
+    const x2 = rect.x + rect.w - o, y2 = rect.y + rect.h - o;
+    ctx.beginPath();
+    // TL
+    ctx.moveTo(x1, y1); ctx.lineTo(x1 + len, y1);
+    ctx.moveTo(x1, y1); ctx.lineTo(x1, y1 + len);
+    // TR
+    ctx.moveTo(x2, y1); ctx.lineTo(x2 - len, y1);
+    ctx.moveTo(x2, y1); ctx.lineTo(x2, y1 + len);
+    // BL
+    ctx.moveTo(x1, y2); ctx.lineTo(x1 + len, y2);
+    ctx.moveTo(x1, y2); ctx.lineTo(x1, y2 - len);
+    // BR
+    ctx.moveTo(x2, y2); ctx.lineTo(x2 - len, y2);
+    ctx.moveTo(x2, y2); ctx.lineTo(x2, y2 - len);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 /**
  * Render the full template (all layers, in zIndex order) to a PNG/JPEG dataURL.
  * Map layers are rendered sequentially to avoid WebGL context exhaustion.
@@ -488,6 +571,8 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
       }
     } else if (layer.type === "line") {
       drawLineLayer(ctx, rect, layer, pxPerMm, Math.min(frontPxW, frontPxH));
+    } else if (layer.type === "shape") {
+      drawShapeLayer(ctx, rect, layer, Math.min(frontPxW, frontPxH));
     } else if (layer.type === "margin") {
       // Margin frames the FRONT zone only — never the wrap/bleed band. This
       // matches the editor's dashed "Synlig framsida" rectangle and keeps the

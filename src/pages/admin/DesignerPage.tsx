@@ -10,8 +10,14 @@
 // product_configs. Publish stamps `publishedAt` and runs zod validation.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Eye, Image as ImageIcon, Loader2, MapPin, Minus, Save, Send, Square, Type, Undo2, Zap } from "lucide-react";
+import { ArrowLeft, ChevronDown, Eye, Image as ImageIcon, Loader2, MapPin, Minus, Save, Send, Shapes, Square, Type, Undo2, Zap } from "lucide-react";
 import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -27,7 +33,8 @@ import {
   type Template,
   type TemplateLayer,
 } from "@/lib/template-schema";
-import { createDefaultLayout, createLayer, moveLayer, normaliseZIndex } from "@/lib/layer-utils";
+import { createDefaultLayout, createLayer, createShapeLayer, moveLayer, normaliseZIndex } from "@/lib/layer-utils";
+import type { ShapeKind } from "@/lib/template-schema";
 import { Sparkles } from "lucide-react";
 import ProductOptionsSection from "@/components/admin/ProductOptionsSection";
 import ShopifyPublishingSection from "@/components/admin/ShopifyPublishingSection";
@@ -191,6 +198,12 @@ export default function DesignerPage() {
 
   function addLayer(type: LayerType) {
     const nextLayer = createLayer(type, layers);
+    setLayers(normaliseZIndex([...layers, nextLayer]));
+    setSelectedId(nextLayer.id);
+  }
+
+  function addShape(kind: ShapeKind) {
+    const nextLayer = createShapeLayer(kind, layers);
     setLayers(normaliseZIndex([...layers, nextLayer]));
     setSelectedId(nextLayer.id);
   }
@@ -453,10 +466,38 @@ export default function DesignerPage() {
                 <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
                 Lägg till bild
               </Button>
-              <Button size="sm" variant="outline" onClick={() => addLayer("line")}>
-                <Minus className="h-3.5 w-3.5 mr-1.5" />
-                Lägg till linje
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline">
+                    <Shapes className="h-3.5 w-3.5 mr-1.5" />
+                    Lägg till figur
+                    <ChevronDown className="h-3 w-3 ml-1 opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => addShape("line-horizontal")}>
+                    <Minus className="h-3.5 w-3.5 mr-2" /> Horisontell linje
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => addShape("line-vertical")}>
+                    <Minus className="h-3.5 w-3.5 mr-2 rotate-90" /> Vertikal linje
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => addShape("frame-rect")}>
+                    <Square className="h-3.5 w-3.5 mr-2" /> Rektangulär ram
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => addShape("frame-oval")}>
+                    <Square className="h-3.5 w-3.5 mr-2 rounded-full" /> Oval ram
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => addShape("frame-rounded")}>
+                    <Square className="h-3.5 w-3.5 mr-2" /> Rundad ram
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => addShape("frame-double")}>
+                    <Square className="h-3.5 w-3.5 mr-2" /> Dubbel ram
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => addShape("frame-corners")}>
+                    <Square className="h-3.5 w-3.5 mr-2" /> Hörn-dekoration
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button size="sm" variant="outline" onClick={() => addLayer("margin")}>
                 <Square className="h-3.5 w-3.5 mr-1.5" />
                 Lägg till marginal

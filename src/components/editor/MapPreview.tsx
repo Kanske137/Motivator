@@ -4,6 +4,7 @@ import { useEditorStore, type PhotoLayerValue } from "@/stores/editorStore";
 import type { TemplateLayer } from "@/lib/template-schema";
 import { MapLayerInstance } from "./layers/MapLayerInstance";
 import { ImageLayerView, LineLayerView, MarginLayerView } from "./layers/StaticLayers";
+import { ShapeLayerView } from "./layers/ShapeLayerView";
 import { lineThicknessPxFromCanvas } from "@/lib/layer-utils";
 
 interface Props {
@@ -343,6 +344,15 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             return (
               <div key={l.id} style={{ ...wrapStyle, pointerEvents: "none" }}>
                 <MarginLayerView layer={l} />
+              </div>
+            );
+          }
+
+          if (l.type === "shape") {
+            // Admin-only decoration — never blocks customer interaction.
+            return (
+              <div key={l.id} style={{ ...wrapStyle, pointerEvents: "none" }}>
+                <ShapeLayerView layer={l} canvasShortPx={frameShortPx} />
               </div>
             );
           }

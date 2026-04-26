@@ -27,6 +27,7 @@ const typeLabel: Record<TemplateLayer["type"], string> = {
   photo: "Foto",
   line: "Linje",
   margin: "Marginal",
+  shape: "Figur",
 };
 
 export default function LayerList({
