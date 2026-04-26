@@ -29,6 +29,169 @@ export function clampLayerBounds<T extends TemplateLayer>(layer: T): T {
   return { ...layer, xPct: x, yPct: y, wPct: w, hPct: h };
 }
 
+// ---------- line snap & corner-fill helpers ----------
+//
+// Lines are admin primitives often used to build frames/grids. Two adjacent
+// lines must meet seamlessly: no sub-pixel gap, no overlap, and where a
+// horizontal meets a vertical the corner must be filled (no L notch).
+//
+// 1. While dragging/resizing, snap the line's edges to other lines' edges
+//    within EDGE_SNAP_TOLERANCE_PCT (falls back to grid snap when none).
+// 2. After commit, extend ends that meet a perpendicular line's body by
+//    that line's thickness so the corner is flush.
+
+export const EDGE_SNAP_TOLERANCE_PCT = 2;
+const LINE_THICKNESS_SCALE = 0.5; // matches LineLayerView's `thicknessMm * 0.5` cqw/cqh
+
+type LineLayer = Extract<TemplateLayer, { type: "line" }>;
+
+function isLine(l: TemplateLayer): l is LineLayer {
+  return l.type === "line";
+}
+
+/** Thickness as a % of the canvas short side, matching what's rendered. */
+export function lineThicknessPct(line: LineLayer): number {
+  return Math.max(0.1, line.defaults.thicknessMm * LINE_THICKNESS_SCALE);
+}
+
+export function snapLineToOtherLines(
+  line: LineLayer,
+  others: TemplateLayer[],
+  tolerance = EDGE_SNAP_TOLERANCE_PCT,
+): LineLayer {
+  const otherLines = others.filter(isLine).filter((l) => l.id !== line.id);
+  if (otherLines.length === 0) return line;
+
+  const horizontal = line.defaults.orientation === "horizontal";
+  const lengthCandidates: number[] = [];
+  const crossCandidates: number[] = [];
+
+  for (const o of otherLines) {
+    const oHorizontal = o.defaults.orientation === "horizontal";
+    const oThick = lineThicknessPct(o);
+    if (oHorizontal === horizontal) {
+      if (horizontal) {
+        lengthCandidates.push(o.xPct, o.xPct + o.wPct);
+        crossCandidates.push(o.yPct, o.yPct + oThick);
+      } else {
+        lengthCandidates.push(o.yPct, o.yPct + o.hPct);
+        crossCandidates.push(o.xPct, o.xPct + oThick);
+      }
+    } else {
+      if (horizontal) {
+        lengthCandidates.push(o.xPct, o.xPct + lineThicknessPct(o));
+      } else {
+        lengthCandidates.push(o.yPct, o.yPct + lineThicknessPct(o));
+      }
+    }
+  }
+
+  function nearest(value: number, candidates: number[]): number | null {
+    let best: number | null = null;
+    let bestDist = tolerance;
+    for (const c of candidates) {
+      const d = Math.abs(value - c);
+      if (d <= bestDist) {
+        best = c;
+        bestDist = d;
+      }
+    }
+    return best;
+  }
+
+  const next = { ...line };
+
+  if (horizontal) {
+    const leftSnap = nearest(line.xPct, lengthCandidates);
+    const rightSnap = nearest(line.xPct + line.wPct, lengthCandidates);
+    const topSnap = nearest(line.yPct, crossCandidates);
+    if (leftSnap !== null && rightSnap !== null) {
+      next.xPct = leftSnap;
+      next.wPct = Math.max(1, rightSnap - leftSnap);
+    } else if (leftSnap !== null) {
+      const right = line.xPct + line.wPct;
+      next.xPct = leftSnap;
+      next.wPct = Math.max(1, right - leftSnap);
+    } else if (rightSnap !== null) {
+      next.wPct = Math.max(1, rightSnap - line.xPct);
+    }
+    if (topSnap !== null) next.yPct = topSnap;
+  } else {
+    const topSnap = nearest(line.yPct, lengthCandidates);
+    const botSnap = nearest(line.yPct + line.hPct, lengthCandidates);
+    const leftSnap = nearest(line.xPct, crossCandidates);
+    if (topSnap !== null && botSnap !== null) {
+      next.yPct = topSnap;
+      next.hPct = Math.max(1, botSnap - topSnap);
+    } else if (topSnap !== null) {
+      const bottom = line.yPct + line.hPct;
+      next.yPct = topSnap;
+      next.hPct = Math.max(1, bottom - topSnap);
+    } else if (botSnap !== null) {
+      next.hPct = Math.max(1, botSnap - line.yPct);
+    }
+    if (leftSnap !== null) next.xPct = leftSnap;
+  }
+
+  return clampLayerBounds(next);
+}
+
+export function extendLineToMeetCorners(
+  line: LineLayer,
+  allLayers: TemplateLayer[],
+  tolerance = EDGE_SNAP_TOLERANCE_PCT,
+): LineLayer {
+  const perp = allLayers
+    .filter(isLine)
+    .filter((l) => l.id !== line.id)
+    .filter((l) => l.defaults.orientation !== line.defaults.orientation);
+  if (perp.length === 0) return line;
+
+  const next = { ...line };
+  const horizontal = line.defaults.orientation === "horizontal";
+  const thisCrossPos = horizontal ? next.yPct : next.xPct;
+  const thisThick = lineThicknessPct(next);
+
+  for (const p of perp) {
+    const pThick = lineThicknessPct(p);
+
+    if (horizontal) {
+      const overlapsY =
+        thisCrossPos + thisThick >= p.yPct - tolerance &&
+        thisCrossPos <= p.yPct + p.hPct + tolerance;
+      if (!overlapsY) continue;
+
+      const pRight = p.xPct + pThick;
+      if (Math.abs(next.xPct - pRight) <= tolerance) {
+        next.xPct = p.xPct;
+        next.wPct = next.wPct + pThick;
+      }
+      const myRight = next.xPct + next.wPct;
+      if (Math.abs(myRight - p.xPct) <= tolerance) {
+        next.wPct = next.wPct + pThick;
+      }
+    } else {
+      const overlapsX =
+        thisCrossPos + thisThick >= p.xPct - tolerance &&
+        thisCrossPos <= p.xPct + p.wPct + tolerance;
+      if (!overlapsX) continue;
+
+      const pBottom = p.yPct + pThick;
+      if (Math.abs(next.yPct - pBottom) <= tolerance) {
+        next.yPct = p.yPct;
+        next.hPct = next.hPct + pThick;
+      }
+      const myBottom = next.yPct + next.hPct;
+      if (Math.abs(myBottom - p.yPct) <= tolerance) {
+        next.hPct = next.hPct + pThick;
+      }
+    }
+  }
+
+  return clampLayerBounds(next);
+}
+
+
 let nextIdCounter = 0;
 export function newLayerId(): string {
   // Stable enough for in-memory work — Mall persisteras med dessa ID och de
