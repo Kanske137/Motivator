@@ -178,7 +178,7 @@ export default function DesignerPage() {
   // ---------- mutators ----------
   function setLayers(next: TemplateLayer[]) {
     if (!template) return;
-    setTemplate({
+    commitTemplate({
       ...template,
       defaultLayout: {
         ...template.defaultLayout,
