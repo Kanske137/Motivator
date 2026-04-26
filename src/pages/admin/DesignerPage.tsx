@@ -336,6 +336,16 @@ export default function DesignerPage() {
               </a>
             </Button>
             <Button
+              variant="ghost"
+              size="sm"
+              onClick={undo}
+              disabled={!canUndo}
+              title="Ångra (Cmd/Ctrl+Z)"
+            >
+              <Undo2 className="h-4 w-4 mr-2" />
+              Ångra
+            </Button>
+            <Button
               variant="outline"
               size="sm"
               onClick={() => persistTemplate({ publish: false })}
