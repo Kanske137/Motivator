@@ -414,14 +414,33 @@ export default function DesignerPage() {
                 Drag & drop · 5% snap · alignment-guides under drag.
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Tabs value={orientation} onValueChange={(v) => setOrientation(v as Orientation)}>
                 <TabsList>
-                  <TabsTrigger value="portrait">Stående</TabsTrigger>
-                  <TabsTrigger value="landscape">Liggande</TabsTrigger>
+                  <TabsTrigger value="portrait" disabled={!template.orientations.includes("portrait")}>
+                    Stående
+                  </TabsTrigger>
+                  <TabsTrigger value="landscape" disabled={!template.orientations.includes("landscape")}>
+                    Liggande
+                  </TabsTrigger>
                 </TabsList>
               </Tabs>
-              <div className="h-6 w-px bg-border" />
+              <div className="flex items-center gap-3 px-2 border-l border-r h-9">
+                <Label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                  <Switch
+                    checked={template.orientations.includes("portrait")}
+                    onCheckedChange={(c) => toggleOrientationEnabled("portrait", c)}
+                  />
+                  Aktiv stående
+                </Label>
+                <Label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                  <Switch
+                    checked={template.orientations.includes("landscape")}
+                    onCheckedChange={(c) => toggleOrientationEnabled("landscape", c)}
+                  />
+                  Aktiv liggande
+                </Label>
+              </div>
               <Button size="sm" variant="outline" onClick={() => addLayer("map")}>
                 <MapPin className="h-3.5 w-3.5 mr-1.5" />
                 Lägg till karta
