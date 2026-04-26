@@ -54,10 +54,23 @@ export function MarginLayerView({
   layer: Extract<TemplateLayer, { type: "margin" }>;
 }) {
   const d = layer.defaults;
+  // Thickness as % of the SHORT side of this layer's box (which equals the
+  // canvas short side, since margin layers always span 0..100%). We use a
+  // container query unit so the same number works regardless of orientation.
+  const thick = `min(${d.thicknessPct}cqw, ${d.thicknessPct}cqh)`;
+  const common: React.CSSProperties = {
+    position: "absolute",
+    background: d.color,
+  };
   return (
     <div
       className="absolute inset-0 pointer-events-none"
-      style={{ border: `${Math.max(1, d.thicknessMm)}px solid ${d.color}` }}
-    />
+      style={{ containerType: "size" }}
+    >
+      <div style={{ ...common, top: 0, left: 0, right: 0, height: thick }} />
+      <div style={{ ...common, bottom: 0, left: 0, right: 0, height: thick }} />
+      <div style={{ ...common, top: 0, bottom: 0, left: 0, width: thick }} />
+      <div style={{ ...common, top: 0, bottom: 0, right: 0, width: thick }} />
+    </div>
   );
 }
