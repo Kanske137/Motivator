@@ -308,6 +308,22 @@ export default function LayerCanvas({
                 onClick={(e) => {
                   e.stopPropagation();
                   onSelect(layer.id);
+                  // Re-snap & corner-fill on click for lines opened from a
+                  // saved template — fixes lines that were stored just before
+                  // snap helpers existed (or with sub-% drift).
+                  if (isLine) {
+                    let next = clampLayerBounds(layer);
+                    next = snapLineToOtherLines(next as Extract<TemplateLayer, { type: "line" }>, layers);
+                    next = extendLineToMeetCorners(next as Extract<TemplateLayer, { type: "line" }>, layers);
+                    if (
+                      next.xPct !== layer.xPct ||
+                      next.yPct !== layer.yPct ||
+                      next.wPct !== layer.wPct ||
+                      next.hPct !== layer.hPct
+                    ) {
+                      onChange(next);
+                    }
+                  }
                 }}
                 onMouseEnter={() => setHoverId(layer.id)}
                 onMouseLeave={() => setHoverId((h) => (h === layer.id ? null : h))}
@@ -320,6 +336,7 @@ export default function LayerCanvas({
                     {layer.type === "image" && "🖼 "}
                     {layer.type === "line" && "▬ "}
                     {layer.type === "margin" && "▢ "}
+                    {layer.type === "shape" && "◇ "}
                     {layer.name}
                   </span>
                 )}
