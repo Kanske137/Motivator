@@ -40,12 +40,19 @@ export function LineLayerView({
   layer: Extract<TemplateLayer, { type: "line" }>;
 }) {
   const d = layer.defaults;
-  // thicknessMm rendered as % of layer's short side — close enough for preview
-  const style: React.CSSProperties =
+  const thick = `${Math.max(1, d.thicknessMm)}px`;
+  // Render the visible line centred inside the layer box so the surrounding
+  // area can be used as a drag hit-zone in the admin canvas (transparent for
+  // the customer either way — locks prevent interaction).
+  const lineStyle: React.CSSProperties =
     d.orientation === "horizontal"
-      ? { width: "100%", height: "100%", borderTop: `${Math.max(1, d.thicknessMm)}px solid ${d.color}` }
-      : { width: "100%", height: "100%", borderLeft: `${Math.max(1, d.thicknessMm)}px solid ${d.color}` };
-  return <div className="absolute inset-0" style={style} />;
+      ? { position: "absolute", left: 0, right: 0, top: "50%", transform: "translateY(-50%)", height: thick, background: d.color }
+      : { position: "absolute", top: 0, bottom: 0, left: "50%", transform: "translateX(-50%)", width: thick, background: d.color };
+  return (
+    <div className="absolute inset-0">
+      <div style={lineStyle} />
+    </div>
+  );
 }
 
 export function MarginLayerView({
