@@ -450,8 +450,78 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
         </div>
       )}
 
-      {/* Locks — hidden for admin-only layer types (margin/line) */}
-      {layer.type !== "margin" && layer.type !== "line" && (
+      {layer.type === "shape" && (
+        <div className="space-y-3 border-t pt-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Figur — defaults
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            Admin-bara dekoration. Position och storlek styrs via X/Y/Bredd/Höjd
+            ovan. Kunden kan inte ändra figuren.
+          </p>
+          <Field label="Form">
+            <Select
+              value={layer.defaults.kind}
+              onValueChange={(v) => updateDefaults({ kind: v as typeof layer.defaults.kind })}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="line-horizontal">Horisontell linje</SelectItem>
+                <SelectItem value="line-vertical">Vertikal linje</SelectItem>
+                <SelectItem value="frame-rect">Rektangulär ram</SelectItem>
+                <SelectItem value="frame-oval">Oval ram</SelectItem>
+                <SelectItem value="frame-rounded">Rundad ram</SelectItem>
+                <SelectItem value="frame-double">Dubbel ram</SelectItem>
+                <SelectItem value="frame-corners">Hörn-dekoration</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Tjocklek (mm)">
+            <Input
+              type="number"
+              min={0.5}
+              max={20}
+              step={0.5}
+              value={layer.defaults.strokeMm}
+              onChange={(e) => updateDefaults({ strokeMm: Number(e.target.value) })}
+            />
+          </Field>
+          <Field label="Färg">
+            <Input
+              type="color"
+              value={layer.defaults.color}
+              onChange={(e) => updateDefaults({ color: e.target.value })}
+            />
+          </Field>
+          {layer.defaults.kind === "frame-rounded" && (
+            <Field label="Hörnradie (% av kortsida)">
+              <Input
+                type="number"
+                min={0}
+                max={50}
+                step={1}
+                value={layer.defaults.cornerRadiusPct ?? 5}
+                onChange={(e) => updateDefaults({ cornerRadiusPct: Number(e.target.value) })}
+              />
+            </Field>
+          )}
+          {layer.defaults.kind === "frame-double" && (
+            <Field label="Mellanrum (mm)">
+              <Input
+                type="number"
+                min={0}
+                max={50}
+                step={0.5}
+                value={layer.defaults.gapMm ?? 4}
+                onChange={(e) => updateDefaults({ gapMm: Number(e.target.value) })}
+              />
+            </Field>
+          )}
+        </div>
+      )}
+
+      {/* Locks — hidden for admin-only layer types */}
+      {layer.type !== "margin" && layer.type !== "line" && layer.type !== "shape" && (
         <div className="space-y-2 border-t pt-4">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Lås per egenskap
