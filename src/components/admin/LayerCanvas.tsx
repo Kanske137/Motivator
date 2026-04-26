@@ -202,6 +202,14 @@ export default function LayerCanvas({
             : null;
           const shapeIsLineH = shapeKind === "line-horizontal";
           const shapeIsLineV = shapeKind === "line-vertical";
+          // A "frame" shape (rect/oval/rounded/double/corners) has a hollow
+          // middle. Treat it like `margin`: the Rnd box becomes pointer-
+          // events:none so clicks in the empty centre fall through to layers
+          // underneath. Only the actual stroke pixels (set to pointer-events:
+          // auto inside ShapeLayerView) catch clicks. Line-shapes are NOT
+          // frames and keep normal hit behaviour.
+          const isShapeFrame =
+            isShape && !shapeIsLineH && !shapeIsLineV;
           const lineHorizontal =
             (isLine && (layer as Extract<TemplateLayer, { type: "line" }>).defaults.orientation === "horizontal") ||
             shapeIsLineH;
@@ -225,7 +233,7 @@ export default function LayerCanvas({
 
           const rndStyle: React.CSSProperties = {
             zIndex: layer.zIndex + 1,
-            ...(isMargin ? { pointerEvents: "none" as const } : {}),
+            ...(isMargin || isShapeFrame ? { pointerEvents: "none" as const } : {}),
             ...(isThinLine && lineHorizontal ? { minHeight: 24 } : {}),
             ...(isThinLine && lineVertical ? { minWidth: 24 } : {}),
           };
