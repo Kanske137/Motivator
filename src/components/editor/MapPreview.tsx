@@ -320,16 +320,22 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
           }
 
           if (l.type === "line") {
+            // Customer never interacts with lines (admin-locked) — let clicks
+            // pass through the wrapper to layers underneath.
             return (
-              <div key={l.id} style={wrapStyle}>
+              <div key={l.id} style={{ ...wrapStyle, pointerEvents: "none" }}>
                 <LineLayerView layer={l} />
               </div>
             );
           }
 
           if (l.type === "margin") {
+            // Margin wrapper covers the full canvas; without pointerEvents:none
+            // it would steal all clicks from the map/text/photo layers below.
+            // MarginLayerView already opts the four visible edge strips back
+            // in via pointer-events:auto.
             return (
-              <div key={l.id} style={wrapStyle}>
+              <div key={l.id} style={{ ...wrapStyle, pointerEvents: "none" }}>
                 <MarginLayerView layer={l} />
               </div>
             );

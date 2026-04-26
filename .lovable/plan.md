@@ -1,52 +1,83 @@
 
-# Fix: marginal stjäl klick + linjer går inte att flytta
+## Plan: Marginal click-through (kund) · Linje-rotation · Ångra-knapp
 
-Två separata buggar i admin-canvasen, båda orsakade av hur Rnd-wrappers och layer-renderare hanterar pointer-events.
+### 1. Marginal blockerar klick i **kund-editorn** (huvudbuggen)
 
-## Problem 1 — Marginal blockerar klick på kartan
+**Rotorsak**: I `src/components/editor/MapPreview.tsx` (rad 202–339) renderas alla lager med en gemensam wrapper-div (`wrapStyle`, rad 204–211). För marginal-lagret är wrappern 100%×100% av canvasen och saknar `pointer-events: none`. Den fångar därför alla klick/drag innan eventet hinner ner till `MarginLayerView` (som internt har korrekt logik med transparent mitt).
 
-**Orsak**: Marginal-lagret har `xPct/yPct/wPct/hPct = 0,0,100,100` och dess Rnd-wrapper ligger överst (högst zIndex). Hela ytan — inklusive den **transparenta mitten** mellan de fyra vita kanterna — fångar pointer-events. När admin (eller kund) försöker dra/zooma kartan under hamnar klicken på marginal-lagret istället.
+**Fix**: I rendrings-grenen för `l.type === "margin"` (rad 330–336), lägg `pointerEvents: "none"` på wrappern. `MarginLayerView` har redan `pointer-events: auto` på de fyra synliga kant-strippsen, så marginalen syns kvar visuellt men mitten släpper igenom klick till kartan/övriga lager.
 
-**Lösning** (admin + kund):
+```tsx
+if (l.type === "margin") {
+  return (
+    <div key={l.id} style={{ ...wrapStyle, pointerEvents: "none" }}>
+      <MarginLayerView layer={l} />
+    </div>
+  );
+}
+```
 
-1. **Kund-vy (`StaticLayers.tsx` → `MarginLayerView`)**: Sätt `pointer-events: none` på hela container-diven. Marginalen är ren visuell dekor för kunden och ska aldrig ta emot klick.
+Samma sak görs förebyggande för `line`-wrappern i kund-editorn (rad 322–328) — kunden ska aldrig kunna interagera med linjer ändå (admin-låsta).
 
-2. **Admin-vy (`LayerCanvas.tsx`)**: När `layer.type === "margin"` ska Rnd-wrappern bara fånga events på de fyra vita kantremsorna, inte i mitten. Två rimliga vägar:
-   - **A (enklast)**: Wrappa `Rnd` i logik som sätter `style={{ pointerEvents: "none" }}` på själva Rnd-elementet för margin-lager, men `pointer-events: auto` på de fyra inre kantremsorna. Selection sker då genom att klicka på själva kanten (vilket är intuitivt — det är ju där marginalen ligger).
-   - **B (alternativ)**: Behåll Rnd som vanligt men lägg en separat "selection hit-area" bara på kanterna. Mer kod, ingen tydlig vinst.
-   
-   → Går på **A**.
+### 2. Linje-rotation: bevara längd vid byte horisontell ↔ vertikal
 
-3. **`renderLayerContent` för margin**: De fyra fyllda div:arna inuti `MarginLayerView` får `pointer-events: auto` så att admin fortfarande kan klicka för att selecta marginalen via dess synliga kant.
+**Rotorsak**: I `LayerInspector.tsx` byter orientation-kontrollen bara `defaults.orientation`, vilket gör att en bred-och-låg box blir en bred-och-låg vertikal linje (= nästan ingen längd).
 
-## Problem 2 — Linjer går bara att resiza, inte flytta
+**Fix**: I `LayerInspector.tsx`, vid orientation-ändring för line-lager: swappa `wPct`/`hPct` och justera `xPct`/`yPct` så att linjens centrum ligger kvar:
 
-**Orsak**: En horisontell linje med `hPct ≈ 1` blir bara ~5–8px hög i admin-canvasen. Hela den ytan täcks av Rnd:s resize-handles (top/bottom edges + corners), så det finns ingen "mitt" kvar att greppa för drag.
+```ts
+const newW = layer.hPct;
+const newH = layer.wPct;
+const newX = layer.xPct + (layer.wPct - newW) / 2;
+const newY = layer.yPct + (layer.hPct - newH) / 2;
+// Klampa till [0, 100 - storlek] för att undvika out-of-bounds
+onChange({
+  ...layer,
+  xPct: clamp(newX, 0, 100 - newW),
+  yPct: clamp(newY, 0, 100 - newH),
+  wPct: newW,
+  hPct: newH,
+  defaults: { ...layer.defaults, orientation: nextOrientation },
+});
+```
 
-**Lösning** (`LayerCanvas.tsx`):
+### 3. Ångra-knapp i admin-designern
 
-1. **Osynlig hit-area runt linjen**: För `layer.type === "line"`, rendera en transparent "padding-zon" på ~10–12px runt själva linjen inuti Rnd-boxen. Själva Rnd-boxen får en minsta interaktiv höjd/bredd (`minHeight: 24px` för horisontell, `minWidth: 24px` för vertikal) **men endast visuellt för admin** — det sparade `hPct/wPct`-värdet ändras inte.
+**Var**: `src/pages/admin/DesignerPage.tsx`.
 
-   Konkret: ge Rnd en `style={{ minHeight: layer.type === "line" && layer.defaults.orientation === "horizontal" ? 24 : undefined, minWidth: layer.type === "line" && layer.defaults.orientation === "vertical" ? 24 : undefined }}`. Linjen själv (`LineLayerView`) renderas centrerat inuti, och resten är transparent drag-yta.
+**Hur**:
+- En `useRef<Template[]>([])` lagrar tidigare versioner av `template`. Sessionsbaserad → försvinner vid sidladdning (precis som du vill).
+- En wrapper `commitTemplate(next)` används istället för direkt `setTemplate` på alla mutator-paths (`setLayers`, orientation-ändringar via `setTemplate({...template, productOptions})` etc.). Den pushar nuvarande `template` till stacken (med en cap på t.ex. 50 steg) och sätter sen den nya.
+- En `undo()`-funktion poppar senaste och `setTemplate(prev)`.
+- En `Ångra`-knapp i headern (mellan "Visa som kund" och "Spara draft") med `Undo2`-ikon från `lucide-react`. Disabled när stacken är tom. Cmd/Ctrl+Z keyboard shortcut som bonus.
 
-2. **Begränsa resize-handles för linjer**: 
-   - Horisontell linje → bara `left` + `right` handles (tjocklek styrs via `thicknessMm` i Inspector, inte via drag).
-   - Vertikal linje → bara `top` + `bottom` handles.
-   - Sätts via Rnd:s `enableResizing={{ left: true, right: true, top: false, ... }}`-prop.
-   
-   Det här gör att resten av hit-arean (mitten + de inaktiva sidorna) reserveras för **drag**, vilket är exakt det användaren vill.
+```tsx
+const historyRef = useRef<Template[]>([]);
+const [canUndo, setCanUndo] = useState(false);
 
-3. **Cursor-feedback**: `cursor: move` på drag-zonen, `cursor: ew-resize`/`ns-resize` på de aktiva handles (Rnd sköter det redan men värt att verifiera).
+function commitTemplate(next: Template) {
+  if (template) {
+    historyRef.current.push(template);
+    if (historyRef.current.length > 50) historyRef.current.shift();
+    setCanUndo(true);
+  }
+  setTemplate(next);
+}
 
-## Sammanfattning av ändringar
+function undo() {
+  const prev = historyRef.current.pop();
+  if (!prev) return;
+  setTemplate(prev);
+  setCanUndo(historyRef.current.length > 0);
+  setSelectedId(null); // valt lager kan vara raderat i föregående state
+}
+```
 
-| Fil | Ändring |
-|---|---|
-| `src/components/editor/layers/StaticLayers.tsx` | `MarginLayerView`: `pointer-events: none` på containern. |
-| `src/components/admin/LayerCanvas.tsx` | För `margin`: Rnd får `pointerEvents: none`, kanterna `pointerEvents: auto`. För `line`: minsta hit-area 24px + begränsade resize-handles (bara längd-axeln). |
+Alla befintliga anrop till `setTemplate(...)` i `DesignerPage.tsx` (inkl. `setLayers`-helpern) byts till `commitTemplate(...)`.
 
-Inget i print-pipelinen, schemat eller kund-editorns kontrollpanel påverkas. Kunden kan ändå inte interagera med marginal/linje (locks är `true`) — fixen för marginalen i kund-vyn handlar bara om att inte blockera klick på kartan under.
+### Filer som ändras
+- `src/components/editor/MapPreview.tsx` — pointer-events fix för margin (+line) wrapper
+- `src/components/admin/LayerInspector.tsx` — line-orientation swap-logik
+- `src/pages/admin/DesignerPage.tsx` — undo stack + knapp + keyboard shortcut
 
-## Frågor
-
-Inga — beteendet är entydigt utifrån din beskrivning. Säg **kör** så implementerar jag.
+Säg **kör** så implementerar jag i ordning: marginal-fix → linje-rotation → ångra.
