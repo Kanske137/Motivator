@@ -10,7 +10,7 @@
 // product_configs. Publish stamps `publishedAt` and runs zod validation.
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Eye, Image as ImageIcon, Loader2, MapPin, Save, Send, Type, Zap } from "lucide-react";
+import { ArrowLeft, Eye, Image as ImageIcon, Loader2, MapPin, Minus, Save, Send, Square, Type, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -361,6 +361,14 @@ export default function DesignerPage() {
               <Button size="sm" variant="outline" onClick={() => addLayer("photo")}>
                 <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
                 Lägg till bild
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => addLayer("line")}>
+                <Minus className="h-3.5 w-3.5 mr-1.5" />
+                Lägg till linje
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => addLayer("margin")}>
+                <Square className="h-3.5 w-3.5 mr-1.5" />
+                Lägg till marginal
               </Button>
             </div>
           </div>
