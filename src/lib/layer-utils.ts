@@ -11,7 +11,7 @@ import {
   type TemplateLayer,
 } from "@/lib/template-schema";
 
-const SNAP_PCT = 5;
+const SNAP_PCT = 1.25;
 
 export function snapPct(value: number, snap = SNAP_PCT): number {
   return Math.round(value / snap) * snap;

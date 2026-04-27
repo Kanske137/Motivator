@@ -17,7 +17,8 @@ const AppRoutes = () => {
   useCartSync();
   return (
     <Routes>
-      <Route path="/" element={<Index />} />
+      <Route path="/" element={<AdminConfigs />} />
+      <Route path="/home" element={<Index />} />
       <Route path="/editor" element={<EditorPage />} />
       <Route path="/admin/configs" element={<AdminConfigs />} />
       <Route path="/admin/designer/:handle" element={<DesignerPage />} />
