@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import type { Template } from "@/lib/template-schema";
 import MapLayerPreview from "./MapLayerPreview";
 import TextLayerPreview from "./TextLayerPreview";
+import { ShapeLayerView } from "@/components/editor/layers/ShapeLayerView";
 
 interface Props {
   template: Template | null;
@@ -82,12 +83,51 @@ export default function TemplateThumbnail({ template, width = 120, height = 160 
             />
           );
         }
-        return (
-          <div
-            key={layer.id}
-            style={{ ...style, background: "hsl(var(--muted))" }}
-          />
-        );
+        if (layer.type === "shape") {
+          return (
+            <div key={layer.id} style={style}>
+              <ShapeLayerView layer={layer} canvasShortPx={Math.min(width, height)} />
+            </div>
+          );
+        }
+        if (layer.type === "image") {
+          return (
+            <div key={layer.id} style={style}>
+              {layer.defaults.url ? (
+                <img
+                  src={layer.defaults.url}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  draggable={false}
+                />
+              ) : (
+                <div className="w-full h-full bg-muted/40" />
+              )}
+            </div>
+          );
+        }
+        if (layer.type === "photo") {
+          const clipPath =
+            layer.defaults.shape === "circle" ? "circle(50% at 50% 50%)" : undefined;
+          const src = layer.defaults.placeholderUrl;
+          return (
+            <div key={layer.id} style={{ ...style, overflow: "hidden", clipPath }}>
+              {src ? (
+                <img
+                  src={src}
+                  alt=""
+                  className={`w-full h-full ${
+                    layer.defaults.fit === "contain" ? "object-contain" : "object-cover"
+                  }`}
+                  draggable={false}
+                />
+              ) : (
+                <div className="w-full h-full bg-muted/40 border border-dashed border-foreground/20" />
+              )}
+            </div>
+          );
+        }
+        return null;
       })}
     </div>
   );
