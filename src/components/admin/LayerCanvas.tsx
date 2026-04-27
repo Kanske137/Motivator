@@ -25,7 +25,7 @@ import TextLayerPreview from "./TextLayerPreview";
 import { LineLayerView, MarginLayerView } from "@/components/editor/layers/StaticLayers";
 import { ShapeLayerView } from "@/components/editor/layers/ShapeLayerView";
 
-const SNAP_PCT = 5;
+const SNAP_PCT = 1.25;
 const GUIDE_TOLERANCE_PCT = 1.5;
 
 interface Props {
@@ -163,7 +163,7 @@ export default function LayerCanvas({
   }
 
   return (
-    <div className="w-full max-w-md mx-auto">
+    <div className="w-full max-w-2xl mx-auto">
       <div
         ref={wrapRef}
         className="relative w-full overflow-hidden rounded-md border shadow-sm"
