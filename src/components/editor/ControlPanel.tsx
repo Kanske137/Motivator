@@ -128,10 +128,10 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
 
   // Hide map layers fully locked (no editable surface)
   const editableMaps = mapLayers.filter(
-    (l) => !l.locks.position || !l.locks.style || !l.locks.shape || !l.locks.visibility,
+    (l) => !l.locks.position || !l.locks.style || !l.locks.shape || !l.locks.visibility || !l.locks.size || !l.locks.move,
   );
   const editableTexts = textLayers.filter(
-    (l) => !l.locks.content || !l.locks.font || !l.locks.visibility,
+    (l) => !l.locks.content || !l.locks.font || !l.locks.visibility || !l.locks.size || !l.locks.move,
   );
 
   // Image section visible only when the template has at least one dedicated
