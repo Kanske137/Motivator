@@ -86,6 +86,11 @@ interface EditorState {
   // Per-layer values keyed by layer id (covers map + text layers).
   layerValues: Record<string, LayerValue>;
 
+  // Customer-driven rect overrides for layers (when locks.size or locks.move
+  // are unlocked). All values in % of editor canvas. Missing fields fall
+  // back to the template layer's xPct/yPct/wPct/hPct.
+  layerTransforms: Record<string, { xPct?: number; yPct?: number; wPct?: number; hPct?: number }>;
+
   // Global background (one per layout). Other map/text values now live in
   // `layerValues`; the fields below are derived getters for legacy callers.
   posterBgColor: string;
