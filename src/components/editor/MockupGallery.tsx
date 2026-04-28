@@ -23,6 +23,7 @@ export function MockupGallery() {
     showLabels, mapShape, posterBgColor,
     layerValues,
     designSource, photoPreviewUrl, aiPrintFileUrl,
+    aiPhotoResults,
   } = useEditorStore();
   const [slots, setSlots] = useState<MockupSlot[]>([]);
   const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null);
