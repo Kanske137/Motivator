@@ -276,7 +276,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             top: `${rect.top}%`,
             width: `${rect.width}%`,
             height: `${rect.height}%`,
-            zIndex: l.zIndex,
+            zIndex: l.type === "margin" ? 9999 : l.zIndex,
           };
           const movable = !l.locks.move && (l.type === "map" || l.type === "photo" || l.type === "aiPhoto" || l.type === "text" || l.type === "image");
           const moveHandle = movable ? (
