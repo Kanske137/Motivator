@@ -195,12 +195,30 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         removeBackgroundStyleId: selectedPreset?.id ?? null,
         force: !!opts.force,
       });
-      // Layer aspect ratio (width / height) — passed to the edge function so
-      // Nano Banana can try to render the removeBackground output in the same
-      // shape as the layer it will land in. Best-effort only; the real
-      // safety net is contain-rendering on the client.
-      const targetAspectRatio =
-        layer.box?.h && layer.box.h > 0 ? layer.box.w / layer.box.h : null;
+      // Layer aspect ratio (visual width / height in CM) — passed to the
+      // edge function so Nano Banana can try to render the removeBackground
+      // output in the same shape as the layer it will land in. Best-effort
+      // only; the real safety net is contain-rendering on the client.
+      const { size: editorSize, orientation: editorOrientation } =
+        useEditorStore.getState();
+      let targetAspectRatio: number | null = null;
+      if (editorSize && layer.wPct > 0 && layer.hPct > 0) {
+        const m = editorSize.match(/(\d+)\s*x\s*(\d+)/i);
+        if (m) {
+          const a = parseInt(m[1], 10);
+          const b = parseInt(m[2], 10);
+          // size is "WxH" in cm. orientation flips which dimension is wider.
+          const [canvasW, canvasH] =
+            editorOrientation === "portrait"
+              ? [Math.min(a, b), Math.max(a, b)]
+              : [Math.max(a, b), Math.min(a, b)];
+          const layerWcm = (layer.wPct / 100) * canvasW;
+          const layerHcm = (layer.hPct / 100) * canvasH;
+          if (layerWcm > 0 && layerHcm > 0) {
+            targetAspectRatio = layerWcm / layerHcm;
+          }
+        }
+      }
 
       const { data, error } = await supabase.functions.invoke("replicate-face-swap", {
         body: {
