@@ -421,42 +421,73 @@ Deno.serve(async (req) => {
     const prompt: string = typeof body?.prompt === "string" ? body.prompt : "";
     const subjectKindRaw: string =
       typeof body?.subjectKind === "string" ? body.subjectKind : "human";
-    const subjectKind = (["human", "cat", "dog", "other"].includes(subjectKindRaw)
-      ? subjectKindRaw
-      : "human") as "human" | "cat" | "dog" | "other";
+    // Accept the new vocabulary AND the old one — the client may be a stale
+    // cached bundle still sending cat/dog/other. Map them to "pet".
+    const normalizedKind: string =
+      subjectKindRaw === "cat" || subjectKindRaw === "dog" || subjectKindRaw === "other"
+        ? "pet"
+        : subjectKindRaw;
+    const subjectKind = (["human", "pet", "removeBackground"].includes(normalizedKind)
+      ? normalizedKind
+      : "human") as "human" | "pet" | "removeBackground";
     const designId: string =
       typeof body?.designId === "string" ? body.designId : crypto.randomUUID();
 
-    if (!referenceImageUrl || !faceImageUrl) {
-      return jsonResponse(
-        { error: "referenceImageUrl and faceImageUrl required" },
-        400,
-      );
+    const removeBackgroundStylePrompt: string | null =
+      typeof body?.removeBackgroundStylePrompt === "string"
+        ? body.removeBackgroundStylePrompt
+        : null;
+    const removeBackgroundStyleLabel: string | null =
+      typeof body?.removeBackgroundStyleLabel === "string"
+        ? body.removeBackgroundStyleLabel
+        : null;
+    const removeBackgroundStyleId: string | null =
+      typeof body?.removeBackgroundStyleId === "string"
+        ? body.removeBackgroundStyleId
+        : null;
+
+    // Validation: faceImageUrl is always required. referenceImageUrl is
+    // required only for human + pet routes.
+    if (!faceImageUrl) {
+      return jsonResponse({ error: "faceImageUrl required" }, 400);
+    }
+    if (subjectKind !== "removeBackground" && !referenceImageUrl) {
+      return jsonResponse({ error: "referenceImageUrl required for this subjectKind" }, 400);
     }
 
-    const isAnimal = subjectKind === "cat" || subjectKind === "dog" || subjectKind === "other";
-    const route = isAnimal ? "animal-nano-banana" : "human-replicate";
-    const modelUsed = isAnimal ? ANIMAL_MODEL : FACE_SWAP_MODEL_NAME;
+    const route =
+      subjectKind === "human" ? "human-replicate"
+      : subjectKind === "pet" ? "pet-nano-banana"
+      : "remove-bg-nano-banana";
+    const modelUsed = subjectKind === "human" ? FACE_SWAP_MODEL_NAME : ANIMAL_MODEL;
 
     console.log(
       `[face-swap] start route=${route} model=${modelUsed} ` +
         `subjectKind=${subjectKind} designId=${designId} ` +
-        `referenceImage=${referenceImageUrl} faceImage=${faceImageUrl} ` +
+        `referenceImage=${referenceImageUrl ?? "(none)"} faceImage=${faceImageUrl} ` +
+        `removeBgStyleId=${removeBackgroundStyleId ?? "(none)"} ` +
         `adminPrompt="${prompt.slice(0, 120)}"`,
     );
 
-    const result = isAnimal
-      ? await runAnimalSwap({
-          referenceImageUrl,
-          faceImageUrl,
-          subjectKind: subjectKind as "cat" | "dog" | "other",
-          adminPrompt: prompt,
-        })
-      : await runReplicateFaceSwap({
-          referenceImageUrl,
-          faceImageUrl,
-          designId,
-        });
+    const result =
+      subjectKind === "human"
+        ? await runReplicateFaceSwap({
+            referenceImageUrl: referenceImageUrl!,
+            faceImageUrl,
+            designId,
+          })
+        : subjectKind === "pet"
+        ? await runPetSwap({
+            referenceImageUrl: referenceImageUrl!,
+            faceImageUrl,
+            adminPrompt: prompt,
+          })
+        : await runRemoveBackground({
+            faceImageUrl,
+            adminPrompt: prompt,
+            stylePrompt: removeBackgroundStylePrompt,
+            styleLabel: removeBackgroundStyleLabel,
+          });
 
     if (!result.ok) return result.response;
 
