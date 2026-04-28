@@ -131,7 +131,7 @@ export function AiPhotoSection({ layer, heading }: Props) {
         const cached = getCachedFaceSwap(layer.id, hash, refUrl);
         if (cached) {
           setAiPhotoResult(layer.id, cached);
-          toast.success("AI-bild återanvänd");
+          toast.success("Bilden är klar");
           return;
         }
       }
