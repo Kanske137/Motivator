@@ -148,15 +148,21 @@ export function AiPhotoSection({ layer, heading }: Props) {
         },
       });
       if (error) throw error;
-      const printFileUrl = (data as { printFileUrl?: string })?.printFileUrl;
-      if (!printFileUrl) throw new Error("AI-tjänsten returnerade ingen bild");
+      const payload = data as { printFileUrl?: string; error?: string; fallback?: boolean; userMessage?: string };
+      if (payload?.error) {
+        const friendly = payload.userMessage ?? "Vi kunde inte skapa bilden. Prova en annan bild med tydligt ansikte och bra ljus.";
+        toast.error("Kunde inte skapa bilden", { description: friendly });
+        return;
+      }
+      const printFileUrl = payload?.printFileUrl;
+      if (!printFileUrl) throw new Error("Tjänsten returnerade ingen bild");
       setAiPhotoResult(layer.id, printFileUrl);
       if (hash) addFaceSwapToCache(layer.id, hash, refUrl, printFileUrl);
-      toast.success("AI-bild skapad");
+      toast.success("Bilden är klar");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Okänt fel";
       console.error("[AiPhoto] swap failed", e);
-      toast.error("Kunde inte skapa AI-bild", { description: msg });
+      toast.error("Kunde inte skapa bilden", { description: msg });
     } finally {
       setBusy(false);
     }
