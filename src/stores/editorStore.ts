@@ -134,6 +134,8 @@ interface EditorState {
   setSize: (s: string) => void;
   setVariant: (v: string) => void;
   setOrientation: (o: Orientation) => void;
+  setLayerTransform: (id: string, patch: { xPct?: number; yPct?: number; wPct?: number; hPct?: number }) => void;
+  resetLayerTransform: (id: string) => void;
   setPhotoSource: (file: File | null, previewUrl: string | null) => void;
   setOriginalPhotoUrl: (url: string | null) => void;
   setPhotoHash: (hash: string | null) => void;
