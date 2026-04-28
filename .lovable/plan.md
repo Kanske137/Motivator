@@ -1,74 +1,125 @@
 ## Mål
 
-Behåll nuvarande `cdingram/face-swap` (Replicate) för **människor** — den fungerar bra. För **katt och hund** routea till en annan modell som hanterar djur bättre.
+1. **Förenkla "Motiv"-listan** för aiPhoto-lager:
+   - **Människa** — Replicate `cdingram/face-swap` (oförändrat).
+   - **Hund / Katt** — gemensam rad, Nano Banana 2 (oförändrat).
+   - **Ta bort bakgrund** — NY. Ingen referensbild. Tar bort bakgrunden runt motivet och adderar en lekfull akvarell-/prick-effekt runt motivet (i stil med uppladdade exemplet).
+   - `"other"` tas bort.
 
-## Modellval för djur
+2. **Stilval för "Ta bort bakgrund"**: Kunden ska kunna välja en stil från templatets befintliga `productOptions.aiStyles` (samma lista admin redan kurerar via `enabled`-flaggan i AI-stilar-sektionen). Bakgrunden måste ALLTID vara borttagen, oavsett stil.
 
-Två rimliga alternativ undersöktes:
+3. Befintliga lager med `subjectKind` `"cat" | "dog" | "other"` mappas vid inläsning till nya `"pet"`.
 
-1. **`fofr/become-image` (Replicate)** — designad för "låt den här personen bli den här bilden", använder IP-Adapter med två inputbilder. Fungerar tekniskt även för djur men är primärt person-tränad.
+## Schema (`src/lib/template-schema.ts`)
 
-2. **Nano Banana 2 / `google/gemini-3.1-flash-image-preview` via Lovable AI Gateway** ✅ rekommenderas
-   - Stark identitetsbevaring vid multi-image edits.
-   - Naturlig prompt: "Use the dog's face from the second image and place it on the dog in the first image".
-   - Behöver ingen extra API-nyckel — `LOVABLE_API_KEY` finns redan.
-   - Snabbt och billigt jämfört med dedikerade Replicate-modeller.
-   - Officiellt stödd via Lovable AI.
-
-Jag väljer **Nano Banana 2** för katt/hund.
-
-## Implementationsplan
-
-1. **Edge function `replicate-face-swap/index.ts`**
-   - Behåll `cdingram/face-swap` när `subjectKind === "human"` (och som fallback).
-   - För `subjectKind === "cat" | "dog" | "other"`: anropa Lovable AI Gateway med `google/gemini-3.1-flash-image-preview`.
-   - Skicka båda bilderna som `image_url` content parts:
-     - Bild 1 = `referenceImageUrl` (scen att behålla)
-     - Bild 2 = `faceImageUrl` (ansikte att överföra)
-   - Använd en explicit svensk-/engelsk prompt anpassad efter `subjectKind` ("dog"/"cat") och inkludera ev. `swapPrompt` från admin.
-   - Parsea bildoutput från Gateway-svaret (base64 i `choices[0].message.images[].image_url.url`), spara till `print-files`-bucket precis som nu.
-   - Behåll samma response-shape: `printFileUrl`, `replicateOutputUrl` (här blir det internt eller utelämnas), `usedReferenceImageUrl`, `usedFaceImageUrl`, plus `modelUsed`.
-   - Behåll dimension-sanity-check (bredd/höjd-ratio).
-   - Hantera 402/429-fel från Lovable AI med vänliga svenska felmeddelanden.
-
-2. **Cache**
-   - Bumpa `STORAGE_KEY` i `src/lib/face-swap-cache.ts` från `v3` → `v4` så gamla djur-resultat invalidiers.
-
-3. **Loggning**
-   - Logga vilken modellroute som valdes (`route=human-replicate` eller `route=animal-nano-banana`) och token usage för djur-vägen.
-
-4. **Inga UI-ändringar** krävs — `subjectKind` finns redan på layern och kunden ser samma flöde.
-
-## Tekniska detaljer
-
-Nano Banana 2 kallas via Lovable AI Gateway med:
-
-```text
-POST https://ai.gateway.lovable.dev/v1/chat/completions
-Authorization: Bearer ${LOVABLE_API_KEY}
-
-{
-  "model": "google/gemini-3.1-flash-image-preview",
-  "messages": [
-    { "role": "user", "content": [
-      { "type": "text", "text": "<svensk/engelsk prompt med subjectKind>" },
-      { "type": "image_url", "image_url": { "url": referenceImageUrl } },
-      { "type": "image_url", "image_url": { "url": faceImageUrl } }
-    ]}
-  ],
-  "modalities": ["image","text"]
-}
+```ts
+export const aiPhotoSubjectKindSchema = z.enum([
+  "human",
+  "pet",
+  "removeBackground",
+]);
 ```
 
-Svaret innehåller en bild som base64 data URL — den dekodas, valideras dimensionsmässigt och laddas upp till `print-files` precis som dagens flöde.
+`referenceImageUrl` förblir optional. Validering sker i edge function (krävs för human/pet, krävs INTE för removeBackground).
+
+## Migrering (`src/lib/template-migrate.ts`)
+
+On-read-mappning: `"cat" | "dog" | "other"` → `"pet"`. Ingen DB-migrering.
+
+## Admin (`LayerInspector.tsx`)
+
+- "Motiv"-dropdown: Människa / Hund-Katt / Ta bort bakgrund.
+- När `removeBackground` valts:
+  - Referensbild-rutan döljs (eller ersätts med info "Behövs ej — bakgrunden tas bort från kundens egen bild").
+  - Prompt-fältets default beskriver färg-/stilpreferens för prick-effekten ("Default: varma jordtoner. Skriv här om du vill ha t.ex. blå/rosa toner eller fler/färre prickar").
+  - Admin uppmärksammas på att kunden kommer att se de aktiverade AI-stilarna (`productOptions.aiStyles` med `enabled`) ovanpå borttagen bakgrund.
+
+## Customer-UI (`AiPhotoSection.tsx`)
+
+- `SUBJECT_HINT` uppdateras (human / pet / removeBackground).
+- För `removeBackground`:
+  - Hoppa över `if (!refUrl)`-checken.
+  - Cache-nyckel använder `"no-ref"` istället för `refUrl`, plus den valda style-presetens id (se nedan).
+  - **Ny stilrad** ovanför "Skapa nu"-knappen, synlig endast när `subjectKind === "removeBackground"` och templatet har minst en aktiverad `aiStyle`:
+    - Visar samma thumbnails som `AiStyleSection` (filtrerat på `enabled !== false`).
+    - Ett extra "Ingen stil"-val (default) som bara tar bort bakgrund och lägger på prick-effekten utan stilförändring av motivet.
+    - Vald preset lagras lokalt i komponentens state, t.ex. `selectedStyleId`.
+    - Skickas vidare till edge functionen i `body` som `removeBackgroundStyleId` + `removeBackgroundStylePrompt` (preseten's `prompt`).
+  - Cache-nyckel = `${hash}::removeBg::${selectedStyleId ?? "none"}` så olika stilar cachas separat.
+
+## Edge function (`supabase/functions/replicate-face-swap/index.ts`)
+
+Ny route:
+
+```ts
+const route =
+  subjectKind === "human"            ? "human-replicate"
+: subjectKind === "pet"              ? "pet-nano-banana"
+: subjectKind === "removeBackground" ? "remove-bg-nano-banana"
+:                                      "human-replicate";
+```
+
+- **`human-replicate`**: oförändrad.
+- **`pet-nano-banana`**: använder dagens `runAnimalSwap`, prompten generaliseras till "the pet".
+- **`remove-bg-nano-banana`** (NY) — `runRemoveBackground`:
+  - Anropar Nano Banana 2 (`google/gemini-3.1-flash-image-preview`) via Lovable AI Gateway.
+  - Skickar ENDAST `faceImageUrl` (kundens bild).
+  - Bygger prompt i två lager:
+
+    **A. Ovillkorlig bakgrunds-/prick-instruktion (alltid):**
+    ```
+    Edit the input photo: isolate the main subject (person or pet) and
+    completely remove the original background. Place the subject on a clean
+    white backdrop. Add a soft, artistic ring of small colorful watercolor
+    dots and gentle paint splatters AROUND the subject (never covering the
+    face/body). Keep the subject's identity, face, eyes, fur/skin and
+    proportions exactly as in the input. Return ONE single edited image,
+    same aspect ratio as the input. No collage, no side-by-side.
+    ```
+
+    **B. Stillager (om `removeBackgroundStylePrompt` finns):**
+    ```
+    Apply the following artistic style to the SUBJECT itself (not to the
+    background — the background must remain a clean white backdrop with
+    the colorful dot/splatter ring described above):
+    <preset.prompt>
+    ```
+
+    **C. Admin's egen `swapPrompt`** läggs sist som "Additional artist guidance" (t.ex. färgton för prickarna).
+
+  - Validerar dimensioner (samma som idag) och laddar upp till `print-files`.
+
+- Validering vid request-start:
+  - `human` / `pet` → `referenceImageUrl` krävs (400 annars).
+  - `removeBackground` → bara `faceImageUrl` krävs.
+
+- Loggar ny route + ev. `removeBackgroundStyleId`.
+
+## Default-prompts (`src/lib/ai-photo-prompts.ts`)
+
+Nya entries:
+- `human` — oförändrad.
+- `pet` — generisk djurversion (täcker hund + katt).
+- `removeBackground` — kort hint åt admin: "Default: varma jordtoner runt motivet. Skriv här för att ändra t.ex. färgton eller mängd prickar. Stilen för själva motivet styrs av AI-stilar-sektionen."
+
+## Cache (`src/lib/face-swap-cache.ts`)
+
+Bumpa `STORAGE_KEY` `v4` → `v5`. Cache-key för removeBackground inkluderar style-id (se ovan).
 
 ## Filer som ändras
 
-- `supabase/functions/replicate-face-swap/index.ts`
-- `src/lib/face-swap-cache.ts`
+- `src/lib/template-schema.ts`
+- `src/lib/template-migrate.ts`
+- `src/lib/ai-photo-prompts.ts`
+- `src/components/admin/LayerInspector.tsx`
+- `src/components/editor/AiPhotoSection.tsx` (lägg till stilväljare för removeBackground)
+- `src/lib/face-swap-cache.ts` (v5)
+- `supabase/functions/replicate-face-swap/index.ts` (ny route + `runRemoveBackground`)
 
-Inga DB-migrations, inga nya secrets, ingen ny UI.
+Inga DB-migrationer, inga nya secrets, inga ändringar i `AiStyleSection.tsx` (vi återanvänder bara presets-listan från templatet).
 
 ## Förväntad effekt
 
-Bättre swaps för hund och katt eftersom Nano Banana 2 är en modern multi-image edit-modell med stark identitetsförståelse, medan `cdingram/face-swap` (som är tränad på människor) lämnas orörd där den fungerar bra.
+- Renare admin-val (3 logiska val).
+- Nytt "Ta bort bakgrund"-läge som matchar din uppladdade hundbild — med prick-/akvarell-effekt.
+- Kunden kan kombinera bakgrundsborttag med vilken aktiverad AI-stil som helst, men bakgrunden förblir alltid borttagen tack vare att stilinstruktionen explicit avgränsas till motivet i prompten.

@@ -1,28 +1,38 @@
-// Edge function: face-swap a customer's uploaded face onto an admin-curated
-// reference image (e.g. king/princess/cat costume) — routed by subjectKind:
+// Edge function: face-swap / background-removal for the editor's aiPhoto
+// layer. Routed by `subjectKind`:
 //
-//   subjectKind === "human" (or unknown)
+//   subjectKind === "human"
 //     → Replicate `cdingram/face-swap` (dedicated human face-swap model;
 //       structured input_image/swap_image; works very well on people).
 //
-//   subjectKind === "cat" | "dog" | "other"
-//     → Lovable AI Gateway, model `google/gemini-3.1-flash-image-preview`
-//       (a.k.a. Nano Banana 2). Multi-image edit: we pass the reference
-//       scene + the customer's pet photo and instruct the model to transfer
-//       the pet's identity into the reference scene. Animals don't have the
-//       facial-landmark structure that face-swap models depend on, so a
-//       general identity-aware editor produces much better results for pets.
+//   subjectKind === "pet"
+//     → Lovable AI Gateway, Nano Banana 2 (`google/gemini-3.1-flash-image-preview`).
+//       Multi-image edit: reference scene + customer pet photo. Animals don't
+//       have the facial-landmark structure that face-swap models depend on,
+//       so a general identity-aware editor produces much better results for
+//       both cats and dogs.
 //
-// Inputs to this function (unchanged contract):
-//   referenceImageUrl  — admin's curated body/scene image (TARGET scene)
-//   faceImageUrl       — customer's uploaded photo (SOURCE identity)
-//   prompt             — admin's free-text instruction (used by the AI route)
-//   subjectKind        — human | cat | dog | other (chooses the route)
+//   subjectKind === "removeBackground"
+//     → Lovable AI Gateway, Nano Banana 2. SINGLE image: customer's photo.
+//       The model removes the background, places the subject on a white
+//       backdrop and surrounds it with a soft watercolor/dot ring. An
+//       optional AI style preset (sent as removeBackgroundStylePrompt) is
+//       applied to the SUBJECT only; the background-removal + dot-ring
+//       effect is enforced regardless.
+//
+// Inputs (JSON body):
+//   referenceImageUrl  — admin's curated body/scene image (REQUIRED for
+//                        human/pet, ignored for removeBackground)
+//   faceImageUrl       — customer's uploaded photo (always REQUIRED)
+//   prompt             — admin's free-text instruction
+//   subjectKind        — human | pet | removeBackground
 //   designId           — used for the output filename
+//   removeBackgroundStyleId / removeBackgroundStylePrompt /
+//   removeBackgroundStyleLabel — optional, only used in removeBackground mode
 //
-// Always returns HTTP 200 with a JSON body. On recoverable errors the body
-// contains { error, fallback: true, userMessage } so the client can show a
-// friendly message instead of crashing on a non-2xx.
+// Always returns HTTP 200. On recoverable errors the body is
+// { error, fallback: true, userMessage } so the client can show a friendly
+// toast instead of crashing on a non-2xx.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -209,12 +219,13 @@ async function runReplicateFaceSwap(params: {
   return { ok: true, bytes, contentType, outputUrl: output };
 }
 
-// ---------- Route 2: Lovable AI Gateway (Nano Banana 2) for animals ----------
-async function runAnimalSwap(params: {
-  referenceImageUrl: string;
-  faceImageUrl: string;
-  subjectKind: "cat" | "dog" | "other";
-  adminPrompt: string;
+// ---------- Shared helper: call Nano Banana 2 via Lovable AI Gateway ----------
+// Sends one user message with `promptText` plus an arbitrary number of input
+// images. Returns either the decoded image bytes or a Response wrapping a
+// friendly error.
+async function callNanoBanana(params: {
+  promptText: string;
+  imageUrls: string[];
 }): Promise<{ ok: true; bytes: Uint8Array; contentType: string; outputUrl: string }
   | { ok: false; response: Response }> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -228,22 +239,12 @@ async function runAnimalSwap(params: {
     };
   }
 
-  const animalNoun =
-    params.subjectKind === "cat" ? "cat"
-      : params.subjectKind === "dog" ? "dog"
-      : "animal";
-
-  const adminPromptLine = params.adminPrompt?.trim()
-    ? `Additional styling guidance from the artist: ${params.adminPrompt.trim()}`
-    : "";
-
-  const promptText = [
-    `You are editing image #1 (the reference scene). Image #2 is a photograph of the customer's own ${animalNoun}.`,
-    `Replace the ${animalNoun} that appears in image #1 with the specific ${animalNoun} from image #2 — keep the unique markings, fur color/pattern, breed traits, eye color, and overall identity from image #2.`,
-    `Keep EVERYTHING ELSE from image #1 unchanged: the costume/clothing, props, background, lighting, camera angle, art style, composition, framing, and aspect ratio. Do not change the pose unless required to make the new ${animalNoun} fit naturally.`,
-    `Return ONE single edited image (NOT a collage, NOT side-by-side, NOT a comparison). Output must have the same aspect ratio as image #1.`,
-    adminPromptLine,
-  ].filter(Boolean).join("\n");
+  const content: Array<Record<string, unknown>> = [
+    { type: "text", text: params.promptText },
+  ];
+  for (const url of params.imageUrls) {
+    content.push({ type: "image_url", image_url: { url } });
+  }
 
   const aiRes = await fetch(AI_GATEWAY_URL, {
     method: "POST",
@@ -254,16 +255,7 @@ async function runAnimalSwap(params: {
     body: JSON.stringify({
       model: ANIMAL_MODEL,
       modalities: ["image", "text"],
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: promptText },
-            { type: "image_url", image_url: { url: params.referenceImageUrl } },
-            { type: "image_url", image_url: { url: params.faceImageUrl } },
-          ],
-        },
-      ],
+      messages: [{ role: "user", content }],
     }),
   });
 
@@ -306,10 +298,6 @@ async function runAnimalSwap(params: {
     );
   }
 
-  // Nano Banana 2 returns generated images on the assistant message.
-  // The OpenAI-compatible shape on Lovable AI Gateway is:
-  //   data.choices[0].message.images[0].image_url.url   (data: URL or https URL)
-  // We accept either form, plus a few defensive fallbacks.
   const msg = data?.choices?.[0]?.message;
   const imageUrl: string | undefined =
     msg?.images?.[0]?.image_url?.url ??
@@ -358,6 +346,71 @@ async function runAnimalSwap(params: {
   };
 }
 
+// ---------- Route 2: pet face/identity transfer (cats + dogs) ----------
+async function runPetSwap(params: {
+  referenceImageUrl: string;
+  faceImageUrl: string;
+  adminPrompt: string;
+}) {
+  const adminPromptLine = params.adminPrompt?.trim()
+    ? `Additional styling guidance from the artist: ${params.adminPrompt.trim()}`
+    : "";
+
+  const promptText = [
+    `You are editing image #1 (the reference scene). Image #2 is a photograph of the customer's own pet (a cat or a dog).`,
+    `Replace the pet that appears in image #1 with the specific pet from image #2 — keep the unique markings, fur color/pattern, breed traits, eye color, ear shape and overall identity from image #2.`,
+    `Keep EVERYTHING ELSE from image #1 unchanged: the costume/clothing, props, background, lighting, camera angle, art style, composition, framing, and aspect ratio. Do not change the pose unless required to make the new pet fit naturally.`,
+    `Return ONE single edited image (NOT a collage, NOT side-by-side, NOT a comparison). Output must have the same aspect ratio as image #1.`,
+    adminPromptLine,
+  ].filter(Boolean).join("\n");
+
+  return callNanoBanana({
+    promptText,
+    imageUrls: [params.referenceImageUrl, params.faceImageUrl],
+  });
+}
+
+// ---------- Route 3: remove background + dot/splatter ring ----------
+// Single-image edit. The customer's photo is the only input. The admin
+// reference image is intentionally NOT used — this mode is meant to work
+// even when the template has no reference. An optional `stylePrompt`
+// (from the template's AI style presets) is applied to the SUBJECT only;
+// the background-removal + dot-ring effect is enforced regardless.
+async function runRemoveBackground(params: {
+  faceImageUrl: string;
+  adminPrompt: string;
+  stylePrompt: string | null;
+  styleLabel: string | null;
+}) {
+  const adminPromptLine = params.adminPrompt?.trim()
+    ? `Additional artist guidance for the dot/splatter color tones and density: ${params.adminPrompt.trim()}`
+    : "";
+
+  const styleBlock = params.stylePrompt?.trim()
+    ? [
+        `Apply the following artistic style to THE SUBJECT itself (not to the background):`,
+        params.stylePrompt.trim(),
+        `IMPORTANT: regardless of the style above, the background must remain a clean white backdrop with the colorful watercolor dot ring described below. Do NOT bring back the original photo background. Do NOT extend the style into the background — only the subject is restyled.`,
+      ].join("\n")
+    : "";
+
+  const promptText = [
+    `Edit the input photo:`,
+    `1. Isolate the main subject (a person or a pet) and COMPLETELY REMOVE the original background.`,
+    `2. Place the subject on a clean pure-white backdrop.`,
+    `3. Around the subject (never covering the face/body), add a soft, artistic ring of small colorful watercolor dots and gentle paint splatters. Default tones: warm earthy colors (amber, rust, soft brown, hint of pink). The dots should feel hand-painted, varied in size, with some small splatter accents — playful but tasteful.`,
+    `4. Keep the subject's identity, face, eyes, fur/skin and proportions exactly as in the input photo unless an artistic style is specified below.`,
+    styleBlock,
+    adminPromptLine,
+    `Return ONE single edited image with the same aspect ratio as the input. No collage, no side-by-side, no before/after comparison.`,
+  ].filter(Boolean).join("\n");
+
+  return callNanoBanana({
+    promptText,
+    imageUrls: [params.faceImageUrl],
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -368,42 +421,73 @@ Deno.serve(async (req) => {
     const prompt: string = typeof body?.prompt === "string" ? body.prompt : "";
     const subjectKindRaw: string =
       typeof body?.subjectKind === "string" ? body.subjectKind : "human";
-    const subjectKind = (["human", "cat", "dog", "other"].includes(subjectKindRaw)
-      ? subjectKindRaw
-      : "human") as "human" | "cat" | "dog" | "other";
+    // Accept the new vocabulary AND the old one — the client may be a stale
+    // cached bundle still sending cat/dog/other. Map them to "pet".
+    const normalizedKind: string =
+      subjectKindRaw === "cat" || subjectKindRaw === "dog" || subjectKindRaw === "other"
+        ? "pet"
+        : subjectKindRaw;
+    const subjectKind = (["human", "pet", "removeBackground"].includes(normalizedKind)
+      ? normalizedKind
+      : "human") as "human" | "pet" | "removeBackground";
     const designId: string =
       typeof body?.designId === "string" ? body.designId : crypto.randomUUID();
 
-    if (!referenceImageUrl || !faceImageUrl) {
-      return jsonResponse(
-        { error: "referenceImageUrl and faceImageUrl required" },
-        400,
-      );
+    const removeBackgroundStylePrompt: string | null =
+      typeof body?.removeBackgroundStylePrompt === "string"
+        ? body.removeBackgroundStylePrompt
+        : null;
+    const removeBackgroundStyleLabel: string | null =
+      typeof body?.removeBackgroundStyleLabel === "string"
+        ? body.removeBackgroundStyleLabel
+        : null;
+    const removeBackgroundStyleId: string | null =
+      typeof body?.removeBackgroundStyleId === "string"
+        ? body.removeBackgroundStyleId
+        : null;
+
+    // Validation: faceImageUrl is always required. referenceImageUrl is
+    // required only for human + pet routes.
+    if (!faceImageUrl) {
+      return jsonResponse({ error: "faceImageUrl required" }, 400);
+    }
+    if (subjectKind !== "removeBackground" && !referenceImageUrl) {
+      return jsonResponse({ error: "referenceImageUrl required for this subjectKind" }, 400);
     }
 
-    const isAnimal = subjectKind === "cat" || subjectKind === "dog" || subjectKind === "other";
-    const route = isAnimal ? "animal-nano-banana" : "human-replicate";
-    const modelUsed = isAnimal ? ANIMAL_MODEL : FACE_SWAP_MODEL_NAME;
+    const route =
+      subjectKind === "human" ? "human-replicate"
+      : subjectKind === "pet" ? "pet-nano-banana"
+      : "remove-bg-nano-banana";
+    const modelUsed = subjectKind === "human" ? FACE_SWAP_MODEL_NAME : ANIMAL_MODEL;
 
     console.log(
       `[face-swap] start route=${route} model=${modelUsed} ` +
         `subjectKind=${subjectKind} designId=${designId} ` +
-        `referenceImage=${referenceImageUrl} faceImage=${faceImageUrl} ` +
+        `referenceImage=${referenceImageUrl ?? "(none)"} faceImage=${faceImageUrl} ` +
+        `removeBgStyleId=${removeBackgroundStyleId ?? "(none)"} ` +
         `adminPrompt="${prompt.slice(0, 120)}"`,
     );
 
-    const result = isAnimal
-      ? await runAnimalSwap({
-          referenceImageUrl,
-          faceImageUrl,
-          subjectKind: subjectKind as "cat" | "dog" | "other",
-          adminPrompt: prompt,
-        })
-      : await runReplicateFaceSwap({
-          referenceImageUrl,
-          faceImageUrl,
-          designId,
-        });
+    const result =
+      subjectKind === "human"
+        ? await runReplicateFaceSwap({
+            referenceImageUrl: referenceImageUrl!,
+            faceImageUrl,
+            designId,
+          })
+        : subjectKind === "pet"
+        ? await runPetSwap({
+            referenceImageUrl: referenceImageUrl!,
+            faceImageUrl,
+            adminPrompt: prompt,
+          })
+        : await runRemoveBackground({
+            faceImageUrl,
+            adminPrompt: prompt,
+            stylePrompt: removeBackgroundStylePrompt,
+            styleLabel: removeBackgroundStyleLabel,
+          });
 
     if (!result.ok) return result.response;
 
