@@ -11,13 +11,14 @@ export interface FaceSwapCacheEntry {
   timestamp: number;
 }
 
-// v2: bumped to invalidate older results that were generated with the
-// reversed-direction prompt (admin face was placed onto customer scene).
-const STORAGE_KEY = "lovable.face-swap-cache.v2";
+// v3: bumped after switching from flux-kontext multi-image (which produced
+// collages / wrong-direction swaps) to a dedicated face-swap model.
+const STORAGE_KEY = "lovable.face-swap-cache.v3";
 
-// Best-effort cleanup of the old key so we don't leave orphan data behind.
+// Best-effort cleanup of older keys so we don't leave orphan data behind.
 if (typeof window !== "undefined") {
   try { window.localStorage.removeItem("lovable.face-swap-cache.v1"); } catch { /* noop */ }
+  try { window.localStorage.removeItem("lovable.face-swap-cache.v2"); } catch { /* noop */ }
 }
 const MAX_ENTRIES = 30;
 
