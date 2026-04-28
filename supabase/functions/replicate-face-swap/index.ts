@@ -78,19 +78,27 @@ Deno.serve(async (req) => {
       `[face-swap] start subjectKind=${subjectKind} designId=${designId} prompt="${prompt.slice(0, 80)}"`,
     );
 
-    // Build the prompt sent to the model. The Kontext multi-image model
-    // can be tricked into returning a side-by-side collage if the prompt
-    // talks about "first image" / "second image". We instead phrase the
-    // prompt as a single editing instruction and append a strict
-    // "single edited image" guard so the model returns ONE picture.
+    // Build the prompt sent to the model.
+    // input_image_1 = admin's reference scene (keep its costume/pose/background)
+    // input_image_2 = customer's uploaded photo (lift the face FROM here)
+    // We must be explicit about direction or the model swaps the wrong way.
     const subjectWord =
-      subjectKind === "cat" ? "cat's" : subjectKind === "dog" ? "dog's" : "person's";
+      subjectKind === "cat" ? "cat" : subjectKind === "dog" ? "dog" : "person";
     const defaultPrompt =
-      `Replace the ${subjectWord} face with the new face provided. ` +
-      `Keep the original costume, pose, lighting and background exactly the same.`;
+      `Take the ${subjectWord}'s face from input_image_2 and place it onto the ${subjectWord} in input_image_1. ` +
+      `Keep input_image_1's costume, pose, lighting and background exactly the same. ` +
+      `The final ${subjectWord} must have the face from input_image_2, not from input_image_1.`;
     const adminPrompt = prompt && prompt.trim().length > 0 ? prompt.trim() : defaultPrompt;
+    // If the admin's prompt does not already mention the input names, prepend
+    // a direction guard so the model always swaps the correct way (face from
+    // customer photo, scene from admin reference). Old saved prompts don't
+    // know about input_image_1/2 — without this they get reversed.
+    const mentionsInputs = /input_image_[12]/i.test(adminPrompt);
+    const directionGuard = mentionsInputs
+      ? ""
+      : `Use input_image_1 as the scene to keep (costume, pose, background) and use the face from input_image_2. The final ${subjectWord} must have the face from input_image_2, not from input_image_1. `;
     const finalPrompt =
-      `${adminPrompt} Output a single edited image only — do not return a collage, ` +
+      `${directionGuard}${adminPrompt} Output a single edited image only — do not return a collage, ` +
       `do not show the input images side by side, do not include any reference panels.`;
 
     const start = await fetch(

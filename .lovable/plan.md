@@ -1,27 +1,30 @@
-## Vad hände egentligen?
+## Bekräftat: swap-riktningen är fel
 
-Jag tittade på den faktiska bilden som modellen returnerade. Den är **1568×672 pixlar** — alltså två bilder bredvid varandra (ett före/efter-collage). Vad du såg i editorn var troligen vänster halva av collaget inzoomat i din crop-ruta. Ingen riktig swap presenterades — modellen gjorde tekniskt en swap men packade ihop båda bilderna i ett collage.
+Du har rätt. Modellen behöll adminens ansikte och tog kundens kostym/bakgrund — tvärtom mot vad vi vill.
 
-Du kan se hela bilden här: [swap-result-debug.jpg](sandbox:/mnt/documents/swap-result-debug.jpg)
+## Varför
 
-## Varför blev det collage?
+Vi skickar in bilderna i rätt ordning (`input_image_1` = adminens scen, `input_image_2` = kundens foto), men min senaste prompt sa bara *"Replace the dog's face with the new face provided"* utan att peka ut vilken bild som är "den nya". Modellen gissade åt fel håll och behandlade `input_image_2` som scenen i stället.
 
-Vår prompt sa bokstavligen *"Take the dog's face from the second image and place it onto the dog in the first image"*. Modellen tolkade "first image" / "second image" som visuella instruktioner och bestämde sig för att visa båda bilderna sida vid sida. Det officiella exemplet i Replicates dokumentation använder en mycket enklare prompt — *"Put the woman into a white t-shirt with the text on it"* — och returnerar en ren single-image output.
+Adminens egen sparade prompt har samma problem — den säger *"Replace only the dog's face with the uploaded dog's face"* utan att referera till någondera input. Modellen vet då inte vilken som är "the uploaded one".
 
 ## Fixen
 
-Ändra prompten i edge-funktionen så modellen tvingas returnera **en enda redigerad bild**:
+Skriv om default-prompten så den explicit pekar ut input-namnen som modellen själv förstår:
 
-1. Skriv om default-prompten utan att referera till "first image" / "second image". Istället: `"Replace the dog's face with the new face provided. Keep the original costume, pose, lighting and background exactly the same."`
-2. Lägg till en hård efter-instruktion (oavsett om admin har skrivit en egen prompt eller inte): `"Output a single edited image only — do not return a collage, do not show the input images side by side, do not include any reference panels."`
-3. Adminens egen prompt från configs respekteras fortfarande som huvudinstruktion — vi appendar bara collage-skyddet.
+```
+Take the dog's face from input_image_2 and place it onto the dog in input_image_1.
+Keep input_image_1's costume, pose, lighting and background exactly the same.
+The final dog must have the face from input_image_2, not from input_image_1.
+```
 
-Inget annat behöver ändras (frontend, cache, store, UI är redan klart).
+Den dubbla bekräftelsen i sista meningen ("must have the face from input_image_2, not from input_image_1") är medvetet redundant — Kontext-modeller följer den typen av entydiga instruktioner mycket bättre.
+
+Adminens egen sparade prompt respekteras fortfarande som huvudinstruktion. Vi appendar bara collage-skyddet som tidigare. (På sikt bör vi även uppdatera adminens default-prompt-mall till samma `input_image_1/2`-stil — det gör jag i samma svep i admin-UI:t.)
 
 ## Filer som ändras
 
-- `supabase/functions/replicate-face-swap/index.ts` — bara prompt-byggandet (rad 81–90).
+- `supabase/functions/replicate-face-swap/index.ts` — bara prompt-byggandet (rad 81–94).
+- `src/components/admin/LayerInspector.tsx` (eller motsvarande där adminens swapPrompt placeholder/default sätts) — uppdatera placeholder-texten så admin guidas att skriva prompts som refererar till `input_image_1` / `input_image_2`. Bara hjälptext, ingen logikändring.
 
-## Efter deploy
-
-Jag deployar funktionen direkt och du kan testa skapa igen med samma hund-bild. Om den fortfarande gör collage faller vi tillbaka på plan B: kapa höger halva av output-bilden i edge-funktionen innan vi laddar upp den.
+Jag deployar funktionen efteråt så du kan testa direkt.
