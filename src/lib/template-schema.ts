@@ -208,6 +208,10 @@ export const photoLayerSchema = layerBase.extend({
   type: z.literal("photo"),
   defaults: photoDefaultsSchema,
 });
+export const aiPhotoLayerSchema = layerBase.extend({
+  type: z.literal("aiPhoto"),
+  defaults: aiPhotoDefaultsSchema,
+});
 export const shapeLayerSchema = layerBase.extend({
   type: z.literal("shape"),
   defaults: shapeDefaultsSchema,
@@ -220,6 +224,7 @@ export const layerSchema = z.discriminatedUnion("type", [
   lineLayerSchema,
   marginLayerSchema,
   photoLayerSchema,
+  aiPhotoLayerSchema,
   shapeLayerSchema,
 ]);
 export type TemplateLayer = z.infer<typeof layerSchema>;
