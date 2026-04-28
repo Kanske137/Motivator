@@ -3,14 +3,16 @@
 // `replicate-style` edge function which returns a `printFileUrl` already
 // uploaded to the print-files bucket.
 //
-// Cache: results are keyed by (originalPhotoUrl, presetId) and persisted in
-// localStorage so revisiting a previously-tried style is instant and free.
-import { useState } from "react";
+// Cache: results are keyed by (photoHash, presetId) where photoHash is a
+// SHA-256 of the file bytes. This survives URL churn (re-uploads create new
+// paths) and full page reloads.
+import { useEffect, useState } from "react";
 import { Loader2, Sparkles, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEditorStore } from "@/stores/editorStore";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadCartPreview } from "@/lib/upload-preview";
+import { hashFile } from "@/lib/ai-cache-storage";
 import type { AiStylePreset } from "@/lib/template-schema";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -35,9 +37,11 @@ export function AiStyleSection({ presets }: Props) {
   const photoPreviewUrl = useEditorStore((s) => s.photoPreviewUrl);
   const originalPhotoUrl = useEditorStore((s) => s.originalPhotoUrl);
   const setOriginalPhotoUrl = useEditorStore((s) => s.setOriginalPhotoUrl);
+  const photoHash = useEditorStore((s) => s.photoHash);
+  const setPhotoHash = useEditorStore((s) => s.setPhotoHash);
   const aiPrintFileUrl = useEditorStore((s) => s.aiPrintFileUrl);
   const setAiPrintFileUrl = useEditorStore((s) => s.setAiPrintFileUrl);
-  const setPhotoSource = useEditorStore((s) => s.setPhotoSource);
+  const clearAiResultOnly = useEditorStore((s) => s.clearAiResultOnly);
   const addAiResultToCache = useEditorStore((s) => s.addAiResultToCache);
   const getCachedAiResult = useEditorStore((s) => s.getCachedAiResult);
   const listAiResultsForPhoto = useEditorStore((s) => s.listAiResultsForPhoto);
@@ -46,6 +50,22 @@ export function AiStyleSection({ presets }: Props) {
   const aiResultCache = useEditorStore((s) => s.aiResultCache);
 
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  // Compute the photo hash whenever the file changes. Cheap (a few ms for
+  // typical phone photos) and runs only once per upload thanks to setPhotoHash
+  // bailing out when the hash is unchanged.
+  useEffect(() => {
+    if (!photoFile) return;
+    let cancelled = false;
+    hashFile(photoFile)
+      .then((h) => {
+        if (!cancelled) setPhotoHash(h);
+      })
+      .catch((e) => console.warn("[AiStyle] hashFile failed", e));
+    return () => {
+      cancelled = true;
+    };
+  }, [photoFile, setPhotoHash]);
 
   const ensureUploadedPhotoUrl = async (): Promise<string | null> => {
     if (originalPhotoUrl) return originalPhotoUrl;
@@ -63,37 +83,41 @@ export function AiStyleSection({ presets }: Props) {
     }
   };
 
+  const ensurePhotoHash = async (): Promise<string | null> => {
+    if (photoHash) return photoHash;
+    if (!photoFile) return null;
+    try {
+      const h = await hashFile(photoFile);
+      setPhotoHash(h);
+      return h;
+    } catch (e) {
+      console.warn("[AiStyle] hashFile failed", e);
+      return null;
+    }
+  };
+
   const applyStyle = async (preset: AiStylePreset) => {
     if (!photoFile) {
       toast.error("Ladda upp en bild först");
       return;
     }
 
-    // Try cache first using whichever photoKey we already have (no upload yet).
-    const knownKey = originalPhotoUrl;
-    if (knownKey) {
-      const cached = getCachedAiResult(knownKey, preset.id);
-      if (cached) {
-        setAiPrintFileUrl(cached);
-        toast.success(`Stil "${preset.label}" återanvänd`);
-        return;
-      }
-    }
-
     setBusyId(preset.id);
     try {
+      // Resolve a stable cache key first (the hash) — never the upload URL.
+      const hash = await ensurePhotoHash();
+      if (hash) {
+        const cached = getCachedAiResult(hash, preset.id);
+        if (cached) {
+          setAiPrintFileUrl(cached);
+          toast.success(`Stil "${preset.label}" återanvänd`);
+          return;
+        }
+      }
+
+      // Cache miss → ensure the photo is uploaded so Replicate can fetch it.
       const imageUrl = await ensureUploadedPhotoUrl();
       if (!imageUrl) return;
-
-      // Re-check cache once we have the resolved photoKey (covers the case
-      // where the upload just happened and an entry already exists from a
-      // previous session).
-      const cached = getCachedAiResult(imageUrl, preset.id);
-      if (cached) {
-        setAiPrintFileUrl(cached);
-        toast.success(`Stil "${preset.label}" återanvänd`);
-        return;
-      }
 
       const designId = (crypto as any)?.randomUUID?.() ?? `${Date.now()}`;
       const { data, error } = await supabase.functions.invoke("replicate-style", {
@@ -103,7 +127,7 @@ export function AiStyleSection({ presets }: Props) {
       const printFileUrl = (data as { printFileUrl?: string })?.printFileUrl;
       if (!printFileUrl) throw new Error("AI-tjänsten returnerade ingen bild");
       setAiPrintFileUrl(printFileUrl);
-      addAiResultToCache(imageUrl, preset.id, preset.label, printFileUrl);
+      if (hash) addAiResultToCache(hash, preset.id, preset.label, printFileUrl);
       toast.success(`Stil "${preset.label}" tillämpad`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Okänt fel";
@@ -115,9 +139,9 @@ export function AiStyleSection({ presets }: Props) {
   };
 
   const undoAi = () => {
-    // Drop AI result; keep the original photo as design source.
-    if (photoFile) setPhotoSource(photoFile, photoPreviewUrl);
-    else setAiPrintFileUrl(null);
+    // Drop AI result only — keep photoFile/photoHash/originalPhotoUrl so the
+    // history list stays visible and a re-applied style is a cache hit.
+    clearAiResultOnly();
   };
 
   if (!photoFile) {
@@ -131,8 +155,8 @@ export function AiStyleSection({ presets }: Props) {
   const visiblePresets = presets.filter((p) => p.enabled !== false);
   if (visiblePresets.length === 0) return null;
 
-  // History for the active photo (if uploaded).
-  const history = originalPhotoUrl ? listAiResultsForPhoto(originalPhotoUrl) : [];
+  // History for the active photo (driven by hash, not URL).
+  const history = photoHash ? listAiResultsForPhoto(photoHash) : [];
   // Cheap subscription tickle (avoid lint warning for unused var).
   void aiResultCache;
 
@@ -145,7 +169,7 @@ export function AiStyleSection({ presets }: Props) {
       <div className="grid grid-cols-3 gap-2">
         {visiblePresets.map((p) => {
           const busy = busyId === p.id;
-          const cachedUrl = originalPhotoUrl ? getCachedAiResult(originalPhotoUrl, p.id) : null;
+          const cachedUrl = photoHash ? getCachedAiResult(photoHash, p.id) : null;
           const isActive = !!cachedUrl && aiPrintFileUrl === cachedUrl;
           return (
             <button
@@ -219,7 +243,7 @@ export function AiStyleSection({ presets }: Props) {
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      clearAiResult(entry.photoKey, entry.presetId);
+                      clearAiResult(entry.photoHash, entry.presetId);
                     }}
                     className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-background/90 ring-1 ring-border flex items-center justify-center text-muted-foreground hover:text-foreground"
                     aria-label="Ta bort från historik"
