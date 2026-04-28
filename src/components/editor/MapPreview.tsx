@@ -146,7 +146,13 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   // layer + remap remaining layers so they fill the freed-up area.
   const marginInsets = getActiveMarginInsetsPct(allLayers, frontW, frontH);
   const marginRemovedInsets = !whiteMarginEnabled ? marginInsets : undefined;
-  const layers = whiteMarginEnabled ? allLayers : allLayers.filter((l) => l.type !== "margin");
+  // Margin must always render visually on top of all other layers (but its
+  // wrapper still has pointer-events:none so it never blocks clicks).
+  const visibleLayers = whiteMarginEnabled ? allLayers : allLayers.filter((l) => l.type !== "margin");
+  const layers = [
+    ...visibleLayers.filter((l) => l.type !== "margin"),
+    ...visibleLayers.filter((l) => l.type === "margin"),
+  ];
 
   useEffect(() => {
     const el = frameRef.current;
