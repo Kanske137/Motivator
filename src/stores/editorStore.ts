@@ -4,6 +4,12 @@ import { getEffectiveSizes } from "@/lib/product-config";
 import type { DesignSource } from "@/lib/print-pipeline";
 import type { ProductOptions, Template, TemplateLayer } from "@/lib/template-schema";
 import { resolveTemplate } from "@/lib/template-migrate";
+import {
+  type AiCacheEntry,
+  loadAiCache,
+  makeCacheKey,
+  saveAiCache,
+} from "@/lib/ai-cache-storage";
 
 interface ApplyPlaceArgs {
   placeName: string;
@@ -77,6 +83,11 @@ interface EditorState {
   shopifyVariantId: string | null;
   shopifyVariantResolving: boolean;
 
+  /** AI-styled image cache keyed by `${photoKey}|${presetId}`. Avoids repeat
+   *  Replicate calls when the customer revisits a style they already tried.
+   *  Persisted to localStorage with LRU eviction. */
+  aiResultCache: Record<string, AiCacheEntry>;
+
   // ---------- setters ----------
   setConfig: (c: ProductConfig) => void;
   setPosterBgColor: (c: string) => void;
@@ -89,6 +100,12 @@ interface EditorState {
   resetDesignSource: () => void;
   setShopifyVariantId: (id: string | null) => void;
   setShopifyVariantResolving: (resolving: boolean) => void;
+
+  // ---------- AI cache ----------
+  addAiResultToCache: (photoKey: string, presetId: string, presetLabel: string, url: string) => void;
+  getCachedAiResult: (photoKey: string, presetId: string) => string | null;
+  listAiResultsForPhoto: (photoKey: string) => AiCacheEntry[];
+  clearAiResult: (photoKey: string, presetId: string) => void;
 
   // Per-layer setters
   setLayerMapCenter: (id: string, c: [number, number]) => void;
@@ -225,6 +242,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   aiPrintFileUrl: null,
   shopifyVariantId: null,
   shopifyVariantResolving: false,
+  aiResultCache: loadAiCache(),
 
   // legacy mirrors (initial values, replaced once a config is loaded)
   mapCenter: [18.0686, 59.3293],
@@ -343,6 +361,39 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   setShopifyVariantId: (shopifyVariantId) => set({ shopifyVariantId }),
   setShopifyVariantResolving: (shopifyVariantResolving) => set({ shopifyVariantResolving }),
+
+  // ---------- AI cache ----------
+  addAiResultToCache: (photoKey, presetId, presetLabel, url) => {
+    if (!photoKey) return;
+    const key = makeCacheKey(photoKey, presetId);
+    const next = {
+      ...get().aiResultCache,
+      [key]: { url, presetId, presetLabel, photoKey, timestamp: Date.now() },
+    };
+    set({ aiResultCache: next });
+    saveAiCache(next);
+  },
+  getCachedAiResult: (photoKey, presetId) => {
+    if (!photoKey) return null;
+    const entry = get().aiResultCache[makeCacheKey(photoKey, presetId)];
+    return entry?.url ?? null;
+  },
+  listAiResultsForPhoto: (photoKey) => {
+    if (!photoKey) return [];
+    return Object.values(get().aiResultCache)
+      .filter((e) => e.photoKey === photoKey)
+      .sort((a, b) => b.timestamp - a.timestamp);
+  },
+  clearAiResult: (photoKey, presetId) => {
+    if (!photoKey) return;
+    const key = makeCacheKey(photoKey, presetId);
+    const cur = get().aiResultCache;
+    if (!cur[key]) return;
+    const next = { ...cur };
+    delete next[key];
+    set({ aiResultCache: next });
+    saveAiCache(next);
+  },
 
   // ---------- per-layer setters ----------
   setLayerMapCenter: (id, c) => updateMap(set, get, id, { center: c }),
