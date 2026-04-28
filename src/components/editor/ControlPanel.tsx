@@ -54,6 +54,9 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
   const mapLayers = layers.filter((l): l is Extract<TemplateLayer, { type: "map" }> => l.type === "map");
   const textLayers = layers.filter((l): l is Extract<TemplateLayer, { type: "text" }> => l.type === "text");
   const photoLayers = layers.filter((l): l is Extract<TemplateLayer, { type: "photo" }> => l.type === "photo");
+  const aiPhotoLayers = layers.filter(
+    (l): l is Extract<TemplateLayer, { type: "aiPhoto" }> => l.type === "aiPhoto",
+  );
 
   // Hide map layers fully locked (no editable surface)
   const editableMaps = mapLayers.filter(
@@ -68,6 +71,7 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
   const showImageSection = photoLayers.length > 0;
   const aiStyles = productOptions?.aiStyles ?? [];
   const showAiInsideImage = !!photoFile && aiStyles.length > 0;
+  const showAiPhotoSection = aiPhotoLayers.length > 0;
 
   return (
     <Accordion type="single" collapsible defaultValue="plats" className="w-full space-y-3">
@@ -100,6 +104,23 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
                 <AiStyleSection presets={aiStyles} />
               </div>
             )}
+          </AccordionContent>
+        </AccordionItem>
+      )}
+
+      {showAiPhotoSection && (
+        <AccordionItem value="ai-bild" className={cn(cardClass, "border-b-0")}>
+          <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
+            AI-bild
+          </AccordionTrigger>
+          <AccordionContent className="pt-1 pb-4 space-y-5">
+            {aiPhotoLayers.map((l, idx, arr) => (
+              <AiPhotoSection
+                key={l.id}
+                layer={l}
+                heading={arr.length > 1 ? l.name || `AI-bild ${idx + 1}` : null}
+              />
+            ))}
           </AccordionContent>
         </AccordionItem>
       )}
