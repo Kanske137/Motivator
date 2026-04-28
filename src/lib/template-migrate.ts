@@ -71,6 +71,17 @@ function migrateLayer(layer: TemplateLayer): TemplateLayer {
       };
     }
   }
+  // aiPhoto: collapse legacy "cat" / "dog" / "other" → "pet". This runs at
+  // template-read time so existing saved templates upgrade transparently.
+  if (layer.type === "aiPhoto") {
+    const sk = layer.defaults.subjectKind as string;
+    if (sk === "cat" || sk === "dog" || sk === "other") {
+      return {
+        ...layer,
+        defaults: { ...layer.defaults, subjectKind: "pet" },
+      };
+    }
+  }
   return layer;
 }
 

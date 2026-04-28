@@ -11,15 +11,18 @@ export interface FaceSwapCacheEntry {
   timestamp: number;
 }
 
-// v4: bumped after routing cat/dog swaps to Nano Banana 2 (Gemini 3.1 Flash
-// Image) via Lovable AI Gateway, while humans stay on cdingram/face-swap.
-const STORAGE_KEY = "lovable.face-swap-cache.v4";
+// v5: bumped after merging cat/dog → "pet" and adding "removeBackground"
+// route. The "referenceImageUrl" slot in the key may be a synthetic value
+// like "no-ref::style:<id>" for removeBackground variants so different style
+// picks cache separately.
+const STORAGE_KEY = "lovable.face-swap-cache.v5";
 
 // Best-effort cleanup of older keys so we don't leave orphan data behind.
 if (typeof window !== "undefined") {
   try { window.localStorage.removeItem("lovable.face-swap-cache.v1"); } catch { /* noop */ }
   try { window.localStorage.removeItem("lovable.face-swap-cache.v2"); } catch { /* noop */ }
   try { window.localStorage.removeItem("lovable.face-swap-cache.v3"); } catch { /* noop */ }
+  try { window.localStorage.removeItem("lovable.face-swap-cache.v4"); } catch { /* noop */ }
 }
 const MAX_ENTRIES = 30;
 

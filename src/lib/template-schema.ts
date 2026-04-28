@@ -96,7 +96,16 @@ export type PhotoDefaults = z.infer<typeof photoDefaultsSchema>;
 // it renders identically, but distinct semantics: customer uploads a FACE,
 // the swap happens server-side, and the swapped result is shown in place of
 // the placeholder/reference.
-export const aiPhotoSubjectKindSchema = z.enum(["human", "cat", "dog", "other"]);
+// "human" → Replicate cdingram/face-swap (dedicated face-swap model)
+// "pet"   → Nano Banana 2 multi-image edit (works for both cats and dogs)
+// "removeBackground" → Nano Banana 2 single-image edit; no reference needed.
+//                      The customer's photo gets its background removed and
+//                      replaced with a clean white backdrop + a colorful
+//                      watercolor/dot ring around the subject. An optional
+//                      AI style preset (from productOptions.aiStyles) can
+//                      be applied to the SUBJECT while the background stays
+//                      white-with-dots regardless.
+export const aiPhotoSubjectKindSchema = z.enum(["human", "pet", "removeBackground"]);
 export type AiPhotoSubjectKind = z.infer<typeof aiPhotoSubjectKindSchema>;
 
 export const aiPhotoDefaultsSchema = z.object({
