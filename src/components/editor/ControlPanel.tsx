@@ -150,10 +150,10 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
           </AccordionTrigger>
           <AccordionContent className="pt-1 pb-4">
             <PhotoUploadSection />
-            {photoLayers.some((l) => !l.locks.shape) && (
+            {photoLayers.some((l) => !l.locks.shape || !l.locks.size || !l.locks.move) && (
               <div className="mt-4 pt-4 border-t space-y-3">
                 {photoLayers
-                  .filter((l) => !l.locks.shape)
+                  .filter((l) => !l.locks.shape || !l.locks.size || !l.locks.move)
                   .map((l, idx, arr) => (
                     <PhotoShapeSection
                       key={l.id}
