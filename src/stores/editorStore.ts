@@ -309,6 +309,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   shopifyVariantId: null,
   shopifyVariantResolving: false,
   aiResultCache: loadAiCache(),
+  aiPhotoSources: {},
+  aiPhotoResults: {},
+  faceSwapCache: loadFaceSwapCache(),
 
   // legacy mirrors (initial values, replaced once a config is loaded)
   mapCenter: [18.0686, 59.3293],
