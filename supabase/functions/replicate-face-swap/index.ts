@@ -449,8 +449,8 @@ async function runRemoveBackground(params: {
   }
 
   const aspectInstruction = params.targetAspectRatio && params.targetAspectRatio > 0
-    ? `Return ONE single edited image with an output aspect ratio of approximately ${aspectLabel(params.targetAspectRatio)} (width:height ≈ ${params.targetAspectRatio.toFixed(3)}). The subject MUST be composed and scaled so it fits comfortably INSIDE this output frame with generous pure-white padding on every side — never crop the subject to the frame, never let the subject touch any edge. If the subject's natural shape doesn't fill the frame, leave the extra space as pure white (#FFFFFF) — do NOT stretch, distort, zoom in, or crop the subject to make it fill the frame. The whole subject (full vehicle, full body, full silhouette) must be visible. No collage, no side-by-side, no before/after comparison.`
-    : `Return ONE single edited image with the same aspect ratio as the input. No collage, no side-by-side, no before/after comparison.`;
+    ? `Return ONE single edited image with an output aspect ratio of approximately ${aspectLabel(params.targetAspectRatio)} (width:height ≈ ${params.targetAspectRatio.toFixed(3)}). The whole subject (full vehicle, full body, full silhouette — nothing cropped) must be visible, and it must be SCALED UP to fill the output frame as much as possible while leaving only a thin (~2-5%) sliver of pure white at the outer edge for the soft fade. DO NOT add big empty white margins on any side just to match the aspect — instead, make the subject as large as it can be inside the frame. Never stretch or distort the subject; preserve its natural proportions. No collage, no side-by-side, no before/after comparison.`
+    : `Return ONE single edited image with the same aspect ratio as the input. The subject must fill the frame as much as possible (only a thin ~2-5% white sliver at the outer edge for the soft fade). No collage, no side-by-side, no before/after comparison.`;
 
   const promptText = [
     `Edit the input photo:`,
