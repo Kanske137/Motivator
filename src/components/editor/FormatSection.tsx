@@ -174,6 +174,35 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
         </div>
       </div>
 
+      {/* Vit marginal — Ja/Nej toggle, visas endast om mallen har ett margin-lager */}
+      {hasMarginLayer && (
+        <div className="space-y-2">
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Vit marginal</Label>
+          <div className="flex p-1 bg-muted rounded-full">
+            {([
+              { id: true, label: "Ja" },
+              { id: false, label: "Nej" },
+            ] as const).map(({ id, label }) => {
+              const active = whiteMarginEnabled === id;
+              return (
+                <button
+                  key={String(id)}
+                  type="button"
+                  onClick={() => setWhiteMarginEnabled(id)}
+                  className={`flex-1 h-10 rounded-full text-sm font-medium transition ${
+                    active
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-foreground/70 hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Tomt-tillstånd: ingen storlek aktiverad i admin för den här produkttypen. */}
       {visibleSizes.length === 0 && (
         <div className="rounded-2xl border border-dashed bg-muted/40 p-4 text-sm text-muted-foreground">
