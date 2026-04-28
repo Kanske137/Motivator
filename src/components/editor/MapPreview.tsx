@@ -146,7 +146,13 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   // layer + remap remaining layers so they fill the freed-up area.
   const marginInsets = getActiveMarginInsetsPct(allLayers, frontW, frontH);
   const marginRemovedInsets = !whiteMarginEnabled ? marginInsets : undefined;
-  const layers = whiteMarginEnabled ? allLayers : allLayers.filter((l) => l.type !== "margin");
+  // Margin must always render visually on top of all other layers (but its
+  // wrapper still has pointer-events:none so it never blocks clicks).
+  const visibleLayers = whiteMarginEnabled ? allLayers : allLayers.filter((l) => l.type !== "margin");
+  const layers = [
+    ...visibleLayers.filter((l) => l.type !== "margin"),
+    ...visibleLayers.filter((l) => l.type === "margin"),
+  ];
 
   useEffect(() => {
     const el = frameRef.current;
@@ -270,7 +276,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             top: `${rect.top}%`,
             width: `${rect.width}%`,
             height: `${rect.height}%`,
-            zIndex: l.zIndex,
+            zIndex: l.type === "margin" ? 9999 : l.zIndex,
           };
           const movable = !l.locks.move && (l.type === "map" || l.type === "photo" || l.type === "aiPhoto" || l.type === "text" || l.type === "image");
           const moveHandle = movable ? (
