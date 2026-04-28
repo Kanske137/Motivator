@@ -320,6 +320,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             );
           }
 
+          if (l.type === "text") {
             const v = layerValues[l.id];
             const tv = v && v.kind === "text" ? v : null;
             if (tv && !tv.visible) return null;
