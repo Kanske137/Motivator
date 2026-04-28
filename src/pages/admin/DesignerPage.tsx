@@ -10,7 +10,7 @@
 // product_configs. Publish stamps `publishedAt` and runs zod validation.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, ChevronDown, Eye, Image as ImageIcon, Loader2, MapPin, Minus, Save, Send, Shapes, Square, Type, Undo2, Zap } from "lucide-react";
+import { ArrowLeft, ChevronDown, Eye, Image as ImageIcon, Loader2, MapPin, Minus, Save, Send, Shapes, Sparkle, Square, Type, Undo2, Zap } from "lucide-react";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -487,6 +487,10 @@ export default function DesignerPage() {
               <Button size="sm" variant="outline" onClick={() => addLayer("photo")}>
                 <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
                 Lägg till bild
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => addLayer("aiPhoto")}>
+                <Sparkle className="h-3.5 w-3.5 mr-1.5" />
+                Lägg till AI-referensbild
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
