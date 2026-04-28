@@ -149,6 +149,7 @@ export default function EditorPage() {
           : designSource === "photo"
           ? useEditorStore.getState().photoPreviewUrl ?? undefined
           : undefined,
+      aiPhotoResults,
     };
 
     setIsPreparing(true);
