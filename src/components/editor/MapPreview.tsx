@@ -381,14 +381,21 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             );
             // Source priority: face-swap result → admin reference image →
             // empty placeholder.
-            const src = aiPhotoResults[l.id] ?? l.defaults.referenceImageUrl ?? null;
+            const aiResultUrl = aiPhotoResults[l.id] ?? null;
+            const src = aiResultUrl ?? l.defaults.referenceImageUrl ?? null;
+            // For AI-generated removeBackground results, force `contain` so
+            // the whole subject is always visible inside the layer — Nano
+            // Banana 2 doesn't always honor a target aspect ratio, and the
+            // pure-white padding blends seamlessly into the layer's white
+            // background. Admin reference images keep their default fit.
+            const effectiveFit = aiResultUrl ? "contain" : l.defaults.fit;
             return (
               <div key={l.id} style={wrapStyle}>
                 {src ? (
                   <PhotoLayerView
                     layerId={l.id}
                     src={src}
-                    fit={l.defaults.fit}
+                    fit={effectiveFit}
                     shape={effectiveShape}
                     staticClipPath={staticClip}
                     offsetX={offsetX}
