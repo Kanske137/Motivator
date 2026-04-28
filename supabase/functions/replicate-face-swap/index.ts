@@ -529,6 +529,13 @@ Deno.serve(async (req) => {
         `adminPrompt="${prompt.slice(0, 120)}"`,
     );
 
+    const targetAspectRatio: number | null =
+      typeof body?.targetAspectRatio === "number" &&
+      isFinite(body.targetAspectRatio) &&
+      body.targetAspectRatio > 0
+        ? body.targetAspectRatio
+        : null;
+
     const result =
       subjectKind === "human"
         ? await runReplicateFaceSwap({
@@ -547,6 +554,7 @@ Deno.serve(async (req) => {
             adminPrompt: prompt,
             stylePrompt: removeBackgroundStylePrompt,
             styleLabel: removeBackgroundStyleLabel,
+            targetAspectRatio,
           });
 
     if (!result.ok) return result.response;
