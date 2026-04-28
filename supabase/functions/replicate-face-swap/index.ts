@@ -78,16 +78,20 @@ Deno.serve(async (req) => {
       `[face-swap] start subjectKind=${subjectKind} designId=${designId} prompt="${prompt.slice(0, 80)}"`,
     );
 
-    // Build the prompt sent to the model. Prefer admin's prompt, fall back
-    // to a sensible subject-specific default. The Kontext model is told that
-    // image 1 = the scene/character to keep, image 2 = the subject to lift in.
+    // Build the prompt sent to the model. The Kontext multi-image model
+    // can be tricked into returning a side-by-side collage if the prompt
+    // talks about "first image" / "second image". We instead phrase the
+    // prompt as a single editing instruction and append a strict
+    // "single edited image" guard so the model returns ONE picture.
+    const subjectWord =
+      subjectKind === "cat" ? "cat's" : subjectKind === "dog" ? "dog's" : "person's";
     const defaultPrompt =
-      subjectKind === "cat"
-        ? "Take the cat's face from the second image and place it onto the cat in the first image. Preserve the first image's costume, pose, lighting and background exactly. Match the new cat's fur color and breed."
-        : subjectKind === "dog"
-        ? "Take the dog's face from the second image and place it onto the dog in the first image. Preserve the first image's costume, pose, lighting and background exactly. Match the new dog's coat color and breed."
-        : "Take the face from the second image and place it onto the person in the first image. Preserve the first image's hair, costume, pose, lighting and background exactly.";
-    const finalPrompt = prompt && prompt.trim().length > 0 ? prompt : defaultPrompt;
+      `Replace the ${subjectWord} face with the new face provided. ` +
+      `Keep the original costume, pose, lighting and background exactly the same.`;
+    const adminPrompt = prompt && prompt.trim().length > 0 ? prompt.trim() : defaultPrompt;
+    const finalPrompt =
+      `${adminPrompt} Output a single edited image only — do not return a collage, ` +
+      `do not show the input images side by side, do not include any reference panels.`;
 
     const start = await fetch(
       `https://api.replicate.com/v1/models/${FACE_SWAP_MODEL}/predictions`,
