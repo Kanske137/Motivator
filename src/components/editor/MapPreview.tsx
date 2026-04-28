@@ -408,7 +408,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             return (
               <div
                 key={l.id}
-                className="absolute pointer-events-none whitespace-pre-line leading-tight"
+                className="absolute whitespace-pre-line leading-tight"
                 style={{
                   ...wrapStyle,
                   fontFamily: effectiveFont,
@@ -421,9 +421,11 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
                     d.align === "left" ? "flex-start" : d.align === "right" ? "flex-end" : "center",
                   padding: "0 4px",
                   containerType: "size",
+                  pointerEvents: movable ? "auto" : "none",
                 }}
               >
-                <span style={{ width: "100%" }}>{effectiveText || "Lägg till text…"}</span>
+                <span style={{ width: "100%", pointerEvents: "none" }}>{effectiveText || "Lägg till text…"}</span>
+                {moveHandle}
               </div>
             );
           }
@@ -432,6 +434,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             return (
               <div key={l.id} style={wrapStyle}>
                 <ImageLayerView layer={l} />
+                {moveHandle}
               </div>
             );
           }
