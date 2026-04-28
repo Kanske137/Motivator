@@ -421,6 +421,37 @@ async function runRemoveBackground(params: {
     ? `5. SOFT FADE-OUT TO FRAME — mandatory on ALL FOUR sides equally (top, bottom, left AND right — no side may be skipped): the watercolor dots, splatters and pigment washes must progressively fade and dissipate as they approach EACH of the four edges of the output image. The outermost ~15-20% of the canvas on every side must be pure clean white (#FFFFFF) with at most a few extremely faint, sparse, low-opacity flecks that gently scatter and dissolve into nothing. The subject itself must also be composed and sized so its top, bottom, left and right extremes all sit comfortably inside this safe area, leaving visible whitespace on EACH of the four sides — never crop or extend the subject to any edge. Absolutely NO splatters, dots, droplets or pigment touching or bleeding off ANY of the four edges. The composition should feel like an aesthetic vignette that floats inside a sea of white and softly evaporates outward in every direction (up, down, left and right symmetrically), so the artwork blends seamlessly into the white page background with no perceptible image border on any side.`
     : `5. SOFT FADE-OUT TO FRAME — mandatory on ALL FOUR sides equally (top, bottom, left AND right — no side may be skipped, no side may remain sharp): the outermost ~15-20% of the canvas on every side must be pure clean white (#FFFFFF) and completely empty — no marks, no dots, no splatters, no stray pigment of any kind. Absolutely nothing may touch or bleed off ANY of the four edges. The subject itself must be composed and sized so that its top, bottom, left and right extremes all sit comfortably inside this safe area, leaving visible whitespace on EACH of the four sides — never crop or extend the subject to any edge. The fade from styled subject into pure white must look symmetrical on all four sides; do not leave (for example) the bottom of the torso or one shoulder cleanly cut while the top of the head softly fades. The composition should feel like an aesthetic vignette of the styled subject floating inside a sea of pure white, blending seamlessly into the white web page with no perceptible image border anywhere.`;
 
+  // Map a numeric aspect ratio to the closest common ratio label that Nano
+  // Banana 2 understands well. The model respects these labels much better
+  // than arbitrary decimals like "0.7142".
+  function aspectLabel(ar: number): string {
+    const candidates: Array<{ label: string; value: number }> = [
+      { label: "1:1", value: 1 },
+      { label: "4:5", value: 4 / 5 },
+      { label: "3:4", value: 3 / 4 },
+      { label: "2:3", value: 2 / 3 },
+      { label: "9:16", value: 9 / 16 },
+      { label: "5:4", value: 5 / 4 },
+      { label: "4:3", value: 4 / 3 },
+      { label: "3:2", value: 3 / 2 },
+      { label: "16:9", value: 16 / 9 },
+    ];
+    let best = candidates[0];
+    let bestDiff = Math.abs(ar - best.value);
+    for (const c of candidates) {
+      const d = Math.abs(ar - c.value);
+      if (d < bestDiff) {
+        best = c;
+        bestDiff = d;
+      }
+    }
+    return best.label;
+  }
+
+  const aspectInstruction = params.targetAspectRatio && params.targetAspectRatio > 0
+    ? `Return ONE single edited image with an output aspect ratio of approximately ${aspectLabel(params.targetAspectRatio)} (width:height ≈ ${params.targetAspectRatio.toFixed(3)}). The subject MUST be composed and scaled so it fits comfortably INSIDE this output frame with generous pure-white padding on every side — never crop the subject to the frame, never let the subject touch any edge. If the subject's natural shape doesn't fill the frame, leave the extra space as pure white (#FFFFFF) — do NOT stretch, distort, zoom in, or crop the subject to make it fill the frame. The whole subject (full vehicle, full body, full silhouette) must be visible. No collage, no side-by-side, no before/after comparison.`
+    : `Return ONE single edited image with the same aspect ratio as the input. No collage, no side-by-side, no before/after comparison.`;
+
   const promptText = [
     `Edit the input photo:`,
     `1. Isolate the main subject (a person or a pet) and COMPLETELY REMOVE the original background.`,
@@ -431,7 +462,7 @@ async function runRemoveBackground(params: {
     `6. Keep the subject's identity, face, eyes, fur/skin and proportions exactly as in the input photo unless an artistic style is specified below.`,
     styleBlock,
     adminPromptLine,
-    `Return ONE single edited image with the same aspect ratio as the input. No collage, no side-by-side, no before/after comparison.`,
+    aspectInstruction,
   ].filter(Boolean).join("\n");
 
   return callNanoBanana({
