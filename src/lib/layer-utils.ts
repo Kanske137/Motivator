@@ -38,6 +38,21 @@ export function clampLayerRect(rect: { xPct: number; yPct: number; wPct: number;
   return { xPct, yPct, wPct, hPct };
 }
 
+/** Effective rect for a layer = template defaults overridden by any per-layer
+ *  customer transform (size slider / drag). */
+export function effectiveLayerRect(
+  layer: TemplateLayer,
+  transforms?: Record<string, { xPct?: number; yPct?: number; wPct?: number; hPct?: number }>,
+): { xPct: number; yPct: number; wPct: number; hPct: number } {
+  const t = transforms?.[layer.id];
+  return {
+    xPct: t?.xPct ?? layer.xPct,
+    yPct: t?.yPct ?? layer.yPct,
+    wPct: t?.wPct ?? layer.wPct,
+    hPct: t?.hPct ?? layer.hPct,
+  };
+}
+
 // ---------- line snap & corner-fill helpers ----------
 //
 // Lines are admin primitives often used to build frames/grids. Two adjacent
