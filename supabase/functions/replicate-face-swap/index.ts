@@ -23,10 +23,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Prompt-aware face-swap model on Replicate. Accepts `input_image` (scene)
-// and `swap_image` (face source) plus a `prompt` to steer the swap. Works
-// for humans and animals.
-const FACE_SWAP_MODEL = "flux-kontext-apps/face-swap";
+// Prompt-aware multi-image Kontext model on Replicate. Accepts
+// `input_image_1` (scene/character to keep), `input_image_2` (face/subject
+// source) and a `prompt`. It is a general-purpose Kontext editor — NOT a
+// face detector — so it works equally well for humans, cats and dogs.
+// Officially hosted, predictable pricing (~$0.08/image).
+const FACE_SWAP_MODEL = "flux-kontext-apps/multi-image-kontext-max";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
