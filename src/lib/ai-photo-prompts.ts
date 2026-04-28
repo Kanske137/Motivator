@@ -20,7 +20,7 @@ export const DEFAULT_AI_PHOTO_PROMPTS: Record<AiPhotoSubjectKind, string> = {
   pet:
     "Take the pet's face from input_image_2 and place it onto the pet in input_image_1. Keep input_image_1's body, fur, costume, pose and background exactly. The final pet must have the unique markings, fur color/pattern, breed traits and identity from input_image_2 — not from input_image_1.",
   removeBackground:
-    "Default: warm earthy watercolor dots (amber, rust, soft brown, hint of pink) around the subject. Edit this text to change the dot color tones, density, or style. The subject's appearance is controlled by the AI style preset the customer picks (or left untouched if no style is picked). The background is always removed and replaced with a clean white backdrop.",
+    "Default: warm earthy watercolor dots (amber, rust, soft brown, hint of pink) around the subject, with soft feathered edges where the subject's outer silhouette dissolves organically into the white background (no hard cut-out). Edit this text to change the dot color tones, density, or style. The subject's appearance is controlled by the AI style preset the customer picks (or left untouched if no style is picked). The background is always removed and replaced with a clean white backdrop.",
 };
 
 export function defaultPromptFor(kind: AiPhotoSubjectKind): string {
