@@ -22,6 +22,7 @@ export function MockupGallery() {
     text, textFont, textVisible,
     showLabels, mapShape, posterBgColor,
     layerValues,
+    layerTransforms,
     designSource, photoPreviewUrl, aiPrintFileUrl,
     aiPhotoResults,
   } = useEditorStore();
@@ -62,6 +63,7 @@ export function MockupGallery() {
           orientation,
           size,
           layerValues,
+          layerTransforms,
           livePosterBgColor: posterBgColor,
           liveMapCenter: mapCenter,
           liveMapZoom: mapZoom,
@@ -135,7 +137,7 @@ export function MockupGallery() {
     };
   }, [
     config, template, size, variant, orientation, isCanvas, canvasDepthCm,
-    layerValues, posterBgColor,
+    layerValues, layerTransforms, posterBgColor,
     mapStyleId, mapCenter, mapZoom, showLabels, mapShape,
     text, textFont, textVisible,
     designSource, photoPreviewUrl, aiPrintFileUrl,

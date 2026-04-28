@@ -5,7 +5,7 @@ import type { TemplateLayer } from "@/lib/template-schema";
 import { MapLayerInstance } from "./layers/MapLayerInstance";
 import { ImageLayerView, LineLayerView, MarginLayerView } from "./layers/StaticLayers";
 import { ShapeLayerView } from "./layers/ShapeLayerView";
-import { lineThicknessPxFromCanvas } from "@/lib/layer-utils";
+import { lineThicknessPxFromCanvas, effectiveLayerRect, clampLayerRect } from "@/lib/layer-utils";
 
 interface Props {
   frameColor?: string;
@@ -107,6 +107,8 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
     posterBgColor,
     templateLayers,
     layerValues,
+    layerTransforms,
+    setLayerTransform,
     designSource,
     photoPreviewUrl,
     aiPrintFileUrl,
@@ -114,6 +116,8 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   } = useEditorStore();
 
   const layers = templateLayers();
+  // Center-alignment guides shown while dragging a layer (in % of editor).
+  const [guides, setGuides] = useState<{ h: boolean; v: boolean }>({ h: false, v: false });
   // When the customer has uploaded a photo (or generated an AI image) we
   // show that image inside every map layer's shape instead of Mapbox.
   const photoOverlayUrl =
@@ -174,12 +178,59 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   };
 
   const layerToEditorRect = (l: TemplateLayer) => {
-    const left = (frontInsetX + (l.xPct / 100) * (1 - 2 * frontInsetX)) * 100;
-    const top = (frontInsetY + (l.yPct / 100) * (1 - 2 * frontInsetY)) * 100;
-    const width = (l.wPct / 100) * (1 - 2 * frontInsetX) * 100;
-    const height = (l.hPct / 100) * (1 - 2 * frontInsetY) * 100;
+    const eff = effectiveLayerRect(l, layerTransforms);
+    const left = (frontInsetX + (eff.xPct / 100) * (1 - 2 * frontInsetX)) * 100;
+    const top = (frontInsetY + (eff.yPct / 100) * (1 - 2 * frontInsetY)) * 100;
+    const width = (eff.wPct / 100) * (1 - 2 * frontInsetX) * 100;
+    const height = (eff.hPct / 100) * (1 - 2 * frontInsetY) * 100;
     return { left, top, width, height };
   };
+
+  // Pointer-drag handler attached to the wrapper div of any draggable layer.
+  // Translates pixel deltas → % of editor canvas, snaps to center (h/v) when
+  // close, and clamps so the layer never crosses the editor edges.
+  const SNAP_PCT = 0.6; // distance from center where we snap
+  const onDragStart = useCallback(
+    (l: TemplateLayer, e: React.PointerEvent<Element>) => {
+      const frame = frameRef.current;
+      if (!frame) return;
+      e.preventDefault();
+      e.stopPropagation();
+      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+      const rect = frame.getBoundingClientRect();
+      const eff = effectiveLayerRect(l, layerTransforms);
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startXPct = eff.xPct;
+      const startYPct = eff.yPct;
+      const wPct = eff.wPct;
+      const hPct = eff.hPct;
+
+      const onMove = (ev: PointerEvent) => {
+        const dxPct = ((ev.clientX - startX) / rect.width) * 100;
+        const dyPct = ((ev.clientY - startY) / rect.height) * 100;
+        let nx = startXPct + dxPct;
+        let ny = startYPct + dyPct;
+        // Center-snap (horizontal: layer center == 50; vertical likewise)
+        const centerXTarget = 50 - wPct / 2;
+        const centerYTarget = 50 - hPct / 2;
+        let snapH = false, snapV = false;
+        if (Math.abs(nx - centerXTarget) < SNAP_PCT) { nx = centerXTarget; snapV = true; }
+        if (Math.abs(ny - centerYTarget) < SNAP_PCT) { ny = centerYTarget; snapH = true; }
+        const c = clampLayerRect({ xPct: nx, yPct: ny, wPct, hPct });
+        setLayerTransform(l.id, c);
+        setGuides({ h: snapH, v: snapV });
+      };
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        setGuides({ h: false, v: false });
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    },
+    [layerTransforms, setLayerTransform],
+  );
 
   const isWrap = wrapCm > 0;
   const frontZoneStyle: React.CSSProperties = {
@@ -214,6 +265,18 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             height: `${rect.height}%`,
             zIndex: l.zIndex,
           };
+          const movable = !l.locks.move && (l.type === "map" || l.type === "photo" || l.type === "aiPhoto" || l.type === "text" || l.type === "image");
+          const moveHandle = movable ? (
+            <button
+              type="button"
+              onPointerDown={(e) => onDragStart(l, e)}
+              className="absolute -top-3 -left-3 w-7 h-7 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center text-[12px] cursor-move touch-none z-10 ring-2 ring-background"
+              aria-label="Flytta lager"
+              title="Dra för att flytta lagret"
+            >
+              ✥
+            </button>
+          ) : null;
 
           if (l.type === "map") {
             const v = layerValues[l.id];
@@ -237,6 +300,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
                 wrapStyle={wrapStyle}
                 isCircle={effectiveShape === "circle"}
                 staticClip={staticClip}
+                overlay={moveHandle}
               >
                 {(clip) => (
                   <MapLayerInstance
@@ -282,6 +346,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
                   offsetY={offsetY}
                   draggable={!!src}
                 />
+                {moveHandle}
               </div>
             );
           }
@@ -328,6 +393,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
                     </span>
                   </div>
                 )}
+                {moveHandle}
               </div>
             );
           }
@@ -342,7 +408,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             return (
               <div
                 key={l.id}
-                className="absolute pointer-events-none whitespace-pre-line leading-tight"
+                className="absolute whitespace-pre-line leading-tight"
                 style={{
                   ...wrapStyle,
                   fontFamily: effectiveFont,
@@ -355,9 +421,11 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
                     d.align === "left" ? "flex-start" : d.align === "right" ? "flex-end" : "center",
                   padding: "0 4px",
                   containerType: "size",
+                  pointerEvents: movable ? "auto" : "none",
                 }}
               >
-                <span style={{ width: "100%" }}>{effectiveText || "Lägg till text…"}</span>
+                <span style={{ width: "100%", pointerEvents: "none" }}>{effectiveText || "Lägg till text…"}</span>
+                {moveHandle}
               </div>
             );
           }
@@ -366,6 +434,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             return (
               <div key={l.id} style={wrapStyle}>
                 <ImageLayerView layer={l} />
+                {moveHandle}
               </div>
             );
           }
@@ -418,6 +487,14 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             </span>
           </div>
         )}
+
+        {/* Center alignment guides (shown only while dragging snaps) */}
+        {guides.v && (
+          <div className="absolute pointer-events-none top-0 bottom-0 left-1/2 -translate-x-1/2 border-l border-dashed border-primary" style={{ zIndex: 10000 }} />
+        )}
+        {guides.h && (
+          <div className="absolute pointer-events-none left-0 right-0 top-1/2 -translate-y-1/2 border-t border-dashed border-primary" style={{ zIndex: 10000 }} />
+        )}
       </div>
       <p className="text-[10px] text-muted-foreground">© Mapbox · © OpenStreetMap</p>
     </div>
@@ -434,17 +511,20 @@ function MapLayerSlot({
   isCircle,
   staticClip,
   children,
+  overlay,
 }: {
   wrapStyle: React.CSSProperties;
   isCircle: boolean;
   staticClip: string | undefined;
   children: (clip: string | undefined) => React.ReactNode;
+  overlay?: React.ReactNode;
 }) {
   const { ref, clipPath } = useCircleClip(isCircle);
   const effectiveClip = isCircle ? clipPath ?? staticClip : staticClip;
   return (
     <div ref={ref} style={wrapStyle}>
       {children(effectiveClip)}
+      {overlay}
     </div>
   );
 }

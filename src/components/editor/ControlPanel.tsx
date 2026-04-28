@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
-import { Circle, Heart, Star, Square } from "lucide-react";
+import { Circle, Heart, Star, Square, RotateCcw } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useEditorStore, type MapLayerValue, type TextLayerValue, type PhotoLayerValue, type PhotoShape } from "@/stores/editorStore";
 import { geocode, type GeocodeResult } from "@/lib/mapbox";
@@ -23,7 +23,80 @@ import { AiPhotoSection } from "./AiPhotoSection";
 import { Loader2, Search } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { effectiveLayerRect, clampLayerRect } from "@/lib/layer-utils";
 import type { TemplateLayer } from "@/lib/template-schema";
+
+/** Per-layer slider that scales a layer up/down while preserving aspect ratio.
+ *  Shown in the customer editor for any layer where `locks.size === false`.
+ *  Scale percentage is RELATIVE to the layer's template default size. */
+function LayerSizeSlider({ layer }: { layer: TemplateLayer }) {
+  const layerTransforms = useEditorStore((s) => s.layerTransforms);
+  const setLayerTransform = useEditorStore((s) => s.setLayerTransform);
+  const resetLayerTransform = useEditorStore((s) => s.resetLayerTransform);
+  const eff = effectiveLayerRect(layer, layerTransforms);
+  // % of original size (avoid /0)
+  const scale = layer.wPct > 0 ? Math.round((eff.wPct / layer.wPct) * 100) : 100;
+
+  const onChange = (val: number) => {
+    const factor = val / 100;
+    const newW = Math.max(1, Math.min(100, layer.wPct * factor));
+    const newH = Math.max(1, Math.min(100, layer.hPct * factor));
+    // Keep the layer centered around its previous center
+    const cx = eff.xPct + eff.wPct / 2;
+    const cy = eff.yPct + eff.hPct / 2;
+    const clamped = clampLayerRect({
+      xPct: cx - newW / 2,
+      yPct: cy - newH / 2,
+      wPct: newW,
+      hPct: newH,
+    });
+    setLayerTransform(layer.id, clamped);
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
+          Storlek <span className="ml-1 text-foreground/60 normal-case">{scale}%</span>
+        </Label>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="h-7 px-2 text-[10px]"
+          onClick={() => resetLayerTransform(layer.id)}
+        >
+          <RotateCcw className="h-3 w-3 mr-1" /> Återställ
+        </Button>
+      </div>
+      <Slider
+        min={20}
+        max={200}
+        step={1}
+        value={[scale]}
+        onValueChange={(v) => onChange(v[0]!)}
+      />
+    </div>
+  );
+}
+
+/** Aggregated transform controls for a layer (size slider when unlocked + a
+ *  reminder that the user can drag the layer when move is unlocked). */
+function LayerTransformControls({ layer }: { layer: TemplateLayer }) {
+  const showSize = !layer.locks.size;
+  const showMove = !layer.locks.move;
+  if (!showSize && !showMove) return null;
+  return (
+    <div className="space-y-3 pt-1">
+      {showSize && <LayerSizeSlider layer={layer} />}
+      {showMove && (
+        <p className="text-[11px] text-muted-foreground">
+          Tips: dra ✥-handtaget på lagret i förhandsvisningen för att flytta det.
+        </p>
+      )}
+    </div>
+  );
+}
 
 interface Props {
   configs: ProductConfig[];
@@ -55,10 +128,10 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
 
   // Hide map layers fully locked (no editable surface)
   const editableMaps = mapLayers.filter(
-    (l) => !l.locks.position || !l.locks.style || !l.locks.shape || !l.locks.visibility,
+    (l) => !l.locks.position || !l.locks.style || !l.locks.shape || !l.locks.visibility || !l.locks.size || !l.locks.move,
   );
   const editableTexts = textLayers.filter(
-    (l) => !l.locks.content || !l.locks.font || !l.locks.visibility,
+    (l) => !l.locks.content || !l.locks.font || !l.locks.visibility || !l.locks.size || !l.locks.move,
   );
 
   // Image section visible only when the template has at least one dedicated
@@ -77,10 +150,10 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
           </AccordionTrigger>
           <AccordionContent className="pt-1 pb-4">
             <PhotoUploadSection />
-            {photoLayers.some((l) => !l.locks.shape) && (
+            {photoLayers.some((l) => !l.locks.shape || !l.locks.size || !l.locks.move) && (
               <div className="mt-4 pt-4 border-t space-y-3">
                 {photoLayers
-                  .filter((l) => !l.locks.shape)
+                  .filter((l) => !l.locks.shape || !l.locks.size || !l.locks.move)
                   .map((l, idx, arr) => (
                     <PhotoShapeSection
                       key={l.id}
@@ -289,6 +362,7 @@ function PlaceLayerSection({
       <p className="text-[11px] text-muted-foreground">
         Tips: dra och zooma direkt i kartan för att finjustera.
       </p>
+      <LayerTransformControls layer={layer} />
     </div>
   );
 }
@@ -446,6 +520,7 @@ function TextLayerSection({
           </div>
         </div>
       )}
+      <LayerTransformControls layer={layer} />
     </div>
   );
 }
@@ -475,30 +550,35 @@ function PhotoShapeSection({
           {heading}
         </h4>
       )}
-      <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-        Bildens form
-      </Label>
-      <div className="grid grid-cols-4 gap-2">
-        {options.map(({ id, label, Icon }) => {
-          const selected = shape === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setLayerPhotoShape(layer.id, id as PhotoShape)}
-              className={cn(
-                "flex flex-col items-center justify-center gap-1.5 aspect-square rounded-xl transition",
-                selected
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-background ring-1 ring-border hover:bg-accent/50",
-              )}
-            >
-              <Icon className="h-5 w-5" />
-              <span className="text-[10px] font-medium">{label}</span>
-            </button>
-          );
-        })}
-      </div>
+      {!layer.locks.shape && (
+        <>
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
+            Bildens form
+          </Label>
+          <div className="grid grid-cols-4 gap-2">
+            {options.map(({ id, label, Icon }) => {
+              const selected = shape === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setLayerPhotoShape(layer.id, id as PhotoShape)}
+                  className={cn(
+                    "flex flex-col items-center justify-center gap-1.5 aspect-square rounded-xl transition",
+                    selected
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-background ring-1 ring-border hover:bg-accent/50",
+                  )}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span className="text-[10px] font-medium">{label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+      <LayerTransformControls layer={layer} />
     </div>
   );
 }
