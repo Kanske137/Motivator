@@ -487,6 +487,14 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             </span>
           </div>
         )}
+
+        {/* Center alignment guides (shown only while dragging snaps) */}
+        {guides.v && (
+          <div className="absolute pointer-events-none top-0 bottom-0 left-1/2 -translate-x-1/2 border-l border-dashed border-primary" style={{ zIndex: 10000 }} />
+        )}
+        {guides.h && (
+          <div className="absolute pointer-events-none left-0 right-0 top-1/2 -translate-y-1/2 border-t border-dashed border-primary" style={{ zIndex: 10000 }} />
+        )}
       </div>
       <p className="text-[10px] text-muted-foreground">© Mapbox · © OpenStreetMap</p>
     </div>
