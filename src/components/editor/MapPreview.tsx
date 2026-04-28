@@ -5,7 +5,7 @@ import type { TemplateLayer } from "@/lib/template-schema";
 import { MapLayerInstance } from "./layers/MapLayerInstance";
 import { ImageLayerView, LineLayerView, MarginLayerView } from "./layers/StaticLayers";
 import { ShapeLayerView } from "./layers/ShapeLayerView";
-import { lineThicknessPxFromCanvas } from "@/lib/layer-utils";
+import { lineThicknessPxFromCanvas, effectiveLayerRect, clampLayerRect } from "@/lib/layer-utils";
 
 interface Props {
   frameColor?: string;
@@ -107,6 +107,8 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
     posterBgColor,
     templateLayers,
     layerValues,
+    layerTransforms,
+    setLayerTransform,
     designSource,
     photoPreviewUrl,
     aiPrintFileUrl,
@@ -114,6 +116,8 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   } = useEditorStore();
 
   const layers = templateLayers();
+  // Center-alignment guides shown while dragging a layer (in % of editor).
+  const [guides, setGuides] = useState<{ h: boolean; v: boolean }>({ h: false, v: false });
   // When the customer has uploaded a photo (or generated an AI image) we
   // show that image inside every map layer's shape instead of Mapbox.
   const photoOverlayUrl =
