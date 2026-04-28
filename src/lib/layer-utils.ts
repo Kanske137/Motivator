@@ -29,6 +29,15 @@ export function clampLayerBounds<T extends TemplateLayer>(layer: T): T {
   return { ...layer, xPct: x, yPct: y, wPct: w, hPct: h };
 }
 
+/** Clamp arbitrary rect (in % of editor) so it stays fully inside [0..100]. */
+export function clampLayerRect(rect: { xPct: number; yPct: number; wPct: number; hPct: number }) {
+  const wPct = Math.max(1, Math.min(100, rect.wPct));
+  const hPct = Math.max(1, Math.min(100, rect.hPct));
+  const xPct = Math.max(0, Math.min(100 - wPct, rect.xPct));
+  const yPct = Math.max(0, Math.min(100 - hPct, rect.yPct));
+  return { xPct, yPct, wPct, hPct };
+}
+
 // ---------- line snap & corner-fill helpers ----------
 //
 // Lines are admin primitives often used to build frames/grids. Two adjacent
