@@ -94,6 +94,9 @@ interface EditorState {
 
   // Global background (one per layout). Other map/text values now live in
   // `layerValues`; the fields below are derived getters for legacy callers.
+  /** Customer toggle: when false, the white margin layer is hidden and all
+   *  other layers expand to fill the freed-up area. Default true. */
+  whiteMarginEnabled: boolean;
   posterBgColor: string;
 
   // format
