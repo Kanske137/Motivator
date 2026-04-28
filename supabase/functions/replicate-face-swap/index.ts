@@ -381,6 +381,7 @@ async function runRemoveBackground(params: {
   adminPrompt: string;
   stylePrompt: string | null;
   styleLabel: string | null;
+  targetAspectRatio: number | null;
 }) {
   // Detect whether the chosen AI style is a watercolor style. The colorful
   // dot/splatter ring is ONLY appropriate for watercolor — for any other
