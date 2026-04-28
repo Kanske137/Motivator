@@ -75,7 +75,10 @@ Deno.serve(async (req) => {
     }
 
     console.log(
-      `[face-swap] start subjectKind=${subjectKind} designId=${designId} prompt="${prompt.slice(0, 80)}"`,
+      `[face-swap] start subjectKind=${subjectKind} designId=${designId} ` +
+        `referenceImageUrl(input_image_1)=${referenceImageUrl} ` +
+        `faceImageUrl(input_image_2)=${faceImageUrl} ` +
+        `adminPrompt="${prompt.slice(0, 120)}"`,
     );
 
     // Build the prompt sent to the model.
@@ -85,21 +88,22 @@ Deno.serve(async (req) => {
     const subjectWord =
       subjectKind === "cat" ? "cat" : subjectKind === "dog" ? "dog" : "person";
     const defaultPrompt =
-      `Take the ${subjectWord}'s face from input_image_2 and place it onto the ${subjectWord} in input_image_1. ` +
-      `Keep input_image_1's costume, pose, lighting and background exactly the same. ` +
-      `The final ${subjectWord} must have the face from input_image_2, not from input_image_1.`;
+      `Edit input_image_1: replace ONLY the ${subjectWord}'s face/head with the ${subjectWord}'s face/head from input_image_2. ` +
+      `Keep input_image_1's body, costume, pose, lighting, composition and background exactly the same. ` +
+      `The new face must clearly look like the ${subjectWord} in input_image_2 (same identity, breed coloring, markings). ` +
+      `Do NOT keep the original face from input_image_1.`;
     const adminPrompt = prompt && prompt.trim().length > 0 ? prompt.trim() : defaultPrompt;
-    // If the admin's prompt does not already mention the input names, prepend
-    // a direction guard so the model always swaps the correct way (face from
-    // customer photo, scene from admin reference). Old saved prompts don't
-    // know about input_image_1/2 — without this they get reversed.
-    const mentionsInputs = /input_image_[12]/i.test(adminPrompt);
-    const directionGuard = mentionsInputs
-      ? ""
-      : `Use input_image_1 as the scene to keep (costume, pose, background) and use the face from input_image_2. The final ${subjectWord} must have the face from input_image_2, not from input_image_1. `;
+    // Always prepend a strong direction guard. Even if the admin prompt
+    // mentions the inputs, restating the direction reduces the chance the
+    // model returns the reference scene unchanged.
+    const directionGuard =
+      `You are editing input_image_1. input_image_2 is ONLY a face/identity reference. ` +
+      `Replace the ${subjectWord}'s face in input_image_1 with the face from input_image_2 so the identity visibly changes. ` +
+      `Do not return input_image_1 unchanged. Do not return input_image_2. Output exactly one edited image. `;
     const finalPrompt =
       `${directionGuard}${adminPrompt} Output a single edited image only — do not return a collage, ` +
       `do not show the input images side by side, do not include any reference panels.`;
+    console.log(`[face-swap] finalPrompt="${finalPrompt.slice(0, 240)}"`);
 
     const start = await fetch(
       `https://api.replicate.com/v1/models/${FACE_SWAP_MODEL}/predictions`,
@@ -198,9 +202,18 @@ Deno.serve(async (req) => {
 
     const { data: pub } = supabase.storage.from("print-files").getPublicUrl(path);
     const printFileUrl = pub.publicUrl;
-    console.log(`[face-swap] done → ${printFileUrl}`);
+    console.log(
+      `[face-swap] done → printFileUrl=${printFileUrl} replicateOutputUrl=${output}`,
+    );
 
-    return jsonResponse({ output, previewUrl: output, printFileUrl });
+    return jsonResponse({
+      output,
+      previewUrl: output,
+      printFileUrl,
+      replicateOutputUrl: output,
+      usedReferenceImageUrl: referenceImageUrl,
+      usedFaceImageUrl: faceImageUrl,
+    });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Unknown error";
     console.error("[face-swap] error:", msg);
