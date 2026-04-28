@@ -362,6 +362,7 @@ function PlaceLayerSection({
       <p className="text-[11px] text-muted-foreground">
         Tips: dra och zooma direkt i kartan för att finjustera.
       </p>
+      <LayerTransformControls layer={layer} />
     </div>
   );
 }
@@ -519,6 +520,7 @@ function TextLayerSection({
           </div>
         </div>
       )}
+      <LayerTransformControls layer={layer} />
     </div>
   );
 }
@@ -572,6 +574,7 @@ function PhotoShapeSection({
           );
         })}
       </div>
+      <LayerTransformControls layer={layer} />
     </div>
   );
 }
