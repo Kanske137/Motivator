@@ -178,12 +178,59 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   };
 
   const layerToEditorRect = (l: TemplateLayer) => {
-    const left = (frontInsetX + (l.xPct / 100) * (1 - 2 * frontInsetX)) * 100;
-    const top = (frontInsetY + (l.yPct / 100) * (1 - 2 * frontInsetY)) * 100;
-    const width = (l.wPct / 100) * (1 - 2 * frontInsetX) * 100;
-    const height = (l.hPct / 100) * (1 - 2 * frontInsetY) * 100;
+    const eff = effectiveLayerRect(l, layerTransforms);
+    const left = (frontInsetX + (eff.xPct / 100) * (1 - 2 * frontInsetX)) * 100;
+    const top = (frontInsetY + (eff.yPct / 100) * (1 - 2 * frontInsetY)) * 100;
+    const width = (eff.wPct / 100) * (1 - 2 * frontInsetX) * 100;
+    const height = (eff.hPct / 100) * (1 - 2 * frontInsetY) * 100;
     return { left, top, width, height };
   };
+
+  // Pointer-drag handler attached to the wrapper div of any draggable layer.
+  // Translates pixel deltas → % of editor canvas, snaps to center (h/v) when
+  // close, and clamps so the layer never crosses the editor edges.
+  const SNAP_PCT = 0.6; // distance from center where we snap
+  const onDragStart = useCallback(
+    (l: TemplateLayer, e: React.PointerEvent<HTMLDivElement>) => {
+      const frame = frameRef.current;
+      if (!frame) return;
+      e.preventDefault();
+      e.stopPropagation();
+      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+      const rect = frame.getBoundingClientRect();
+      const eff = effectiveLayerRect(l, layerTransforms);
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startXPct = eff.xPct;
+      const startYPct = eff.yPct;
+      const wPct = eff.wPct;
+      const hPct = eff.hPct;
+
+      const onMove = (ev: PointerEvent) => {
+        const dxPct = ((ev.clientX - startX) / rect.width) * 100;
+        const dyPct = ((ev.clientY - startY) / rect.height) * 100;
+        let nx = startXPct + dxPct;
+        let ny = startYPct + dyPct;
+        // Center-snap (horizontal: layer center == 50; vertical likewise)
+        const centerXTarget = 50 - wPct / 2;
+        const centerYTarget = 50 - hPct / 2;
+        let snapH = false, snapV = false;
+        if (Math.abs(nx - centerXTarget) < SNAP_PCT) { nx = centerXTarget; snapV = true; }
+        if (Math.abs(ny - centerYTarget) < SNAP_PCT) { ny = centerYTarget; snapH = true; }
+        const c = clampLayerRect({ xPct: nx, yPct: ny, wPct, hPct });
+        setLayerTransform(l.id, c);
+        setGuides({ h: snapH, v: snapV });
+      };
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        setGuides({ h: false, v: false });
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    },
+    [layerTransforms, setLayerTransform],
+  );
 
   const isWrap = wrapCm > 0;
   const frontZoneStyle: React.CSSProperties = {
