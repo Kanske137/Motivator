@@ -523,7 +523,11 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
 
   // Sort layers by zIndex
   const layout = input.template.defaultLayout[input.orientation];
-  const layers = [...layout.layers].sort((a, b) => a.zIndex - b.zIndex);
+  const allLayers = [...layout.layers].sort((a, b) => a.zIndex - b.zIndex);
+  const marginEnabled = input.whiteMarginEnabled !== false;
+  const marginInsets = getActiveMarginInsetsPct(allLayers, frontWcm, frontHcm);
+  const marginRemovedInsets = !marginEnabled ? marginInsets : null;
+  const layers = marginEnabled ? allLayers : allLayers.filter((l) => l.type !== "margin");
 
   // First map / text layer — used when no `layerValues` is provided so legacy
   // callers (cart pipeline) still produce the same output.
@@ -532,15 +536,20 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
 
   for (const layer of layers) {
     const t = input.layerTransforms?.[layer.id];
-    const eXPct = t?.xPct ?? layer.xPct;
-    const eYPct = t?.yPct ?? layer.yPct;
-    const eWPct = t?.wPct ?? layer.wPct;
-    const eHPct = t?.hPct ?? layer.hPct;
+    const baseRect = {
+      xPct: t?.xPct ?? layer.xPct,
+      yPct: t?.yPct ?? layer.yPct,
+      wPct: t?.wPct ?? layer.wPct,
+      hPct: t?.hPct ?? layer.hPct,
+    };
+    const eff = marginRemovedInsets && layer.type !== "margin"
+      ? expandRectForRemovedMargin(baseRect, marginRemovedInsets)
+      : baseRect;
     const rect = {
-      x: frontPxX + (eXPct / 100) * frontPxW,
-      y: frontPxY + (eYPct / 100) * frontPxH,
-      w: (eWPct / 100) * frontPxW,
-      h: (eHPct / 100) * frontPxH,
+      x: frontPxX + (eff.xPct / 100) * frontPxW,
+      y: frontPxY + (eff.yPct / 100) * frontPxH,
+      w: (eff.wPct / 100) * frontPxW,
+      h: (eff.hPct / 100) * frontPxH,
     };
 
     if (layer.type === "map") {
