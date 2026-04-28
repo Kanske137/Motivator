@@ -436,7 +436,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { template } = get();
     if (!template) return set({ orientation });
     const layerValues = hydrateLayerValues(template, orientation);
-    set({ orientation, layerValues, ...mirrorLegacy({ template, orientation, layerValues }) });
+    set({ orientation, layerValues, layerTransforms: {}, ...mirrorLegacy({ template, orientation, layerValues }) });
   },
 
   setPhotoSource: (file, previewUrl) => {
