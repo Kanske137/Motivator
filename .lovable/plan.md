@@ -1,37 +1,22 @@
-# Margin alltid visuellt överst
+## Problem
+Den nuvarande prompten för "ta bort bakgrund" säger att fade ska ske mot kanterna, men i praktiken får icke-akvarell-stilar ofta skarpa avgränsningar på en eller flera sidor (typiskt botten/axlar eller en sida av huvudet) medan andra sidor fadar mjukt. Modellen tolkar instruktionen asymmetriskt.
 
-Litet tillägg till tidigare implementation av "Vit marginal"-toggle:
+## Lösning
+Förstärk `runRemoveBackground`-prompten i `supabase/functions/replicate-face-swap/index.ts` så att fade-kravet uttryckligen gäller alla fyra kanter symmetriskt — för både akvarell- och övriga stilar.
 
-## Beteende
-- Margin-lagret ska ALLTID renderas visuellt överst, oavsett dess `zIndex` i mallen.
-- Klick-beteende oförändrat — margin-wrappern fortsätter ha `pointer-events: none` så den aldrig stjäl klick från lager under (kanterna har `pointer-events: auto` enbart för att vara synliga, men margin är admin-låst så det spelar ingen roll).
+### Konkreta promptändringar
 
-## Ändringar
+**Steg 4 (CRITICAL EDGE TREATMENT)** — båda varianterna:
+- Räkna upp alla fyra sidor explicit: TOP (huvud/hår), BOTTOM (haka/axlar/torso/ben), LEFT (kind/öra/axel/arm), RIGHT (kind/öra/axel/arm).
+- Lägg till mening: "The fade must be visibly symmetrical: top, bottom, left and right edges of the subject must each dissolve with the same softness — do not leave one side (e.g. the bottom or one shoulder) sharp while another fades."
+- Betona "on EVERY side" där det tidigare bara stod "outward".
 
-### `src/components/editor/MapPreview.tsx`
-Efter att `layers`-arrayen byggts (rad ~149), sortera om så margin-lager hamnar SIST i loop-ordningen:
-```ts
-const visibleLayers = whiteMarginEnabled ? allLayers : allLayers.filter((l) => l.type !== "margin");
-const layers = [
-  ...visibleLayers.filter((l) => l.type !== "margin"),
-  ...visibleLayers.filter((l) => l.type === "margin"),
-];
-```
-Eftersom varje lagers wrapper sätter CSS `zIndex: l.zIndex`, lägger vi också till en override för margin: i wrapperStyle, om `l.type === "margin"`, sätt `zIndex: 9999` istället för `l.zIndex`. Det säkerställer att även när admin gett ett annat lager högre `zIndex`, hamnar margin överst.
+**Steg 5 (SOFT FADE-OUT TO FRAME)** — båda varianterna:
+- Ändra "mandatory" → "mandatory on ALL FOUR sides equally (top, bottom, left AND right — no side may be skipped, no side may remain sharp)".
+- Lägg till komposition: "The subject itself must be composed and sized so its top, bottom, left and right extremes all sit comfortably inside this safe area, leaving visible whitespace on EACH of the four sides — never crop or extend the subject to any edge."
+- För icke-akvarell: lägg till "do not leave (for example) the bottom of the torso or one shoulder cleanly cut while the top of the head softly fades".
 
-### `src/lib/template-snapshot.ts`
-I render-loopen efter sort-by-zIndex (rad ~523), gör samma omsortering:
-```ts
-const sorted = [...layout.layers].sort((a, b) => a.zIndex - b.zIndex);
-const allLayers = [
-  ...sorted.filter((l) => l.type !== "margin"),
-  ...sorted.filter((l) => l.type === "margin"),
-];
-```
-Eftersom snapshot ritar lager i array-ordning, hamnar margin sist = överst på canvas.
+## Filer
+- `supabase/functions/replicate-face-swap/index.ts` — endast `edgeInstruction` och `fadeInstruction` strängarna inom `runRemoveBackground`.
 
-## Filer som ändras
-- `src/components/editor/MapPreview.tsx` — omsortera `layers`, override CSS `zIndex` för margin-wrappers.
-- `src/lib/template-snapshot.ts` — omsortera `allLayers` så margin alltid ritas sist.
-
-Mockups, cart-thumbnail och printfilen ärver detta automatiskt eftersom de alla går via `renderTemplateSnapshot`.
+Inga ändringar i UI, schema eller frontend.
