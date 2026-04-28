@@ -159,39 +159,6 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
                 heading={editableMaps.length > 1 ? `${l.name || `Karta ${idx + 1}`}` : null}
               />
             ))}
-
-            <div className="space-y-2 pt-1 border-t pt-4">
-              <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Bakgrundsfärg</Label>
-              <div className="flex flex-wrap gap-2 items-center">
-                {BG_SWATCHES.map((c) => {
-                  const selected = posterBgColor.toLowerCase() === c.toLowerCase();
-                  return (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setPosterBgColor(c)}
-                      className={cn(
-                        "h-8 w-8 rounded-full transition border",
-                        selected
-                          ? "ring-2 ring-primary ring-offset-2 ring-offset-card border-transparent"
-                          : "border-border",
-                      )}
-                      style={{ background: c }}
-                      aria-label={c}
-                    />
-                  );
-                })}
-                <label className="h-8 w-8 rounded-full border border-dashed border-border flex items-center justify-center cursor-pointer relative overflow-hidden">
-                  <input
-                    type="color"
-                    value={posterBgColor}
-                    onChange={(e) => setPosterBgColor(e.target.value)}
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                  />
-                  <span className="text-[10px] text-muted-foreground">+</span>
-                </label>
-              </div>
-            </div>
           </AccordionContent>
         </AccordionItem>
       )}
