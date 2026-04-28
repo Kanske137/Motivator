@@ -92,6 +92,15 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
   const visibleStyles = (aiStylePresets ?? []).filter((p) => p.enabled !== false);
   const [selectedStyleId, setSelectedStyleId] = useState<string | null>(null);
 
+  // Auto-select the first available style when none is picked yet (the
+  // "Ingen stil"/no-style option has been removed — customers must pick one).
+  useEffect(() => {
+    if (!isRemoveBg) return;
+    if (selectedStyleId) return;
+    if (visibleStyles.length === 0) return;
+    setSelectedStyleId(visibleStyles[0].id);
+  }, [isRemoveBg, selectedStyleId, visibleStyles]);
+
   const [busy, setBusy] = useState(false);
 
   // Hash the face photo whenever it changes.
@@ -314,17 +323,6 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
             Välj stil (valfritt)
           </Label>
           <div className="grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={() => setSelectedStyleId(null)}
-              className={cn(
-                "aspect-square rounded-xl ring-1 ring-border bg-muted flex flex-col items-center justify-center gap-1 transition hover:-translate-y-0.5",
-                selectedStyleId === null && "ring-2 ring-primary",
-              )}
-            >
-              <Sparkles className="h-4 w-4 text-muted-foreground" />
-              <span className="text-[10px] font-medium px-1 text-center">Ingen stil</span>
-            </button>
             {visibleStyles.map((p) => {
               const isActive = selectedStyleId === p.id;
               return (
