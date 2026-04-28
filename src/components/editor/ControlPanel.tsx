@@ -119,6 +119,7 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
                 key={l.id}
                 layer={l}
                 heading={arr.length > 1 ? l.name || `Förvandling ${idx + 1}` : null}
+                aiStylePresets={aiStyles}
               />
             ))}
           </AccordionContent>
