@@ -89,8 +89,16 @@ Deno.serve(async (req) => {
       `Keep input_image_1's costume, pose, lighting and background exactly the same. ` +
       `The final ${subjectWord} must have the face from input_image_2, not from input_image_1.`;
     const adminPrompt = prompt && prompt.trim().length > 0 ? prompt.trim() : defaultPrompt;
+    // If the admin's prompt does not already mention the input names, prepend
+    // a direction guard so the model always swaps the correct way (face from
+    // customer photo, scene from admin reference). Old saved prompts don't
+    // know about input_image_1/2 — without this they get reversed.
+    const mentionsInputs = /input_image_[12]/i.test(adminPrompt);
+    const directionGuard = mentionsInputs
+      ? ""
+      : `Use input_image_1 as the scene to keep (costume, pose, background) and use the face from input_image_2. The final ${subjectWord} must have the face from input_image_2, not from input_image_1. `;
     const finalPrompt =
-      `${adminPrompt} Output a single edited image only — do not return a collage, ` +
+      `${directionGuard}${adminPrompt} Output a single edited image only — do not return a collage, ` +
       `do not show the input images side by side, do not include any reference panels.`;
 
     const start = await fetch(
