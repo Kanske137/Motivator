@@ -1,43 +1,45 @@
 ## Problem
 
-När AI-bilden (ta bort bakgrund) genereras har den samma aspect ratio som kundens uppladdade originalfoto (bred bil → bred bild). Men lagret i mallen kan ha annan aspect ratio (mer kvadratiskt eller stående). Eftersom `PhotoLayerView` renderar i "cover"-läge skärs bildens kanter bort så att den fyller lagret — vilket klipper av motivet (t.ex. bilens fram-/bakparti) trots att vi precis instruerat modellen att lämna whitespace runt motivet. Hela soft-fade-effekten på alla fyra kanter går förlorad.
+Två separata problem efter den senaste contain-fixen:
 
-## Viktig kontext
+### Problem 1 — Motivet blir för litet i lagret
 
-Vi använder **Nano Banana 2** (`google/gemini-3.1-flash-image-preview`) via Lovable AI Gateway för removeBackground — INTE ett dedikerat API där vi kan sätta exakt output-aspect som parameter. Modellen styrs enbart via prompttext, och respekterar inte alltid aspect-instruktioner perfekt. Därför är frontend-fallbacken (Steg 2 & 3) det egentliga skyddsnätet — prompten i Steg 1 är "best effort".
+`object-contain` skalar bilden så att hela bilden får plats i lagret. Men prompten (`fadeInstruction`) säger redan åt Nano Banana att lämna 15-20% pure-white "safe area" runt motivet inuti den genererade bilden. När bilden sen renderas med `contain` får vi:
+
+- Modellens egna 15-20% vita padding runt motivet
+- Ev. extra padding pga aspect-mismatch mellan output och lager
+
+→ Motivet hamnar på ~50-60% av lagrets yta, känns litet och "fördränkt" i vitt, även om kunden drar storleken till max tillåtna.
+
+### Problem 2 — Lagret kan inte flyttas / fyller hela editorn
+
+När AI-lagret är stort (eller satt till nära 100% i mallen) hamnar move-handle (`-top-3 -left-3`) utanför den synliga ramen (negativ offset från lagrets övre vänstra hörn → utanför poster-frame). Användaren ser då ingen handtagsknapp och kan inte dra lagret. Den vita PNG:n från modellen täcker visuellt hela editorn så det går inte heller att hitta något annat att klicka på.
 
 ## Lösning
 
-Tvådelad fix — be Nano Banana att leverera bild i lagrets aspect ratio (mjuk styrning), men **frontend renderar alltid i contain-läge för AI-resultat** så hela motivet syns även om modellen levererar fel aspect.
+### Fix 1 — Ta bort den interna paddingen i AI-bilden
 
-### Steg 1 — Skicka lagrets aspect ratio till edge-funktionen (best effort)
+I `supabase/functions/replicate-face-swap/index.ts`, `runRemoveBackground`:
 
-I `src/components/editor/AiPhotoSection.tsx` (där `replicate-face-swap` anropas i removeBackground-läget): inkludera lagrets aspect ratio i request-bodyn, t.ex. `targetAspectRatio: layer.box.w / layer.box.h` (komponenten har redan tillgång till layer-objektet).
+- **`fadeInstruction`** (båda varianterna): ta bort kravet på "outermost ~15-20% must be pure white" / "subject must sit inside this safe area". Behåll kravet på MJUK FEATHER på alla fyra kanter (soft fade, no sharp cut-out), men låt motivet faktiskt fylla bildytan så långt det går — bara den allra yttersta 1-3 pixelraden ska vara ren vit för en sömlös övergång till sidans bakgrund.
+- **`aspectInstruction`**: behåll kravet att motivet ska få plats utan att skäras, men säg uttryckligen att modellen ska skala upp motivet så stort den kan inom output-frame medan den behåller liten feather-marginal — INTE lämna stora vita ytor om motivet inte har den exakta aspect-ration.
+- **`edgeInstruction`**: behåll mjuk symmetrisk fade på alla fyra sidor (det är fortfarande viktigt) men gör det tydligt att fade ska vara en *kant-effekt på motivet*, inte en stor vit ram.
 
-I `supabase/functions/replicate-face-swap/index.ts`:
-- Läs `targetAspectRatio` (number, valfri) från body i `Deno.serve`-handlern.
-- Skicka vidare till `runRemoveBackground`.
-- I prompten i `runRemoveBackground` (sista raden, rad 433): ersätt "Return ONE single edited image with the same aspect ratio as the input." med en variant som — när `targetAspectRatio` finns — instruerar Nano Banana att producera bild med ungefär den angivna aspect-ration (formatera som närmaste vanliga ratio, t.ex. "3:4", "4:5", "1:1", "16:9"), och att placera motivet centrerat med rikligt med vit padding så att inget av motivet skärs eller töms ut till någon kant. Behåll fade-instruktionerna.
-- Justera sanity-checken på rad 529 (`ratio > 2.2 || ratio < 0.45`) så den inte avvisar legitima format som motsvarar lagrets aspect — utöka spannet eller hoppa över checken när `targetAspectRatio` är satt och utfallet ligger nära det målet.
+Resultatet: bilden från Nano Banana är ~95% motiv + 5% mjuk feather, och `contain` i lagret ger ett motiv som faktiskt fyller lagret istället för att flyta i mitten.
 
-Notera: Nano Banana 2 är ökänd för att inte alltid hålla en strikt aspect — så detta är "best effort"; det riktiga skyddsnätet är Steg 2 & 3.
+### Fix 2 — Move-handle som alltid är synlig och nåbar
 
-### Steg 2 — Skyddsnätet: tvinga `contain` för AI-resultat i editor-previewen
+I `src/components/editor/MapPreview.tsx` (raderna 282-292, `moveHandle`):
 
-I `src/components/editor/MapPreview.tsx` (raderna 384-397, där `aiPhoto`-lagret renderas via `PhotoLayerView`):
-- När källbilden är ett `aiPhotoResults[l.id]`-värde (dvs. en genererad ta-bort-bakgrund-bild, inte adminens referens), tvinga `fit="contain"` istället för att använda `l.defaults.fit`.
-- Detta säkerställer att även om Nano Banana mot förmodan returnerar fel aspect, så visas HELA bilden inom lagret med eventuell vit padding på sidorna — vilket smälter sömlöst in i lagrets bakgrund eftersom AI-bilden alltid har ren #FFFFFF.
-- Adminens originalreferens (när inget face-swap-resultat finns ännu) får fortsatt använda `l.defaults.fit`.
+- Ändra position från `-top-3 -left-3` (utanför lagret) till `top-2 left-2` (inuti lagret, övre vänstra hörnet, alltid synligt oavsett lagrets storlek).
+- Behåll storlek/styling så det syns tydligt mot AI-bilden — lägg till lite extra opacity/skugga om det behövs för kontrast mot vitt motiv.
+- Detta gäller alla movable layers (map, photo, aiPhoto, text, image), så fördelen sträcker sig längre än bara AI-fixen.
 
-### Steg 3 — Samma fix i tryckfilsgenereringen
-
-I `src/lib/template-snapshot.ts` (raderna 604-615, aiPhoto-grenen): samma villkorliga override — när en `aiPhotoResults`-URL används, rendera med "contain"-beteende istället för layerns `fit`-default, så tryckfilen matchar editor-previewen exakt och hela motivet kommer med på affischen/canvasen.
+Alternativ-flex: överväg att även justera resize-handles om de också hamnar utanför, men move-handle är prio.
 
 ## Filer som ändras
 
-- `src/components/editor/AiPhotoSection.tsx` — skicka `targetAspectRatio` i edge-anropet
-- `supabase/functions/replicate-face-swap/index.ts` — ta emot aspect, förstärk Nano Banana-prompten, justera sanity-check
-- `src/components/editor/MapPreview.tsx` — tvinga contain för AI-resultat
-- `src/lib/template-snapshot.ts` — tvinga contain för AI-resultat i tryckfilen
+- `supabase/functions/replicate-face-swap/index.ts` — slimma `fadeInstruction` + `aspectInstruction` så motivet fyller bildytan
+- `src/components/editor/MapPreview.tsx` — flytta move-handle till `top-2 left-2` (inuti lagret)
 
-Inga schema- eller UI-ändringar utöver intern fit-logik.
+Inga schema- eller andra UI-ändringar.
