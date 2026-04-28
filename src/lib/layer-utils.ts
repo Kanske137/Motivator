@@ -360,6 +360,26 @@ export function createLayer(type: LayerType, existing: TemplateLayer[]): Templat
         defaults: { shape: "rect", fit: "cover" },
         locks: defaultLocks({ content: false, shape: false }),
       };
+    case "aiPhoto":
+      return {
+        ...base,
+        xPct: 20,
+        yPct: 20,
+        wPct: 60,
+        hPct: 60,
+        type: "aiPhoto",
+        name: `AI-bild ${countOfType(existing, "aiPhoto") + 1}`,
+        defaults: {
+          shape: "rect",
+          fit: "cover",
+          subjectKind: "human",
+          swapPrompt:
+            "Replace only the face/head onto the reference subject. Preserve the reference outfit, hair contour, lighting, pose and background.",
+        },
+        // Customer can change the SHAPE and upload content; everything else
+        // (position/size/style) is admin-controlled like a regular photo layer.
+        locks: defaultLocks({ content: false, shape: false }),
+      };
     case "shape":
       return {
         ...base,
