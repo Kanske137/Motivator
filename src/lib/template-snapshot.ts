@@ -26,6 +26,9 @@ export interface TemplateSnapshotInput {
   // legacy live* fields. Falls back to layer.defaults when missing.
   layerValues?: Record<string, LayerValue>;
 
+  /** Customer-driven rect overrides (size slider / drag) keyed by layer id. */
+  layerTransforms?: Record<string, { xPct?: number; yPct?: number; wPct?: number; hPct?: number }>;
+
   // Legacy live customer state — overrides defaults on the FIRST map/text
   // layer when `layerValues` is not supplied.
   liveMapCenter: [number, number];
@@ -523,11 +526,16 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
   const liveTextId = layers.find((l) => l.type === "text")?.id ?? null;
 
   for (const layer of layers) {
+    const t = input.layerTransforms?.[layer.id];
+    const eXPct = t?.xPct ?? layer.xPct;
+    const eYPct = t?.yPct ?? layer.yPct;
+    const eWPct = t?.wPct ?? layer.wPct;
+    const eHPct = t?.hPct ?? layer.hPct;
     const rect = {
-      x: frontPxX + (layer.xPct / 100) * frontPxW,
-      y: frontPxY + (layer.yPct / 100) * frontPxH,
-      w: (layer.wPct / 100) * frontPxW,
-      h: (layer.hPct / 100) * frontPxH,
+      x: frontPxX + (eXPct / 100) * frontPxW,
+      y: frontPxY + (eYPct / 100) * frontPxH,
+      w: (eWPct / 100) * frontPxW,
+      h: (eHPct / 100) * frontPxH,
     };
 
     if (layer.type === "map") {
