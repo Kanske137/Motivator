@@ -10,6 +10,12 @@ import {
   makeCacheKey,
   saveAiCache,
 } from "@/lib/ai-cache-storage";
+import {
+  type FaceSwapCacheEntry,
+  loadFaceSwapCache,
+  makeFaceSwapKey,
+  saveFaceSwapCache,
+} from "@/lib/face-swap-cache";
 
 interface ApplyPlaceArgs {
   placeName: string;
