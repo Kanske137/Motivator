@@ -1,58 +1,31 @@
-# Face-swap fix + UI-förbättringar på kundsidan
+## Vad var felet?
 
-## Varför misslyckades skapandet?
-
-Edge function-loggen säger:
+Edge-loggen säger:
 ```
-[face-swap] error: Replicate succeeded but produced no output URL
-subjectKind=dog
+[face-swap] start failed { detail: "The requested resource could not be found.", status: 404 }
 ```
 
-Modellen vi använder (`cdingram/face-swap`) är **enbart tränad på mänskliga ansikten**. När den får en hund eller katt — eller en bild där den inte hittar ett tydligt mänskligt ansikte — returnerar den `null` istället för en bild, och vi kastar ett fel.
+Jag pekade edge-funktionen mot `flux-kontext-apps/face-swap` — **den modellen finns inte på Replicate**. Det var min miss förra rundan. Replicate svarar 404 och kunden får "Vi kunde inte skapa bilden".
 
-Det är alltså inte ett buggat anrop, utan fel modell för djur. För människor fungerar den bra; för katt/hund behövs en annan strategi.
+## Fixen
 
-## Vad jag föreslår att vi gör
+Byt till **`flux-kontext-apps/multi-image-kontext-max`** — en officiell Replicate-modell som faktiskt existerar och som passar exakt vårt behov:
 
-### 1. Byt till en mer kapabel modell (huvudfix)
-Använd `flux-kontext-apps/face-swap` (eller motsv. Kontext-baserad modell på Replicate) som styrs av prompten admin redan skriver. Den:
-- accepterar prompt + två bilder
-- klarar djur betydligt bättre eftersom den inte är låst till ansiktsdetektor
-- respekterar instruktioner som "behåll kläder/miljö, byt bara ansiktet på hunden"
+- Tar två bilder (`input_image_1` = adminens referensbild, `input_image_2` = kundens uppladdade bild) plus en prompt.
+- Är en generell Kontext-baserad redigeringsmodell, **inte** en ansiktsdetektor → fungerar för människor OCH djur (katt/hund).
+- Officiell, alltid-uppe, förutsägbart pris (~$0.08/bild).
+- Stödjer `/v1/models/{owner}/{name}/predictions`-endpointen vi redan använder, så koden ändras minimalt.
 
-Adminens prompt (`Replace only the dog's face…`) skickas in direkt — det är precis det som behövs.
+## Ändringar
 
-### 2. Bättre felmeddelanden
-- Om Replicate returnerar tom output → visa kunden "Vi kunde inte hitta ett tydligt ansikte i din bild. Prova en annan bild med bra ljus."
-- Returnera 200 med `{ error, fallback: true }` istället för 500, så frontend kan visa ett vänligt felmeddelande utan att krascha.
-- Validera att uppladdad bild är < 10 MB innan vi ringer Replicate.
+**`supabase/functions/replicate-face-swap/index.ts`:**
+- Byt `FACE_SWAP_MODEL` till `flux-kontext-apps/multi-image-kontext-max`.
+- Byt input-payload från `{ input_image, swap_image, prompt }` till `{ input_image_1: referenceImageUrl, input_image_2: faceImageUrl, prompt, aspect_ratio: "match_input_image", output_format: "jpg", safety_tolerance: 2 }`.
+- Justera default-prompten så den är formulerad för Kontext-modellen ("Take the face/subject from the second image and place it onto the character in the first image. Keep the first image's pose, costume, lighting and background unchanged.") med subject-specifika varianter för `cat`/`dog`/`human`.
+- Behåll all befintlig felhantering, polling, upload till `print-files` och `fallback`-svar.
 
-### 3. Kund-UI-städning (det du bad om)
+**Inget annat rörs** — frontend, cache, store, UI är redan klart från förra rundan.
 
-I `src/components/editor/AiPhotoSection.tsx`:
-- **Ta bort hela "Stilreferens"-blocket** (raderna med admin-bilden + "Visa referensbilden istället"-knappen). Kunden ser bara sin egen uppladdning + slutresultatet.
-- **Knapp**: `"Skapa AI-bild" / "Skapa AI-bild igen"` → `"Skapa nu" / "Skapa igen"`.
-- Toast-texter: `"AI-bild skapad"` → `"Bilden är klar"`, `"Kunde inte skapa AI-bild"` → `"Kunde inte skapa bilden"`.
+## Efter deploy
 
-I `src/components/editor/ControlPanel.tsx`:
-- **Flikens namn** `"AI-bild"` → välj ett av förslagen nedan.
-
-## Förslag på nytt namn för fliken (välj ett)
-
-| Förslag | Känsla |
-|---|---|
-| **Porträtt** | Klassiskt, passar både människor och djur |
-| **Karaktär** | Lekfullt, fungerar för "kungar/prinsessor"-temat |
-| **Förvandling** | Beskriver vad som händer (du blir en kung osv) |
-| **Din bild** | Neutralt, väldigt tydligt vad fliken gör |
-| **Motiv** | Kort, snyggt, generiskt |
-
-Min favorit givet konceptet (riddare/prinsessa/husdjur som kung): **Förvandling** eller **Karaktär**. Säg till vilket du vill ha så använder jag det — annars defaultar jag till **Förvandling**.
-
-## Filer som ändras
-
-- `supabase/functions/replicate-face-swap/index.ts` — byt modell, bättre felhantering
-- `src/components/editor/AiPhotoSection.tsx` — ta bort stilreferens-block, ändra knapptexter och toasts, hantera `fallback`-svar
-- `src/components/editor/ControlPanel.tsx` — byt fliknamn (default: "Förvandling")
-
-Adminsidan rörs inte — där behåller vi all info inkl. referensbild och prompt.
+Deploya edge-funktionen direkt och testa igen med samma hund-bild. Om det fortfarande failar tittar jag på de nya loggarna — men 404:an försvinner garanterat eftersom modellen verifierat finns och endpointen är dokumenterad.

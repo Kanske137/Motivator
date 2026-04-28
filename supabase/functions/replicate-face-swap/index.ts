@@ -23,10 +23,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Prompt-aware face-swap model on Replicate. Accepts `input_image` (scene)
-// and `swap_image` (face source) plus a `prompt` to steer the swap. Works
-// for humans and animals.
-const FACE_SWAP_MODEL = "flux-kontext-apps/face-swap";
+// Prompt-aware multi-image Kontext model on Replicate. Accepts
+// `input_image_1` (scene/character to keep), `input_image_2` (face/subject
+// source) and a `prompt`. It is a general-purpose Kontext editor — NOT a
+// face detector — so it works equally well for humans, cats and dogs.
+// Officially hosted, predictable pricing (~$0.08/image).
+const FACE_SWAP_MODEL = "flux-kontext-apps/multi-image-kontext-max";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -76,14 +78,15 @@ Deno.serve(async (req) => {
       `[face-swap] start subjectKind=${subjectKind} designId=${designId} prompt="${prompt.slice(0, 80)}"`,
     );
 
-    // Build the prompt sent to the model. Prefer admin's prompt, fall back to
-    // a sensible subject-specific default.
+    // Build the prompt sent to the model. Prefer admin's prompt, fall back
+    // to a sensible subject-specific default. The Kontext model is told that
+    // image 1 = the scene/character to keep, image 2 = the subject to lift in.
     const defaultPrompt =
       subjectKind === "cat"
-        ? "Replace only the cat's face with the uploaded cat's face. Preserve breed, fur color, costume, lighting, pose and background exactly."
+        ? "Take the cat's face from the second image and place it onto the cat in the first image. Preserve the first image's costume, pose, lighting and background exactly. Match the new cat's fur color and breed."
         : subjectKind === "dog"
-        ? "Replace only the dog's face with the uploaded dog's face. Preserve breed, coat color, costume, lighting, pose and background exactly."
-        : "Replace only the face with the uploaded face. Preserve hair, costume, lighting, pose and background exactly.";
+        ? "Take the dog's face from the second image and place it onto the dog in the first image. Preserve the first image's costume, pose, lighting and background exactly. Match the new dog's coat color and breed."
+        : "Take the face from the second image and place it onto the person in the first image. Preserve the first image's hair, costume, pose, lighting and background exactly.";
     const finalPrompt = prompt && prompt.trim().length > 0 ? prompt : defaultPrompt;
 
     const start = await fetch(
@@ -97,9 +100,12 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           input: {
-            input_image: referenceImageUrl,
-            swap_image: faceImageUrl,
+            input_image_1: referenceImageUrl,
+            input_image_2: faceImageUrl,
             prompt: finalPrompt,
+            aspect_ratio: "match_input_image",
+            output_format: "jpg",
+            safety_tolerance: 2,
           },
         }),
       },
