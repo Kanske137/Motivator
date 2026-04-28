@@ -79,6 +79,7 @@ export function MockupGallery() {
               : designSource === "photo"
               ? photoPreviewUrl ?? undefined
               : undefined,
+          aiPhotoResults,
         });
         if (myReq !== reqIdRef.current) return;
 
