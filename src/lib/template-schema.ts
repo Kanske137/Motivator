@@ -91,6 +91,29 @@ export const photoDefaultsSchema = z.object({
 });
 export type PhotoDefaults = z.infer<typeof photoDefaultsSchema>;
 
+// Customer-uploads-a-face layer used for AI face-swap onto an admin-curated
+// reference image (king/princess/etc). Same surface as `photo` (shape/fit) so
+// it renders identically, but distinct semantics: customer uploads a FACE,
+// the swap happens server-side, and the swapped result is shown in place of
+// the placeholder/reference.
+export const aiPhotoSubjectKindSchema = z.enum(["human", "cat", "dog", "other"]);
+export type AiPhotoSubjectKind = z.infer<typeof aiPhotoSubjectKindSchema>;
+
+export const aiPhotoDefaultsSchema = z.object({
+  shape: photoShapeSchema,
+  fit: imageFitSchema,
+  /** Admin-uploaded reference image (the king/princess/etc body+outfit). */
+  referenceImageUrl: z.string().url().optional(),
+  /** Free-text prompt sent to the face-swap model. Edited by admin. */
+  swapPrompt: z.string().min(1).default(
+    "Replace only the face/head onto the reference subject. Preserve the reference outfit, hair contour, lighting, pose and background.",
+  ),
+  /** Helps admin pick a sensible default prompt; also forwarded to the
+   *  edge function so it can pick the best swap-mode for animals vs humans. */
+  subjectKind: aiPhotoSubjectKindSchema.default("human"),
+});
+export type AiPhotoDefaults = z.infer<typeof aiPhotoDefaultsSchema>;
+
 export const textDefaultsSchema = z.object({
   text: z.string(),
   font: z.string().min(1),
