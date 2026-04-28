@@ -4,6 +4,7 @@ import { getEffectiveSizes } from "@/lib/product-config";
 import type { DesignSource } from "@/lib/print-pipeline";
 import type { ProductOptions, Template, TemplateLayer } from "@/lib/template-schema";
 import { resolveTemplate } from "@/lib/template-migrate";
+import { clampLayerRect } from "@/lib/layer-utils";
 import {
   type AiCacheEntry,
   loadAiCache,
@@ -86,6 +87,11 @@ interface EditorState {
   // Per-layer values keyed by layer id (covers map + text layers).
   layerValues: Record<string, LayerValue>;
 
+  // Customer-driven rect overrides for layers (when locks.size or locks.move
+  // are unlocked). All values in % of editor canvas. Missing fields fall
+  // back to the template layer's xPct/yPct/wPct/hPct.
+  layerTransforms: Record<string, { xPct?: number; yPct?: number; wPct?: number; hPct?: number }>;
+
   // Global background (one per layout). Other map/text values now live in
   // `layerValues`; the fields below are derived getters for legacy callers.
   posterBgColor: string;
@@ -129,6 +135,8 @@ interface EditorState {
   setSize: (s: string) => void;
   setVariant: (v: string) => void;
   setOrientation: (o: Orientation) => void;
+  setLayerTransform: (id: string, patch: { xPct?: number; yPct?: number; wPct?: number; hPct?: number }) => void;
+  resetLayerTransform: (id: string) => void;
   setPhotoSource: (file: File | null, previewUrl: string | null) => void;
   setOriginalPhotoUrl: (url: string | null) => void;
   setPhotoHash: (hash: string | null) => void;
@@ -294,6 +302,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   template: null,
   productOptions: null,
   layerValues: {},
+  layerTransforms: {},
   posterBgColor: "#EFE7D6",
 
   size: null,
@@ -375,6 +384,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       size: nextSize,
       variant: nextVariant,
       layerValues,
+      layerTransforms: {} as Record<string, { xPct?: number; yPct?: number; wPct?: number; hPct?: number }>,
       ...(isFirstLoad && layout?.background?.color
         ? { posterBgColor: layout.background.color }
         : {}),
@@ -383,6 +393,32 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   setPosterBgColor: (posterBgColor) => set({ posterBgColor }),
+  setLayerTransform: (id, patch) => {
+    const state = get();
+    const layer = state.template?.defaultLayout[state.orientation].layers.find((l) => l.id === id);
+    if (!layer) return;
+    const cur = state.layerTransforms[id] ?? {};
+    const merged = {
+      xPct: patch.xPct ?? cur.xPct ?? layer.xPct,
+      yPct: patch.yPct ?? cur.yPct ?? layer.yPct,
+      wPct: patch.wPct ?? cur.wPct ?? layer.wPct,
+      hPct: patch.hPct ?? cur.hPct ?? layer.hPct,
+    };
+    const clamped = clampLayerRect(merged);
+    set({
+      layerTransforms: {
+        ...state.layerTransforms,
+        [id]: clamped,
+      },
+    });
+  },
+  resetLayerTransform: (id) => {
+    const state = get();
+    if (!(id in state.layerTransforms)) return;
+    const next = { ...state.layerTransforms };
+    delete next[id];
+    set({ layerTransforms: next });
+  },
   setSize: (size) => {
     const { config, productOptions } = get();
     if (!config) return set({ size });
@@ -400,7 +436,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { template } = get();
     if (!template) return set({ orientation });
     const layerValues = hydrateLayerValues(template, orientation);
-    set({ orientation, layerValues, ...mirrorLegacy({ template, orientation, layerValues }) });
+    set({ orientation, layerValues, layerTransforms: {}, ...mirrorLegacy({ template, orientation, layerValues }) });
   },
 
   setPhotoSource: (file, previewUrl) => {

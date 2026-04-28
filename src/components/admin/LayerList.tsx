@@ -152,6 +152,7 @@ export function toggleAllLocks(layer: TemplateLayer): TemplateLayer {
   const next = allLocked
     ? defaultLocks({
         position: false,
+        move: false,
         size: false,
         shape: false,
         content: false,
@@ -161,6 +162,7 @@ export function toggleAllLocks(layer: TemplateLayer): TemplateLayer {
       })
     : defaultLocks({
         position: true,
+        move: true,
         size: true,
         shape: true,
         content: true,

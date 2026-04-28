@@ -42,7 +42,8 @@ interface Props {
 }
 
 const LOCK_LABELS: Array<{ key: keyof LayerLocks; label: string }> = [
-  { key: "position", label: "Position" },
+  { key: "position", label: "Position (karta pan/zoom)" },
+  { key: "move", label: "Förflytta lager" },
   { key: "size", label: "Storlek" },
   { key: "shape", label: "Form" },
   { key: "content", label: "Innehåll" },

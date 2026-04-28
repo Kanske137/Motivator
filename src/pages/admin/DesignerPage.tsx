@@ -531,6 +531,55 @@ export default function DesignerPage() {
             </div>
           </div>
 
+          <div className="flex items-center gap-3 pb-3 border-b mb-4">
+            <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              Bakgrundsfärg
+            </Label>
+            <div className="flex flex-wrap gap-2 items-center">
+              {["#EFE7D6","#FFFFFF","#F8F4EC","#E5E5E5","#D9CDB5","#D6E4D2","#CFE0EA","#1A1A1A"].map((c) => {
+                const selected = layout.background.color.toLowerCase() === c.toLowerCase();
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => commitTemplate({
+                      ...template,
+                      defaultLayout: {
+                        ...template.defaultLayout,
+                        [orientation]: { ...layout, background: { color: c } },
+                      },
+                    })}
+                    className={`h-7 w-7 rounded-full transition border ${
+                      selected
+                        ? "ring-2 ring-primary ring-offset-2 ring-offset-card border-transparent"
+                        : "border-border"
+                    }`}
+                    style={{ background: c }}
+                    aria-label={c}
+                  />
+                );
+              })}
+              <label className="h-7 w-7 rounded-full border border-dashed border-border flex items-center justify-center cursor-pointer relative overflow-hidden">
+                <input
+                  type="color"
+                  value={layout.background.color}
+                  onChange={(e) => commitTemplate({
+                    ...template,
+                    defaultLayout: {
+                      ...template.defaultLayout,
+                      [orientation]: { ...layout, background: { color: e.target.value } },
+                    },
+                  })}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                />
+                <span className="text-[10px] text-muted-foreground">+</span>
+              </label>
+            </div>
+            <span className="text-[11px] text-muted-foreground ml-auto">
+              Sätter kundens default-bakgrund för {orientation === "portrait" ? "stående" : "liggande"}.
+            </span>
+          </div>
+
           <div className="relative">
             <LayerCanvas
               aspect={layout.aspect}

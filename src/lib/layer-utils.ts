@@ -29,6 +29,30 @@ export function clampLayerBounds<T extends TemplateLayer>(layer: T): T {
   return { ...layer, xPct: x, yPct: y, wPct: w, hPct: h };
 }
 
+/** Clamp arbitrary rect (in % of editor) so it stays fully inside [0..100]. */
+export function clampLayerRect(rect: { xPct: number; yPct: number; wPct: number; hPct: number }) {
+  const wPct = Math.max(1, Math.min(100, rect.wPct));
+  const hPct = Math.max(1, Math.min(100, rect.hPct));
+  const xPct = Math.max(0, Math.min(100 - wPct, rect.xPct));
+  const yPct = Math.max(0, Math.min(100 - hPct, rect.yPct));
+  return { xPct, yPct, wPct, hPct };
+}
+
+/** Effective rect for a layer = template defaults overridden by any per-layer
+ *  customer transform (size slider / drag). */
+export function effectiveLayerRect(
+  layer: TemplateLayer,
+  transforms?: Record<string, { xPct?: number; yPct?: number; wPct?: number; hPct?: number }>,
+): { xPct: number; yPct: number; wPct: number; hPct: number } {
+  const t = transforms?.[layer.id];
+  return {
+    xPct: t?.xPct ?? layer.xPct,
+    yPct: t?.yPct ?? layer.yPct,
+    wPct: t?.wPct ?? layer.wPct,
+    hPct: t?.hPct ?? layer.hPct,
+  };
+}
+
 // ---------- line snap & corner-fill helpers ----------
 //
 // Lines are admin primitives often used to build frames/grids. Two adjacent

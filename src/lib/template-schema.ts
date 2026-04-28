@@ -35,6 +35,7 @@ export const hexColorSchema = z
 // where it makes sense (e.g. text font usually stays admin-controlled).
 export const layerLocksSchema = z.object({
   position: z.boolean(),
+  move: z.boolean().default(true),
   size: z.boolean(),
   shape: z.boolean(),
   content: z.boolean(),
@@ -46,6 +47,7 @@ export type LayerLocks = z.infer<typeof layerLocksSchema>;
 
 export const defaultLocks = (overrides: Partial<LayerLocks> = {}): LayerLocks => ({
   position: true,
+  move: true,
   size: true,
   shape: true,
   content: false,

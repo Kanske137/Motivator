@@ -1,77 +1,65 @@
-## Problem
+# Justeringar (steg 1, 2, 3 reviderade)
 
-För `aiPhoto`-lager (särskilt nya "Ta bort bakgrund"-läget) syns inte den genererade bilden i:
-- 3D-canvas-förhandsvisningen
-- Mockup-galleriet (poster-scener)
-- Cart-thumbnail/printfil i vissa fall
-- Tom/ful platshållare i poster-preview innan kunden genererat
+## 1) Admin: Bakgrundsfärg på Designytan
+Oförändrat från förra planen — swatch + custom-color-picker ovanför `LayerCanvas` i `DesignerPage.tsx`, sparas på `template.defaultLayout[orientation].background.color`, per orientering, går genom `commitTemplate` (undo). Kundens default `posterBgColor` hydratiseras redan från detta fält.
 
-**Rotorsak**: `MockupGallery.tsx` (som driver både scen-mockups OCH 3D-canvas) skickar inte `aiPhotoResults` till `renderTemplateSnapshot`, och har inte heller `aiPhotoResults` i sin `useEffect`-deps. När kunden klickar "Skapa nu" och `aiPhotoResults` uppdateras → snapshoten ritas aldrig om → mockup + 3D visar fortfarande den tomma bakgrunden.
+## 2) Kundeditor: Flytta "Bakgrundsfärg" från Kartstil till Format
+Oförändrat — flyttas högst upp i `FormatSection`, ovanför `Produkt`. Tas bort från `Kartstil`-blocket i `ControlPanel`.
 
-`MapPreview` (poster-preview) läser visserligen `aiPhotoResults` reaktivt men för `removeBackground`-läget finns ingen `referenceImageUrl` heller, så innan generering är hela ytan tom utan tydlig instruktion.
+## 3) Lås per egenskap — uppdatera betydelse + lägg till "Förflytta"
 
-## Åtgärder
+### Nytt schema
+Lägg till **`move`** i `LayerLocks` (`src/lib/template-schema.ts`) — default `true` (låst). Migration i `template-migrate.ts` sätter `move: true` på alla befintliga lager.
 
-### 1. `src/components/editor/MockupGallery.tsx`
-- Hämta `aiPhotoResults` från store.
-- Skicka med `aiPhotoResults` i `renderTemplateSnapshot`-anropet.
-- Lägg till `aiPhotoResults` i `useEffect`-deps så snapshoten regenereras direkt när AI-bilden blir klar (debouncad 600 ms är OK).
+Ny tolkning av befintliga lås:
 
-### 2. `src/components/editor/MapPreview.tsx` (poster-preview, kund)
-- För `aiPhoto`-lager utan src (varken result eller `referenceImageUrl`): visa en tydlig dashed platshållare med ✨-ikon och text "AI-bild visas här efter Skapa nu" — istället för helt tom yta.
-- Behåll befintlig logik när src finns.
+| Lås | Ny innebörd (kund-sidan) |
+|---|---|
+| **Storlek** | Olåst → kunden kan skala lagret via en slider i lagrets sektion. Bibehåller aspect ratio. Min 20% / max 200% av admin-defaultstorleken, klampt till editorns kanter. |
+| **Förflytta** *(ny)* | Olåst → kunden kan dra hela lagret inom editorn. Center-snap-guides (horisontell + vertikal mittlinje på editorn) visas under drag. Klampt till editorns kanter. |
+| Position | (Befintlig) Karta: pan/zoom inuti kart-shapen. Oförändrad. |
+| Form, Innehåll, Typsnitt, Synlighet, Stil | Som tidigare (se audit i förra planen). |
 
-### 3. `src/components/admin/LayerCanvas.tsx` & `TemplateThumbnail.tsx`
-- För `aiPhoto`-lager med `subjectKind === "removeBackground"`: gör platshållartexten mer beskrivande ("✨ AI-bild (bakgrund tas bort)") så admin förstår att avsaknad av referensbild är förväntat.
+### Storleks-slider — beteende
+- Visas i lagrets respektive sektion i `ControlPanel` när `!locks.size`. För `text`/`map`/`photo`/`aiPhoto` — alla får samma kontroll.
+- En `<Slider>` 20–200 % (steg 5), default 100 %.
+- Skala = `scale / 100`. Nya `wPct = baseW * scale`, `hPct = baseH * scale`. Centrum bevaras (justera `xPct`/`yPct` så bounding-box-mitten är samma som före). Om resultatet hamnar utanför 0..100 → klamp till kanten (förskjut centrum så lagret precis ryms).
+- "Base" = lagrets admin-definierade `wPct`/`hPct` (sparas separat på det kund-overridade lagret som referens — eller härleds från `template` vid varje render, vilket är enklare och stateless).
 
-### 4. Verifiera printfil/cart-flödet
-- `EditorPage.tsx` skickar redan `aiPhotoResults` till `renderTemplateSnapshot`/`getPrintFileUrl`. Inget att ändra här.
-- `template-snapshot.ts` läser redan `input.aiPhotoResults?.[layer.id] ?? layer.defaults.referenceImageUrl`. Inget att ändra.
-- `print-pipeline.ts` kräver bara photo-layer för `source: "photo" | "ai"`. För `aiPhoto`-only mallar är `designSource === "map"` och kontrollen hoppas korrekt. Inget att ändra.
+### Förflytta — beteende
+- Visas inte som UI-kontroll i sidopanelen — istället blir lagret drag-bart direkt i `MapPreview` när `!locks.move`.
+- I `MapPreview.tsx` får varje wrapper-`<div>` `onPointerDown`/`Move`/`Up`-handlers som uppdaterar `xPct`/`yPct` i ett nytt customer-overlay-state.
+- Editor-bounds: `xPct ∈ [0, 100 - wPct]`, `yPct ∈ [0, 100 - hPct]`.
+- **Center-alignment-guides**: under drag, om lagrets centrum är inom 1.5 % av editorns horisontella eller vertikala mittlinje → snap till exakt 50 % och visa en streckad guide (återanvänd `AlignmentGuides`-komponenten). Endast center-axlarna, inga edges/andra-lager-snaps på kund-sidan.
 
-## Tekniskt
-
+### Ny store-yta
+Eftersom alla lager-typer nu kan ha kund-overrides på `xPct/yPct/wPct/hPct`, lägger vi till ett gemensamt overlay-fält per lager:
 ```ts
-// MockupGallery.tsx — diff
-const {
-  // ...
-  designSource, photoPreviewUrl, aiPrintFileUrl,
-+ aiPhotoResults,
-} = useEditorStore();
-
-await renderTemplateSnapshot({
-  // ...existing fields
-  photoOverlayUrl: /* ... */,
-+ aiPhotoResults,
-});
-
-useEffect(() => { /* ... */ }, [
-  /* ...existing deps */,
-  designSource, photoPreviewUrl, aiPrintFileUrl,
-+ aiPhotoResults,
-]);
+// editorStore
+layerTransforms: Record<string, { xPct?: number; yPct?: number; wPct?: number; hPct?: number }>
+setLayerTransform(id, patch): merge + clamp till editorns kanter
+resetLayerTransforms(): rensa (vid template-byte/orientation-byte)
 ```
+`MapPreview` (och `template-snapshot`, `MockupGallery`, `editor-snapshot`) läser `transform[id] ?? layer` när de räknar ut wrapper-rect. Det säkerställer att 3D-canvas, mockups, cart-thumbnail och printfilen alla speglar kundens nya storlek/position.
 
-```tsx
-// MapPreview.tsx (aiPhoto-block) — om src är null:
-{!src ? (
-  <div className="w-full h-full flex flex-col items-center justify-center
-                  bg-accent/30 border-2 border-dashed border-primary/40
-                  rounded text-center px-2 gap-1">
-    <Sparkles className="h-5 w-5 text-primary/70" />
-    <span className="text-[10px] text-muted-foreground">
-      AI-bild visas här
-    </span>
-  </div>
-) : (
-  <PhotoLayerView ... />
-)}
-```
+### Editor-kant-respekt
+En enda hjälpare `clampLayerRect(xPct, yPct, wPct, hPct)` i `layer-utils.ts` som klampar:
+1. `wPct = min(wPct, 100)`, `hPct = min(hPct, 100)`
+2. `xPct = clamp(xPct, 0, 100 - wPct)`, samma för y.
+
+Används av både slider-skala och drag.
+
+### Admin-inspector
+Lås-listan i `LayerInspector.tsx` får en ny rad **"Förflytta"** mellan Position och Storlek. Etikett-tooltips uppdateras kort så admin förstår vad varje lås gör.
 
 ## Filer som kommer ändras
-- `src/components/editor/MockupGallery.tsx` (huvudfix — 3D + scen-mockups)
-- `src/components/editor/MapPreview.tsx` (snyggare placeholder pre-generation)
-- `src/components/admin/LayerCanvas.tsx` (klarare admin-platshållare för removeBackground)
-- `src/components/admin/TemplateThumbnail.tsx` (samma)
-
-Inga schema-, migration- eller edge-function-ändringar behövs.
+- `src/lib/template-schema.ts` — `move`-fält i `LayerLocks` + `defaultLocks`.
+- `src/lib/template-migrate.ts` — sätt `move: true` på legacy-lager.
+- `src/lib/layer-utils.ts` — `clampLayerRect`-helper, `defaultLocks`-baserade lager-faktorer får `move: true`.
+- `src/stores/editorStore.ts` — `layerTransforms` + setters/reset.
+- `src/components/editor/MapPreview.tsx` — drag-handlers, center-guides, läs `layerTransforms`.
+- `src/components/editor/ControlPanel.tsx` — storleks-slider per lager-sektion (där `!locks.size`).
+- `src/components/editor/MockupGallery.tsx` + `src/lib/template-snapshot.ts` + `src/lib/editor-snapshot.ts` — applicera `layerTransforms` när rect räknas ut.
+- `src/components/admin/LayerInspector.tsx` + `LayerList.tsx` — UI för nya `move`-låset.
+- `src/pages/admin/DesignerPage.tsx` — admin bg-color-picker (steg 1).
+- `src/components/editor/FormatSection.tsx` — bg-color-picker högst upp (steg 2).

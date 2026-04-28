@@ -131,8 +131,43 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
   const currentSizeBasePrice =
     sizeDef?.variants.find((v) => v.name === variantNameForCompare)?.price ?? currentVariantPrice;
 
+  const posterBgColor = useEditorStore((s) => s.posterBgColor);
+  const setPosterBgColor = useEditorStore((s) => s.setPosterBgColor);
+  const BG_SWATCHES = ["#EFE7D6","#FFFFFF","#F8F4EC","#E5E5E5","#D9CDB5","#D6E4D2","#CFE0EA","#1A1A1A"];
+
   return (
     <div className="space-y-5">
+      {/* Bakgrundsfärg — högst upp, alltid synlig */}
+      <div className="space-y-2">
+        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Bakgrundsfärg</Label>
+        <div className="flex flex-wrap gap-2 items-center">
+          {BG_SWATCHES.map((c) => {
+            const selected = posterBgColor.toLowerCase() === c.toLowerCase();
+            return (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setPosterBgColor(c)}
+                className={`h-8 w-8 rounded-full transition border ${
+                  selected ? "ring-2 ring-primary ring-offset-2 ring-offset-card border-transparent" : "border-border"
+                }`}
+                style={{ background: c }}
+                aria-label={c}
+              />
+            );
+          })}
+          <label className="h-8 w-8 rounded-full border border-dashed border-border flex items-center justify-center cursor-pointer relative overflow-hidden">
+            <input
+              type="color"
+              value={posterBgColor}
+              onChange={(e) => setPosterBgColor(e.target.value)}
+              className="absolute inset-0 opacity-0 cursor-pointer"
+            />
+            <span className="text-[10px] text-muted-foreground">+</span>
+          </label>
+        </div>
+      </div>
+
       {/* Tomt-tillstånd: ingen storlek aktiverad i admin för den här produkttypen. */}
       {visibleSizes.length === 0 && (
         <div className="rounded-2xl border border-dashed bg-muted/40 p-4 text-sm text-muted-foreground">
