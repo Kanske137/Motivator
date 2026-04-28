@@ -1,28 +1,38 @@
-// Edge function: face-swap a customer's uploaded face onto an admin-curated
-// reference image (e.g. king/princess/cat costume) — routed by subjectKind:
+// Edge function: face-swap / background-removal for the editor's aiPhoto
+// layer. Routed by `subjectKind`:
 //
-//   subjectKind === "human" (or unknown)
+//   subjectKind === "human"
 //     → Replicate `cdingram/face-swap` (dedicated human face-swap model;
 //       structured input_image/swap_image; works very well on people).
 //
-//   subjectKind === "cat" | "dog" | "other"
-//     → Lovable AI Gateway, model `google/gemini-3.1-flash-image-preview`
-//       (a.k.a. Nano Banana 2). Multi-image edit: we pass the reference
-//       scene + the customer's pet photo and instruct the model to transfer
-//       the pet's identity into the reference scene. Animals don't have the
-//       facial-landmark structure that face-swap models depend on, so a
-//       general identity-aware editor produces much better results for pets.
+//   subjectKind === "pet"
+//     → Lovable AI Gateway, Nano Banana 2 (`google/gemini-3.1-flash-image-preview`).
+//       Multi-image edit: reference scene + customer pet photo. Animals don't
+//       have the facial-landmark structure that face-swap models depend on,
+//       so a general identity-aware editor produces much better results for
+//       both cats and dogs.
 //
-// Inputs to this function (unchanged contract):
-//   referenceImageUrl  — admin's curated body/scene image (TARGET scene)
-//   faceImageUrl       — customer's uploaded photo (SOURCE identity)
-//   prompt             — admin's free-text instruction (used by the AI route)
-//   subjectKind        — human | cat | dog | other (chooses the route)
+//   subjectKind === "removeBackground"
+//     → Lovable AI Gateway, Nano Banana 2. SINGLE image: customer's photo.
+//       The model removes the background, places the subject on a white
+//       backdrop and surrounds it with a soft watercolor/dot ring. An
+//       optional AI style preset (sent as removeBackgroundStylePrompt) is
+//       applied to the SUBJECT only; the background-removal + dot-ring
+//       effect is enforced regardless.
+//
+// Inputs (JSON body):
+//   referenceImageUrl  — admin's curated body/scene image (REQUIRED for
+//                        human/pet, ignored for removeBackground)
+//   faceImageUrl       — customer's uploaded photo (always REQUIRED)
+//   prompt             — admin's free-text instruction
+//   subjectKind        — human | pet | removeBackground
 //   designId           — used for the output filename
+//   removeBackgroundStyleId / removeBackgroundStylePrompt /
+//   removeBackgroundStyleLabel — optional, only used in removeBackground mode
 //
-// Always returns HTTP 200 with a JSON body. On recoverable errors the body
-// contains { error, fallback: true, userMessage } so the client can show a
-// friendly message instead of crashing on a non-2xx.
+// Always returns HTTP 200. On recoverable errors the body is
+// { error, fallback: true, userMessage } so the client can show a friendly
+// toast instead of crashing on a non-2xx.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
