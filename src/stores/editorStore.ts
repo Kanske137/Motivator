@@ -255,6 +255,13 @@ function hydrateLayerValues(template: Template, orientation: Orientation): Recor
         offsetX: 0,
         offsetY: 0,
       };
+    } else if (l.type === "aiPhoto") {
+      out[l.id] = {
+        kind: "aiPhoto",
+        shape: l.defaults.shape as PhotoShape,
+        offsetX: 0,
+        offsetY: 0,
+      };
     }
   }
   return out;
