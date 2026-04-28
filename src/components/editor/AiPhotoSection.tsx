@@ -246,28 +246,15 @@ export function AiPhotoSection({ layer, heading }: Props) {
         {busy ? (
           <>
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            Skapar AI-bild…
+            Skapar…
           </>
         ) : (
           <>
             <Sparkles className="h-4 w-4 mr-2" />
-            {result ? "Skapa AI-bild igen" : "Skapa AI-bild"}
+            {result ? "Skapa igen" : "Skapa nu"}
           </>
         )}
       </Button>
-
-      {result && (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => setAiPhotoResult(layer.id, null)}
-          className="w-full"
-        >
-          <Undo2 className="h-3.5 w-3.5 mr-1.5" />
-          Visa referensbilden istället
-        </Button>
-      )}
     </div>
   );
 }
