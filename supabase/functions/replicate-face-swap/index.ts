@@ -382,25 +382,51 @@ async function runRemoveBackground(params: {
   stylePrompt: string | null;
   styleLabel: string | null;
 }) {
+  // Detect whether the chosen AI style is a watercolor style. The colorful
+  // dot/splatter ring is ONLY appropriate for watercolor — for any other
+  // style (pencil sketch, line-art, oil, cartoon, vector, etc.) the dots
+  // would clash visually, so we suppress them and rely on a soft pigment-
+  // free fade-out instead.
+  const styleHaystack = `${params.stylePrompt ?? ""} ${params.styleLabel ?? ""}`.toLowerCase();
+  const isWatercolorStyle =
+    !params.stylePrompt?.trim() || // default (no style picked) = watercolor dots
+    /water\s*colou?r|akvarell|aquarelle/.test(styleHaystack);
+
   const adminPromptLine = params.adminPrompt?.trim()
-    ? `Additional artist guidance for the dot/splatter color tones and density: ${params.adminPrompt.trim()}`
+    ? (isWatercolorStyle
+        ? `Additional artist guidance for the dot/splatter color tones and density: ${params.adminPrompt.trim()}`
+        : `Additional artist guidance (apply only where compatible with the chosen style — do NOT use it as an excuse to add watercolor dots or splatters): ${params.adminPrompt.trim()}`)
     : "";
 
   const styleBlock = params.stylePrompt?.trim()
     ? [
         `Apply the following artistic style to THE SUBJECT itself (not to the background):`,
         params.stylePrompt.trim(),
-        `IMPORTANT: regardless of the style above, the background must remain a clean white backdrop with the colorful watercolor dot ring described below. Do NOT bring back the original photo background. Do NOT extend the style into the background — only the subject is restyled.`,
+        isWatercolorStyle
+          ? `IMPORTANT: regardless of the style above, the background must remain a clean white backdrop with the colorful watercolor dot ring described below. Do NOT bring back the original photo background. Do NOT extend the style into the background — only the subject is restyled.`
+          : `IMPORTANT: the background must remain a clean PURE WHITE backdrop (#FFFFFF) with NOTHING on it — no watercolor dots, no paint splatters, no droplets, no pigment flecks, no colored marks of any kind. Do NOT bring back the original photo background. Do NOT extend the style into the background — only the subject is restyled. The chosen style is NOT watercolor, so the decorative dot/splatter ring must be completely omitted.`,
       ].join("\n")
     : "";
+
+  const ringInstruction = isWatercolorStyle
+    ? `3. Around the subject (never covering the face/body), add a soft, artistic ring of small colorful watercolor dots and gentle paint splatters. Default tones: warm earthy colors (amber, rust, soft brown, hint of pink). The dots should feel hand-painted, varied in size, with some small splatter accents — playful but tasteful.`
+    : `3. Do NOT add any watercolor dots, paint splatters, droplets, pigment flecks, colored marks or decorative ring around the subject. The area surrounding the subject must be completely empty pure white (#FFFFFF). The dot/splatter decoration is reserved exclusively for the watercolor style and must be entirely omitted for the chosen style.`;
+
+  const edgeInstruction = isWatercolorStyle
+    ? `4. CRITICAL EDGE TREATMENT — applies to the ENTIRE silhouette (top, sides, bottom — head, hair, ears, shoulders, arms, hands, torso, legs, paws/feet, tail, fur, clothing edges — every single outer edge of the subject without exception): the subject must NOT have a hard, clean cut-out silhouette against the white background anywhere. The full perimeter of the subject should softly dissolve and feather into loose watercolor washes, gentle pigment bleeds, wispy translucent edges, and a few stray paint droplets that flow organically into the surrounding pure-white space. Think of an aesthetic watercolor portrait where the subject fades out at every edge rather than being masked. Keep ONLY the face, eyes and central features crisp and in focus — everything from roughly the shoulders/upper-torso outward should progressively soften into the white. Absolutely no sharp masking artifacts, no visible cut-out outline, no crisp silhouette line, no halo or fringe of off-white pixels around the subject.`
+    : `4. CRITICAL EDGE TREATMENT — applies to the ENTIRE silhouette: the subject must NOT have a hard, clean cut-out silhouette against the white background anywhere. The full perimeter should softly feather and fade into the surrounding pure-white space using ONLY techniques that are native to the chosen style (e.g. softened pencil strokes for sketch, dissolving line-work for line-art, loose brushstrokes for painting styles) — NEVER by adding watercolor washes, paint splatters or colored droplets. Keep ONLY the face, eyes and central features crisp and in focus — everything from roughly the shoulders/upper-torso outward should progressively soften into the white. Absolutely no sharp masking artifacts, no visible cut-out outline, no crisp silhouette line, no halo or fringe of off-white pixels around the subject.`;
+
+  const fadeInstruction = isWatercolorStyle
+    ? `5. SOFT FADE-OUT TO FRAME — mandatory: the watercolor dots, splatters and pigment washes must progressively fade and dissipate as they approach the edges of the output image. The outermost ~15-20% of the canvas on every side (top, bottom, left and right) should be pure clean white (#FFFFFF) with at most a few extremely faint, sparse, low-opacity flecks that gently scatter and dissolve into nothing. Absolutely NO splatters, dots, droplets or pigment touching or bleeding off any of the four edges of the image — that would create a hard visible boundary against the surrounding white web page. The composition should feel like an aesthetic vignette that floats inside a sea of white and softly evaporates outward in every direction, so the artwork blends seamlessly into the white page background with no perceptible image border anywhere.`
+    : `5. SOFT FADE-OUT TO FRAME — mandatory: the outermost ~15-20% of the canvas on every side (top, bottom, left and right) must be pure clean white (#FFFFFF) and completely empty — no marks, no dots, no splatters, no stray pigment of any kind. Absolutely nothing may touch or bleed off any of the four edges. The composition should feel like an aesthetic vignette of the styled subject floating inside a sea of pure white, blending seamlessly into the white web page with no perceptible image border anywhere.`;
 
   const promptText = [
     `Edit the input photo:`,
     `1. Isolate the main subject (a person or a pet) and COMPLETELY REMOVE the original background.`,
     `2. Place the subject on a backdrop that is PURE WHITE — exact RGB (255,255,255) / hex #FFFFFF. The background must be perfectly neutral white with ZERO tint: no cream, no beige, no ivory, no off-white, no warm/cool cast, no subtle gradient, no paper texture, no vignette, no shadow halo around the subject. The pure-white backdrop must extend cleanly all the way to all four edges of the output image so the boundary between the artwork and a surrounding white web page becomes invisible. If you generate any tint at all, it is wrong. The white must match a blank web page background exactly so it blends seamlessly with a #FFFFFF web layout.`,
-    `3. Around the subject (never covering the face/body), add a soft, artistic ring of small colorful watercolor dots and gentle paint splatters. Default tones: warm earthy colors (amber, rust, soft brown, hint of pink). The dots should feel hand-painted, varied in size, with some small splatter accents — playful but tasteful.`,
-    `4. CRITICAL EDGE TREATMENT — applies to the ENTIRE silhouette (top, sides, bottom — head, hair, ears, shoulders, arms, hands, torso, legs, paws/feet, tail, fur, clothing edges — every single outer edge of the subject without exception): the subject must NOT have a hard, clean cut-out silhouette against the white background anywhere. The full perimeter of the subject should softly dissolve and feather into loose watercolor washes, gentle pigment bleeds, wispy translucent edges, and a few stray paint droplets that flow organically into the surrounding pure-white space. Think of an aesthetic watercolor portrait where the subject fades out at every edge rather than being masked. Keep ONLY the face, eyes and central features crisp and in focus — everything from roughly the shoulders/upper-torso outward should progressively soften into the white. Absolutely no sharp masking artifacts, no visible cut-out outline, no crisp silhouette line, no halo or fringe of off-white pixels around the subject.`,
-    `5. SOFT FADE-OUT TO FRAME — mandatory: the watercolor dots, splatters and pigment washes must progressively fade and dissipate as they approach the edges of the output image. The outermost ~15-20% of the canvas on every side (top, bottom, left and right) should be pure clean white (#FFFFFF) with at most a few extremely faint, sparse, low-opacity flecks that gently scatter and dissolve into nothing. Absolutely NO splatters, dots, droplets or pigment touching or bleeding off any of the four edges of the image — that would create a hard visible boundary against the surrounding white web page. The composition should feel like an aesthetic vignette that floats inside a sea of white and softly evaporates outward in every direction, so the artwork blends seamlessly into the white page background with no perceptible image border anywhere.`,
+    ringInstruction,
+    edgeInstruction,
+    fadeInstruction,
     `6. Keep the subject's identity, face, eyes, fur/skin and proportions exactly as in the input photo unless an artistic style is specified below.`,
     styleBlock,
     adminPromptLine,
