@@ -110,6 +110,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
     designSource,
     photoPreviewUrl,
     aiPrintFileUrl,
+    aiPhotoResults,
   } = useEditorStore();
 
   const layers = templateLayers();
