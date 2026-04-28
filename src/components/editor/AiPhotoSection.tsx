@@ -92,6 +92,15 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
   const visibleStyles = (aiStylePresets ?? []).filter((p) => p.enabled !== false);
   const [selectedStyleId, setSelectedStyleId] = useState<string | null>(null);
 
+  // Auto-select the first available style when none is picked yet (the
+  // "Ingen stil"/no-style option has been removed — customers must pick one).
+  useEffect(() => {
+    if (!isRemoveBg) return;
+    if (selectedStyleId) return;
+    if (visibleStyles.length === 0) return;
+    setSelectedStyleId(visibleStyles[0].id);
+  }, [isRemoveBg, selectedStyleId, visibleStyles]);
+
   const [busy, setBusy] = useState(false);
 
   // Hash the face photo whenever it changes.
