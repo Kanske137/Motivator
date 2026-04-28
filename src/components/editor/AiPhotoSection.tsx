@@ -1,8 +1,19 @@
-// Customer-side face-swap section. One instance per `aiPhoto` layer. The
-// admin has uploaded a reference image (e.g. a king); the customer uploads
-// a face photo, then taps "Skapa AI-bild" to run the face-swap edge
-// function. Results are cached in localStorage so re-using the same selfie
-// on the same reference is instant.
+// Customer-side face-swap section. One instance per `aiPhoto` layer.
+//
+// Three modes (driven by layer.defaults.subjectKind):
+//   "human"            → admin reference + customer face → cdingram/face-swap
+//   "pet"              → admin reference + customer pet  → Nano Banana 2
+//   "removeBackground" → no reference; customer photo gets background removed
+//                        and a colorful watercolor/dot ring around the
+//                        subject. Customer can additionally pick one of the
+//                        template's enabled AI style presets and that style
+//                        is applied to the SUBJECT only — the background
+//                        stays white-with-dots regardless of style.
+//
+// Results are cached in localStorage keyed by (layerId, faceHash, refSlot)
+// where refSlot is the admin reference URL for human/pet, and a synthetic
+// "no-ref::style:<id>" string for removeBackground so each style picks
+// caches separately.
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Sparkles, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,7 +22,7 @@ import { useEditorStore } from "@/stores/editorStore";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadCartPreview } from "@/lib/upload-preview";
 import { hashFile } from "@/lib/ai-cache-storage";
-import type { TemplateLayer } from "@/lib/template-schema";
+import type { TemplateLayer, AiStylePreset } from "@/lib/template-schema";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +32,9 @@ interface Props {
   layer: AiPhotoLayer;
   /** Heading shown when there are multiple aiPhoto layers in one template. */
   heading?: string | null;
+  /** Template-level AI style presets. Only `enabled !== false` ones are shown,
+   *  and only when the layer is in "removeBackground" mode. */
+  aiStylePresets?: AiStylePreset[];
 }
 
 const ACCEPT = "image/jpeg,image/png,image/webp,image/heic";
@@ -28,10 +42,23 @@ const MAX_BYTES = 25 * 1024 * 1024;
 
 const SUBJECT_HINT: Record<string, string> = {
   human: "Bilden ska visa ansiktet rakt framifrån, väl belyst.",
-  cat: "Bilden ska visa kattens ansikte tydligt, gärna framifrån.",
-  dog: "Bilden ska visa hundens ansikte tydligt, gärna framifrån.",
-  other: "Bilden ska visa motivets ansikte tydligt och väl belyst.",
+  pet: "Bilden ska visa djurets ansikte tydligt, gärna framifrån.",
+  removeBackground:
+    "Ladda upp bilden där motivet syns tydligt — vi tar bort bakgrunden åt dig.",
 };
+
+/** Cache slot used in place of the admin reference URL for removeBackground.
+ *  Including the style id keeps each style pick cached separately. */
+function refSlotFor(
+  subjectKind: string,
+  refUrl: string | null,
+  styleId: string | null,
+): string {
+  if (subjectKind === "removeBackground") {
+    return `no-ref::style:${styleId ?? "none"}`;
+  }
+  return refUrl ?? "";
+}
 
 async function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -42,7 +69,7 @@ async function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-export function AiPhotoSection({ layer, heading }: Props) {
+export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const sources = useEditorStore((s) => s.aiPhotoSources);
   const results = useEditorStore((s) => s.aiPhotoResults);
@@ -59,6 +86,11 @@ export function AiPhotoSection({ layer, heading }: Props) {
   const refUrl = layer.defaults.referenceImageUrl ?? null;
   const subjectKind = layer.defaults.subjectKind ?? "human";
   const swapPrompt = layer.defaults.swapPrompt;
+  const isRemoveBg = subjectKind === "removeBackground";
+
+  // Style picker state — only relevant for removeBackground mode.
+  const visibleStyles = (aiStylePresets ?? []).filter((p) => p.enabled !== false);
+  const [selectedStyleId, setSelectedStyleId] = useState<string | null>(null);
 
   const [busy, setBusy] = useState(false);
 
@@ -116,7 +148,8 @@ export function AiPhotoSection({ layer, heading }: Props) {
   };
 
   const runSwap = async (opts: { force?: boolean } = {}) => {
-    if (!refUrl) {
+    // human/pet need a reference image; removeBackground does NOT.
+    if (!isRemoveBg && !refUrl) {
       toast.error("Saknar referensbild för det här motivet");
       return;
     }
@@ -127,11 +160,10 @@ export function AiPhotoSection({ layer, heading }: Props) {
     setBusy(true);
     try {
       const hash = await ensureHash();
+      const cacheRefSlot = refSlotFor(subjectKind, refUrl, selectedStyleId);
       // Only use cache when the user hasn't explicitly asked for a regenerate.
-      // "Skapa igen" must always hit the model so we never re-show a stale,
-      // possibly incorrect result.
       if (!opts.force && hash) {
-        const cached = getCachedFaceSwap(layer.id, hash, refUrl);
+        const cached = getCachedFaceSwap(layer.id, hash, cacheRefSlot);
         if (cached) {
           setAiPhotoResult(layer.id, cached);
           toast.success("Bilden är klar");
@@ -141,11 +173,17 @@ export function AiPhotoSection({ layer, heading }: Props) {
       const faceImageUrl = await ensureUploadedUrl();
       if (!faceImageUrl) return;
       const designId = `swap-${(crypto as { randomUUID?: () => string }).randomUUID?.() ?? Date.now()}`;
+
+      const selectedPreset = isRemoveBg && selectedStyleId
+        ? visibleStyles.find((p) => p.id === selectedStyleId) ?? null
+        : null;
+
       console.info("[AiPhoto] invoking face-swap", {
         layerId: layer.id,
         referenceImageUrl: refUrl,
         faceImageUrl,
         subjectKind,
+        removeBackgroundStyleId: selectedPreset?.id ?? null,
         force: !!opts.force,
       });
       const { data, error } = await supabase.functions.invoke("replicate-face-swap", {
@@ -155,6 +193,9 @@ export function AiPhotoSection({ layer, heading }: Props) {
           prompt: swapPrompt,
           subjectKind,
           designId,
+          removeBackgroundStyleId: selectedPreset?.id ?? null,
+          removeBackgroundStylePrompt: selectedPreset?.prompt ?? null,
+          removeBackgroundStyleLabel: selectedPreset?.label ?? null,
         },
       });
       if (error) throw error;
@@ -182,7 +223,7 @@ export function AiPhotoSection({ layer, heading }: Props) {
         usedFaceImageUrl: payload.usedFaceImageUrl,
       });
       setAiPhotoResult(layer.id, printFileUrl);
-      if (hash) addFaceSwapToCache(layer.id, hash, refUrl, printFileUrl);
+      if (hash) addFaceSwapToCache(layer.id, hash, cacheRefSlot, printFileUrl);
       toast.success("Bilden är klar");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Okänt fel";
@@ -193,6 +234,10 @@ export function AiPhotoSection({ layer, heading }: Props) {
     }
   };
 
+  // Disabled state for the create button. Reference image is only required
+  // for non-removeBackground modes.
+  const disabledCreate = !source || busy || (!isRemoveBg && !refUrl);
+
   return (
     <div className="space-y-3">
       {heading && (
@@ -201,7 +246,7 @@ export function AiPhotoSection({ layer, heading }: Props) {
         </h4>
       )}
 
-      {!refUrl && (
+      {!isRemoveBg && !refUrl && (
         <p className="text-xs text-destructive">
           Den här produkten är inte fullt konfigurerad än. Kontakta support.
         </p>
@@ -222,7 +267,7 @@ export function AiPhotoSection({ layer, heading }: Props) {
             <Upload className="h-5 w-5 text-muted-foreground" />
             <span className="text-sm font-medium">Ladda upp bild</span>
             <span className="text-[10px] text-muted-foreground px-3 text-center">
-              {SUBJECT_HINT[subjectKind] ?? SUBJECT_HINT.other}
+              {SUBJECT_HINT[subjectKind] ?? SUBJECT_HINT.human}
             </span>
           </button>
         ) : (
@@ -262,10 +307,60 @@ export function AiPhotoSection({ layer, heading }: Props) {
         />
       </div>
 
+      {/* Style picker — only for removeBackground when the template has presets. */}
+      {isRemoveBg && visibleStyles.length > 0 && (
+        <div className="space-y-2">
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
+            Välj stil (valfritt)
+          </Label>
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedStyleId(null)}
+              className={cn(
+                "aspect-square rounded-xl ring-1 ring-border bg-muted flex flex-col items-center justify-center gap-1 transition hover:-translate-y-0.5",
+                selectedStyleId === null && "ring-2 ring-primary",
+              )}
+            >
+              <Sparkles className="h-4 w-4 text-muted-foreground" />
+              <span className="text-[10px] font-medium px-1 text-center">Ingen stil</span>
+            </button>
+            {visibleStyles.map((p) => {
+              const isActive = selectedStyleId === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setSelectedStyleId(p.id)}
+                  className={cn(
+                    "relative aspect-square rounded-xl overflow-hidden ring-1 ring-border bg-muted transition hover:-translate-y-0.5",
+                    isActive && "ring-2 ring-primary",
+                  )}
+                >
+                  {p.thumbnailUrl ? (
+                    <img src={p.thumbnailUrl} alt={p.label} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-muted to-accent/30 flex items-center justify-center">
+                      <Sparkles className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  )}
+                  <span className="absolute bottom-0 inset-x-0 bg-background/85 backdrop-blur-sm text-[10px] py-1 text-center font-medium">
+                    {p.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            Bakgrunden tas alltid bort — stilen påverkar bara själva motivet.
+          </p>
+        </div>
+      )}
+
       <Button
         type="button"
         onClick={() => runSwap({ force: !!result })}
-        disabled={!source || !refUrl || busy}
+        disabled={disabledCreate}
         className="w-full"
       >
         {busy ? (
