@@ -176,18 +176,9 @@ export function AiPhotoSection({ layer, heading }: Props) {
         </h4>
       )}
 
-      {refUrl ? (
-        <div className="space-y-2">
-          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-            Stilreferens
-          </Label>
-          <div className="relative rounded-xl overflow-hidden border bg-muted aspect-square w-24">
-            <img src={refUrl} alt="Referens" className="w-full h-full object-cover" />
-          </div>
-        </div>
-      ) : (
+      {!refUrl && (
         <p className="text-xs text-destructive">
-          Den här produkten saknar referensbild. Be admin lägga till en.
+          Den här produkten är inte fullt konfigurerad än. Kontakta support.
         </p>
       )}
 
