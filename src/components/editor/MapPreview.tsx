@@ -142,6 +142,12 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   const frontInsetX = wrapCm > 0 ? wrapCm / editorW : 0;
   const frontInsetY = wrapCm > 0 ? wrapCm / editorH : 0;
 
+  // Derive margin insets and (when customer hides margin) filter the margin
+  // layer + remap remaining layers so they fill the freed-up area.
+  const marginInsets = getActiveMarginInsetsPct(allLayers, frontW, frontH);
+  const marginRemovedInsets = !whiteMarginEnabled ? marginInsets : undefined;
+  const layers = whiteMarginEnabled ? allLayers : allLayers.filter((l) => l.type !== "margin");
+
   useEffect(() => {
     const el = frameRef.current;
     if (!el) return;
