@@ -573,6 +573,20 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
           console.warn("[template-snapshot] photo layer failed", e);
         }
       }
+    } else if (layer.type === "aiPhoto") {
+      const url = input.aiPhotoResults?.[layer.id] ?? layer.defaults.referenceImageUrl;
+      if (url) {
+        const lv = input.layerValues?.[layer.id];
+        const av = lv && lv.kind === "aiPhoto" ? lv : null;
+        const shape = (av?.shape ?? layer.defaults.shape) as "rect" | "circle" | "heart" | "star";
+        const offsetX = av?.offsetX ?? 0;
+        const offsetY = av?.offsetY ?? 0;
+        try {
+          await drawPhotoLayer(ctx, rect, url, shape, layer.defaults.fit, offsetX, offsetY);
+        } catch (e) {
+          console.warn("[template-snapshot] aiPhoto layer failed", e);
+        }
+      }
     } else if (layer.type === "line") {
       drawLineLayer(ctx, rect, layer, pxPerMm, Math.min(frontPxW, frontPxH));
     } else if (layer.type === "shape") {
