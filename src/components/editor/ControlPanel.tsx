@@ -40,8 +40,6 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
   const productOptions = useEditorStore((s) => s.productOptions);
   const templateLayers = useEditorStore((s) => s.templateLayers);
   const layerValues = useEditorStore((s) => s.layerValues);
-  const posterBgColor = useEditorStore((s) => s.posterBgColor);
-  const setPosterBgColor = useEditorStore((s) => s.setPosterBgColor);
   const photoFile = useEditorStore((s) => s.photoFile);
 
   if (!config) return null;
