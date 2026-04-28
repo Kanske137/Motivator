@@ -4,9 +4,11 @@
 //   - Edit position/size numerically (snap to 5%)
 //   - Map: search a default place (geocoding) → updates center/zoom +
 //     placeName/city/country, AND auto-builds text for any linked text layers.
-import React, { useEffect, useState } from "react";
-import { Loader2, Search } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Loader2, Search, Upload } from "lucide-react";
+import { toast } from "sonner";
 import type { ProductConfig } from "@/lib/product-config";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -20,12 +22,15 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type {
+  AiPhotoSubjectKind,
   LayerLocks,
   TemplateLayer,
 } from "@/lib/template-schema";
 import { geocode, type GeocodeResult } from "@/lib/mapbox";
 import { applyAdminPlaceToLinkedTexts } from "@/lib/template-migrate";
 import { MAP_STYLE_CATALOG } from "@/lib/map-style-catalog";
+import { defaultPromptFor } from "@/lib/ai-photo-prompts";
+import { uploadAiReferenceImage } from "@/lib/ai-reference-upload";
 
 interface Props {
   config: ProductConfig;
