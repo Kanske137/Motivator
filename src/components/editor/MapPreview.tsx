@@ -497,17 +497,20 @@ function MapLayerSlot({
   isCircle,
   staticClip,
   children,
+  overlay,
 }: {
   wrapStyle: React.CSSProperties;
   isCircle: boolean;
   staticClip: string | undefined;
   children: (clip: string | undefined) => React.ReactNode;
+  overlay?: React.ReactNode;
 }) {
   const { ref, clipPath } = useCircleClip(isCircle);
   const effectiveClip = isCircle ? clipPath ?? staticClip : staticClip;
   return (
     <div ref={ref} style={wrapStyle}>
       {children(effectiveClip)}
+      {overlay}
     </div>
   );
 }
