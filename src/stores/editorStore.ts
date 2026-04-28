@@ -362,6 +362,39 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setShopifyVariantId: (shopifyVariantId) => set({ shopifyVariantId }),
   setShopifyVariantResolving: (shopifyVariantResolving) => set({ shopifyVariantResolving }),
 
+  // ---------- AI cache ----------
+  addAiResultToCache: (photoKey, presetId, presetLabel, url) => {
+    if (!photoKey) return;
+    const key = makeCacheKey(photoKey, presetId);
+    const next = {
+      ...get().aiResultCache,
+      [key]: { url, presetId, presetLabel, photoKey, timestamp: Date.now() },
+    };
+    set({ aiResultCache: next });
+    saveAiCache(next);
+  },
+  getCachedAiResult: (photoKey, presetId) => {
+    if (!photoKey) return null;
+    const entry = get().aiResultCache[makeCacheKey(photoKey, presetId)];
+    return entry?.url ?? null;
+  },
+  listAiResultsForPhoto: (photoKey) => {
+    if (!photoKey) return [];
+    return Object.values(get().aiResultCache)
+      .filter((e) => e.photoKey === photoKey)
+      .sort((a, b) => b.timestamp - a.timestamp);
+  },
+  clearAiResult: (photoKey, presetId) => {
+    if (!photoKey) return;
+    const key = makeCacheKey(photoKey, presetId);
+    const cur = get().aiResultCache;
+    if (!cur[key]) return;
+    const next = { ...cur };
+    delete next[key];
+    set({ aiResultCache: next });
+    saveAiCache(next);
+  },
+
   // ---------- per-layer setters ----------
   setLayerMapCenter: (id, c) => updateMap(set, get, id, { center: c }),
   setLayerMapZoom: (id, z) => updateMap(set, get, id, { zoom: z }),
