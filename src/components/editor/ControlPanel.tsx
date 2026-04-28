@@ -183,12 +183,14 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
           </AccordionTrigger>
           <AccordionContent className="pt-1 pb-4 space-y-5">
             {aiPhotoLayers.map((l, idx, arr) => (
-              <AiPhotoSection
-                key={l.id}
-                layer={l}
-                heading={arr.length > 1 ? l.name || `Förvandling ${idx + 1}` : null}
-                aiStylePresets={aiStyles}
-              />
+              <div key={l.id} className="space-y-3">
+                <AiPhotoSection
+                  layer={l}
+                  heading={arr.length > 1 ? l.name || `Förvandling ${idx + 1}` : null}
+                  aiStylePresets={aiStyles}
+                />
+                <LayerTransformControls layer={l} />
+              </div>
             ))}
           </AccordionContent>
         </AccordionItem>
