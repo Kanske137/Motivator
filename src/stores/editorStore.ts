@@ -345,20 +345,40 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   setPhotoSource: (file, previewUrl) => {
+    const prev = get();
+    // If a file is being cleared, also clear hash + originalPhotoUrl.
+    // If a new file is set, callers should follow up with `setPhotoHash` once
+    // the SHA-256 has been computed. We optimistically null the AI result and
+    // upload URL since they belong to the previous photo.
     set({
       photoFile: file,
       photoPreviewUrl: previewUrl,
       designSource: file ? "photo" : "map",
-      // Switching photo invalidates AI result + cached upload URL.
-      aiPrintFileUrl: file ? null : get().aiPrintFileUrl,
-      originalPhotoUrl: file ? null : get().originalPhotoUrl,
-      // Reset pan offsets so a freshly-uploaded photo starts centered.
-      layerValues: resetPhotoOffsets(get().layerValues),
+      aiPrintFileUrl: file ? null : prev.aiPrintFileUrl,
+      originalPhotoUrl: file ? null : prev.originalPhotoUrl,
+      photoHash: file ? null : prev.photoHash,
+      layerValues: resetPhotoOffsets(prev.layerValues),
     });
   },
   setOriginalPhotoUrl: (url) => set({ originalPhotoUrl: url }),
+  setPhotoHash: (hash) => {
+    // If the new hash matches what we already had, this is the same photo
+    // being re-set (e.g. via undo) — nothing to invalidate.
+    const prev = get();
+    if (prev.photoHash === hash) return;
+    set({ photoHash: hash });
+  },
   setAiPrintFileUrl: (url) => {
     set({ aiPrintFileUrl: url, designSource: url ? "ai" : "map" });
+  },
+  clearAiResultOnly: () => {
+    // Drop only the AI-styled result, preserve photo identity so the history
+    // list keeps showing and re-applying a cached style is instant.
+    const { photoFile } = get();
+    set({
+      aiPrintFileUrl: null,
+      designSource: photoFile ? "photo" : "map",
+    });
   },
   resetDesignSource: () =>
     set({
@@ -366,6 +386,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       photoFile: null,
       photoPreviewUrl: null,
       originalPhotoUrl: null,
+      photoHash: null,
       aiPrintFileUrl: null,
       layerValues: resetPhotoOffsets(get().layerValues),
     }),
@@ -373,30 +394,30 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setShopifyVariantResolving: (shopifyVariantResolving) => set({ shopifyVariantResolving }),
 
   // ---------- AI cache ----------
-  addAiResultToCache: (photoKey, presetId, presetLabel, url) => {
-    if (!photoKey) return;
-    const key = makeCacheKey(photoKey, presetId);
-    const next = {
+  addAiResultToCache: (photoHash, presetId, presetLabel, url) => {
+    if (!photoHash) return;
+    const key = makeCacheKey(photoHash, presetId);
+    const next: Record<string, AiCacheEntry> = {
       ...get().aiResultCache,
-      [key]: { url, presetId, presetLabel, photoKey, timestamp: Date.now() },
+      [key]: { url, presetId, presetLabel, photoHash, timestamp: Date.now() },
     };
     set({ aiResultCache: next });
     saveAiCache(next);
   },
-  getCachedAiResult: (photoKey, presetId) => {
-    if (!photoKey) return null;
-    const entry = get().aiResultCache[makeCacheKey(photoKey, presetId)];
+  getCachedAiResult: (photoHash, presetId) => {
+    if (!photoHash) return null;
+    const entry = get().aiResultCache[makeCacheKey(photoHash, presetId)];
     return entry?.url ?? null;
   },
-  listAiResultsForPhoto: (photoKey) => {
-    if (!photoKey) return [];
+  listAiResultsForPhoto: (photoHash) => {
+    if (!photoHash) return [];
     return Object.values(get().aiResultCache)
-      .filter((e) => e.photoKey === photoKey)
+      .filter((e) => e.photoHash === photoHash)
       .sort((a, b) => b.timestamp - a.timestamp);
   },
-  clearAiResult: (photoKey, presetId) => {
-    if (!photoKey) return;
-    const key = makeCacheKey(photoKey, presetId);
+  clearAiResult: (photoHash, presetId) => {
+    if (!photoHash) return;
+    const key = makeCacheKey(photoHash, presetId);
     const cur = get().aiResultCache;
     if (!cur[key]) return;
     const next = { ...cur };
