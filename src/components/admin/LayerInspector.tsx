@@ -793,8 +793,10 @@ function AiPhotoDefaultsSection({
         />
       </Field>
       <p className="text-[11px] text-muted-foreground -mt-2">
-        Tips: var specifik om vad som ska bevaras (kläder, frisyr, miljö) för
-        att minska felkällor.
+        Tips: referera till <code>input_image_1</code> (din referensbild =
+        kostym/scen som ska behållas) och <code>input_image_2</code> (kundens
+        foto = ansiktet som ska lyftas in). Var specifik om vad som ska
+        bevaras (kläder, frisyr, miljö).
       </p>
     </div>
   );
