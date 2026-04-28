@@ -300,6 +300,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
                 wrapStyle={wrapStyle}
                 isCircle={effectiveShape === "circle"}
                 staticClip={staticClip}
+                overlay={moveHandle}
               >
                 {(clip) => (
                   <MapLayerInstance
@@ -345,6 +346,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
                   offsetY={offsetY}
                   draggable={!!src}
                 />
+                {moveHandle}
               </div>
             );
           }
@@ -391,6 +393,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
                     </span>
                   </div>
                 )}
+                {moveHandle}
               </div>
             );
           }
