@@ -157,6 +157,29 @@ export default function LayerCanvas({
           </div>
         );
       }
+      case "aiPhoto": {
+        const clipPath =
+          layer.defaults.shape === "circle" ? "circle(50% at 50% 50%)" : undefined;
+        const src = layer.defaults.referenceImageUrl;
+        return (
+          <div className="absolute inset-0 overflow-hidden" style={{ clipPath }}>
+            {src ? (
+              <img
+                src={src}
+                alt=""
+                className={`w-full h-full ${
+                  layer.defaults.fit === "contain" ? "object-contain" : "object-cover"
+                }`}
+                draggable={false}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground bg-accent/60 border border-dashed border-primary/40 text-center px-1">
+                ✨ AI-bildplats
+              </div>
+            )}
+          </div>
+        );
+      }
       default:
         return null;
     }
@@ -343,6 +366,8 @@ export default function LayerCanvas({
                     {layer.type === "map" && "🗺 "}
                     {layer.type === "text" && "T "}
                     {layer.type === "image" && "🖼 "}
+                    {layer.type === "photo" && "📷 "}
+                    {layer.type === "aiPhoto" && "✨ "}
                     {layer.type === "line" && "▬ "}
                     {layer.type === "margin" && "▢ "}
                     {layer.type === "shape" && "◇ "}
