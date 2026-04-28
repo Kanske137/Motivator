@@ -384,6 +384,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       size: nextSize,
       variant: nextVariant,
       layerValues,
+      layerTransforms: {} as Record<string, { xPct?: number; yPct?: number; wPct?: number; hPct?: number }>,
       ...(isFirstLoad && layout?.background?.color
         ? { posterBgColor: layout.background.color }
         : {}),
