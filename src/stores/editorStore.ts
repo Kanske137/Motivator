@@ -57,7 +57,26 @@ export interface PhotoLayerValue {
   offsetY: number;
 }
 
-export type LayerValue = MapLayerValue | TextLayerValue | PhotoLayerValue;
+export interface AiPhotoLayerValue {
+  kind: "aiPhoto";
+  shape: PhotoShape;
+  offsetX: number;
+  offsetY: number;
+}
+
+export type LayerValue = MapLayerValue | TextLayerValue | PhotoLayerValue | AiPhotoLayerValue;
+
+/** Per-aiPhoto-layer customer state. The customer's selfie/pet photo lives
+ *  here keyed by layer id, so multiple aiPhoto layers in one template are
+ *  independent. */
+export interface AiPhotoSource {
+  file: File;
+  previewUrl: string;
+  /** SHA-256 of the file bytes; lazy-computed by AiPhotoSection. */
+  hash: string | null;
+  /** Public URL after lazy upload to cart-previews (so Replicate can fetch). */
+  uploadedUrl: string | null;
+}
 
 interface EditorState {
   config: ProductConfig | null;
