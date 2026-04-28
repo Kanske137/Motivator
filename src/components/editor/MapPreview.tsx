@@ -265,6 +265,18 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             height: `${rect.height}%`,
             zIndex: l.zIndex,
           };
+          const movable = !l.locks.move && (l.type === "map" || l.type === "photo" || l.type === "aiPhoto" || l.type === "text" || l.type === "image");
+          const moveHandle = movable ? (
+            <button
+              type="button"
+              onPointerDown={(e) => onDragStart(l, e)}
+              className="absolute -top-3 -left-3 w-7 h-7 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center text-[12px] cursor-move touch-none z-10 ring-2 ring-background"
+              aria-label="Flytta lager"
+              title="Dra för att flytta lagret"
+            >
+              ✥
+            </button>
+          ) : null;
 
           if (l.type === "map") {
             const v = layerValues[l.id];
