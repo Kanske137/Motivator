@@ -195,6 +195,13 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         removeBackgroundStyleId: selectedPreset?.id ?? null,
         force: !!opts.force,
       });
+      // Layer aspect ratio (width / height) — passed to the edge function so
+      // Nano Banana can try to render the removeBackground output in the same
+      // shape as the layer it will land in. Best-effort only; the real
+      // safety net is contain-rendering on the client.
+      const targetAspectRatio =
+        layer.box?.h && layer.box.h > 0 ? layer.box.w / layer.box.h : null;
+
       const { data, error } = await supabase.functions.invoke("replicate-face-swap", {
         body: {
           referenceImageUrl: refUrl,
@@ -205,6 +212,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
           removeBackgroundStyleId: selectedPreset?.id ?? null,
           removeBackgroundStylePrompt: selectedPreset?.prompt ?? null,
           removeBackgroundStyleLabel: selectedPreset?.label ?? null,
+          targetAspectRatio,
         },
       });
       if (error) throw error;
