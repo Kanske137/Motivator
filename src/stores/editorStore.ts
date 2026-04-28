@@ -248,6 +248,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   photoFile: null,
   photoPreviewUrl: null,
   originalPhotoUrl: null,
+  photoHash: null,
   aiPrintFileUrl: null,
   shopifyVariantId: null,
   shopifyVariantResolving: false,
