@@ -1,57 +1,78 @@
-Jag kan bekräfta två viktiga saker från loggarna:
+Jag kan bekräfta vad som hände i senaste körningen:
 
-- En ny bild skickades och sparades: `print-files/swap-58169e30-33e2-42f6-b0fc-17748ce74879.jpg`.
-- Det är den URL:en som funktionen returnerade som färdig bild.
+- Funktionen skickade rätt två bilder till modellen:
+  - `input_image_1` = admin/referensbilden, alltså scenen som ska behållas.
+  - `input_image_2` = kundens uppladdade hundbild, alltså ansiktet som ska användas.
+- Funktionen sparade och visar modellens returnerade bild, inte en gammal lokal bild.
+- Resultatet blev ändå fel: modellen genererade en side-by-side-/jämförelsebild i stället för en faktisk swap.
 
-Men jag ser också varför det fortfarande blir fel i upplevelsen: den sparade genererade bilden är mycket nära referensbilden och verkar inte ha gjort en verklig face swap. Dessutom finns en lokal cache i webbläsaren som kan återanvända ett tidigare felaktigt resultat för samma uppladdade bild + referens, så “Skapa igen” kan visa samma felaktiga bild utan att faktiskt generera om.
+Problemet är alltså inte primärt att vi visar fel URL eller att bilderna skickas bakvänt. Problemet är modellvalet.
 
-Plan för korrigering:
+## Varför blir det side-by-side?
 
-1. Tvinga “Skapa igen” att verkligen skapa om
-   - Ändra kundflödet så knappen “Skapa igen” inte hämtar från lokal face-swap-cache.
-   - Cache får bara användas för första snabbvisning om det redan finns ett resultat, men när användaren aktivt trycker “Skapa igen” ska den alltid anropa AI-funktionen igen.
-   - Alternativt ta bort cache för face swap helt tills vi vet att kvaliteten är stabil.
+Nuvarande modell är `flux-kontext-apps/multi-image-kontext-max`. Den är en generell multi-image editing-modell: den försöker tolka två bilder + prompt och skapa en ny komposition. Trots att prompten säger “do not return collage / side by side” kan modellen välja att visuellt sammanställa båda inputbilderna, särskilt när uppgiften är svår: hundansikte från en uppladdad bild till en stiliserad/referensbaserad hundscen.
 
-2. Lägg till cache-version så gamla felaktiga resultat ignoreras
-   - Uppdatera cache-nyckeln från v1 till v2.
-   - Inkludera prompt/version i cache-nyckeln så gamla resultat från tidigare felaktiga promptar aldrig återanvänds.
+Det här är typiskt för generativa multi-image-modeller. De kan vara bra på kreativa bildkombinationer, men de har ingen hård garanti att bara byta ansikte. Därför har vi sett tre olika felsätt:
 
-3. Gör backend-loggarna tydligare
-   - Logga vilken bild som är scene/reference och vilken som är kundens face image.
-   - Logga slutlig prompt i förkortad form och modellens output-URL.
-   - Detta gör att vi kan bekräfta efter nästa test om rätt bild skickades och exakt vilken bild som visas.
+1. Referensbilden nästan oförändrad.
+2. Fel riktning på swap.
+3. Side-by-side av båda bilderna.
 
-4. Stärk prompten igen, men utan att skapa förvirring
-   - Justera prompten till mer “edit reference scene only”-språk:
-     - input_image_1 = final canvas / scene / body that must remain
-     - input_image_2 = identity/face donor only
-     - do not recreate input_image_1 unchanged
-     - change the face/identity visibly enough to match input_image_2
-   - Behåll instruktionen om en enda slutbild, ingen collage.
+Det pekar starkt på att modellen inte är rätt verktyg för den här produktfunktionen.
 
-5. Visa tydligare i UI vilken bild som används
-   - Efter generering kan komponenten visa “Genererad bild används” och gärna intern debug-info i console med result URL.
-   - För användaren ska preview alltid använda `aiPhotoResults[layer.id]` först, annars referensbilden. Den prioriteten finns redan, men vi gör det lättare att felsöka om resultatet saknas eller är cache:at.
+## Rekommenderad korrigering
 
-Tekniska filer som ändras:
+Byt `replicate-face-swap` från generell Kontext-modell till en riktig face-swap-modell med tydliga fält för källa och mål.
 
-- `src/components/editor/AiPhotoSection.tsx`
-  - Bypass/invalidera cache vid “Skapa igen”.
-  - Lägg till bättre client-loggning för reference, uploaded face och result URL.
-
-- `src/lib/face-swap-cache.ts`
-  - Uppdatera cache-version och/eller cache-nyckel så gamla felaktiga resultat inte kan återanvändas.
-
-- `supabase/functions/replicate-face-swap/index.ts`
-  - Förbättra prompt och loggning.
-  - Returnera eventuellt extra debugfält som `usedReferenceImageUrl`, `usedFaceImageUrl`, `replicateOutputUrl` i JSON-svaret.
-
-Efter ändringen bör nästa test visa om problemet är:
+För hund/katt/person bör vi köra:
 
 ```text
-A) cache/UI visar gammal referenslik bild
-eller
-B) AI-modellen returnerar faktiskt nästan oförändrad referensbild
+Target image: referensbilden/scenen där ansiktet ska hamna
+Source image: kundens uppladdade ansiktsbild
+Output: target image med source face inblandat
 ```
 
-Om B kvarstår efter detta behöver vi byta strategi/model för hund/katt-swap, men först behöver vi rensa cache och få säkra loggar så vi inte felsöker ett gammalt resultat.
+Jag föreslår i första hand att vi testar en dedikerad face-swap-modell med API-fält som `target_image`/`source_image` eller `input_image`/`swap_image`, t.ex. `catio-apps/cog-faceswap-catio` som har:
+
+```text
+target_image = referensbild
+source_image = uppladdad kundbild
+```
+
+Den är mer passande än en promptstyrd multi-image-modell eftersom modellen inte ska “komponera två bilder”; den ska applicera ett source face på en target image.
+
+Som alternativ/fallback för mänskliga ansikten kan vi använda enklare modeller som `codeplugtech/face-swap` eller `cdingram/face-swap`, men de är mer fokuserade på människor och kan vara sämre för hund/katt.
+
+## Plan för implementation
+
+1. Uppdatera `supabase/functions/replicate-face-swap/index.ts`
+   - Byt modellflödet från `flux-kontext-apps/multi-image-kontext-max` till en dedikerad face-swap-modell.
+   - Mappa bilderna explicit:
+     - `target_image` = `referenceImageUrl`
+     - `source_image` = `faceImageUrl`
+   - Behåll samma svar till frontend: `printFileUrl`, `replicateOutputUrl`, `usedReferenceImageUrl`, `usedFaceImageUrl`.
+
+2. Lägg till validering av modelloutput
+   - Om modellen returnerar en bild med uppenbart fel format, t.ex. dubbelt så bred side-by-side-bild, ska funktionen inte visa den som lyckad.
+   - Då ska kunden få ett tydligt felmeddelande i stället för att en felaktig bild hamnar i editorn.
+   - Om tekniskt möjligt kontrollerar vi bilddimensioner innan den sparas till `print-files`.
+
+3. Förbättra fallback och loggning
+   - Logga vilken modell som användes och vilka inputfält som skickades.
+   - Om modellen inte hittar ansikte eller misslyckas ska vi returnera ett vänligt fel: “Prova en tydligare bild framifrån”.
+   - Ta bort beroendet av prompt för själva swap-riktningen; prompten kan finnas kvar som metadata/styrning men ska inte bära huvudlogiken.
+
+4. Invalidera cache igen
+   - Uppdatera face-swap-cache-versionen till nästa version så tidigare felaktiga resultat aldrig återanvänds.
+   - “Skapa igen” fortsätter att bypassa cache.
+
+5. Test efter ändring
+   - Kör med samma hundbild/referens igen.
+   - Kontrollera i loggarna att ny modell används.
+   - Bekräfta att den visade bilden är den sparade modelloutputen och inte referensbilden eller en side-by-side-komposition.
+
+## Förväntad effekt
+
+Detta bör lösa grundproblemet genom att använda rätt typ av modell. En dedikerad face-swap-modell är betydligt mindre benägen att skapa side-by-side/collage, eftersom den har strukturerad input för “source face” och “target image” i stället för att försöka tolka två bilder kreativt via prompt.
+
+Det kan fortfarande finnas begränsningar med djuransikten: vissa face-swap-modeller är tränade mest på mänskliga ansikten. Därför behöver vi behandla första bytet som ett modelltest. Om `catio-apps/cog-faceswap-catio` inte ger bra hundresultat är nästa steg att välja en mer specialiserad pet/animal-workflow eller byta produktmetod från “face swap” till “AI pet portrait generation” med referensbild, men just nu är det mest rationella att först lämna multi-image Kontext-flödet.

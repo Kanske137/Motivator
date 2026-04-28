@@ -1,16 +1,23 @@
 // Edge function: face-swap a customer's uploaded face onto an admin-curated
 // reference image (e.g. king/princess/etc) via Replicate.
 //
-// Model: `flux-kontext-apps/face-swap` — a Kontext-based prompt-aware swap
-// that handles humans AND animals (cats/dogs) much better than the older
-// cdingram model, because it isn't gated by a strict human face detector.
-// The admin's prompt is forwarded so behaviour can be tuned per template.
+// IMPORTANT model choice:
+// We previously used `flux-kontext-apps/multi-image-kontext-max` (a generic
+// prompt-driven multi-image editor). It frequently produced a side-by-side
+// collage of the two inputs instead of an actual face swap, even with strong
+// "no collage" instructions. That model is not the right tool — it composes,
+// it doesn't swap.
 //
-// Inputs:
-//   referenceImageUrl  — admin's curated body/scene image (face source target)
-//   faceImageUrl       — customer's selfie (face that gets pasted)
-//   prompt             — admin's free-text instruction
-//   subjectKind        — human | cat | dog | other (logged + used in prompt)
+// We now use a dedicated face-swap model that has strict, structured inputs:
+//   input_image (target) — the scene to keep (admin reference)
+//   swap_image  (source) — the face to lift FROM (customer upload)
+// Output: target image with source face blended in. No prompt, no collage.
+//
+// Inputs to this function:
+//   referenceImageUrl  — admin's curated body/scene image (face TARGET)
+//   faceImageUrl       — customer's selfie (face SOURCE)
+//   prompt             — admin's free-text instruction (kept for logging only)
+//   subjectKind        — human | cat | dog | other (logged; affects fallback)
 //   designId           — used for the output filename
 //
 // Always returns HTTP 200 with a JSON body. On recoverable errors the body
@@ -23,12 +30,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Prompt-aware multi-image Kontext model on Replicate. Accepts
-// `input_image_1` (scene/character to keep), `input_image_2` (face/subject
-// source) and a `prompt`. It is a general-purpose Kontext editor — NOT a
-// face detector — so it works equally well for humans, cats and dogs.
-// Officially hosted, predictable pricing (~$0.08/image).
-const FACE_SWAP_MODEL = "flux-kontext-apps/multi-image-kontext-max";
+// Dedicated face-swap model. Pinned to a specific version for stability.
+// `cdingram/face-swap` accepts:
+//   input_image: target image (face to be replaced lives here)
+//   swap_image:  source image (face to lift FROM)
+// Source: https://replicate.com/cdingram/face-swap
+const FACE_SWAP_MODEL_VERSION =
+  "cdingram/face-swap:d1d6ea8c8be89d664a07a457526f7128109dee7030fdac424788d762c71ed111";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -44,6 +52,43 @@ function fallbackResponse(userMessage: string, internal: string) {
     fallback: true,
     userMessage,
   });
+}
+
+// Decode JPEG/PNG dimensions from a Uint8Array. Returns null when the format
+// isn't recognised — we then skip the dimension sanity check.
+function readImageSize(bytes: Uint8Array): { w: number; h: number } | null {
+  // PNG: 8-byte signature, then IHDR with width/height as big-endian u32.
+  if (
+    bytes.length > 24 &&
+    bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47
+  ) {
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    return { w: dv.getUint32(16), h: dv.getUint32(20) };
+  }
+  // JPEG: scan SOF markers for size.
+  if (bytes.length > 4 && bytes[0] === 0xff && bytes[1] === 0xd8) {
+    let i = 2;
+    while (i < bytes.length) {
+      if (bytes[i] !== 0xff) return null;
+      const marker = bytes[i + 1];
+      i += 2;
+      if (marker === 0xd8 || marker === 0xd9) return null;
+      const len = (bytes[i] << 8) | bytes[i + 1];
+      // SOF0..SOF3, SOF5..SOF7, SOF9..SOF11, SOF13..SOF15
+      if (
+        (marker >= 0xc0 && marker <= 0xc3) ||
+        (marker >= 0xc5 && marker <= 0xc7) ||
+        (marker >= 0xc9 && marker <= 0xcb) ||
+        (marker >= 0xcd && marker <= 0xcf)
+      ) {
+        const h = (bytes[i + 3] << 8) | bytes[i + 4];
+        const w = (bytes[i + 5] << 8) | bytes[i + 6];
+        return { w, h };
+      }
+      i += len;
+    }
+  }
+  return null;
 }
 
 Deno.serve(async (req) => {
@@ -75,38 +120,25 @@ Deno.serve(async (req) => {
     }
 
     console.log(
-      `[face-swap] start subjectKind=${subjectKind} designId=${designId} ` +
-        `referenceImageUrl(input_image_1)=${referenceImageUrl} ` +
-        `faceImageUrl(input_image_2)=${faceImageUrl} ` +
-        `adminPrompt="${prompt.slice(0, 120)}"`,
+      `[face-swap] start model=${FACE_SWAP_MODEL_VERSION.split(":")[0]} ` +
+        `subjectKind=${subjectKind} designId=${designId} ` +
+        `targetImage(input_image)=${referenceImageUrl} ` +
+        `sourceImage(swap_image)=${faceImageUrl} ` +
+        `adminPromptIgnored="${prompt.slice(0, 80)}"`,
     );
 
-    // Build the prompt sent to the model.
-    // input_image_1 = admin's reference scene (keep its costume/pose/background)
-    // input_image_2 = customer's uploaded photo (lift the face FROM here)
-    // We must be explicit about direction or the model swaps the wrong way.
-    const subjectWord =
-      subjectKind === "cat" ? "cat" : subjectKind === "dog" ? "dog" : "person";
-    const defaultPrompt =
-      `Edit input_image_1: replace ONLY the ${subjectWord}'s face/head with the ${subjectWord}'s face/head from input_image_2. ` +
-      `Keep input_image_1's body, costume, pose, lighting, composition and background exactly the same. ` +
-      `The new face must clearly look like the ${subjectWord} in input_image_2 (same identity, breed coloring, markings). ` +
-      `Do NOT keep the original face from input_image_1.`;
-    const adminPrompt = prompt && prompt.trim().length > 0 ? prompt.trim() : defaultPrompt;
-    // Always prepend a strong direction guard. Even if the admin prompt
-    // mentions the inputs, restating the direction reduces the chance the
-    // model returns the reference scene unchanged.
-    const directionGuard =
-      `You are editing input_image_1. input_image_2 is ONLY a face/identity reference. ` +
-      `Replace the ${subjectWord}'s face in input_image_1 with the face from input_image_2 so the identity visibly changes. ` +
-      `Do not return input_image_1 unchanged. Do not return input_image_2. Output exactly one edited image. `;
-    const finalPrompt =
-      `${directionGuard}${adminPrompt} Output a single edited image only — do not return a collage, ` +
-      `do not show the input images side by side, do not include any reference panels.`;
-    console.log(`[face-swap] finalPrompt="${finalPrompt.slice(0, 240)}"`);
+    // The dedicated face-swap model is trained primarily on human faces. For
+    // cat/dog the swap quality is limited; we still try it, but log so we can
+    // diagnose if the result looks off.
+    if (subjectKind === "cat" || subjectKind === "dog") {
+      console.warn(
+        `[face-swap] subjectKind=${subjectKind} — this model is optimised for humans. ` +
+          `Animal swaps may produce weak results.`,
+      );
+    }
 
     const start = await fetch(
-      `https://api.replicate.com/v1/models/${FACE_SWAP_MODEL}/predictions`,
+      `https://api.replicate.com/v1/predictions`,
       {
         method: "POST",
         headers: {
@@ -115,13 +147,12 @@ Deno.serve(async (req) => {
           Prefer: "wait=30",
         },
         body: JSON.stringify({
+          version: FACE_SWAP_MODEL_VERSION.split(":")[1],
           input: {
-            input_image_1: referenceImageUrl,
-            input_image_2: faceImageUrl,
-            prompt: finalPrompt,
-            aspect_ratio: "match_input_image",
-            output_format: "jpg",
-            safety_tolerance: 2,
+            // Target image: the scene/character to keep.
+            input_image: referenceImageUrl,
+            // Source image: the face to paste in (customer upload).
+            swap_image: faceImageUrl,
           },
         }),
       },
@@ -174,13 +205,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Upload to print-files so the customer gets a stable public URL.
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
-
-    const path = `${designId}.jpg`;
+    // Fetch the generated image and run a sanity check on its dimensions
+    // before saving. If the output is suspiciously wide (e.g. >2x as wide as
+    // tall) it's almost certainly a side-by-side collage; reject so we don't
+    // show a broken result to the customer.
     const imgRes = await fetch(output);
     if (!imgRes.ok) {
       return fallbackResponse(
@@ -188,11 +216,31 @@ Deno.serve(async (req) => {
         `Replicate image fetch failed ${imgRes.status}`,
       );
     }
-    const imgBlob = await imgRes.blob();
+    const imgBuf = new Uint8Array(await imgRes.arrayBuffer());
+    const dims = readImageSize(imgBuf);
+    if (dims) {
+      const ratio = dims.w / Math.max(1, dims.h);
+      console.log(`[face-swap] outputDimensions=${dims.w}x${dims.h} aspectRatio=${ratio.toFixed(2)}`);
+      if (ratio > 2.2 || ratio < 0.45) {
+        return fallbackResponse(
+          "AI-modellen returnerade en ogiltig bild. Prova att skapa igen, eller använd en tydligare bild.",
+          `Suspicious output dimensions ${dims.w}x${dims.h} — likely a collage`,
+        );
+      }
+    }
+
+    // Upload to print-files so the customer gets a stable public URL.
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+
+    const path = `${designId}.jpg`;
+    const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
 
     const { error: upErr } = await supabase.storage
       .from("print-files")
-      .upload(path, imgBlob, { contentType: "image/jpeg", upsert: true });
+      .upload(path, imgBuf, { contentType, upsert: true });
     if (upErr) {
       return fallbackResponse(
         "Vi kunde inte spara den genererade bilden. Försök igen.",
@@ -213,6 +261,7 @@ Deno.serve(async (req) => {
       replicateOutputUrl: output,
       usedReferenceImageUrl: referenceImageUrl,
       usedFaceImageUrl: faceImageUrl,
+      modelUsed: FACE_SWAP_MODEL_VERSION.split(":")[0],
     });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Unknown error";
