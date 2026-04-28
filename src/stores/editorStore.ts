@@ -94,6 +94,9 @@ interface EditorState {
 
   // Global background (one per layout). Other map/text values now live in
   // `layerValues`; the fields below are derived getters for legacy callers.
+  /** Customer toggle: when false, the white margin layer is hidden and all
+   *  other layers expand to fill the freed-up area. Default true. */
+  whiteMarginEnabled: boolean;
   posterBgColor: string;
 
   // format
@@ -135,6 +138,7 @@ interface EditorState {
   setSize: (s: string) => void;
   setVariant: (v: string) => void;
   setOrientation: (o: Orientation) => void;
+  setWhiteMarginEnabled: (v: boolean) => void;
   setLayerTransform: (id: string, patch: { xPct?: number; yPct?: number; wPct?: number; hPct?: number }) => void;
   resetLayerTransform: (id: string) => void;
   setPhotoSource: (file: File | null, previewUrl: string | null) => void;
@@ -304,6 +308,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   layerValues: {},
   layerTransforms: {},
   posterBgColor: "#EFE7D6",
+  whiteMarginEnabled: true,
 
   size: null,
   variant: null,
@@ -385,6 +390,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       variant: nextVariant,
       layerValues,
       layerTransforms: {} as Record<string, { xPct?: number; yPct?: number; wPct?: number; hPct?: number }>,
+      whiteMarginEnabled: true,
       ...(isFirstLoad && layout?.background?.color
         ? { posterBgColor: layout.background.color }
         : {}),
@@ -393,6 +399,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   setPosterBgColor: (posterBgColor) => set({ posterBgColor }),
+  setWhiteMarginEnabled: (whiteMarginEnabled) => set({ whiteMarginEnabled }),
   setLayerTransform: (id, patch) => {
     const state = get();
     const layer = state.template?.defaultLayout[state.orientation].layers.find((l) => l.id === id);
@@ -436,7 +443,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { template } = get();
     if (!template) return set({ orientation });
     const layerValues = hydrateLayerValues(template, orientation);
-    set({ orientation, layerValues, layerTransforms: {}, ...mirrorLegacy({ template, orientation, layerValues }) });
+    set({ orientation, layerValues, layerTransforms: {}, whiteMarginEnabled: true, ...mirrorLegacy({ template, orientation, layerValues }) });
   },
 
   setPhotoSource: (file, previewUrl) => {

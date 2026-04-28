@@ -25,6 +25,7 @@ export function MockupGallery() {
     layerTransforms,
     designSource, photoPreviewUrl, aiPrintFileUrl,
     aiPhotoResults,
+    whiteMarginEnabled,
   } = useEditorStore();
   const [slots, setSlots] = useState<MockupSlot[]>([]);
   const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null);
@@ -64,6 +65,7 @@ export function MockupGallery() {
           size,
           layerValues,
           layerTransforms,
+          whiteMarginEnabled,
           livePosterBgColor: posterBgColor,
           liveMapCenter: mapCenter,
           liveMapZoom: mapZoom,
@@ -137,7 +139,7 @@ export function MockupGallery() {
     };
   }, [
     config, template, size, variant, orientation, isCanvas, canvasDepthCm,
-    layerValues, layerTransforms, posterBgColor,
+    layerValues, layerTransforms, posterBgColor, whiteMarginEnabled,
     mapStyleId, mapCenter, mapZoom, showLabels, mapShape,
     text, textFont, textVisible,
     designSource, photoPreviewUrl, aiPrintFileUrl,

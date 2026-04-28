@@ -5,7 +5,7 @@ import type { TemplateLayer } from "@/lib/template-schema";
 import { MapLayerInstance } from "./layers/MapLayerInstance";
 import { ImageLayerView, LineLayerView, MarginLayerView } from "./layers/StaticLayers";
 import { ShapeLayerView } from "./layers/ShapeLayerView";
-import { lineThicknessPxFromCanvas, effectiveLayerRect, clampLayerRect } from "@/lib/layer-utils";
+import { lineThicknessPxFromCanvas, effectiveLayerRect, clampLayerRect, getActiveMarginInsetsPct } from "@/lib/layer-utils";
 
 interface Props {
   frameColor?: string;
@@ -113,9 +113,10 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
     photoPreviewUrl,
     aiPrintFileUrl,
     aiPhotoResults,
+    whiteMarginEnabled,
   } = useEditorStore();
 
-  const layers = templateLayers();
+  const allLayers = templateLayers();
   // Center-alignment guides shown while dragging a layer (in % of editor).
   const [guides, setGuides] = useState<{ h: boolean; v: boolean }>({ h: false, v: false });
   // When the customer has uploaded a photo (or generated an AI image) we
@@ -140,6 +141,12 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   const posterAspect = editorW / editorH;
   const frontInsetX = wrapCm > 0 ? wrapCm / editorW : 0;
   const frontInsetY = wrapCm > 0 ? wrapCm / editorH : 0;
+
+  // Derive margin insets and (when customer hides margin) filter the margin
+  // layer + remap remaining layers so they fill the freed-up area.
+  const marginInsets = getActiveMarginInsetsPct(allLayers, frontW, frontH);
+  const marginRemovedInsets = !whiteMarginEnabled ? marginInsets : undefined;
+  const layers = whiteMarginEnabled ? allLayers : allLayers.filter((l) => l.type !== "margin");
 
   useEffect(() => {
     const el = frameRef.current;
@@ -178,7 +185,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   };
 
   const layerToEditorRect = (l: TemplateLayer) => {
-    const eff = effectiveLayerRect(l, layerTransforms);
+    const eff = effectiveLayerRect(l, layerTransforms, { marginRemovedInsets });
     const left = (frontInsetX + (eff.xPct / 100) * (1 - 2 * frontInsetX)) * 100;
     const top = (frontInsetY + (eff.yPct / 100) * (1 - 2 * frontInsetY)) * 100;
     const width = (eff.wPct / 100) * (1 - 2 * frontInsetX) * 100;

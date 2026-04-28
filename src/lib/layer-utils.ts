@@ -38,19 +38,74 @@ export function clampLayerRect(rect: { xPct: number; yPct: number; wPct: number;
   return { xPct, yPct, wPct, hPct };
 }
 
+export interface MarginInsetsPct {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+/**
+ * Compute per-axis margin insets (in % of canvas) for the first margin layer.
+ * thicknessPct is admin-defined as % of the canvas SHORT side, so for non-
+ * square canvases the left/right inset% differs from the top/bottom inset%.
+ */
+export function getActiveMarginInsetsPct(
+  layers: TemplateLayer[],
+  frontWcm: number,
+  frontHcm: number,
+): MarginInsetsPct {
+  const margin = layers.find((l) => l.type === "margin") as
+    | Extract<TemplateLayer, { type: "margin" }>
+    | undefined;
+  if (!margin) return { left: 0, right: 0, top: 0, bottom: 0 };
+  const shortCm = Math.min(frontWcm, frontHcm);
+  const marginCm = (margin.defaults.thicknessPct / 100) * shortCm;
+  const leftRight = (marginCm / frontWcm) * 100;
+  const topBottom = (marginCm / frontHcm) * 100;
+  return { left: leftRight, right: leftRight, top: topBottom, bottom: topBottom };
+}
+
+/**
+ * When the customer hides the white margin, every other layer's rect is
+ * remapped from "% of full canvas" to "% of full canvas" where the previous
+ * inner area now spans 0..100. This expands all layers proportionally so they
+ * fill the freed-up space while preserving each layer's own aspect ratio.
+ */
+export function expandRectForRemovedMargin(
+  rect: { xPct: number; yPct: number; wPct: number; hPct: number },
+  insets: MarginInsetsPct,
+): { xPct: number; yPct: number; wPct: number; hPct: number } {
+  const innerW = Math.max(0.0001, 100 - insets.left - insets.right);
+  const innerH = Math.max(0.0001, 100 - insets.top - insets.bottom);
+  const expanded = {
+    xPct: ((rect.xPct - insets.left) / innerW) * 100,
+    yPct: ((rect.yPct - insets.top) / innerH) * 100,
+    wPct: (rect.wPct / innerW) * 100,
+    hPct: (rect.hPct / innerH) * 100,
+  };
+  return clampLayerRect(expanded);
+}
+
 /** Effective rect for a layer = template defaults overridden by any per-layer
- *  customer transform (size slider / drag). */
+ *  customer transform (size slider / drag), then optionally expanded if the
+ *  white margin has been removed by the customer. */
 export function effectiveLayerRect(
   layer: TemplateLayer,
   transforms?: Record<string, { xPct?: number; yPct?: number; wPct?: number; hPct?: number }>,
+  opts?: { marginRemovedInsets?: MarginInsetsPct },
 ): { xPct: number; yPct: number; wPct: number; hPct: number } {
   const t = transforms?.[layer.id];
-  return {
+  const base = {
     xPct: t?.xPct ?? layer.xPct,
     yPct: t?.yPct ?? layer.yPct,
     wPct: t?.wPct ?? layer.wPct,
     hPct: t?.hPct ?? layer.hPct,
   };
+  if (opts?.marginRemovedInsets && layer.type !== "margin") {
+    return expandRectForRemovedMargin(base, opts.marginRemovedInsets);
+  }
+  return base;
 }
 
 // ---------- line snap & corner-fill helpers ----------
