@@ -51,6 +51,10 @@ export interface TemplateSnapshotInput {
 
   /** Customer-uploaded photo or AI result. Rendered into every `photo` layer. */
   photoOverlayUrl?: string;
+
+  /** Per-aiPhoto-layer face-swap result URLs. Falls back to the layer's
+   *  admin-set referenceImageUrl when no result is present. */
+  aiPhotoResults?: Record<string, string>;
 }
 
 export interface TemplateSnapshotResult {
