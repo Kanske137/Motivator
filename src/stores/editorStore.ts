@@ -392,6 +392,32 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   setPosterBgColor: (posterBgColor) => set({ posterBgColor }),
+  setLayerTransform: (id, patch) => {
+    const state = get();
+    const layer = state.template?.defaultLayout[state.orientation].layers.find((l) => l.id === id);
+    if (!layer) return;
+    const cur = state.layerTransforms[id] ?? {};
+    const merged = {
+      xPct: patch.xPct ?? cur.xPct ?? layer.xPct,
+      yPct: patch.yPct ?? cur.yPct ?? layer.yPct,
+      wPct: patch.wPct ?? cur.wPct ?? layer.wPct,
+      hPct: patch.hPct ?? cur.hPct ?? layer.hPct,
+    };
+    const clamped = clampLayerRect(merged);
+    set({
+      layerTransforms: {
+        ...state.layerTransforms,
+        [id]: clamped,
+      },
+    });
+  },
+  resetLayerTransform: (id) => {
+    const state = get();
+    if (!(id in state.layerTransforms)) return;
+    const next = { ...state.layerTransforms };
+    delete next[id];
+    set({ layerTransforms: next });
+  },
   setSize: (size) => {
     const { config, productOptions } = get();
     if (!config) return set({ size });
