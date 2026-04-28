@@ -11,14 +11,15 @@ export interface FaceSwapCacheEntry {
   timestamp: number;
 }
 
-// v3: bumped after switching from flux-kontext multi-image (which produced
-// collages / wrong-direction swaps) to a dedicated face-swap model.
-const STORAGE_KEY = "lovable.face-swap-cache.v3";
+// v4: bumped after routing cat/dog swaps to Nano Banana 2 (Gemini 3.1 Flash
+// Image) via Lovable AI Gateway, while humans stay on cdingram/face-swap.
+const STORAGE_KEY = "lovable.face-swap-cache.v4";
 
 // Best-effort cleanup of older keys so we don't leave orphan data behind.
 if (typeof window !== "undefined") {
   try { window.localStorage.removeItem("lovable.face-swap-cache.v1"); } catch { /* noop */ }
   try { window.localStorage.removeItem("lovable.face-swap-cache.v2"); } catch { /* noop */ }
+  try { window.localStorage.removeItem("lovable.face-swap-cache.v3"); } catch { /* noop */ }
 }
 const MAX_ENTRIES = 30;
 
