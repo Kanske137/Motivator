@@ -78,16 +78,16 @@ Deno.serve(async (req) => {
       `[face-swap] start subjectKind=${subjectKind} designId=${designId} prompt="${prompt.slice(0, 80)}"`,
     );
 
-    // Build the prompt sent to the model. The Kontext multi-image model
-    // can be tricked into returning a side-by-side collage if the prompt
-    // talks about "first image" / "second image". We instead phrase the
-    // prompt as a single editing instruction and append a strict
-    // "single edited image" guard so the model returns ONE picture.
+    // Build the prompt sent to the model.
+    // input_image_1 = admin's reference scene (keep its costume/pose/background)
+    // input_image_2 = customer's uploaded photo (lift the face FROM here)
+    // We must be explicit about direction or the model swaps the wrong way.
     const subjectWord =
-      subjectKind === "cat" ? "cat's" : subjectKind === "dog" ? "dog's" : "person's";
+      subjectKind === "cat" ? "cat" : subjectKind === "dog" ? "dog" : "person";
     const defaultPrompt =
-      `Replace the ${subjectWord} face with the new face provided. ` +
-      `Keep the original costume, pose, lighting and background exactly the same.`;
+      `Take the ${subjectWord}'s face from input_image_2 and place it onto the ${subjectWord} in input_image_1. ` +
+      `Keep input_image_1's costume, pose, lighting and background exactly the same. ` +
+      `The final ${subjectWord} must have the face from input_image_2, not from input_image_1.`;
     const adminPrompt = prompt && prompt.trim().length > 0 ? prompt.trim() : defaultPrompt;
     const finalPrompt =
       `${adminPrompt} Output a single edited image only — do not return a collage, ` +
