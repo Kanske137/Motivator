@@ -191,7 +191,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   // close, and clamps so the layer never crosses the editor edges.
   const SNAP_PCT = 0.6; // distance from center where we snap
   const onDragStart = useCallback(
-    (l: TemplateLayer, e: React.PointerEvent<HTMLDivElement>) => {
+    (l: TemplateLayer, e: React.PointerEvent<Element>) => {
       const frame = frameRef.current;
       if (!frame) return;
       e.preventDefault();
