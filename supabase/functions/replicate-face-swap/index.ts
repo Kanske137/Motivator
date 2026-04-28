@@ -219,12 +219,13 @@ async function runReplicateFaceSwap(params: {
   return { ok: true, bytes, contentType, outputUrl: output };
 }
 
-// ---------- Route 2: Lovable AI Gateway (Nano Banana 2) for animals ----------
-async function runAnimalSwap(params: {
-  referenceImageUrl: string;
-  faceImageUrl: string;
-  subjectKind: "cat" | "dog" | "other";
-  adminPrompt: string;
+// ---------- Shared helper: call Nano Banana 2 via Lovable AI Gateway ----------
+// Sends one user message with `promptText` plus an arbitrary number of input
+// images. Returns either the decoded image bytes or a Response wrapping a
+// friendly error.
+async function callNanoBanana(params: {
+  promptText: string;
+  imageUrls: string[];
 }): Promise<{ ok: true; bytes: Uint8Array; contentType: string; outputUrl: string }
   | { ok: false; response: Response }> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -238,22 +239,12 @@ async function runAnimalSwap(params: {
     };
   }
 
-  const animalNoun =
-    params.subjectKind === "cat" ? "cat"
-      : params.subjectKind === "dog" ? "dog"
-      : "animal";
-
-  const adminPromptLine = params.adminPrompt?.trim()
-    ? `Additional styling guidance from the artist: ${params.adminPrompt.trim()}`
-    : "";
-
-  const promptText = [
-    `You are editing image #1 (the reference scene). Image #2 is a photograph of the customer's own ${animalNoun}.`,
-    `Replace the ${animalNoun} that appears in image #1 with the specific ${animalNoun} from image #2 — keep the unique markings, fur color/pattern, breed traits, eye color, and overall identity from image #2.`,
-    `Keep EVERYTHING ELSE from image #1 unchanged: the costume/clothing, props, background, lighting, camera angle, art style, composition, framing, and aspect ratio. Do not change the pose unless required to make the new ${animalNoun} fit naturally.`,
-    `Return ONE single edited image (NOT a collage, NOT side-by-side, NOT a comparison). Output must have the same aspect ratio as image #1.`,
-    adminPromptLine,
-  ].filter(Boolean).join("\n");
+  const content: Array<Record<string, unknown>> = [
+    { type: "text", text: params.promptText },
+  ];
+  for (const url of params.imageUrls) {
+    content.push({ type: "image_url", image_url: { url } });
+  }
 
   const aiRes = await fetch(AI_GATEWAY_URL, {
     method: "POST",
@@ -264,16 +255,7 @@ async function runAnimalSwap(params: {
     body: JSON.stringify({
       model: ANIMAL_MODEL,
       modalities: ["image", "text"],
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: promptText },
-            { type: "image_url", image_url: { url: params.referenceImageUrl } },
-            { type: "image_url", image_url: { url: params.faceImageUrl } },
-          ],
-        },
-      ],
+      messages: [{ role: "user", content }],
     }),
   });
 
@@ -316,10 +298,6 @@ async function runAnimalSwap(params: {
     );
   }
 
-  // Nano Banana 2 returns generated images on the assistant message.
-  // The OpenAI-compatible shape on Lovable AI Gateway is:
-  //   data.choices[0].message.images[0].image_url.url   (data: URL or https URL)
-  // We accept either form, plus a few defensive fallbacks.
   const msg = data?.choices?.[0]?.message;
   const imageUrl: string | undefined =
     msg?.images?.[0]?.image_url?.url ??
@@ -366,6 +344,71 @@ async function runAnimalSwap(params: {
     contentType,
     outputUrl: imageUrl.startsWith("data:") ? "(inline base64)" : imageUrl,
   };
+}
+
+// ---------- Route 2: pet face/identity transfer (cats + dogs) ----------
+async function runPetSwap(params: {
+  referenceImageUrl: string;
+  faceImageUrl: string;
+  adminPrompt: string;
+}) {
+  const adminPromptLine = params.adminPrompt?.trim()
+    ? `Additional styling guidance from the artist: ${params.adminPrompt.trim()}`
+    : "";
+
+  const promptText = [
+    `You are editing image #1 (the reference scene). Image #2 is a photograph of the customer's own pet (a cat or a dog).`,
+    `Replace the pet that appears in image #1 with the specific pet from image #2 — keep the unique markings, fur color/pattern, breed traits, eye color, ear shape and overall identity from image #2.`,
+    `Keep EVERYTHING ELSE from image #1 unchanged: the costume/clothing, props, background, lighting, camera angle, art style, composition, framing, and aspect ratio. Do not change the pose unless required to make the new pet fit naturally.`,
+    `Return ONE single edited image (NOT a collage, NOT side-by-side, NOT a comparison). Output must have the same aspect ratio as image #1.`,
+    adminPromptLine,
+  ].filter(Boolean).join("\n");
+
+  return callNanoBanana({
+    promptText,
+    imageUrls: [params.referenceImageUrl, params.faceImageUrl],
+  });
+}
+
+// ---------- Route 3: remove background + dot/splatter ring ----------
+// Single-image edit. The customer's photo is the only input. The admin
+// reference image is intentionally NOT used — this mode is meant to work
+// even when the template has no reference. An optional `stylePrompt`
+// (from the template's AI style presets) is applied to the SUBJECT only;
+// the background-removal + dot-ring effect is enforced regardless.
+async function runRemoveBackground(params: {
+  faceImageUrl: string;
+  adminPrompt: string;
+  stylePrompt: string | null;
+  styleLabel: string | null;
+}) {
+  const adminPromptLine = params.adminPrompt?.trim()
+    ? `Additional artist guidance for the dot/splatter color tones and density: ${params.adminPrompt.trim()}`
+    : "";
+
+  const styleBlock = params.stylePrompt?.trim()
+    ? [
+        `Apply the following artistic style to THE SUBJECT itself (not to the background):`,
+        params.stylePrompt.trim(),
+        `IMPORTANT: regardless of the style above, the background must remain a clean white backdrop with the colorful watercolor dot ring described below. Do NOT bring back the original photo background. Do NOT extend the style into the background — only the subject is restyled.`,
+      ].join("\n")
+    : "";
+
+  const promptText = [
+    `Edit the input photo:`,
+    `1. Isolate the main subject (a person or a pet) and COMPLETELY REMOVE the original background.`,
+    `2. Place the subject on a clean pure-white backdrop.`,
+    `3. Around the subject (never covering the face/body), add a soft, artistic ring of small colorful watercolor dots and gentle paint splatters. Default tones: warm earthy colors (amber, rust, soft brown, hint of pink). The dots should feel hand-painted, varied in size, with some small splatter accents — playful but tasteful.`,
+    `4. Keep the subject's identity, face, eyes, fur/skin and proportions exactly as in the input photo unless an artistic style is specified below.`,
+    styleBlock,
+    adminPromptLine,
+    `Return ONE single edited image with the same aspect ratio as the input. No collage, no side-by-side, no before/after comparison.`,
+  ].filter(Boolean).join("\n");
+
+  return callNanoBanana({
+    promptText,
+    imageUrls: [params.faceImageUrl],
+  });
 }
 
 Deno.serve(async (req) => {
