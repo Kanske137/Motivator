@@ -139,6 +139,7 @@ export function MockupGallery() {
     mapStyleId, mapCenter, mapZoom, showLabels, mapShape,
     text, textFont, textVisible,
     designSource, photoPreviewUrl, aiPrintFileUrl,
+    aiPhotoResults,
   ]);
 
   if (!config) return null;
