@@ -138,6 +138,7 @@ interface EditorState {
   setSize: (s: string) => void;
   setVariant: (v: string) => void;
   setOrientation: (o: Orientation) => void;
+  setWhiteMarginEnabled: (v: boolean) => void;
   setLayerTransform: (id: string, patch: { xPct?: number; yPct?: number; wPct?: number; hPct?: number }) => void;
   resetLayerTransform: (id: string) => void;
   setPhotoSource: (file: File | null, previewUrl: string | null) => void;
@@ -307,6 +308,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   layerValues: {},
   layerTransforms: {},
   posterBgColor: "#EFE7D6",
+  whiteMarginEnabled: true,
 
   size: null,
   variant: null,
