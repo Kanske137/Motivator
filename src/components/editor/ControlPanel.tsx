@@ -18,6 +18,7 @@ import { getEnabledMapStyleIds, mapStyleLabel, mapStylePreviewBg } from "@/lib/m
 import { FormatSection } from "./FormatSection";
 import { PhotoUploadSection } from "./PhotoUploadSection";
 import { AiStyleSection } from "./AiStyleSection";
+import { AiPhotoSection } from "./AiPhotoSection";
 import { Loader2, Search } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
