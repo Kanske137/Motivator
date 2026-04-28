@@ -51,6 +51,10 @@ export interface TemplateSnapshotInput {
 
   /** Customer-uploaded photo or AI result. Rendered into every `photo` layer. */
   photoOverlayUrl?: string;
+
+  /** Per-aiPhoto-layer face-swap result URLs. Falls back to the layer's
+   *  admin-set referenceImageUrl when no result is present. */
+  aiPhotoResults?: Record<string, string>;
 }
 
 export interface TemplateSnapshotResult {
@@ -567,6 +571,20 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
           await drawPhotoLayer(ctx, rect, url, shape, layer.defaults.fit, offsetX, offsetY);
         } catch (e) {
           console.warn("[template-snapshot] photo layer failed", e);
+        }
+      }
+    } else if (layer.type === "aiPhoto") {
+      const url = input.aiPhotoResults?.[layer.id] ?? layer.defaults.referenceImageUrl;
+      if (url) {
+        const lv = input.layerValues?.[layer.id];
+        const av = lv && lv.kind === "aiPhoto" ? lv : null;
+        const shape = (av?.shape ?? layer.defaults.shape) as "rect" | "circle" | "heart" | "star";
+        const offsetX = av?.offsetX ?? 0;
+        const offsetY = av?.offsetY ?? 0;
+        try {
+          await drawPhotoLayer(ctx, rect, url, shape, layer.defaults.fit, offsetX, offsetY);
+        } catch (e) {
+          console.warn("[template-snapshot] aiPhoto layer failed", e);
         }
       }
     } else if (layer.type === "line") {

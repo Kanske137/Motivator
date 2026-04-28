@@ -45,7 +45,7 @@ export default function EditorPage() {
   const [configs, setConfigs] = useState<ProductConfig[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const { config, template, layerValues, setConfig, currentPrice, currentLayout, mapStyleId, mapCenter, mapZoom, text, textFont, textVisible, showLabels, mapShape, orientation, size, variant, posterBgColor, designSource, aiPrintFileUrl, shopifyVariantId, shopifyVariantResolving, setShopifyVariantId, setShopifyVariantResolving } =
+  const { config, template, layerValues, setConfig, currentPrice, currentLayout, mapStyleId, mapCenter, mapZoom, text, textFont, textVisible, showLabels, mapShape, orientation, size, variant, posterBgColor, designSource, aiPrintFileUrl, aiPhotoResults, shopifyVariantId, shopifyVariantResolving, setShopifyVariantId, setShopifyVariantResolving } =
     useEditorStore();
   const addItem = useCartStore((s) => s.addItem);
   const isAdding = useCartStore((s) => s.isLoading);
@@ -149,6 +149,7 @@ export default function EditorPage() {
           : designSource === "photo"
           ? useEditorStore.getState().photoPreviewUrl ?? undefined
           : undefined,
+      aiPhotoResults,
     };
 
     setIsPreparing(true);

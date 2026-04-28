@@ -10,6 +10,12 @@ import {
   makeCacheKey,
   saveAiCache,
 } from "@/lib/ai-cache-storage";
+import {
+  type FaceSwapCacheEntry,
+  loadFaceSwapCache,
+  makeFaceSwapKey,
+  saveFaceSwapCache,
+} from "@/lib/face-swap-cache";
 
 interface ApplyPlaceArgs {
   placeName: string;
@@ -51,7 +57,26 @@ export interface PhotoLayerValue {
   offsetY: number;
 }
 
-export type LayerValue = MapLayerValue | TextLayerValue | PhotoLayerValue;
+export interface AiPhotoLayerValue {
+  kind: "aiPhoto";
+  shape: PhotoShape;
+  offsetX: number;
+  offsetY: number;
+}
+
+export type LayerValue = MapLayerValue | TextLayerValue | PhotoLayerValue | AiPhotoLayerValue;
+
+/** Per-aiPhoto-layer customer state. The customer's selfie/pet photo lives
+ *  here keyed by layer id, so multiple aiPhoto layers in one template are
+ *  independent. */
+export interface AiPhotoSource {
+  file: File;
+  previewUrl: string;
+  /** SHA-256 of the file bytes; lazy-computed by AiPhotoSection. */
+  hash: string | null;
+  /** Public URL after lazy upload to cart-previews (so Replicate can fetch). */
+  uploadedUrl: string | null;
+}
 
 interface EditorState {
   config: ProductConfig | null;
@@ -91,6 +116,13 @@ interface EditorState {
    *  Persisted to localStorage with LRU eviction. */
   aiResultCache: Record<string, AiCacheEntry>;
 
+  /** Customer-uploaded face photos per aiPhoto layer. */
+  aiPhotoSources: Record<string, AiPhotoSource>;
+  /** Face-swap result URLs per aiPhoto layer (current selection only). */
+  aiPhotoResults: Record<string, string>;
+  /** Persistent face-swap cache keyed by `${faceHash}|${refUrl}|${layerId}`. */
+  faceSwapCache: Record<string, FaceSwapCacheEntry>;
+
   // ---------- setters ----------
   setConfig: (c: ProductConfig) => void;
   setPosterBgColor: (c: string) => void;
@@ -114,6 +146,24 @@ interface EditorState {
   getCachedAiResult: (photoHash: string, presetId: string) => string | null;
   listAiResultsForPhoto: (photoHash: string) => AiCacheEntry[];
   clearAiResult: (photoHash: string, presetId: string) => void;
+
+  // ---------- aiPhoto (face-swap) ----------
+  setAiPhotoSource: (layerId: string, file: File | null, previewUrl: string | null) => void;
+  setAiPhotoHash: (layerId: string, hash: string) => void;
+  setAiPhotoUploadedUrl: (layerId: string, url: string) => void;
+  setAiPhotoResult: (layerId: string, url: string | null) => void;
+  clearAiPhoto: (layerId: string) => void;
+  addFaceSwapToCache: (
+    layerId: string,
+    faceHash: string,
+    referenceImageUrl: string,
+    url: string,
+  ) => void;
+  getCachedFaceSwap: (
+    layerId: string,
+    faceHash: string,
+    referenceImageUrl: string,
+  ) => string | null;
 
   // Per-layer setters
   setLayerMapCenter: (id: string, c: [number, number]) => void;
@@ -205,6 +255,13 @@ function hydrateLayerValues(template: Template, orientation: Orientation): Recor
         offsetX: 0,
         offsetY: 0,
       };
+    } else if (l.type === "aiPhoto") {
+      out[l.id] = {
+        kind: "aiPhoto",
+        shape: l.defaults.shape as PhotoShape,
+        offsetX: 0,
+        offsetY: 0,
+      };
     }
   }
   return out;
@@ -252,6 +309,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   shopifyVariantId: null,
   shopifyVariantResolving: false,
   aiResultCache: loadAiCache(),
+  aiPhotoSources: {},
+  aiPhotoResults: {},
+  faceSwapCache: loadFaceSwapCache(),
 
   // legacy mirrors (initial values, replaced once a config is loaded)
   mapCenter: [18.0686, 59.3293],
@@ -425,7 +485,91 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     saveAiCache(next);
   },
 
-  // ---------- per-layer setters ----------
+  // ---------- aiPhoto (face-swap) ----------
+  setAiPhotoSource: (layerId, file, previewUrl) => {
+    const cur = get().aiPhotoSources;
+    const prev = cur[layerId];
+    if (!file || !previewUrl) {
+      // Clear
+      if (prev?.previewUrl?.startsWith("blob:")) {
+        try { URL.revokeObjectURL(prev.previewUrl); } catch { /* noop */ }
+      }
+      const next = { ...cur };
+      delete next[layerId];
+      const results = { ...get().aiPhotoResults };
+      delete results[layerId];
+      set({ aiPhotoSources: next, aiPhotoResults: results });
+      return;
+    }
+    if (prev?.previewUrl?.startsWith("blob:") && prev.previewUrl !== previewUrl) {
+      try { URL.revokeObjectURL(prev.previewUrl); } catch { /* noop */ }
+    }
+    set({
+      aiPhotoSources: {
+        ...cur,
+        [layerId]: { file, previewUrl, hash: null, uploadedUrl: null },
+      },
+      // New face → drop the old swap result for this layer.
+      aiPhotoResults: (() => {
+        const r = { ...get().aiPhotoResults };
+        delete r[layerId];
+        return r;
+      })(),
+    });
+  },
+  setAiPhotoHash: (layerId, hash) => {
+    const cur = get().aiPhotoSources[layerId];
+    if (!cur || cur.hash === hash) return;
+    set({
+      aiPhotoSources: {
+        ...get().aiPhotoSources,
+        [layerId]: { ...cur, hash },
+      },
+    });
+  },
+  setAiPhotoUploadedUrl: (layerId, url) => {
+    const cur = get().aiPhotoSources[layerId];
+    if (!cur) return;
+    set({
+      aiPhotoSources: {
+        ...get().aiPhotoSources,
+        [layerId]: { ...cur, uploadedUrl: url },
+      },
+    });
+  },
+  setAiPhotoResult: (layerId, url) => {
+    const cur = { ...get().aiPhotoResults };
+    if (url) cur[layerId] = url;
+    else delete cur[layerId];
+    set({ aiPhotoResults: cur });
+  },
+  clearAiPhoto: (layerId) => {
+    const sources = { ...get().aiPhotoSources };
+    const prev = sources[layerId];
+    if (prev?.previewUrl?.startsWith("blob:")) {
+      try { URL.revokeObjectURL(prev.previewUrl); } catch { /* noop */ }
+    }
+    delete sources[layerId];
+    const results = { ...get().aiPhotoResults };
+    delete results[layerId];
+    set({ aiPhotoSources: sources, aiPhotoResults: results });
+  },
+  addFaceSwapToCache: (layerId, faceHash, referenceImageUrl, url) => {
+    if (!faceHash || !referenceImageUrl) return;
+    const key = makeFaceSwapKey(faceHash, referenceImageUrl, layerId);
+    const next: Record<string, FaceSwapCacheEntry> = {
+      ...get().faceSwapCache,
+      [key]: { url, layerId, faceHash, referenceImageUrl, timestamp: Date.now() },
+    };
+    set({ faceSwapCache: next });
+    saveFaceSwapCache(next);
+  },
+  getCachedFaceSwap: (layerId, faceHash, referenceImageUrl) => {
+    if (!faceHash || !referenceImageUrl) return null;
+    const entry = get().faceSwapCache[makeFaceSwapKey(faceHash, referenceImageUrl, layerId)];
+    return entry?.url ?? null;
+  },
+
   setLayerMapCenter: (id, c) => updateMap(set, get, id, { center: c }),
   setLayerMapZoom: (id, z) => updateMap(set, get, id, { zoom: z }),
   setLayerMapStyle: (id, s) => updateMap(set, get, id, { styleId: s }),

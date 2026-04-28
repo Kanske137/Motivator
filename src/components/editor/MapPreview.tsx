@@ -110,6 +110,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
     designSource,
     photoPreviewUrl,
     aiPrintFileUrl,
+    aiPhotoResults,
   } = useEditorStore();
 
   const layers = templateLayers();
@@ -269,6 +270,40 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
               starIdRef.current,
             );
             const src = photoOverlayUrl ?? l.defaults.placeholderUrl ?? null;
+            return (
+              <div key={l.id} style={wrapStyle}>
+                <PhotoLayerView
+                  layerId={l.id}
+                  src={src}
+                  fit={l.defaults.fit}
+                  shape={effectiveShape}
+                  staticClipPath={staticClip}
+                  offsetX={offsetX}
+                  offsetY={offsetY}
+                  draggable={!!src}
+                />
+              </div>
+            );
+          }
+
+          if (l.type === "aiPhoto") {
+            const v = layerValues[l.id];
+            const av = v && v.kind === "aiPhoto" ? v : null;
+            const effectiveShape = (av?.shape ?? l.defaults.shape) as
+              | "rect"
+              | "circle"
+              | "heart"
+              | "star";
+            const offsetX = av?.offsetX ?? 0;
+            const offsetY = av?.offsetY ?? 0;
+            const staticClip = shapeClipPath(
+              effectiveShape,
+              heartIdRef.current,
+              starIdRef.current,
+            );
+            // Source priority: face-swap result → admin reference image →
+            // empty placeholder.
+            const src = aiPhotoResults[l.id] ?? l.defaults.referenceImageUrl ?? null;
             return (
               <div key={l.id} style={wrapStyle}>
                 <PhotoLayerView
