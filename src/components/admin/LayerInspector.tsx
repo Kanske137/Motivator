@@ -678,65 +678,97 @@ function AiPhotoDefaultsSection({
     }
   };
 
+  const isRemoveBg = layer.defaults.subjectKind === "removeBackground";
+
   return (
     <div className="space-y-3 border-t pt-4">
       <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
         AI-bild — defaults
       </p>
       <p className="text-[11px] text-muted-foreground -mt-1">
-        Kunden laddar upp ett ansikte som byts in på referensbilden via AI.
-        Allt annat (kläder, miljö, pose) bevaras från referensbilden.
+        {isRemoveBg
+          ? "Kunden laddar upp en bild — vi tar bort bakgrunden och lägger till en lekfull prick-/akvarell-effekt runt motivet. Kunden kan dessutom välja en av de aktiverade AI-stilarna nedanför."
+          : "Kunden laddar upp ett ansikte som byts in på referensbilden via AI. Allt annat (kläder, miljö, pose) bevaras från referensbilden."}
       </p>
 
-      <div className="space-y-2">
-        <Label className="text-xs">Referensbild</Label>
-        {layer.defaults.referenceImageUrl ? (
-          <div className="relative rounded-lg overflow-hidden border bg-muted aspect-square w-32">
-            <img
-              src={layer.defaults.referenceImageUrl}
-              alt="Referensbild"
-              className="w-full h-full object-cover"
-            />
-          </div>
-        ) : (
-          <div className="rounded-lg border border-dashed bg-muted/40 aspect-square w-32 flex items-center justify-center text-[10px] text-muted-foreground text-center px-2">
-            Ingen referensbild
-          </div>
-        )}
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={uploading}
-            onClick={() => inputRef.current?.click()}
-          >
-            {uploading ? (
-              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-            ) : (
-              <Upload className="h-3.5 w-3.5 mr-1.5" />
-            )}
-            {layer.defaults.referenceImageUrl ? "Byt referensbild" : "Ladda upp referensbild"}
-          </Button>
-          {layer.defaults.referenceImageUrl && (
+      <Field label="Motiv">
+        <Select
+          value={layer.defaults.subjectKind}
+          onValueChange={(v) => {
+            const kind = v as AiPhotoSubjectKind;
+            // Auto-fyll prompten med default för det nya motivet — admin kan
+            // sedan redigera fritt.
+            updateDefaults({ subjectKind: kind, swapPrompt: defaultPromptFor(kind) });
+          }}
+        >
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="human">Människa</SelectItem>
+            <SelectItem value="pet">Hund / Katt</SelectItem>
+            <SelectItem value="removeBackground">Ta bort bakgrund (ingen referens)</SelectItem>
+          </SelectContent>
+        </Select>
+      </Field>
+
+      {!isRemoveBg && (
+        <div className="space-y-2">
+          <Label className="text-xs">Referensbild</Label>
+          {layer.defaults.referenceImageUrl ? (
+            <div className="relative rounded-lg overflow-hidden border bg-muted aspect-square w-32">
+              <img
+                src={layer.defaults.referenceImageUrl}
+                alt="Referensbild"
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed bg-muted/40 aspect-square w-32 flex items-center justify-center text-[10px] text-muted-foreground text-center px-2">
+              Ingen referensbild
+            </div>
+          )}
+          <div className="flex gap-2">
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               size="sm"
-              onClick={() => updateDefaults({ referenceImageUrl: undefined })}
+              disabled={uploading}
+              onClick={() => inputRef.current?.click()}
             >
-              Ta bort
+              {uploading ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <Upload className="h-3.5 w-3.5 mr-1.5" />
+              )}
+              {layer.defaults.referenceImageUrl ? "Byt referensbild" : "Ladda upp referensbild"}
             </Button>
-          )}
+            {layer.defaults.referenceImageUrl && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => updateDefaults({ referenceImageUrl: undefined })}
+              >
+                Ta bort
+              </Button>
+            )}
+          </div>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(e) => onFile(e.target.files?.[0])}
+          />
         </div>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          className="hidden"
-          onChange={(e) => onFile(e.target.files?.[0])}
-        />
-      </div>
+      )}
+
+      {isRemoveBg && (
+        <p className="rounded-md bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">
+          Referensbild behövs inte. Kunden ser de AI-stilar du markerat som
+          "enabled" i AI-stilar-sektionen — vald stil läggs på själva motivet
+          medan bakgrunden alltid är borttagen.
+        </p>
+      )}
 
       <Field label="Form">
         <Select
@@ -765,39 +797,21 @@ function AiPhotoDefaultsSection({
         </Select>
       </Field>
 
-      <Field label="Motiv">
-        <Select
-          value={layer.defaults.subjectKind}
-          onValueChange={(v) => {
-            const kind = v as AiPhotoSubjectKind;
-            // Auto-fyll prompten med default för det nya motivet — admin kan
-            // sedan redigera fritt.
-            updateDefaults({ subjectKind: kind, swapPrompt: defaultPromptFor(kind) });
-          }}
-        >
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="human">Människa</SelectItem>
-            <SelectItem value="cat">Katt</SelectItem>
-            <SelectItem value="dog">Hund</SelectItem>
-            <SelectItem value="other">Annat</SelectItem>
-          </SelectContent>
-        </Select>
-      </Field>
-
-      <Field label="Prompt (skickas till AI)">
+      <Field label={isRemoveBg ? "Stylguide för prick-effekten (valfri)" : "Prompt (skickas till AI)"}>
         <Textarea
           rows={4}
           value={layer.defaults.swapPrompt}
           onChange={(e) => updateDefaults({ swapPrompt: e.target.value })}
         />
       </Field>
-      <p className="text-[11px] text-muted-foreground -mt-2">
-        Tips: referera till <code>input_image_1</code> (din referensbild =
-        kostym/scen som ska behållas) och <code>input_image_2</code> (kundens
-        foto = ansiktet som ska lyftas in). Var specifik om vad som ska
-        bevaras (kläder, frisyr, miljö).
-      </p>
+      {!isRemoveBg && (
+        <p className="text-[11px] text-muted-foreground -mt-2">
+          Tips: referera till <code>input_image_1</code> (din referensbild =
+          kostym/scen som ska behållas) och <code>input_image_2</code> (kundens
+          foto = ansiktet som ska lyftas in). Var specifik om vad som ska
+          bevaras (kläder, frisyr, miljö).
+        </p>
+      )}
     </div>
   );
 }
