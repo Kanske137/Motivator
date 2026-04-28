@@ -306,16 +306,28 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             const src = aiPhotoResults[l.id] ?? l.defaults.referenceImageUrl ?? null;
             return (
               <div key={l.id} style={wrapStyle}>
-                <PhotoLayerView
-                  layerId={l.id}
-                  src={src}
-                  fit={l.defaults.fit}
-                  shape={effectiveShape}
-                  staticClipPath={staticClip}
-                  offsetX={offsetX}
-                  offsetY={offsetY}
-                  draggable={!!src}
-                />
+                {src ? (
+                  <PhotoLayerView
+                    layerId={l.id}
+                    src={src}
+                    fit={l.defaults.fit}
+                    shape={effectiveShape}
+                    staticClipPath={staticClip}
+                    offsetX={offsetX}
+                    offsetY={offsetY}
+                    draggable={!!src}
+                  />
+                ) : (
+                  <div
+                    className="w-full h-full flex flex-col items-center justify-center gap-1 text-center px-2 bg-accent/30 border-2 border-dashed border-primary/40 rounded"
+                    style={{ clipPath: staticClip }}
+                  >
+                    <span className="text-base">✨</span>
+                    <span className="text-[10px] text-muted-foreground leading-tight">
+                      AI-bild visas här efter Skapa nu
+                    </span>
+                  </div>
+                )}
               </div>
             );
           }

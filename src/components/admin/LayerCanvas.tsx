@@ -161,6 +161,10 @@ export default function LayerCanvas({
         const clipPath =
           layer.defaults.shape === "circle" ? "circle(50% at 50% 50%)" : undefined;
         const src = layer.defaults.referenceImageUrl;
+        const isRemoveBg = layer.defaults.subjectKind === "removeBackground";
+        const placeholderText = isRemoveBg
+          ? "✨ AI-bild (bakgrund tas bort)"
+          : "✨ AI-bildplats";
         return (
           <div className="absolute inset-0 overflow-hidden" style={{ clipPath }}>
             {src ? (
@@ -174,7 +178,7 @@ export default function LayerCanvas({
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground bg-accent/60 border border-dashed border-primary/40 text-center px-1">
-                ✨ AI-bildplats
+                {placeholderText}
               </div>
             )}
           </div>

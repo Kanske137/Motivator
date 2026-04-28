@@ -23,6 +23,7 @@ export function MockupGallery() {
     showLabels, mapShape, posterBgColor,
     layerValues,
     designSource, photoPreviewUrl, aiPrintFileUrl,
+    aiPhotoResults,
   } = useEditorStore();
   const [slots, setSlots] = useState<MockupSlot[]>([]);
   const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null);
@@ -78,6 +79,7 @@ export function MockupGallery() {
               : designSource === "photo"
               ? photoPreviewUrl ?? undefined
               : undefined,
+          aiPhotoResults,
         });
         if (myReq !== reqIdRef.current) return;
 
@@ -137,6 +139,7 @@ export function MockupGallery() {
     mapStyleId, mapCenter, mapZoom, showLabels, mapShape,
     text, textFont, textVisible,
     designSource, photoPreviewUrl, aiPrintFileUrl,
+    aiPhotoResults,
   ]);
 
   if (!config) return null;
