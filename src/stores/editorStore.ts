@@ -6,7 +6,6 @@ import type { ProductOptions, Template, TemplateLayer } from "@/lib/template-sch
 import { resolveTemplate } from "@/lib/template-migrate";
 import {
   type AiCacheEntry,
-  hashFile,
   loadAiCache,
   makeCacheKey,
   saveAiCache,
