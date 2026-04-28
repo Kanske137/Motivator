@@ -357,6 +357,10 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
         </div>
       )}
 
+      {layer.type === "aiPhoto" && (
+        <AiPhotoDefaultsSection layer={layer} onChange={onChange} />
+      )}
+
       {layer.type === "margin" && (
         <div className="space-y-3 border-t pt-4">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
