@@ -560,13 +560,23 @@ Deno.serve(async (req) => {
     if (!result.ok) return result.response;
 
     // Sanity-check dimensions to catch collages / weirdly-shaped outputs.
+    // When a targetAspectRatio was provided, allow any ratio reasonably close
+    // to the target (the layer might legitimately be very tall or very wide).
     const dims = readImageSize(result.bytes);
     if (dims) {
       const ratio = dims.w / Math.max(1, dims.h);
       console.log(
-        `[face-swap] outputDimensions=${dims.w}x${dims.h} aspectRatio=${ratio.toFixed(2)}`,
+        `[face-swap] outputDimensions=${dims.w}x${dims.h} aspectRatio=${ratio.toFixed(2)} ` +
+          `targetAspectRatio=${targetAspectRatio?.toFixed(2) ?? "(none)"}`,
       );
-      if (ratio > 2.2 || ratio < 0.45) {
+      // Default safe band; widen to match the target when one is provided.
+      let minRatio = 0.45;
+      let maxRatio = 2.2;
+      if (targetAspectRatio && targetAspectRatio > 0) {
+        minRatio = Math.min(minRatio, targetAspectRatio * 0.5);
+        maxRatio = Math.max(maxRatio, targetAspectRatio * 2.0);
+      }
+      if (ratio > maxRatio || ratio < minRatio) {
         return fallbackResponse(
           "AI-modellen returnerade en ogiltig bild. Prova att skapa igen, eller använd en tydligare bild.",
           `Suspicious output dimensions ${dims.w}x${dims.h} — likely a collage`,
