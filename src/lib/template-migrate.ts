@@ -94,6 +94,12 @@ function coerceLegacyRaw(raw: unknown): unknown {
     const layout = root?.defaultLayout?.[o];
     if (!layout?.layers) continue;
     for (const l of layout.layers) {
+      // Backfill `move` lock on legacy layers (default = locked).
+      const locks = (l.locks ?? {}) as Record<string, unknown>;
+      if (typeof locks.move !== "boolean") {
+        locks.move = true;
+        l.locks = locks;
+      }
       // Legacy margin: thicknessMm → thicknessPct (~5% of short side).
       if (l?.type === "margin") {
         const d = (l.defaults ?? {}) as Record<string, unknown>;
