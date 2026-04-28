@@ -4,7 +4,7 @@
 // function. Results are cached in localStorage so re-using the same selfie
 // on the same reference is instant.
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Sparkles, Trash2, Undo2, Upload } from "lucide-react";
+import { Loader2, Sparkles, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useEditorStore } from "@/stores/editorStore";
