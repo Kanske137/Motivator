@@ -78,13 +78,16 @@ interface EditorState {
   /** Public URL of the original photo (uploaded to cart-previews lazily) so
    *  Replicate can fetch it for AI styles. Cached so we don't re-upload. */
   originalPhotoUrl: string | null;
+  /** SHA-256 of the uploaded photo's bytes. Stable across re-uploads and
+   *  page reloads → used as the cache key for AI results. */
+  photoHash: string | null;
   aiPrintFileUrl: string | null;
   /** Real Shopify variant GID (e.g. gid://shopify/ProductVariant/123). Resolved
    *  lazily based on (handle, size, variant). Null while resolving / not found. */
   shopifyVariantId: string | null;
   shopifyVariantResolving: boolean;
 
-  /** AI-styled image cache keyed by `${photoKey}|${presetId}`. Avoids repeat
+  /** AI-styled image cache keyed by `${photoHash}|${presetId}`. Avoids repeat
    *  Replicate calls when the customer revisits a style they already tried.
    *  Persisted to localStorage with LRU eviction. */
   aiResultCache: Record<string, AiCacheEntry>;
@@ -97,16 +100,21 @@ interface EditorState {
   setOrientation: (o: Orientation) => void;
   setPhotoSource: (file: File | null, previewUrl: string | null) => void;
   setOriginalPhotoUrl: (url: string | null) => void;
+  setPhotoHash: (hash: string | null) => void;
   setAiPrintFileUrl: (url: string | null) => void;
+  /** Drops only the AI-styled result, keeps the original photo + hash + URL
+   *  intact so the history list stays visible and re-applying a style is
+   *  a cache hit. */
+  clearAiResultOnly: () => void;
   resetDesignSource: () => void;
   setShopifyVariantId: (id: string | null) => void;
   setShopifyVariantResolving: (resolving: boolean) => void;
 
   // ---------- AI cache ----------
-  addAiResultToCache: (photoKey: string, presetId: string, presetLabel: string, url: string) => void;
-  getCachedAiResult: (photoKey: string, presetId: string) => string | null;
-  listAiResultsForPhoto: (photoKey: string) => AiCacheEntry[];
-  clearAiResult: (photoKey: string, presetId: string) => void;
+  addAiResultToCache: (photoHash: string, presetId: string, presetLabel: string, url: string) => void;
+  getCachedAiResult: (photoHash: string, presetId: string) => string | null;
+  listAiResultsForPhoto: (photoHash: string) => AiCacheEntry[];
+  clearAiResult: (photoHash: string, presetId: string) => void;
 
   // Per-layer setters
   setLayerMapCenter: (id: string, c: [number, number]) => void;
