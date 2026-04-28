@@ -11,7 +11,14 @@ export interface FaceSwapCacheEntry {
   timestamp: number;
 }
 
-const STORAGE_KEY = "lovable.face-swap-cache.v1";
+// v2: bumped to invalidate older results that were generated with the
+// reversed-direction prompt (admin face was placed onto customer scene).
+const STORAGE_KEY = "lovable.face-swap-cache.v2";
+
+// Best-effort cleanup of the old key so we don't leave orphan data behind.
+if (typeof window !== "undefined") {
+  try { window.localStorage.removeItem("lovable.face-swap-cache.v1"); } catch { /* noop */ }
+}
 const MAX_ENTRIES = 30;
 
 export function loadFaceSwapCache(): Record<string, FaceSwapCacheEntry> {

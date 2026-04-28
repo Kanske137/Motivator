@@ -115,7 +115,7 @@ export function AiPhotoSection({ layer, heading }: Props) {
     }
   };
 
-  const runSwap = async () => {
+  const runSwap = async (opts: { force?: boolean } = {}) => {
     if (!refUrl) {
       toast.error("Saknar referensbild för det här motivet");
       return;
@@ -127,7 +127,10 @@ export function AiPhotoSection({ layer, heading }: Props) {
     setBusy(true);
     try {
       const hash = await ensureHash();
-      if (hash) {
+      // Only use cache when the user hasn't explicitly asked for a regenerate.
+      // "Skapa igen" must always hit the model so we never re-show a stale,
+      // possibly incorrect result.
+      if (!opts.force && hash) {
         const cached = getCachedFaceSwap(layer.id, hash, refUrl);
         if (cached) {
           setAiPhotoResult(layer.id, cached);
@@ -138,6 +141,13 @@ export function AiPhotoSection({ layer, heading }: Props) {
       const faceImageUrl = await ensureUploadedUrl();
       if (!faceImageUrl) return;
       const designId = `swap-${(crypto as { randomUUID?: () => string }).randomUUID?.() ?? Date.now()}`;
+      console.info("[AiPhoto] invoking face-swap", {
+        layerId: layer.id,
+        referenceImageUrl: refUrl,
+        faceImageUrl,
+        subjectKind,
+        force: !!opts.force,
+      });
       const { data, error } = await supabase.functions.invoke("replicate-face-swap", {
         body: {
           referenceImageUrl: refUrl,
@@ -148,7 +158,15 @@ export function AiPhotoSection({ layer, heading }: Props) {
         },
       });
       if (error) throw error;
-      const payload = data as { printFileUrl?: string; error?: string; fallback?: boolean; userMessage?: string };
+      const payload = data as {
+        printFileUrl?: string;
+        error?: string;
+        fallback?: boolean;
+        userMessage?: string;
+        usedReferenceImageUrl?: string;
+        usedFaceImageUrl?: string;
+        replicateOutputUrl?: string;
+      };
       if (payload?.error) {
         const friendly = payload.userMessage ?? "Vi kunde inte skapa bilden. Prova en annan bild med tydligt ansikte och bra ljus.";
         toast.error("Kunde inte skapa bilden", { description: friendly });
@@ -156,6 +174,13 @@ export function AiPhotoSection({ layer, heading }: Props) {
       }
       const printFileUrl = payload?.printFileUrl;
       if (!printFileUrl) throw new Error("Tjänsten returnerade ingen bild");
+      console.info("[AiPhoto] face-swap result", {
+        layerId: layer.id,
+        printFileUrl,
+        replicateOutputUrl: payload.replicateOutputUrl,
+        usedReferenceImageUrl: payload.usedReferenceImageUrl,
+        usedFaceImageUrl: payload.usedFaceImageUrl,
+      });
       setAiPhotoResult(layer.id, printFileUrl);
       if (hash) addFaceSwapToCache(layer.id, hash, refUrl, printFileUrl);
       toast.success("Bilden är klar");
@@ -239,7 +264,7 @@ export function AiPhotoSection({ layer, heading }: Props) {
 
       <Button
         type="button"
-        onClick={runSwap}
+        onClick={() => runSwap({ force: !!result })}
         disabled={!source || !refUrl || busy}
         className="w-full"
       >
