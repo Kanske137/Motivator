@@ -83,6 +83,11 @@ interface EditorState {
   shopifyVariantId: string | null;
   shopifyVariantResolving: boolean;
 
+  /** AI-styled image cache keyed by `${photoKey}|${presetId}`. Avoids repeat
+   *  Replicate calls when the customer revisits a style they already tried.
+   *  Persisted to localStorage with LRU eviction. */
+  aiResultCache: Record<string, AiCacheEntry>;
+
   // ---------- setters ----------
   setConfig: (c: ProductConfig) => void;
   setPosterBgColor: (c: string) => void;
@@ -95,6 +100,12 @@ interface EditorState {
   resetDesignSource: () => void;
   setShopifyVariantId: (id: string | null) => void;
   setShopifyVariantResolving: (resolving: boolean) => void;
+
+  // ---------- AI cache ----------
+  addAiResultToCache: (photoKey: string, presetId: string, presetLabel: string, url: string) => void;
+  getCachedAiResult: (photoKey: string, presetId: string) => string | null;
+  listAiResultsForPhoto: (photoKey: string) => AiCacheEntry[];
+  clearAiResult: (photoKey: string, presetId: string) => void;
 
   // Per-layer setters
   setLayerMapCenter: (id: string, c: [number, number]) => void;
