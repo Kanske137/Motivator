@@ -16,6 +16,7 @@ import mapboxgl from "mapbox-gl";
 import { getMapboxToken, styleUrl } from "./mapbox";
 import type { Template, TemplateLayer } from "./template-schema";
 import type { LayerValue } from "@/stores/editorStore";
+import { getActiveMarginInsetsPct, expandRectForRemovedMargin } from "./layer-utils";
 
 export interface TemplateSnapshotInput {
   template: Template;
@@ -58,6 +59,10 @@ export interface TemplateSnapshotInput {
   /** Per-aiPhoto-layer face-swap result URLs. Falls back to the layer's
    *  admin-set referenceImageUrl when no result is present. */
   aiPhotoResults?: Record<string, string>;
+
+  /** Customer toggle: when false, the white margin layer is omitted and all
+   *  other layers are expanded proportionally to fill the freed area. */
+  whiteMarginEnabled?: boolean;
 }
 
 export interface TemplateSnapshotResult {
