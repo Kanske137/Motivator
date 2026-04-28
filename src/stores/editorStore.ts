@@ -116,6 +116,13 @@ interface EditorState {
    *  Persisted to localStorage with LRU eviction. */
   aiResultCache: Record<string, AiCacheEntry>;
 
+  /** Customer-uploaded face photos per aiPhoto layer. */
+  aiPhotoSources: Record<string, AiPhotoSource>;
+  /** Face-swap result URLs per aiPhoto layer (current selection only). */
+  aiPhotoResults: Record<string, string>;
+  /** Persistent face-swap cache keyed by `${faceHash}|${refUrl}|${layerId}`. */
+  faceSwapCache: Record<string, FaceSwapCacheEntry>;
+
   // ---------- setters ----------
   setConfig: (c: ProductConfig) => void;
   setPosterBgColor: (c: string) => void;
@@ -139,6 +146,24 @@ interface EditorState {
   getCachedAiResult: (photoHash: string, presetId: string) => string | null;
   listAiResultsForPhoto: (photoHash: string) => AiCacheEntry[];
   clearAiResult: (photoHash: string, presetId: string) => void;
+
+  // ---------- aiPhoto (face-swap) ----------
+  setAiPhotoSource: (layerId: string, file: File | null, previewUrl: string | null) => void;
+  setAiPhotoHash: (layerId: string, hash: string) => void;
+  setAiPhotoUploadedUrl: (layerId: string, url: string) => void;
+  setAiPhotoResult: (layerId: string, url: string | null) => void;
+  clearAiPhoto: (layerId: string) => void;
+  addFaceSwapToCache: (
+    layerId: string,
+    faceHash: string,
+    referenceImageUrl: string,
+    url: string,
+  ) => void;
+  getCachedFaceSwap: (
+    layerId: string,
+    faceHash: string,
+    referenceImageUrl: string,
+  ) => string | null;
 
   // Per-layer setters
   setLayerMapCenter: (id: string, c: [number, number]) => void;
