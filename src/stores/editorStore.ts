@@ -301,6 +301,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   template: null,
   productOptions: null,
   layerValues: {},
+  layerTransforms: {},
   posterBgColor: "#EFE7D6",
 
   size: null,
