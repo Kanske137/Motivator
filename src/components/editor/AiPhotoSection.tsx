@@ -4,7 +4,7 @@
 // function. Results are cached in localStorage so re-using the same selfie
 // on the same reference is instant.
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Sparkles, Trash2, Undo2, Upload } from "lucide-react";
+import { Loader2, Sparkles, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useEditorStore } from "@/stores/editorStore";
@@ -131,7 +131,7 @@ export function AiPhotoSection({ layer, heading }: Props) {
         const cached = getCachedFaceSwap(layer.id, hash, refUrl);
         if (cached) {
           setAiPhotoResult(layer.id, cached);
-          toast.success("AI-bild återanvänd");
+          toast.success("Bilden är klar");
           return;
         }
       }
@@ -148,15 +148,21 @@ export function AiPhotoSection({ layer, heading }: Props) {
         },
       });
       if (error) throw error;
-      const printFileUrl = (data as { printFileUrl?: string })?.printFileUrl;
-      if (!printFileUrl) throw new Error("AI-tjänsten returnerade ingen bild");
+      const payload = data as { printFileUrl?: string; error?: string; fallback?: boolean; userMessage?: string };
+      if (payload?.error) {
+        const friendly = payload.userMessage ?? "Vi kunde inte skapa bilden. Prova en annan bild med tydligt ansikte och bra ljus.";
+        toast.error("Kunde inte skapa bilden", { description: friendly });
+        return;
+      }
+      const printFileUrl = payload?.printFileUrl;
+      if (!printFileUrl) throw new Error("Tjänsten returnerade ingen bild");
       setAiPhotoResult(layer.id, printFileUrl);
       if (hash) addFaceSwapToCache(layer.id, hash, refUrl, printFileUrl);
-      toast.success("AI-bild skapad");
+      toast.success("Bilden är klar");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Okänt fel";
       console.error("[AiPhoto] swap failed", e);
-      toast.error("Kunde inte skapa AI-bild", { description: msg });
+      toast.error("Kunde inte skapa bilden", { description: msg });
     } finally {
       setBusy(false);
     }
@@ -170,18 +176,9 @@ export function AiPhotoSection({ layer, heading }: Props) {
         </h4>
       )}
 
-      {refUrl ? (
-        <div className="space-y-2">
-          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-            Stilreferens
-          </Label>
-          <div className="relative rounded-xl overflow-hidden border bg-muted aspect-square w-24">
-            <img src={refUrl} alt="Referens" className="w-full h-full object-cover" />
-          </div>
-        </div>
-      ) : (
+      {!refUrl && (
         <p className="text-xs text-destructive">
-          Den här produkten saknar referensbild. Be admin lägga till en.
+          Den här produkten är inte fullt konfigurerad än. Kontakta support.
         </p>
       )}
 
@@ -249,28 +246,15 @@ export function AiPhotoSection({ layer, heading }: Props) {
         {busy ? (
           <>
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            Skapar AI-bild…
+            Skapar…
           </>
         ) : (
           <>
             <Sparkles className="h-4 w-4 mr-2" />
-            {result ? "Skapa AI-bild igen" : "Skapa AI-bild"}
+            {result ? "Skapa igen" : "Skapa nu"}
           </>
         )}
       </Button>
-
-      {result && (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => setAiPhotoResult(layer.id, null)}
-          className="w-full"
-        >
-          <Undo2 className="h-3.5 w-3.5 mr-1.5" />
-          Visa referensbilden istället
-        </Button>
-      )}
     </div>
   );
 }

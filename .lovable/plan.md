@@ -1,68 +1,58 @@
-# Fix: aiPhoto-layern visas inte och saknar kund-UI
+# Face-swap fix + UI-förbättringar på kundsidan
 
-## Problem
-1. **Kund-canvas är tom där aiPhoto-layern ligger.** `MapPreview.tsx` har inget `if (l.type === "aiPhoto")`-fall, så layern hoppas över helt. Adminens referensbild ignoreras.
-2. **Det finns ingen "Bild"-flik för face-swap.** `ControlPanel.tsx` filtrerar bara på `type === "photo"`. Eftersom mallen nu använder `aiPhoto` istället för `photo` syns ingen sektion.
-3. **Tryckfilen** kommer också bli tom — `template-snapshot.ts` saknar samma fall.
+## Varför misslyckades skapandet?
 
-## Lösning
+Edge function-loggen säger:
+```
+[face-swap] error: Replicate succeeded but produced no output URL
+subjectKind=dog
+```
 
-### 1. Visa referensbilden + face-swap-resultatet i kundens canvas
-Lägg till `if (l.type === "aiPhoto")`-fall i `MapPreview.tsx` direkt efter `photo`-fallet. Återanvänd den befintliga `PhotoLayerView` (samma form/clipping/fit). Bildkällan väljs så här:
-- Om vi har ett face-swap-resultat (`aiPhotoResults[layer.id]`) → visa det
-- Annars → visa `layer.defaults.referenceImageUrl`
-- Annars → visa platsmarkör ("Ladda upp en bild …")
+Modellen vi använder (`cdingram/face-swap`) är **enbart tränad på mänskliga ansikten**. När den får en hund eller katt — eller en bild där den inte hittar ett tydligt mänskligt ansikte — returnerar den `null` istället för en bild, och vi kastar ett fel.
 
-### 2. Lägg till kund-UI i `ControlPanel.tsx`
-Ny accordion-sektion "Bild" (eller "Din bild") som visas när `templateLayers` innehåller minst en `aiPhoto`-layer:
-- Per `aiPhoto`-layer:
-  - Liten thumbnail av admin-referensbilden (för att kunden ser vad face-swappen utgår från)
-  - Upload-knapp för kundens egen bild (selfie / husdjursbild) — återanvänder upload-mönstret från `PhotoUploadSection`
-  - "Byt bild" / "Ta bort"
-  - Knapp **"Skapa AI-bild"** som triggar `replicate-face-swap`
-  - Spinner medan jobbet kör
-  - Tunn instruktionstext anpassad efter `subjectKind` ("Bilden ska visa ansiktet på personen/katten/hunden tydligt")
+Det är alltså inte ett buggat anrop, utan fel modell för djur. För människor fungerar den bra; för katt/hund behövs en annan strategi.
 
-Sektionen visas oavsett om mallen också har en vanlig `photo`-layer. När bara `aiPhoto` finns ska gamla "Bild"-sektionen + AI-stilar inte visas (de hör inte ihop med face-swap).
+## Vad jag föreslår att vi gör
 
-### 3. Store-stöd
-I `editorStore.ts`:
-- Ny `aiPhotoSources: Record<layerId, { file: File; previewUrl: string; hash: string | null }>` — kundens uppladdade bilder per aiPhoto-layer.
-- Ny `aiPhotoResults: Record<layerId, string>` — resulterande swap-URL per layer.
-- Persistent cache i localStorage (samma stil som AI-style-cachen, ny `STORAGE_KEY = "lovable.face-swap-cache.v1"`), keyat på `${faceHash}|${referenceImageUrl}|${layerId}` så att samma selfie + samma referens inte triggar nytt Replicate-anrop.
-- Setters: `setAiPhotoSource(layerId, file, previewUrl)`, `setAiPhotoHash(layerId, hash)`, `setAiPhotoResult(layerId, url)`, `clearAiPhoto(layerId)`.
-- Hydrering: `hydrateLayerValues` får ett aiPhoto-fall för konsekvens (offsetX/Y, shape) — viktigt så att panorering fungerar precis som för `photo`.
+### 1. Byt till en mer kapabel modell (huvudfix)
+Använd `flux-kontext-apps/face-swap` (eller motsv. Kontext-baserad modell på Replicate) som styrs av prompten admin redan skriver. Den:
+- accepterar prompt + två bilder
+- klarar djur betydligt bättre eftersom den inte är låst till ansiktsdetektor
+- respekterar instruktioner som "behåll kläder/miljö, byt bara ansiktet på hunden"
 
-### 4. Edge function-anrop (frontend)
-Ny komponent `AiPhotoSection.tsx` (eller subkomponent i ControlPanel) som:
-1. Tar emot layer + admin-defaults
-2. Vid uppladdning: skapar blob-URL + räknar SHA-256
-3. Vid "Skapa AI-bild": laddar först upp selfie till `cart-previews` (samma `uploadCartPreview` som AI-styles), kollar cachen, annars `supabase.functions.invoke("replicate-face-swap", { body: { referenceImageUrl, faceImageUrl, prompt, subjectKind, designId }})`
-4. Lagrar resultatet i store + cache
-5. Visar toasts vid fel
+Adminens prompt (`Replace only the dog's face…`) skickas in direkt — det är precis det som behövs.
 
-### 5. Print-snapshot
-I `template-snapshot.ts`:
-- Lägg till aiPhoto-rendering (återanvänd `drawPhotoLayer`)
-- Källa = swap-resultat → referensbild → tom (skip)
-- I `EditorPage.tsx` skicka med `aiPhotoResults` i `baseTemplateInput` så att snapshot kan komma åt det. Enklast: tillåt store-läsning direkt i renderaren via en ny prop `aiPhotoResults?: Record<string, string>`.
+### 2. Bättre felmeddelanden
+- Om Replicate returnerar tom output → visa kunden "Vi kunde inte hitta ett tydligt ansikte i din bild. Prova en annan bild med bra ljus."
+- Returnera 200 med `{ error, fallback: true }` istället för 500, så frontend kan visa ett vänligt felmeddelande utan att krascha.
+- Validera att uppladdad bild är < 10 MB innan vi ringer Replicate.
 
-### 6. Pris/cart
-Inga ändringar i pris-flödet. Cart-preview funkar tack vare snapshot-fixen.
+### 3. Kund-UI-städning (det du bad om)
 
-## Filer
-- ny: `src/components/editor/AiPhotoSection.tsx`
-- ny: `src/lib/face-swap-cache.ts` (analog med `ai-cache-storage.ts`)
-- redigera: `src/stores/editorStore.ts` (hydrering, setters, cache)
-- redigera: `src/components/editor/MapPreview.tsx` (rendera aiPhoto)
-- redigera: `src/components/editor/ControlPanel.tsx` (ny sektion + dölj photo/AI när bara aiPhoto)
-- redigera: `src/lib/template-snapshot.ts` (rendera aiPhoto)
-- redigera: `src/pages/EditorPage.tsx` (skicka aiPhotoResults till snapshot)
+I `src/components/editor/AiPhotoSection.tsx`:
+- **Ta bort hela "Stilreferens"-blocket** (raderna med admin-bilden + "Visa referensbilden istället"-knappen). Kunden ser bara sin egen uppladdning + slutresultatet.
+- **Knapp**: `"Skapa AI-bild" / "Skapa AI-bild igen"` → `"Skapa nu" / "Skapa igen"`.
+- Toast-texter: `"AI-bild skapad"` → `"Bilden är klar"`, `"Kunde inte skapa AI-bild"` → `"Kunde inte skapa bilden"`.
 
-## Verifiering
-1. På `/admin/designer/...`: referensbilden ligger kvar (redan fixat).
-2. På kundeditorn: referensbilden syns i layern.
-3. Ny "Bild"-sektion visas. Ladda upp en hund-bild → klicka "Skapa AI-bild" → Replicate kör → swap-resultat visas i layern.
-4. Återgå-knapp tar bort swappen, referensbilden visas igen.
-5. Klicka "Skapa AI-bild" igen med samma bild → cache-träff (instant).
-6. Lägg i varukorg → tryckfil-thumbnail innehåller swap-resultatet.
+I `src/components/editor/ControlPanel.tsx`:
+- **Flikens namn** `"AI-bild"` → välj ett av förslagen nedan.
+
+## Förslag på nytt namn för fliken (välj ett)
+
+| Förslag | Känsla |
+|---|---|
+| **Porträtt** | Klassiskt, passar både människor och djur |
+| **Karaktär** | Lekfullt, fungerar för "kungar/prinsessor"-temat |
+| **Förvandling** | Beskriver vad som händer (du blir en kung osv) |
+| **Din bild** | Neutralt, väldigt tydligt vad fliken gör |
+| **Motiv** | Kort, snyggt, generiskt |
+
+Min favorit givet konceptet (riddare/prinsessa/husdjur som kung): **Förvandling** eller **Karaktär**. Säg till vilket du vill ha så använder jag det — annars defaultar jag till **Förvandling**.
+
+## Filer som ändras
+
+- `supabase/functions/replicate-face-swap/index.ts` — byt modell, bättre felhantering
+- `src/components/editor/AiPhotoSection.tsx` — ta bort stilreferens-block, ändra knapptexter och toasts, hantera `fallback`-svar
+- `src/components/editor/ControlPanel.tsx` — byt fliknamn (default: "Förvandling")
+
+Adminsidan rörs inte — där behåller vi all info inkl. referensbild och prompt.

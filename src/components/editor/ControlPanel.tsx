@@ -109,16 +109,16 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
       )}
 
       {showAiPhotoSection && (
-        <AccordionItem value="ai-bild" className={cn(cardClass, "border-b-0")}>
+        <AccordionItem value="forvandling" className={cn(cardClass, "border-b-0")}>
           <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
-            AI-bild
+            Förvandling
           </AccordionTrigger>
           <AccordionContent className="pt-1 pb-4 space-y-5">
             {aiPhotoLayers.map((l, idx, arr) => (
               <AiPhotoSection
                 key={l.id}
                 layer={l}
-                heading={arr.length > 1 ? l.name || `AI-bild ${idx + 1}` : null}
+                heading={arr.length > 1 ? l.name || `Förvandling ${idx + 1}` : null}
               />
             ))}
           </AccordionContent>
