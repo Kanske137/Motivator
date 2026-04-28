@@ -602,15 +602,20 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
         }
       }
     } else if (layer.type === "aiPhoto") {
-      const url = input.aiPhotoResults?.[layer.id] ?? layer.defaults.referenceImageUrl;
+      const aiResultUrl = input.aiPhotoResults?.[layer.id] ?? null;
+      const url = aiResultUrl ?? layer.defaults.referenceImageUrl;
       if (url) {
         const lv = input.layerValues?.[layer.id];
         const av = lv && lv.kind === "aiPhoto" ? lv : null;
         const shape = (av?.shape ?? layer.defaults.shape) as "rect" | "circle" | "heart" | "star";
         const offsetX = av?.offsetX ?? 0;
         const offsetY = av?.offsetY ?? 0;
+        // For AI removeBackground results, force `contain` so the entire
+        // generated subject lands on the print file with white padding on
+        // any side that doesn't match the layer aspect — never crop.
+        const fit = aiResultUrl ? "contain" : layer.defaults.fit;
         try {
-          await drawPhotoLayer(ctx, rect, url, shape, layer.defaults.fit, offsetX, offsetY);
+          await drawPhotoLayer(ctx, rect, url, shape, fit, offsetX, offsetY);
         } catch (e) {
           console.warn("[template-snapshot] aiPhoto layer failed", e);
         }
