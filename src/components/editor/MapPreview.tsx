@@ -185,7 +185,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   };
 
   const layerToEditorRect = (l: TemplateLayer) => {
-    const eff = effectiveLayerRect(l, layerTransforms);
+    const eff = effectiveLayerRect(l, layerTransforms, { marginRemovedInsets });
     const left = (frontInsetX + (eff.xPct / 100) * (1 - 2 * frontInsetX)) * 100;
     const top = (frontInsetY + (eff.yPct / 100) * (1 - 2 * frontInsetY)) * 100;
     const width = (eff.wPct / 100) * (1 - 2 * frontInsetX) * 100;
