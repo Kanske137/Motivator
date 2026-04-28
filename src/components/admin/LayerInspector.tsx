@@ -4,9 +4,11 @@
 //   - Edit position/size numerically (snap to 5%)
 //   - Map: search a default place (geocoding) → updates center/zoom +
 //     placeName/city/country, AND auto-builds text for any linked text layers.
-import React, { useEffect, useState } from "react";
-import { Loader2, Search } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Loader2, Search, Upload } from "lucide-react";
+import { toast } from "sonner";
 import type { ProductConfig } from "@/lib/product-config";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -20,12 +22,15 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type {
+  AiPhotoSubjectKind,
   LayerLocks,
   TemplateLayer,
 } from "@/lib/template-schema";
 import { geocode, type GeocodeResult } from "@/lib/mapbox";
 import { applyAdminPlaceToLinkedTexts } from "@/lib/template-migrate";
 import { MAP_STYLE_CATALOG } from "@/lib/map-style-catalog";
+import { defaultPromptFor } from "@/lib/ai-photo-prompts";
+import { uploadAiReferenceImage } from "@/lib/ai-reference-upload";
 
 interface Props {
   config: ProductConfig;
@@ -357,6 +362,10 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
         </div>
       )}
 
+      {layer.type === "aiPhoto" && (
+        <AiPhotoDefaultsSection layer={layer} onChange={onChange} />
+      )}
+
       {layer.type === "margin" && (
         <div className="space-y-3 border-t pt-4">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -631,6 +640,162 @@ function DefaultPlaceSearch({
           </div>
         </PopoverContent>
       </Popover>
+    </div>
+  );
+}
+
+// ---------- AI-photo (face-swap reference) defaults ----------
+function AiPhotoDefaultsSection({
+  layer,
+  onChange,
+}: {
+  layer: Extract<TemplateLayer, { type: "aiPhoto" }>;
+  onChange: (next: TemplateLayer) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const updateDefaults = (patch: Partial<typeof layer.defaults>) => {
+    onChange({ ...layer, defaults: { ...layer.defaults, ...patch } });
+  };
+
+  const onFile = async (f: File | null | undefined) => {
+    if (!f) return;
+    if (!f.type.startsWith("image/")) {
+      toast.error("Endast bildfiler stöds");
+      return;
+    }
+    setUploading(true);
+    try {
+      const url = await uploadAiReferenceImage(f);
+      updateDefaults({ referenceImageUrl: url });
+      toast.success("Referensbild uppladdad");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Okänt fel";
+      toast.error("Uppladdning misslyckades", { description: msg });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3 border-t pt-4">
+      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        AI-bild — defaults
+      </p>
+      <p className="text-[11px] text-muted-foreground -mt-1">
+        Kunden laddar upp ett ansikte som byts in på referensbilden via AI.
+        Allt annat (kläder, miljö, pose) bevaras från referensbilden.
+      </p>
+
+      <div className="space-y-2">
+        <Label className="text-xs">Referensbild</Label>
+        {layer.defaults.referenceImageUrl ? (
+          <div className="relative rounded-lg overflow-hidden border bg-muted aspect-square w-32">
+            <img
+              src={layer.defaults.referenceImageUrl}
+              alt="Referensbild"
+              className="w-full h-full object-cover"
+            />
+          </div>
+        ) : (
+          <div className="rounded-lg border border-dashed bg-muted/40 aspect-square w-32 flex items-center justify-center text-[10px] text-muted-foreground text-center px-2">
+            Ingen referensbild
+          </div>
+        )}
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={uploading}
+            onClick={() => inputRef.current?.click()}
+          >
+            {uploading ? (
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+            ) : (
+              <Upload className="h-3.5 w-3.5 mr-1.5" />
+            )}
+            {layer.defaults.referenceImageUrl ? "Byt referensbild" : "Ladda upp referensbild"}
+          </Button>
+          {layer.defaults.referenceImageUrl && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => updateDefaults({ referenceImageUrl: undefined })}
+            >
+              Ta bort
+            </Button>
+          )}
+        </div>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={(e) => onFile(e.target.files?.[0])}
+        />
+      </div>
+
+      <Field label="Form">
+        <Select
+          value={layer.defaults.shape}
+          onValueChange={(v) => updateDefaults({ shape: v as typeof layer.defaults.shape })}
+        >
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="rect">Rektangel</SelectItem>
+            <SelectItem value="circle">Cirkel</SelectItem>
+            <SelectItem value="heart">Hjärta</SelectItem>
+            <SelectItem value="star">Stjärna</SelectItem>
+          </SelectContent>
+        </Select>
+      </Field>
+      <Field label="Anpassning">
+        <Select
+          value={layer.defaults.fit}
+          onValueChange={(v) => updateDefaults({ fit: v as typeof layer.defaults.fit })}
+        >
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="cover">Fyll (cover)</SelectItem>
+            <SelectItem value="contain">Inrymd (contain)</SelectItem>
+          </SelectContent>
+        </Select>
+      </Field>
+
+      <Field label="Motiv">
+        <Select
+          value={layer.defaults.subjectKind}
+          onValueChange={(v) => {
+            const kind = v as AiPhotoSubjectKind;
+            // Auto-fyll prompten med default för det nya motivet — admin kan
+            // sedan redigera fritt.
+            updateDefaults({ subjectKind: kind, swapPrompt: defaultPromptFor(kind) });
+          }}
+        >
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="human">Människa</SelectItem>
+            <SelectItem value="cat">Katt</SelectItem>
+            <SelectItem value="dog">Hund</SelectItem>
+            <SelectItem value="other">Annat</SelectItem>
+          </SelectContent>
+        </Select>
+      </Field>
+
+      <Field label="Prompt (skickas till AI)">
+        <Textarea
+          rows={4}
+          value={layer.defaults.swapPrompt}
+          onChange={(e) => updateDefaults({ swapPrompt: e.target.value })}
+        />
+      </Field>
+      <p className="text-[11px] text-muted-foreground -mt-2">
+        Tips: var specifik om vad som ska bevaras (kläder, frisyr, miljö) för
+        att minska felkällor.
+      </p>
     </div>
   );
 }

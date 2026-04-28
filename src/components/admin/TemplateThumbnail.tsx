@@ -127,6 +127,27 @@ export default function TemplateThumbnail({ template, width = 120, height = 160 
             </div>
           );
         }
+        if (layer.type === "aiPhoto") {
+          const clipPath =
+            layer.defaults.shape === "circle" ? "circle(50% at 50% 50%)" : undefined;
+          const src = layer.defaults.referenceImageUrl;
+          return (
+            <div key={layer.id} style={{ ...style, overflow: "hidden", clipPath }}>
+              {src ? (
+                <img
+                  src={src}
+                  alt=""
+                  className={`w-full h-full ${
+                    layer.defaults.fit === "contain" ? "object-contain" : "object-cover"
+                  }`}
+                  draggable={false}
+                />
+              ) : (
+                <div className="w-full h-full bg-accent/40 border border-dashed border-primary/30" />
+              )}
+            </div>
+          );
+        }
         return null;
       })}
     </div>
