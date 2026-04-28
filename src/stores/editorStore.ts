@@ -242,6 +242,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   aiPrintFileUrl: null,
   shopifyVariantId: null,
   shopifyVariantResolving: false,
+  aiResultCache: loadAiCache(),
 
   // legacy mirrors (initial values, replaced once a config is loaded)
   mapCenter: [18.0686, 59.3293],
