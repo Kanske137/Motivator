@@ -509,10 +509,22 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
         {/* Visible front indicator (canvas wrap mode only) */}
         {isWrap && (
           <div
-            className="absolute pointer-events-none border-2 border-dashed border-foreground/40"
-            style={{ ...frontZoneStyle, zIndex: 9999 }}
+            className="absolute pointer-events-none border-2 border-dashed"
+            style={{
+              ...frontZoneStyle,
+              borderColor: "hsl(var(--primary))",
+              boxShadow: "0 0 0 1px hsl(var(--background) / 0.9), inset 0 0 0 1px hsl(var(--background) / 0.9)",
+              zIndex: 9999,
+            }}
           >
-            <span className="absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full bg-background/90 backdrop-blur-sm px-2 py-0.5 text-[10px] uppercase tracking-wider rounded text-foreground/70 whitespace-nowrap">
+            <span
+              className="absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full px-2 py-0.5 text-[10px] uppercase tracking-wider rounded whitespace-nowrap font-semibold shadow"
+              style={{
+                background: "hsl(var(--primary))",
+                color: "hsl(var(--primary-foreground))",
+                zIndex: 10000,
+              }}
+            >
               Synlig framsida · innehållet här viks om på sidorna
             </span>
           </div>

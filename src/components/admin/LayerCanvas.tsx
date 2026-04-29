@@ -216,12 +216,15 @@ export default function LayerCanvas({
           }}
         />
 
-        {/* Canvas wrap-zone visualisation: shaded bands + dashed front marker */}
+        {/* Canvas wrap-zone visualisation: shaded bands + dashed front marker.
+            Rendered with very high z-index so the dashed front-edge is ALWAYS
+            visible above any layer (map, image, margin) the admin places. */}
         {(wrapInsetPctX > 0 || wrapInsetPctY > 0) && (
           <>
             <div
               className="pointer-events-none absolute inset-0"
               style={{
+                zIndex: 9998,
                 background: `linear-gradient(hsl(var(--muted) / 0.55), hsl(var(--muted) / 0.55))`,
                 clipPath: `polygon(
                   0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%,
@@ -234,20 +237,26 @@ export default function LayerCanvas({
               }}
             />
             <div
-              className="pointer-events-none absolute border-2 border-dashed border-primary/70"
+              className="pointer-events-none absolute border-2 border-dashed"
               style={{
                 left: `${wrapInsetPctX * 100}%`,
                 top: `${wrapInsetPctY * 100}%`,
                 right: `${wrapInsetPctX * 100}%`,
                 bottom: `${wrapInsetPctY * 100}%`,
+                borderColor: "hsl(var(--primary))",
+                boxShadow: "0 0 0 1px hsl(var(--background) / 0.9), inset 0 0 0 1px hsl(var(--background) / 0.9)",
+                zIndex: 9999,
               }}
             />
             <div
-              className="pointer-events-none absolute text-[9px] font-medium text-primary uppercase tracking-wider bg-background/85 px-1.5 py-0.5 rounded"
+              className="pointer-events-none absolute text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded shadow"
               style={{
                 left: `${wrapInsetPctX * 100}%`,
                 top: `calc(${wrapInsetPctY * 100}% + 4px)`,
                 transform: "translateX(4px)",
+                background: "hsl(var(--primary))",
+                color: "hsl(var(--primary-foreground))",
+                zIndex: 10000,
               }}
             >
               Synlig framsida

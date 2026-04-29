@@ -1,44 +1,22 @@
-## Bakgrund
+## Problem
 
-Efter att canvasLayout (separat layout-block för canvas med full-area koordinater + wrap-zoner) införts i admin-designern är centrala pipelines redan korrekt uppdaterade — men flera ytor läser fortfarande från `defaultLayout` eller skickar inte med `productType`, vilket gör att canvas-mallar visas/printas fel utanför admin-designern.
+De streckade linjerna som markerar var fronten slutar och wrap/sidan börjar syns inte i praktiken på canvas-mallar — varken i admin-designern eller i kund-editorn. I admin-designern täcks markören av kart-/bildlager (markören saknar z-index, layer-Rnd har `zIndex: layer.zIndex + 1`). I kund-editorn finns markören med `zIndex: 9999` men kontrasten är så låg (`border-foreground/40`, ingen bakgrundsskugga) att den försvinner mot kartan.
 
-## Status — vad funkar redan
+Detta gäller endast designytorna — preview, thumbnails och tryckfil ska förbli orörda.
 
-- `template-snapshot.ts` (`renderTemplateSnapshot`) använder `getActiveLayoutBlock()` + `layersIncludeWrap`-logik
-- `print-pipeline.ts` plockar layers via `getActiveLayoutBlock()`
-- `MapPreview.tsx` (kund-editor) tar emot `layersIncludeWrap`
-- `EditorPage.tsx` skickar `layersIncludeWrap` till `MapPreview` och `productType` till `getPrintFileUrl`
+## Fix
 
-## Vad som måste fixas
+### 1. `src/components/admin/LayerCanvas.tsx`
+- Sätt `zIndex: 9998` på den skuggade wrap-bandet och `zIndex: 9999` på den streckade ramen så den ALLTID hamnar ovanpå alla layer-Rnd-element.
+- Byt rambygden till tydligare färg: `border-2 border-dashed` med `borderColor: hsl(var(--primary))` och en `boxShadow: 0 0 0 1px hsl(var(--background) / 0.9)` så den syns mot både ljus och mörk bakgrund (kartor m.m.).
+- Höj label "Synlig framsida" till `zIndex: 10000`, gör den till en solid primary-pill (`bg-primary text-primary-foreground`) så den läses tydligt.
 
-### 1. `MockupGallery.tsx` — saknar `productType`
-Anropet till `renderTemplateSnapshot` på rad 62 utelämnar `productType`, så canvas-mallar med `canvasLayout` får layern ritad mot fel anchorzone i den snapshot som används som textur i 3D-previewn.
-**Fix:** lägg till `productType: config.product_type` i input-objektet.
+### 2. `src/components/editor/MapPreview.tsx` (kund-editorn)
+- Behåll `zIndex: 9999` men gör den streckade fronten tydligare: `border-2 border-dashed` med `borderColor: hsl(var(--primary))` och samma `boxShadow` outline-trick.
+- Lyft labeln "Synlig framsida · innehållet här viks om på sidorna" till `zIndex: 10000` med solid primary-pill.
 
-### 2. `EditorPage.tsx` — hårdkodat wrap-djup
-`wrapCm: isCanvas ? 2 : 0` ignorerar kundens valda djup (variantens "2 cm"/"3 cm"/"4 cm"). Ska läsa djupet från `variant` på samma sätt som `MockupGallery` redan gör (`variant.match(/(\d+)/)`). Detta påverkar både print-fil och cart-thumbnail.
-**Fix:** beräkna `canvasDepthCm` från variant och använd istället för hårdkodad 2.
-
-### 3. `TemplateThumbnail.tsx` — admin-thumbnails på AdminConfigs
-Använder `template.defaultLayout.portrait`, så canvas-mallar visar poster-layouten i thumbnailen istället för canvasLayout med wrap-zoner.
-**Fix:** välj layout via `getActiveLayoutBlock(template, productType)`. Komponenten saknar idag `productType`, så ny prop läggs till och `AdminConfigs.tsx` skickar `c.product_type`. För canvas-thumbnails ritas dessutom en streckad ram som markerar synlig framsida (motsvarande `LayerCanvas`-overlayen, men i miniatyr).
-
-### 4. `AdminConfigs.tsx` — lager-räkning per kort
-Visar "X lager (stående)" från `defaultLayout.portrait.layers.length`. För canvas-konfigs ska den räkna `canvasLayout.portrait.layers.length`.
-**Fix:** välj rätt block via `getActiveLayoutBlock`.
-
-### 5. `FormatSection.tsx` — margin-detektering
-`hasMarginLayer` läser `template.defaultLayout?.[orientation]`. För canvas-produkter blir detektionen fel.
-**Fix:** använd `getActiveLayoutBlock(template, config.product_type)[orientation]`.
-
-## Filer som ändras
-
-- `src/components/editor/MockupGallery.tsx` — lägg till `productType` i snapshot-input
-- `src/pages/EditorPage.tsx` — använd kundvalt canvas-djup i `wrapCm`
-- `src/components/admin/TemplateThumbnail.tsx` — välj layout via helper, ny `productType`-prop, rita front-zon-markör för canvas
-- `src/pages/AdminConfigs.tsx` — skicka `product_type` till TemplateThumbnail + använd helper för lager-räkning
-- `src/components/editor/FormatSection.tsx` — använd helper för margin-detektering
+### Inga andra filer ändras
+Snapshot-/print-pipeline, thumbnails, mockups och 3D-preview ska inte få markören — de är redan korrekta.
 
 ## Resultat
-
-Efter denna pass går samma `canvasLayout` (med wrap-anchored koordinater och proportionell skalning vid djup-ändring) hela vägen från admin-designern → admin-thumbnail → kund-editor (2D-preview) → 3D-mockup → cart-thumbnail → print-fil. Inga ytor läser längre `defaultLayout` när produkten är canvas.
+Den streckade ramen som visar gränsen mellan synlig front och wrap-zon är alltid synlig ovanpå alla lager i både admin-designern och kund-editorn på canvas-mallar.
