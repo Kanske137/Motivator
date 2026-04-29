@@ -1,85 +1,55 @@
-# Plan: Förfinad karttext-länkning + utbyggd typsnittshantering
+# Plan: Move-handle position + "fyll-hela-lagret"-form för kartor och foton
 
-## 1. Per-fält val för länkad karttext
+## 1. Flytta handtaget till övre vänstra utsidan av lagerinnehållet
 
-Idag, när en text-layer länkas till en karta, sätts hela texten till tre rader (STAD, LAND, koordinater). Vi gör det möjligt att per text-layer välja vilka av dessa rader som ska inkluderas.
+Idag sitter `moveHandle` på `top-2 left-2` (inuti lagret), vilket överlappar innehållet — speciellt på små lager och vid clip-shapes (cirkel/heart/star) där hörnet ändå är "tomt" men på rect/foto syns det överlappa.
 
-### Schema (`src/lib/template-schema.ts`)
-Lägg till på `textDefaultsSchema`:
-```ts
-linkedMapFields: z.object({
-  city: z.boolean().default(true),
-  country: z.boolean().default(true),
-  coordinates: z.boolean().default(true),
-}).optional(),
-```
-Optional för bakåtkompabilitet — saknas fältet behandlas det som "alla tre på" (nuvarande beteende).
+**Lösning:** Flytta handtaget till `top: -14px; left: -14px` (alltså strax utanför övre vänstra kanten av lagrets bounding box). Eftersom lagrets wrapper i `MapPreview` är `position: absolute` inom posterramen, kommer handtaget att ligga utanför bounding boxen men fortfarande renderas (parent har inte `overflow: hidden`).
 
-### Admin UI (`src/components/admin/LayerInspector.tsx`)
-Direkt under "Länka till karta"-selecten, när `linkedMapLayerId` är satt: visa tre `Checkbox`-rader:
-- [x] Stad / ort
-- [x] Land
-- [x] Koordinater
+Säkerställ att:
+- `z-index` är högt nog att alltid synas ovanpå andra lager (`z-50` eller motsvarande inline `zIndex: 9998`).
+- Handtaget får inte clippas av layer-wrapperns clip-path. Handtaget ligger redan **utanför** clip-content (det är ett separat absolut element i wrappern, inte inuti `PhotoLayerView`/`MapLayerSlot`s clippade div), så det är säkert.
+- Specialhantering för text-lager: handtaget renderas idag *inuti* text-divens flex-layout (i `<span>`-grannskap). Vi flyttar det utanför så att det inte påverkar centrerings­layouten.
 
-Uppdaterar `linkedMapFields` via `updateDefaults`.
+**Filer att ändra:** `src/components/editor/MapPreview.tsx` — exakt ett ställe där `moveHandle` definieras (raderna ~282-292), samt text-lagrets render där handtaget ska bli ett syskon till text-wrappern istället för ett barn.
 
-### Auto-text-generering
-`buildAutoText` finns på två ställen — refaktorera till att ta ett valfritt `fields`-objekt:
+## 2. Ny "Fyll lager"-form (rect) för kartor och foton
 
-- `src/stores/editorStore.ts` (rad ~230 och ~790): `applyPlaceInternal` läser layerns `linkedMapFields` och skickar till `buildAutoText`.
-- `src/lib/template-migrate.ts` (rad ~232 och ~252): samma sak när texten initialiseras från admin-default place.
+### Schema-ändringar (`src/lib/template-schema.ts`)
 
-`buildAutoText(args, fields)` filtrerar bort de rader vars flagga är `false`. Saknas `fields` → alla tre med (oförändrat beteende).
+- **`mapShapeSchema`**: Lägg till `"rect"` → `z.enum(["rect", "circle", "heart", "star"])`.
+- **`photoShapeSchema`**: Redan inkluderar `"rect"` — inget att göra här.
+- Migrationsvänligt: nya kartor får default `"circle"` så befintliga templates förblir oförändrade.
 
-## 2. Utbyggd typsnittskatalog + per-template låsning av kundval
+### Admin-inspector (`src/components/admin/LayerInspector.tsx`)
 
-### Ny fontkatalog (`src/lib/font-catalog.ts` — ny fil)
-Definierar ~25-30 kuraterade Google Fonts grupperade i kategorier (Sans, Serif, Display, Script, Mono). Varje post: `{ family, category, googleSpec }`.
+I de två map/photo shape-`Select`-fälten lägg till option:
+- Karta: `<SelectItem value="rect">Fyll lager (rektangel)</SelectItem>`
+- Foto/aiPhoto: redan har "rect"-option (verifiera).
 
-Exempel (urval): Inter, Roboto, Open Sans, Montserrat, Poppins, Lato, Nunito, Work Sans, DM Sans, Manrope · Playfair Display, Cormorant Garamond, Lora, Merriweather, EB Garamond, Crimson Text, Libre Baskerville · Bebas Neue, Oswald, Abril Fatface, Archivo Black, Anton · Dancing Script, Great Vibes, Pacifico, Caveat, Sacramento · JetBrains Mono.
+### Customer-render (`src/components/editor/MapPreview.tsx`)
 
-Genererar också en `GOOGLE_FONTS_HREF` med alla familjer i en `fonts.googleapis.com/css2`-URL.
+**Karta:**
+- I `shapeClipPath()`: `case "rect": return undefined;` (ingen clip → fyller hela bounding box).
+- I `MapLayerSlot`: `isCircle` används bara för att räkna ut perfekt cirkel-clip. För `"rect"` skickas `staticClip = undefined` → kartan renderas som rektangel som fyller hela layer-rect. Inget annat krävs eftersom `MapLayerInstance` redan tar hela `inset-0`.
 
-### Font-loading (`index.html`)
-Ersätt nuvarande hårdkodade `<link href="...family=Cormorant+Garamond&family=Inter...">` med en `<link>` mot hela katalogen. Alternativt lazy-load via en liten effekt i `App.tsx` som injicerar samma URL — vi väljer hårdkodad i `index.html` för enkelhet och cachning.
+**Foto / AI-foto:**
+- `shape === "rect"` → `shapeClipPath` returnerar `undefined`. `PhotoLayerView` har redan exakt rätt logik: när `shape !== "circle"` och `staticClipPath === undefined` får `clipPath = undefined` → bilden fyller hela bounding box.
+- Pan-logiken (cover-mode med `offsetX/Y`) fungerar **redan** för `rect` — `canPan` styrs av `fit !== "contain"` och `maxX/maxY > 0`, helt oberoende av shape. Inget behöver ändras där.
 
-### Admin: typsnittsväljare visad i typsnittet (`LayerInspector.tsx`)
-- Ersätt `config.text_config.fonts` som källa med `FONT_CATALOG`.
-- Varje `<SelectItem>` sätter `style={{ fontFamily: f.family }}` så namnet renderas i sitt eget typsnitt.
-- Gruppera per kategori med `SelectGroup`/`SelectLabel` för läsbarhet.
+### Print-pipeline & snapshot
 
-### Admin: välj vilka typsnitt kunden får använda
-Ny sektion i `ProductOptionsSection.tsx` (visas på Designer-sidan): "Tillåtna typsnitt för kunden". Multi-select-popover med checkboxes över hela `FONT_CATALOG`, namn renderade i eget typsnitt.
+Verifiera att `template-snapshot.ts` och `print-pipeline.ts` hanterar `rect` korrekt (= ingen clip). Eftersom de flesta render-paths redan defaultar till "ingen clip" vid okänd/saknad shape förväntas inga ändringar, men jag granskar och uppdaterar vid behov.
 
-Lagras i `template.productOptions.allowedFonts: string[]` (ny optional zod-array; tom/utelämnad → kunden får hela katalogen så befintliga mallar inte går sönder).
+### Migration
 
-### Schema-tillägg
-I `productOptionsSchema`:
-```ts
-allowedFonts: z.array(z.string()).optional(),
-```
-
-### Kundeditor (`src/components/editor/ControlPanel.tsx` rad ~506-524)
-- Läs `template.productOptions.allowedFonts ?? FONT_CATALOG.map(f => f.family)` istället för `config.text_config.fonts`.
-- Knapparna får `style={{ fontFamily: f }}` (redan idag), oförändrat — så kunden ser typsnittet.
-
-### Bakåtkompabilitet
-- `text_config.fonts` (legacy) lämnas orört i DB; vi slutar bara läsa det. Ingen migration krävs.
-- Befintliga mallar utan `allowedFonts` → hela katalogen tillgänglig (rimligt default; admin kan strama åt).
+Ingen DB-migration krävs. Befintliga template-JSONs har redan `"circle"|"heart"|"star"` för kartor — schemat utvidgas bakåtkompatibelt.
 
 ## Filer som ändras
-- `src/lib/template-schema.ts` — `linkedMapFields`, `allowedFonts`
-- `src/lib/font-catalog.ts` — ny
-- `index.html` — utökad Google Fonts-länk
-- `src/components/admin/LayerInspector.tsx` — checkboxes för länkfält + ny font-dropdown med previews
-- `src/components/admin/ProductOptionsSection.tsx` — välj tillåtna typsnitt
-- `src/components/editor/ControlPanel.tsx` — använd `allowedFonts`
-- `src/stores/editorStore.ts` — `buildAutoText` respekterar `linkedMapFields`
-- `src/lib/template-migrate.ts` — samma
 
-## Att verifiera efter implementation
-1. Befintlig mall med länkad text fortsätter visa STAD/LAND/KOORDINATER.
-2. Avbocka "Land" → bara stad + koordinater i texten, kunden ser uppdateringen vid nytt platsval.
-3. Admin-dropdownen visar varje typsnittsnamn renderat i sitt typsnitt.
-4. Om admin tillåter t.ex. bara Inter + Playfair → kunden ser bara dessa två i sin typsnittsväljare.
-5. Mall utan `allowedFonts`-config → kunden ser alla typsnitt.
+- `src/lib/template-schema.ts` — utvidga `mapShapeSchema`.
+- `src/components/admin/LayerInspector.tsx` — lägg till "rect"-option för karta.
+- `src/components/editor/MapPreview.tsx` — flytta moveHandle utanför + hantera `rect` i `shapeClipPath`.
+- `src/lib/template-snapshot.ts` & `supabase/functions/generate-print-file/index.ts` — verifiera/uppdatera vid behov.
+
+Resultat: Handtaget sitter konsekvent precis utanför övre vänstra hörnet på alla lagertyper, och både kartor och foton kan väljas att fylla hela lagret rektangulärt — foton behåller pan/zoom-stödet.
