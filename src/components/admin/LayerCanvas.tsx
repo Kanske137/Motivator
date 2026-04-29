@@ -55,6 +55,8 @@ export default function LayerCanvas({
   selectedId,
   onSelect,
   onChange,
+  wrapInsetPctX = 0,
+  wrapInsetPctY = 0,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
