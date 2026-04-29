@@ -301,6 +301,9 @@ export const productOptionsSchema = z.object({
   /** Per-template enabled map styles. When missing the editor falls back to
    *  the legacy `config.map_styles` column, then to the full catalog. */
   mapStyles: z.array(mapStylePresetSchema).optional(),
+  /** Font families the customer is allowed to choose from in the editor.
+   *  When missing/empty the customer sees the full FONT_CATALOG. */
+  allowedFonts: z.array(z.string()).optional(),
 });
 export type ProductOptions = z.infer<typeof productOptionsSchema>;
 
