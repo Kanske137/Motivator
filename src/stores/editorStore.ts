@@ -25,7 +25,7 @@ interface ApplyPlaceArgs {
   country?: string;
 }
 
-export type MapShape = "circle" | "heart" | "star";
+export type MapShape = "rect" | "circle" | "heart" | "star";
 
 export interface MapLayerValue {
   kind: "map";

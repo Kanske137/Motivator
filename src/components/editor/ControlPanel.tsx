@@ -396,6 +396,7 @@ function MapStyleLayerSection({
   );
 
   const shapeOptions = ([
+    { id: "rect", label: "Ingen", Icon: Square },
     { id: "circle", label: "Cirkel", Icon: Circle },
     { id: "heart", label: "Hjärta", Icon: Heart },
     { id: "star", label: "Stjärna", Icon: Star },
@@ -545,7 +546,7 @@ function PhotoShapeSection({
   const setLayerPhotoShape = useEditorStore((s) => s.setLayerPhotoShape);
   const shape = value?.shape ?? layer.defaults.shape;
   const options = [
-    { id: "rect", label: "Rektangel", Icon: Square },
+    { id: "rect", label: "Ingen", Icon: Square },
     { id: "circle", label: "Cirkel", Icon: Circle },
     { id: "heart", label: "Hjärta", Icon: Heart },
     { id: "star", label: "Stjärna", Icon: Star },
