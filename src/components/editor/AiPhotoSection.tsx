@@ -185,6 +185,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
           return;
         }
       }
+      setStage("Laddar upp din bild…");
       const faceImageUrl = await ensureUploadedUrl();
       if (!faceImageUrl) return;
       const designId = `swap-${(crypto as { randomUUID?: () => string }).randomUUID?.() ?? Date.now()}`;
