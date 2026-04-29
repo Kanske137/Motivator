@@ -223,22 +223,22 @@ async function runReplicateFaceSwap(params: {
 // Sends one user message with `promptText` plus an arbitrary number of input
 // images. Returns either the decoded image bytes or a Response wrapping a
 // friendly error.
-async function callNanoBanana(params: {
+//
+// Resilience: the underlying Google Vertex pool for Nano Banana 2 frequently
+// returns transient 429 (Resource Exhausted) when several requests land within
+// a few seconds, and the model occasionally responds with text instead of an
+// image. We auto-retry the EXACT same payload up to 2 times with exponential
+// backoff (4s, 8s) so the customer doesn't have to manually re-trigger the
+// generation. The payload itself (prompt, modalities, model, images) is never
+// changed — output bytes are identical to a single-shot call when it succeeds.
+async function callNanoBananaOnce(params: {
   promptText: string;
   imageUrls: string[];
-}): Promise<{ ok: true; bytes: Uint8Array; contentType: string; outputUrl: string }
-  | { ok: false; response: Response }> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) {
-    return {
-      ok: false,
-      response: fallbackResponse(
-        "Tjänsten är tillfälligt otillgänglig. Försök igen senare.",
-        "LOVABLE_API_KEY not configured",
-      ),
-    };
-  }
-
+  apiKey: string;
+}): Promise<
+  | { ok: true; bytes: Uint8Array; contentType: string; outputUrl: string }
+  | { ok: false; retriable: boolean; status: number; reason: string; userMessage: string }
+> {
   const content: Array<Record<string, unknown>> = [
     { type: "text", text: params.promptText },
   ];
@@ -249,7 +249,7 @@ async function callNanoBanana(params: {
   const aiRes = await fetch(AI_GATEWAY_URL, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      Authorization: `Bearer ${params.apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -265,27 +265,30 @@ async function callNanoBanana(params: {
     if (aiRes.status === 429) {
       return {
         ok: false,
-        response: fallbackResponse(
-          "Vi har för många AI-förfrågningar just nu. Vänta en liten stund och försök igen.",
-          "Lovable AI rate-limited (429)",
-        ),
+        retriable: true,
+        status: 429,
+        reason: "Lovable AI rate-limited (429)",
+        userMessage:
+          "AI-tjänsten är överbelastad just nu. Vänta 10–15 sekunder och försök igen.",
       };
     }
     if (aiRes.status === 402) {
       return {
         ok: false,
-        response: fallbackResponse(
-          "AI-krediten är slut. Kontakta supporten så löser vi det.",
-          "Lovable AI payment required (402)",
-        ),
+        retriable: false,
+        status: 402,
+        reason: "Lovable AI payment required (402)",
+        userMessage: "AI-krediten är slut. Kontakta supporten så löser vi det.",
       };
     }
+    // 5xx are likely transient as well — retry. 4xx (except handled above) are not.
+    const retriable = aiRes.status >= 500;
     return {
       ok: false,
-      response: fallbackResponse(
-        "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
-        `AI gateway error ${aiRes.status}: ${errBody.slice(0, 200)}`,
-      ),
+      retriable,
+      status: aiRes.status,
+      reason: `AI gateway error ${aiRes.status}: ${errBody.slice(0, 200)}`,
+      userMessage: "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
     };
   }
 
@@ -310,10 +313,11 @@ async function callNanoBanana(params: {
     console.error("[face-swap] AI returned no image", JSON.stringify(data).slice(0, 500));
     return {
       ok: false,
-      response: fallbackResponse(
-        "AI-modellen returnerade ingen bild. Prova att skapa igen.",
-        "AI gateway response missing image",
-      ),
+      retriable: true,
+      status: 200,
+      reason: "AI gateway response missing image",
+      userMessage:
+        "AI-modellen returnerade ingen bild den här gången. Försök igen.",
     };
   }
 
@@ -328,10 +332,10 @@ async function callNanoBanana(params: {
     if (!r.ok) {
       return {
         ok: false,
-        response: fallbackResponse(
-          "Vi kunde inte hämta den genererade bilden. Försök igen.",
-          `AI image fetch failed ${r.status}`,
-        ),
+        retriable: r.status >= 500,
+        status: r.status,
+        reason: `AI image fetch failed ${r.status}`,
+        userMessage: "Vi kunde inte hämta den genererade bilden. Försök igen.",
       };
     }
     bytes = new Uint8Array(await r.arrayBuffer());
@@ -343,6 +347,70 @@ async function callNanoBanana(params: {
     bytes,
     contentType,
     outputUrl: imageUrl.startsWith("data:") ? "(inline base64)" : imageUrl,
+  };
+}
+
+async function callNanoBanana(params: {
+  promptText: string;
+  imageUrls: string[];
+}): Promise<{ ok: true; bytes: Uint8Array; contentType: string; outputUrl: string }
+  | { ok: false; response: Response }> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Tjänsten är tillfälligt otillgänglig. Försök igen senare.",
+        "LOVABLE_API_KEY not configured",
+      ),
+    };
+  }
+
+  // Backoff schedule between retries (ms). Total worst-case extra latency: 12s.
+  const BACKOFF_MS = [4000, 8000];
+  const MAX_ATTEMPTS = BACKOFF_MS.length + 1; // 1 initial + 2 retries
+
+  let lastFail:
+    | { reason: string; userMessage: string; status: number }
+    | null = null;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const result = await callNanoBananaOnce({
+      promptText: params.promptText,
+      imageUrls: params.imageUrls,
+      apiKey: LOVABLE_API_KEY,
+    });
+
+    if (result.ok) {
+      if (attempt > 1) {
+        console.log(`[face-swap] succeeded on retry attempt ${attempt}/${MAX_ATTEMPTS}`);
+      }
+      return result;
+    }
+
+    lastFail = {
+      reason: result.reason,
+      userMessage: result.userMessage,
+      status: result.status,
+    };
+
+    if (!result.retriable || attempt === MAX_ATTEMPTS) break;
+
+    const wait = BACKOFF_MS[attempt - 1];
+    console.log(
+      `[face-swap] retriable failure (${result.reason}) — backing off ${wait}ms ` +
+        `before attempt ${attempt + 1}/${MAX_ATTEMPTS}`,
+    );
+    await new Promise((r) => setTimeout(r, wait));
+  }
+
+  return {
+    ok: false,
+    response: fallbackResponse(
+      lastFail?.userMessage ??
+        "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
+      `${lastFail?.reason ?? "unknown"} (after ${MAX_ATTEMPTS} attempts)`,
+    ),
   };
 }
 
