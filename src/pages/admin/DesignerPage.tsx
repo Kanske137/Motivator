@@ -593,13 +593,7 @@ export default function DesignerPage() {
                 <input
                   type="color"
                   value={layout.background.color}
-                  onChange={(e) => commitTemplate({
-                    ...template,
-                    defaultLayout: {
-                      ...template.defaultLayout,
-                      [orientation]: { ...layout, background: { color: e.target.value } },
-                    },
-                  })}
+                  onChange={(e) => setLayoutBackground(e.target.value)}
                   className="absolute inset-0 opacity-0 cursor-pointer"
                 />
                 <span className="text-[10px] text-muted-foreground">+</span>
