@@ -1,45 +1,85 @@
-## Problem
+# Plan: Förfinad karttext-länkning + utbyggd typsnittshantering
 
-Två separata problem efter den senaste contain-fixen:
+## 1. Per-fält val för länkad karttext
 
-### Problem 1 — Motivet blir för litet i lagret
+Idag, när en text-layer länkas till en karta, sätts hela texten till tre rader (STAD, LAND, koordinater). Vi gör det möjligt att per text-layer välja vilka av dessa rader som ska inkluderas.
 
-`object-contain` skalar bilden så att hela bilden får plats i lagret. Men prompten (`fadeInstruction`) säger redan åt Nano Banana att lämna 15-20% pure-white "safe area" runt motivet inuti den genererade bilden. När bilden sen renderas med `contain` får vi:
+### Schema (`src/lib/template-schema.ts`)
+Lägg till på `textDefaultsSchema`:
+```ts
+linkedMapFields: z.object({
+  city: z.boolean().default(true),
+  country: z.boolean().default(true),
+  coordinates: z.boolean().default(true),
+}).optional(),
+```
+Optional för bakåtkompabilitet — saknas fältet behandlas det som "alla tre på" (nuvarande beteende).
 
-- Modellens egna 15-20% vita padding runt motivet
-- Ev. extra padding pga aspect-mismatch mellan output och lager
+### Admin UI (`src/components/admin/LayerInspector.tsx`)
+Direkt under "Länka till karta"-selecten, när `linkedMapLayerId` är satt: visa tre `Checkbox`-rader:
+- [x] Stad / ort
+- [x] Land
+- [x] Koordinater
 
-→ Motivet hamnar på ~50-60% av lagrets yta, känns litet och "fördränkt" i vitt, även om kunden drar storleken till max tillåtna.
+Uppdaterar `linkedMapFields` via `updateDefaults`.
 
-### Problem 2 — Lagret kan inte flyttas / fyller hela editorn
+### Auto-text-generering
+`buildAutoText` finns på två ställen — refaktorera till att ta ett valfritt `fields`-objekt:
 
-När AI-lagret är stort (eller satt till nära 100% i mallen) hamnar move-handle (`-top-3 -left-3`) utanför den synliga ramen (negativ offset från lagrets övre vänstra hörn → utanför poster-frame). Användaren ser då ingen handtagsknapp och kan inte dra lagret. Den vita PNG:n från modellen täcker visuellt hela editorn så det går inte heller att hitta något annat att klicka på.
+- `src/stores/editorStore.ts` (rad ~230 och ~790): `applyPlaceInternal` läser layerns `linkedMapFields` och skickar till `buildAutoText`.
+- `src/lib/template-migrate.ts` (rad ~232 och ~252): samma sak när texten initialiseras från admin-default place.
 
-## Lösning
+`buildAutoText(args, fields)` filtrerar bort de rader vars flagga är `false`. Saknas `fields` → alla tre med (oförändrat beteende).
 
-### Fix 1 — Ta bort den interna paddingen i AI-bilden
+## 2. Utbyggd typsnittskatalog + per-template låsning av kundval
 
-I `supabase/functions/replicate-face-swap/index.ts`, `runRemoveBackground`:
+### Ny fontkatalog (`src/lib/font-catalog.ts` — ny fil)
+Definierar ~25-30 kuraterade Google Fonts grupperade i kategorier (Sans, Serif, Display, Script, Mono). Varje post: `{ family, category, googleSpec }`.
 
-- **`fadeInstruction`** (båda varianterna): ta bort kravet på "outermost ~15-20% must be pure white" / "subject must sit inside this safe area". Behåll kravet på MJUK FEATHER på alla fyra kanter (soft fade, no sharp cut-out), men låt motivet faktiskt fylla bildytan så långt det går — bara den allra yttersta 1-3 pixelraden ska vara ren vit för en sömlös övergång till sidans bakgrund.
-- **`aspectInstruction`**: behåll kravet att motivet ska få plats utan att skäras, men säg uttryckligen att modellen ska skala upp motivet så stort den kan inom output-frame medan den behåller liten feather-marginal — INTE lämna stora vita ytor om motivet inte har den exakta aspect-ration.
-- **`edgeInstruction`**: behåll mjuk symmetrisk fade på alla fyra sidor (det är fortfarande viktigt) men gör det tydligt att fade ska vara en *kant-effekt på motivet*, inte en stor vit ram.
+Exempel (urval): Inter, Roboto, Open Sans, Montserrat, Poppins, Lato, Nunito, Work Sans, DM Sans, Manrope · Playfair Display, Cormorant Garamond, Lora, Merriweather, EB Garamond, Crimson Text, Libre Baskerville · Bebas Neue, Oswald, Abril Fatface, Archivo Black, Anton · Dancing Script, Great Vibes, Pacifico, Caveat, Sacramento · JetBrains Mono.
 
-Resultatet: bilden från Nano Banana är ~95% motiv + 5% mjuk feather, och `contain` i lagret ger ett motiv som faktiskt fyller lagret istället för att flyta i mitten.
+Genererar också en `GOOGLE_FONTS_HREF` med alla familjer i en `fonts.googleapis.com/css2`-URL.
 
-### Fix 2 — Move-handle som alltid är synlig och nåbar
+### Font-loading (`index.html`)
+Ersätt nuvarande hårdkodade `<link href="...family=Cormorant+Garamond&family=Inter...">` med en `<link>` mot hela katalogen. Alternativt lazy-load via en liten effekt i `App.tsx` som injicerar samma URL — vi väljer hårdkodad i `index.html` för enkelhet och cachning.
 
-I `src/components/editor/MapPreview.tsx` (raderna 282-292, `moveHandle`):
+### Admin: typsnittsväljare visad i typsnittet (`LayerInspector.tsx`)
+- Ersätt `config.text_config.fonts` som källa med `FONT_CATALOG`.
+- Varje `<SelectItem>` sätter `style={{ fontFamily: f.family }}` så namnet renderas i sitt eget typsnitt.
+- Gruppera per kategori med `SelectGroup`/`SelectLabel` för läsbarhet.
 
-- Ändra position från `-top-3 -left-3` (utanför lagret) till `top-2 left-2` (inuti lagret, övre vänstra hörnet, alltid synligt oavsett lagrets storlek).
-- Behåll storlek/styling så det syns tydligt mot AI-bilden — lägg till lite extra opacity/skugga om det behövs för kontrast mot vitt motiv.
-- Detta gäller alla movable layers (map, photo, aiPhoto, text, image), så fördelen sträcker sig längre än bara AI-fixen.
+### Admin: välj vilka typsnitt kunden får använda
+Ny sektion i `ProductOptionsSection.tsx` (visas på Designer-sidan): "Tillåtna typsnitt för kunden". Multi-select-popover med checkboxes över hela `FONT_CATALOG`, namn renderade i eget typsnitt.
 
-Alternativ-flex: överväg att även justera resize-handles om de också hamnar utanför, men move-handle är prio.
+Lagras i `template.productOptions.allowedFonts: string[]` (ny optional zod-array; tom/utelämnad → kunden får hela katalogen så befintliga mallar inte går sönder).
+
+### Schema-tillägg
+I `productOptionsSchema`:
+```ts
+allowedFonts: z.array(z.string()).optional(),
+```
+
+### Kundeditor (`src/components/editor/ControlPanel.tsx` rad ~506-524)
+- Läs `template.productOptions.allowedFonts ?? FONT_CATALOG.map(f => f.family)` istället för `config.text_config.fonts`.
+- Knapparna får `style={{ fontFamily: f }}` (redan idag), oförändrat — så kunden ser typsnittet.
+
+### Bakåtkompabilitet
+- `text_config.fonts` (legacy) lämnas orört i DB; vi slutar bara läsa det. Ingen migration krävs.
+- Befintliga mallar utan `allowedFonts` → hela katalogen tillgänglig (rimligt default; admin kan strama åt).
 
 ## Filer som ändras
+- `src/lib/template-schema.ts` — `linkedMapFields`, `allowedFonts`
+- `src/lib/font-catalog.ts` — ny
+- `index.html` — utökad Google Fonts-länk
+- `src/components/admin/LayerInspector.tsx` — checkboxes för länkfält + ny font-dropdown med previews
+- `src/components/admin/ProductOptionsSection.tsx` — välj tillåtna typsnitt
+- `src/components/editor/ControlPanel.tsx` — använd `allowedFonts`
+- `src/stores/editorStore.ts` — `buildAutoText` respekterar `linkedMapFields`
+- `src/lib/template-migrate.ts` — samma
 
-- `supabase/functions/replicate-face-swap/index.ts` — slimma `fadeInstruction` + `aspectInstruction` så motivet fyller bildytan
-- `src/components/editor/MapPreview.tsx` — flytta move-handle till `top-2 left-2` (inuti lagret)
-
-Inga schema- eller andra UI-ändringar.
+## Att verifiera efter implementation
+1. Befintlig mall med länkad text fortsätter visa STAD/LAND/KOORDINATER.
+2. Avbocka "Land" → bara stad + koordinater i texten, kunden ser uppdateringen vid nytt platsval.
+3. Admin-dropdownen visar varje typsnittsnamn renderat i sitt typsnitt.
+4. Om admin tillåter t.ex. bara Inter + Playfair → kunden ser bara dessa två i sin typsnittsväljare.
+5. Mall utan `allowedFonts`-config → kunden ser alla typsnitt.

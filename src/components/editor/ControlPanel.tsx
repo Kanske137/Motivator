@@ -13,6 +13,7 @@ import { Slider } from "@/components/ui/slider";
 import { Circle, Heart, Star, Square, RotateCcw } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useEditorStore, type MapLayerValue, type TextLayerValue, type PhotoLayerValue, type PhotoShape } from "@/stores/editorStore";
+import { FONT_FAMILIES } from "@/lib/font-catalog";
 import { geocode, type GeocodeResult } from "@/lib/mapbox";
 import { type ProductConfig } from "@/lib/product-config";
 import { getEnabledMapStyleIds, mapStyleLabel, mapStylePreviewBg } from "@/lib/map-style-catalog";
@@ -476,9 +477,14 @@ function TextLayerSection({
   const setLayerText = useEditorStore((s) => s.setLayerText);
   const setLayerTextFont = useEditorStore((s) => s.setLayerTextFont);
   const setLayerTextVisible = useEditorStore((s) => s.setLayerTextVisible);
+  const productOptions = useEditorStore((s) => s.productOptions);
   const text = value?.text ?? layer.defaults.text;
   const font = value?.font ?? layer.defaults.font;
   const visible = value?.visible ?? true;
+  const allowedFonts =
+    productOptions?.allowedFonts && productOptions.allowedFonts.length > 0
+      ? productOptions.allowedFonts
+      : FONT_FAMILIES;
 
   return (
     <div className="space-y-3">
@@ -507,13 +513,13 @@ function TextLayerSection({
         <div className="space-y-2">
           <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Typsnitt</Label>
           <div className="grid grid-cols-3 gap-2">
-            {config.text_config.fonts.map((f) => (
+            {allowedFonts.map((f) => (
               <Button
                 key={f}
                 size="sm"
                 variant={f === font ? "default" : "outline"}
                 onClick={() => setLayerTextFont(layer.id, f)}
-                style={{ fontFamily: f }}
+                style={{ fontFamily: `"${f}", system-ui, sans-serif` }}
                 className="text-xs rounded-full"
               >
                 {f.split(" ")[0]}

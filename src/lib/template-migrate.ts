@@ -223,17 +223,26 @@ export function resolveTemplate(
 // ---------- helpers exported for admin Designer ----------
 
 /** Build the auto-text customer runtime uses for a place. */
-export function buildPlaceText(args: {
-  placeName?: string;
-  city?: string;
-  country?: string;
-  center?: [number, number];
-}): string {
-  const cityLine = (args.city ?? args.placeName?.split(",")[0] ?? "").trim().toUpperCase();
-  const countryLine = args.country?.trim() ?? "";
-  const coordLine = args.center
-    ? `${args.center[1].toFixed(4)}°N · ${args.center[0].toFixed(4)}°E`
+export function buildPlaceText(
+  args: {
+    placeName?: string;
+    city?: string;
+    country?: string;
+    center?: [number, number];
+  },
+  fields?: { city?: boolean; country?: boolean; coordinates?: boolean },
+): string {
+  const showCity = fields?.city ?? true;
+  const showCountry = fields?.country ?? true;
+  const showCoords = fields?.coordinates ?? true;
+  const cityLine = showCity
+    ? (args.city ?? args.placeName?.split(",")[0] ?? "").trim().toUpperCase()
     : "";
+  const countryLine = showCountry ? (args.country?.trim() ?? "") : "";
+  const coordLine =
+    showCoords && args.center
+      ? `${args.center[1].toFixed(4)}°N · ${args.center[0].toFixed(4)}°E`
+      : "";
   return [cityLine, countryLine, coordLine].filter(Boolean).join("\n");
 }
 
@@ -246,10 +255,10 @@ export function applyAdminPlaceToLinkedTexts(
   mapId: string,
   place: { placeName?: string; city?: string; country?: string; center: [number, number] },
 ): TemplateLayer[] {
-  const text = buildPlaceText(place);
   return layers.map((l) => {
     if (l.type !== "text") return l;
     if (l.defaults.linkedMapLayerId !== mapId) return l;
+    const text = buildPlaceText(place, l.defaults.linkedMapFields);
     return { ...l, defaults: { ...l.defaults, text } };
   });
 }

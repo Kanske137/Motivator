@@ -135,6 +135,15 @@ export const textDefaultsSchema = z.object({
   // referenced map layer (city/country/coords). Customer manual edits override
   // the auto-text until the field is cleared.
   linkedMapLayerId: z.string().nullable().optional(),
+  // Which place-derived rows are included when the text is linked to a map.
+  // Optional — when missing all three fields are included (legacy behaviour).
+  linkedMapFields: z
+    .object({
+      city: z.boolean().default(true),
+      country: z.boolean().default(true),
+      coordinates: z.boolean().default(true),
+    })
+    .optional(),
 });
 export type TextDefaults = z.infer<typeof textDefaultsSchema>;
 
@@ -292,6 +301,9 @@ export const productOptionsSchema = z.object({
   /** Per-template enabled map styles. When missing the editor falls back to
    *  the legacy `config.map_styles` column, then to the full catalog. */
   mapStyles: z.array(mapStylePresetSchema).optional(),
+  /** Font families the customer is allowed to choose from in the editor.
+   *  When missing/empty the customer sees the full FONT_CATALOG. */
+  allowedFonts: z.array(z.string()).optional(),
 });
 export type ProductOptions = z.infer<typeof productOptionsSchema>;
 
