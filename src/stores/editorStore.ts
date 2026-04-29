@@ -711,9 +711,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     return config?.layouts[orientation] ?? null;
   },
   templateLayers: () => {
-    const { template, orientation } = get();
+    const { template, orientation, config } = get();
     if (!template) return [];
-    return [...template.defaultLayout[orientation].layers].sort((a, b) => a.zIndex - b.zIndex);
+    return [...getActiveLayoutBlock(template, config?.product_type)[orientation].layers].sort((a, b) => a.zIndex - b.zIndex);
   },
   firstMapLayerId: () => {
     const layers = get().templateLayers();
