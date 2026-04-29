@@ -35,7 +35,7 @@ export interface TemplateSnapshotInput {
   liveMapCenter: [number, number];
   liveMapZoom: number;
   liveMapStyleId: string;
-  liveMapShape: "circle" | "heart" | "star";
+  liveMapShape: "rect" | "circle" | "heart" | "star";
   liveShowLabels: boolean;
   liveText: string;
   liveTextFont: string;
