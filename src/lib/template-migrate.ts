@@ -89,33 +89,41 @@ function migrateLayer(layer: TemplateLayer): TemplateLayer {
 function coerceLegacyRaw(raw: unknown): unknown {
   if (!raw || typeof raw !== "object") return raw;
   const orients = ["portrait", "landscape"] as const;
-  const root = raw as { defaultLayout?: Record<string, { layers?: Array<Record<string, unknown>> }> };
-  for (const o of orients) {
-    const layout = root?.defaultLayout?.[o];
-    if (!layout?.layers) continue;
-    for (const l of layout.layers) {
-      // Backfill `move` lock on legacy layers (default = locked).
-      const locks = (l.locks ?? {}) as Record<string, unknown>;
-      if (typeof locks.move !== "boolean") {
-        locks.move = true;
-        l.locks = locks;
-      }
-      // Legacy margin: thicknessMm → thicknessPct (~5% of short side).
-      if (l?.type === "margin") {
-        const d = (l.defaults ?? {}) as Record<string, unknown>;
-        if (d.thicknessPct == null) {
-          d.thicknessPct = 5;
-          delete d.thicknessMm;
-          l.defaults = d;
+  const root = raw as {
+    defaultLayout?: Record<string, { layers?: Array<Record<string, unknown>> }>;
+    canvasLayout?: Record<string, { layers?: Array<Record<string, unknown>> }>;
+  };
+  const blocks = [root?.defaultLayout, root?.canvasLayout].filter(Boolean) as Array<
+    Record<string, { layers?: Array<Record<string, unknown>> }>
+  >;
+  for (const block of blocks) {
+    for (const o of orients) {
+      const layout = block?.[o];
+      if (!layout?.layers) continue;
+      for (const l of layout.layers) {
+        // Backfill `move` lock on legacy layers (default = locked).
+        const locks = (l.locks ?? {}) as Record<string, unknown>;
+        if (typeof locks.move !== "boolean") {
+          locks.move = true;
+          l.locks = locks;
         }
-      }
-      // Legacy aiPhoto subjectKind: cat / dog / other → pet.
-      if (l?.type === "aiPhoto") {
-        const d = (l.defaults ?? {}) as Record<string, unknown>;
-        const sk = d.subjectKind;
-        if (sk === "cat" || sk === "dog" || sk === "other") {
-          d.subjectKind = "pet";
-          l.defaults = d;
+        // Legacy margin: thicknessMm → thicknessPct (~5% of short side).
+        if (l?.type === "margin") {
+          const d = (l.defaults ?? {}) as Record<string, unknown>;
+          if (d.thicknessPct == null) {
+            d.thicknessPct = 5;
+            delete d.thicknessMm;
+            l.defaults = d;
+          }
+        }
+        // Legacy aiPhoto subjectKind: cat / dog / other → pet.
+        if (l?.type === "aiPhoto") {
+          const d = (l.defaults ?? {}) as Record<string, unknown>;
+          const sk = d.subjectKind;
+          if (sk === "cat" || sk === "dog" || sk === "other") {
+            d.subjectKind = "pet";
+            l.defaults = d;
+          }
         }
       }
     }
