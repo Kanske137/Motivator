@@ -429,25 +429,25 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             const effectiveText = tv?.text ?? d.text;
             const effectiveFont = tv?.font || d.font;
             return (
-              <div
-                key={l.id}
-                className="absolute whitespace-pre-line leading-tight"
-                style={{
-                  ...wrapStyle,
-                  fontFamily: effectiveFont,
-                  color: d.color,
-                  textAlign: d.align,
-                  fontSize: `calc(${rect.height}cqh * ${d.fontSizePct / 100})`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent:
-                    d.align === "left" ? "flex-start" : d.align === "right" ? "flex-end" : "center",
-                  padding: "0 4px",
-                  containerType: "size",
-                  pointerEvents: movable ? "auto" : "none",
-                }}
-              >
-                <span style={{ width: "100%", pointerEvents: "none" }}>{effectiveText || "Lägg till text…"}</span>
+              <div key={l.id} style={wrapStyle}>
+                <div
+                  className="absolute inset-0 whitespace-pre-line leading-tight"
+                  style={{
+                    fontFamily: effectiveFont,
+                    color: d.color,
+                    textAlign: d.align,
+                    fontSize: `calc(100cqh * ${d.fontSizePct / 100})`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent:
+                      d.align === "left" ? "flex-start" : d.align === "right" ? "flex-end" : "center",
+                    padding: "0 4px",
+                    containerType: "size",
+                    pointerEvents: "none",
+                  }}
+                >
+                  <span style={{ width: "100%" }}>{effectiveText || "Lägg till text…"}</span>
+                </div>
                 {moveHandle}
               </div>
             );
