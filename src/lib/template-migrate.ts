@@ -169,6 +169,24 @@ function migrateTemplate(template: Template): Template {
       },
     };
   }
+  // Same migration pass for the optional canvasLayout block.
+  if (next.canvasLayout) {
+    const cl = next.canvasLayout;
+    const migrated = {
+      portrait: { ...cl.portrait, layers: cl.portrait.layers.map(migrateLayer) },
+      landscape: { ...cl.landscape, layers: cl.landscape.layers.map(migrateLayer) },
+    };
+    next = { ...next, canvasLayout: migrated };
+  }
+  // Seed canvasLayout from defaultLayout when canvas is enabled but no
+  // canvas-specific layout exists yet (legacy templates). Admin can then
+  // edit it independently of the poster layout.
+  if (next.productOptions.canvas?.enabled && !next.canvasLayout) {
+    next = {
+      ...next,
+      canvasLayout: JSON.parse(JSON.stringify(next.defaultLayout)) as Template["canvasLayout"],
+    };
+  }
   // Seed default AI styles when none are configured (admin can edit/remove later).
   if (!next.productOptions.aiStyles || next.productOptions.aiStyles.length === 0) {
     next = {
