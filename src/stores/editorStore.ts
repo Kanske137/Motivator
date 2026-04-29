@@ -799,7 +799,7 @@ function applyPlaceInternal(
     if (l.defaults.linkedMapLayerId !== mapId) continue;
     const tv = state.layerValues[l.id];
     if (!tv || tv.kind !== "text" || tv.isCustom) continue;
-    newLayerValues[l.id] = { ...tv, text: buildAutoText(args) };
+    newLayerValues[l.id] = { ...tv, text: buildAutoText(args, l.defaults.linkedMapFields) };
   }
 
   set({
