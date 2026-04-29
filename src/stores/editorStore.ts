@@ -754,7 +754,7 @@ function updateText(set: SetFn, get: GetFn, id: string, patch: Partial<TextLayer
   const layerValues = { ...state.layerValues, [id]: next };
   set({ layerValues, ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues, config: state.config }) });
 }
-
+function updatePhoto(set: SetFn, get: GetFn, id: string, patch: Partial<PhotoLayerValue>) {
   const state = get();
   const cur = state.layerValues[id];
   if (!cur || cur.kind !== "photo") return;
