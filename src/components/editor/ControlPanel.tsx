@@ -476,9 +476,14 @@ function TextLayerSection({
   const setLayerText = useEditorStore((s) => s.setLayerText);
   const setLayerTextFont = useEditorStore((s) => s.setLayerTextFont);
   const setLayerTextVisible = useEditorStore((s) => s.setLayerTextVisible);
+  const productOptions = useEditorStore((s) => s.productOptions);
   const text = value?.text ?? layer.defaults.text;
   const font = value?.font ?? layer.defaults.font;
   const visible = value?.visible ?? true;
+  const allowedFonts =
+    productOptions?.allowedFonts && productOptions.allowedFonts.length > 0
+      ? productOptions.allowedFonts
+      : FONT_FAMILIES;
 
   return (
     <div className="space-y-3">
@@ -507,13 +512,13 @@ function TextLayerSection({
         <div className="space-y-2">
           <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Typsnitt</Label>
           <div className="grid grid-cols-3 gap-2">
-            {config.text_config.fonts.map((f) => (
+            {allowedFonts.map((f) => (
               <Button
                 key={f}
                 size="sm"
                 variant={f === font ? "default" : "outline"}
                 onClick={() => setLayerTextFont(layer.id, f)}
-                style={{ fontFamily: f }}
+                style={{ fontFamily: `"${f}", system-ui, sans-serif` }}
                 className="text-xs rounded-full"
               >
                 {f.split(" ")[0]}
