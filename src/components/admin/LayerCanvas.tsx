@@ -35,6 +35,11 @@ interface Props {
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onChange: (next: TemplateLayer) => void;
+  /** Canvas wrap depth as a fraction of the editor surface short side
+   *  (e.g. 2 cm wrap on a 30 cm short side → 0.0667). When > 0, the
+   *  designer renders the front-zone marker and shaded wrap bands. */
+  wrapInsetPctX?: number;
+  wrapInsetPctY?: number;
 }
 
 const aspectToRatio: Record<Aspect, string> = {
