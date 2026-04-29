@@ -144,7 +144,7 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
   const showAiPhotoSection = aiPhotoLayers.length > 0;
 
   return (
-    <Accordion type="single" collapsible defaultValue="plats" className="w-full space-y-3">
+    <Accordion type="single" collapsible defaultValue="karta" className="w-full space-y-3">
       {showImageSection && (
         <AccordionItem value="bild" className={cn(cardClass, "border-b-0")}>
           <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
@@ -199,38 +199,12 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
       )}
 
       {editableMaps.length > 0 && (
-        <AccordionItem value="plats" className={cn(cardClass, "border-b-0")}>
+        <AccordionItem value="karta" className={cn(cardClass, "border-b-0")}>
           <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
-            Plats
+            Karta
           </AccordionTrigger>
-          <AccordionContent className="pt-1 pb-4 space-y-5 overflow-visible">
-            {editableMaps.map((l, idx) => (
-              <PlaceLayerSection
-                key={l.id}
-                layer={l}
-                value={(layerValues[l.id] as MapLayerValue | undefined) ?? null}
-                heading={editableMaps.length > 1 ? `${l.name || `Karta ${idx + 1}`}` : null}
-              />
-            ))}
-          </AccordionContent>
-        </AccordionItem>
-      )}
-
-      {editableMaps.length > 0 && (
-        <AccordionItem value="kartstil" className={cn(cardClass, "border-b-0")}>
-          <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
-            Kartstil
-          </AccordionTrigger>
-          <AccordionContent className="pt-1 pb-4 space-y-6">
-            {editableMaps.map((l, idx) => (
-              <MapStyleLayerSection
-                key={l.id}
-                config={config}
-                layer={l}
-                value={(layerValues[l.id] as MapLayerValue | undefined) ?? null}
-                heading={editableMaps.length > 1 ? `${l.name || `Karta ${idx + 1}`}` : null}
-              />
-            ))}
+          <AccordionContent className="pt-1 pb-4 overflow-visible">
+            <MapTabs config={config} layers={editableMaps} layerValues={layerValues} />
           </AccordionContent>
         </AccordionItem>
       )}
