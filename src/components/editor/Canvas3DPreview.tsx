@@ -113,48 +113,52 @@ function CanvasMesh({
     };
 
     // FRONT (+Z): inner motif zone, no wrap, no bleed.
+    // Three.js BoxGeometry +Z UVs: U=0 at -X (left), V=0 at -Y (bottom).
     const front = make(
       fBleedX + fWrapX, fBleedY + fWrapY,
       fFrontX, fFrontY,
     );
 
-    // RIGHT (+X): wrap strip immediately to the right of the front.
-    // Box-face UVs run U along Z (depth) and V along Y (height).
-    // We need the strip's pixel column nearest the front to land at U=1
-    // (the edge that meets the front face). Texture column nearest front is
-    // its leftmost pixel → no flip needed if we map width=fWrapX directly,
-    // because default Box UV gives U=0 at back-of-box, U=1 at front-of-box.
+    // RIGHT (+X): wrap strip immediately to the right of the front in the
+    // print file. Three.js BoxGeometry +X UVs: U=0 at +Z (FRONT edge),
+    // U=1 at -Z (back edge); V=0 at bottom. The strip's leftmost pixel
+    // column (in print-file space) is closest to the front and must land at
+    // U=0 (the face-edge that meets the front). Default mapping puts the
+    // strip's leftmost pixel at U=0 → flip X to align it with the front edge.
     const right = make(
       fBleedX + fWrapX + fFrontX, fBleedY + fWrapY,
-      fWrapX, fFrontY,
-    );
-
-    // LEFT (-X): wrap strip immediately to the left of the front.
-    // Default Box UV for -X: U=0 at front, U=1 at back → texture's rightmost
-    // pixel (closest to front) must sit at U=0 → flip X.
-    const left = make(
-      fBleedX, fBleedY + fWrapY,
       fWrapX, fFrontY,
       true, false,
     );
 
-    // TOP (+Y): wrap strip immediately above the front.
-    // Box-face UVs: U along X (width), V along Z (depth).
-    // Default +Y: V=0 at back, V=1 at front. Texture strip's bottom row
-    // (closest to front in the print file) must land at V=1 → flip Y.
+    // LEFT (-X): wrap strip immediately to the left of the front.
+    // Three.js BoxGeometry -X UVs: U=0 at -Z (back), U=1 at +Z (FRONT edge).
+    // The strip's rightmost pixel column (in print-file space) is closest to
+    // the front and must land at U=1. Default mapping already puts the
+    // rightmost pixel at U=1 → no flip.
+    const left = make(
+      fBleedX, fBleedY + fWrapY,
+      fWrapX, fFrontY,
+    );
+
+    // TOP (+Y): wrap strip immediately above the front in the print file.
+    // Three.js BoxGeometry +Y UVs: U=0 at -X (left); V=0 at +Z (FRONT edge),
+    // V=1 at -Z (back edge). The strip's bottom row (in print-file space) is
+    // closest to the front and must land at V=0. Default mapping puts the
+    // strip's bottom row at V=0 → no flip.
     const top = make(
       fBleedX + fWrapX, fBleedY,
       fFrontX, fWrapY,
-      false, true,
     );
 
     // BOTTOM (-Y): wrap strip immediately below the front.
-    // Default -Y: V=0 at front, V=1 at back. Texture strip's top row
-    // (closest to front in print file) must sit at V=0 → flip Y.
+    // Three.js BoxGeometry -Y UVs: U=0 at -X; V=0 at -Z (back), V=1 at +Z
+    // (FRONT edge). The strip's top row (in print-file space) is closest to
+    // the front and must land at V=1. Default mapping puts the strip's top
+    // row at V=1 → no flip.
     const bottom = make(
       fBleedX + fWrapX, fBleedY + fWrapY + fFrontY,
       fFrontX, fWrapY,
-      false, true,
     );
 
     // BACK (-Z): canvas back is plain stretched fabric. Solid neutral.
