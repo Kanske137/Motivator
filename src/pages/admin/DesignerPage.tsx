@@ -211,7 +211,28 @@ export default function DesignerPage() {
     }
   }
 
-  function addLayer(type: LayerType) {
+  function setLayoutBackground(color: string) {
+    if (!template || !layout) return;
+    if (isCanvasProduct) {
+      const cl = template.canvasLayout ?? template.defaultLayout;
+      commitTemplate({
+        ...template,
+        canvasLayout: {
+          ...cl,
+          [orientation]: { ...cl[orientation], background: { color } },
+        },
+      });
+    } else {
+      commitTemplate({
+        ...template,
+        defaultLayout: {
+          ...template.defaultLayout,
+          [orientation]: { ...layout, background: { color } },
+        },
+      });
+    }
+  }
+
     const nextLayer = createLayer(type, layers);
     setLayers(normaliseZIndex([...layers, nextLayer]));
     setSelectedId(nextLayer.id);
