@@ -105,6 +105,7 @@ export function AiStyleSection({ presets }: Props) {
     }
 
     setBusyId(preset.id);
+    setStage("Förbereder din bild…");
     try {
       // Resolve a stable cache key first (the hash) — never the upload URL.
       const hash = await ensurePhotoHash();
@@ -118,16 +119,19 @@ export function AiStyleSection({ presets }: Props) {
       }
 
       // Cache miss → ensure the photo is uploaded so Replicate can fetch it.
+      setStage("Laddar upp din bild…");
       const imageUrl = await ensureUploadedPhotoUrl();
       if (!imageUrl) return;
 
       const designId = (crypto as any)?.randomUUID?.() ?? `${Date.now()}`;
+      setStage("Skapar din bild…");
       const { data, error } = await supabase.functions.invoke("replicate-style", {
         body: { imageUrl, prompt: preset.prompt, designId },
       });
       if (error) throw error;
+      setStage("Hämtar resultat…");
       const printFileUrl = (data as { printFileUrl?: string })?.printFileUrl;
-      if (!printFileUrl) throw new Error("AI-tjänsten returnerade ingen bild");
+      if (!printFileUrl) throw new Error("Tjänsten returnerade ingen bild");
       setAiPrintFileUrl(printFileUrl);
       if (hash) addAiResultToCache(hash, preset.id, preset.label, printFileUrl);
       toast.success(`Stil "${preset.label}" tillämpad`);
@@ -137,6 +141,7 @@ export function AiStyleSection({ presets }: Props) {
       toast.error("Kunde inte tillämpa stilen", { description: msg });
     } finally {
       setBusyId(null);
+      setStage(null);
     }
   };
 
