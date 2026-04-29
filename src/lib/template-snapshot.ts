@@ -15,6 +15,7 @@
 import mapboxgl from "mapbox-gl";
 import { getMapboxToken, styleUrl } from "./mapbox";
 import type { Template, TemplateLayer } from "./template-schema";
+import { getActiveLayoutBlock } from "./template-schema";
 import type { LayerValue } from "@/stores/editorStore";
 import { getActiveMarginInsetsPct, expandRectForRemovedMargin } from "./layer-utils";
 
