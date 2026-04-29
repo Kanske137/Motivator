@@ -796,7 +796,7 @@ function applyPlaceInternal(
   // promise is upheld by the migration step in template-migrate.ts which
   // back-fills `linkedMapLayerId` for single-map+single-text templates.
   const layers = state.template
-    ? state.template.defaultLayout[state.orientation].layers
+    ? getActiveLayoutBlock(state.template, state.config?.product_type)[state.orientation].layers
     : [];
   const newLayerValues: Record<string, LayerValue> = {
     ...state.layerValues,
@@ -812,6 +812,6 @@ function applyPlaceInternal(
 
   set({
     layerValues: newLayerValues,
-    ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues: newLayerValues }),
+    ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues: newLayerValues, config: state.config }),
   });
 }
