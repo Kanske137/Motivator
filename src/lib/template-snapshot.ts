@@ -114,7 +114,11 @@ function clipForShape(
   h: number,
 ): void {
   ctx.beginPath();
-  if (shape === "circle") {
+  if (shape === "rect") {
+    // No-op clip: cover the full bounding rect so subsequent draws are not
+    // clipped away. Mirrors the editor's "fill the layer" behaviour.
+    ctx.rect(x, y, w, h);
+  } else if (shape === "circle") {
     // Perfect circle inscribed within the rect (diameter = shortest side),
     // centered. Matches editor's `useCircleClip` / px-radius CSS clip-path.
     const r = Math.min(w, h) / 2;

@@ -16,7 +16,7 @@ export type Aspect = z.infer<typeof aspectSchema>;
 export const productTypeSchema = z.enum(["poster", "canvas"]);
 export type TemplateProductType = z.infer<typeof productTypeSchema>;
 
-export const mapShapeSchema = z.enum(["circle", "heart", "star"]);
+export const mapShapeSchema = z.enum(["rect", "circle", "heart", "star"]);
 export type MapShape = z.infer<typeof mapShapeSchema>;
 
 export const imageFitSchema = z.enum(["cover", "contain"]);

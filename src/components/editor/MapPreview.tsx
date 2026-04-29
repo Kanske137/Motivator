@@ -50,6 +50,8 @@ function StarClipDef({ id }: { id: string }) {
 
 function shapeClipPath(shape: string, heartId: string, starId: string): string | undefined {
   switch (shape) {
+    case "rect":
+      return undefined;
     case "circle":
       // Fallback only — for perfect-circle in non-square containers, callers
       // should use `useCircleClip` to get a px-based radius instead.
@@ -283,7 +285,8 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             <button
               type="button"
               onPointerDown={(e) => onDragStart(l, e)}
-              className="absolute top-2 left-2 w-7 h-7 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center text-[12px] cursor-move touch-none z-10 ring-2 ring-background"
+              className="absolute w-7 h-7 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center text-[12px] cursor-move touch-none ring-2 ring-background"
+              style={{ top: -14, left: -14, zIndex: 9998 }}
               aria-label="Flytta lager"
               title="Dra för att flytta lagret"
             >
@@ -426,25 +429,25 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             const effectiveText = tv?.text ?? d.text;
             const effectiveFont = tv?.font || d.font;
             return (
-              <div
-                key={l.id}
-                className="absolute whitespace-pre-line leading-tight"
-                style={{
-                  ...wrapStyle,
-                  fontFamily: effectiveFont,
-                  color: d.color,
-                  textAlign: d.align,
-                  fontSize: `calc(${rect.height}cqh * ${d.fontSizePct / 100})`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent:
-                    d.align === "left" ? "flex-start" : d.align === "right" ? "flex-end" : "center",
-                  padding: "0 4px",
-                  containerType: "size",
-                  pointerEvents: movable ? "auto" : "none",
-                }}
-              >
-                <span style={{ width: "100%", pointerEvents: "none" }}>{effectiveText || "Lägg till text…"}</span>
+              <div key={l.id} style={wrapStyle}>
+                <div
+                  className="absolute inset-0 whitespace-pre-line leading-tight"
+                  style={{
+                    fontFamily: effectiveFont,
+                    color: d.color,
+                    textAlign: d.align,
+                    fontSize: `calc(100cqh * ${d.fontSizePct / 100})`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent:
+                      d.align === "left" ? "flex-start" : d.align === "right" ? "flex-end" : "center",
+                    padding: "0 4px",
+                    containerType: "size",
+                    pointerEvents: "none",
+                  }}
+                >
+                  <span style={{ width: "100%" }}>{effectiveText || "Lägg till text…"}</span>
+                </div>
                 {moveHandle}
               </div>
             );
