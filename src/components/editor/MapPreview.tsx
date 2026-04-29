@@ -285,7 +285,8 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             <button
               type="button"
               onPointerDown={(e) => onDragStart(l, e)}
-              className="absolute top-2 left-2 w-7 h-7 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center text-[12px] cursor-move touch-none z-10 ring-2 ring-background"
+              className="absolute w-7 h-7 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center text-[12px] cursor-move touch-none ring-2 ring-background"
+              style={{ top: -14, left: -14, zIndex: 9998 }}
               aria-label="Flytta lager"
               title="Dra för att flytta lagret"
             >
