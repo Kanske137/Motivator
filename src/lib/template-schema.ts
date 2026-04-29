@@ -324,6 +324,15 @@ export const templateSchema = z
       portrait: orientationLayoutSchema,
       landscape: orientationLayoutSchema,
     }),
+    /** Optional canvas-specific layout. When present and the active product
+     *  type is "canvas", runtime + admin use this instead of `defaultLayout`.
+     *  Layer % are relative to the FULL editor surface (front + 2× wrap). */
+    canvasLayout: z
+      .object({
+        portrait: orientationLayoutSchema,
+        landscape: orientationLayoutSchema,
+      })
+      .optional(),
     sizeOverrides: z.record(z.string(), sizeOverrideSchema).default({}),
   })
   .superRefine((tpl, ctx) => {
