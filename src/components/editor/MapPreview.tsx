@@ -13,6 +13,10 @@ interface Props {
   innerPadding?: string;
   /** Canvas wrap depth in cm. */
   wrapCm?: number;
+  /** When true, layer % are anchored to the FULL editor surface (front + 2×wrap)
+   *  rather than just the front zone. Used by canvas templates that have a
+   *  separate canvasLayout designed against the wrap-extended editor. */
+  layersIncludeWrap?: boolean;
 }
 
 function parseCm(size: string | null): { w: number; h: number } | null {
