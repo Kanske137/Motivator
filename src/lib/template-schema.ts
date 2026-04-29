@@ -378,3 +378,33 @@ export function isEmptyTemplate(value: unknown): boolean {
   const v = value as Record<string, unknown>;
   return Object.keys(v).length === 0;
 }
+
+/**
+ * Pick the layout block (portrait+landscape) the active product type should
+ * render. Canvas products use `canvasLayout` when present so the wrap-zone
+ * layout doesn't bleed onto poster siblings; everything else falls back to
+ * `defaultLayout`.
+ */
+export function getActiveLayoutBlock(
+  template: Template,
+  productType: string | null | undefined,
+): { portrait: OrientationLayout; landscape: OrientationLayout } {
+  const isCanvas = productType === "canvas";
+  if (isCanvas && template.canvasLayout) return template.canvasLayout;
+  return template.defaultLayout;
+}
+
+/** Resolve the depth (cm) the canvas template was DESIGNED against. */
+export function getCanvasDesignDepthCm(template: Template): number {
+  const explicit = template.productOptions.canvas?.canvasDesignDepthCm;
+  if (typeof explicit === "number" && explicit > 0) return explicit;
+  const allowed = template.productOptions.canvas?.allowedDepths ?? [];
+  for (const v of allowed) {
+    const m = v.match(/(\d+(?:[.,]\d+)?)/);
+    if (m) {
+      const n = parseFloat(m[1].replace(",", "."));
+      if (n > 0) return n;
+    }
+  }
+  return 2;
+}
