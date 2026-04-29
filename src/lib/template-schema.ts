@@ -274,6 +274,11 @@ const canvasOptionsSchema = z.object({
   enabled: z.boolean(),
   allowedSizes: z.array(z.string()),
   allowedDepths: z.array(z.string()),
+  /** Canvas wrap depth (cm) the admin DESIGNS against. Layer % in
+   *  `canvasLayout` are relative to the editor surface at this depth. When the
+   *  customer picks a different depth, % auto-rescales — a layer that covers
+   *  half the wrap band at 2 cm covers half the (wider) band at 4 cm. */
+  canvasDesignDepthCm: z.number().min(0).max(10).optional(),
 });
 export const aiStylePresetSchema = z.object({
   id: z.string().min(1),
