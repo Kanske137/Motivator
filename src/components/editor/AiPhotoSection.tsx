@@ -25,6 +25,7 @@ import { hashFile } from "@/lib/ai-cache-storage";
 import type { TemplateLayer, AiStylePreset } from "@/lib/template-schema";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { AiProgress } from "./AiProgress";
 
 type AiPhotoLayer = Extract<TemplateLayer, { type: "aiPhoto" }>;
 
@@ -102,6 +103,10 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
   }, [isRemoveBg, selectedStyleId, visibleStyles]);
 
   const [busy, setBusy] = useState(false);
+  const [stage, setStage] = useState<string | null>(null);
+  // Different models have very different latencies. cdingram/face-swap is
+  // fast (~8s), Nano Banana flows take longer (~18s) and may retry.
+  const expectedSeconds = subjectKind === "human" ? 8 : 18;
 
   // Hash the face photo whenever it changes.
   useEffect(() => {
@@ -167,6 +172,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
       return;
     }
     setBusy(true);
+    setStage("Förbereder din bild…");
     try {
       const hash = await ensureHash();
       const cacheRefSlot = refSlotFor(subjectKind, refUrl, selectedStyleId);
@@ -179,6 +185,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
           return;
         }
       }
+      setStage("Laddar upp din bild…");
       const faceImageUrl = await ensureUploadedUrl();
       if (!faceImageUrl) return;
       const designId = `swap-${(crypto as { randomUUID?: () => string }).randomUUID?.() ?? Date.now()}`;
@@ -220,6 +227,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         }
       }
 
+      setStage("Skapar din bild…");
       const { data, error } = await supabase.functions.invoke("replicate-face-swap", {
         body: {
           referenceImageUrl: refUrl,
@@ -234,6 +242,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         },
       });
       if (error) throw error;
+      setStage("Hämtar resultat…");
       const payload = data as {
         printFileUrl?: string;
         error?: string;
@@ -266,6 +275,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
       toast.error("Kunde inte skapa bilden", { description: msg });
     } finally {
       setBusy(false);
+      setStage(null);
     }
   };
 
@@ -399,6 +409,13 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
           </>
         )}
       </Button>
+
+      <AiProgress
+        active={busy}
+        expectedSeconds={expectedSeconds}
+        label="Skapar bild"
+        stage={stage}
+      />
     </div>
   );
 }

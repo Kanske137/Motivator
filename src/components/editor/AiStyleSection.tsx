@@ -16,6 +16,7 @@ import { hashFile } from "@/lib/ai-cache-storage";
 import type { AiStylePreset } from "@/lib/template-schema";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { AiProgress } from "./AiProgress";
 
 interface Props {
   presets: AiStylePreset[];
@@ -50,6 +51,7 @@ export function AiStyleSection({ presets }: Props) {
   const aiResultCache = useEditorStore((s) => s.aiResultCache);
 
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [stage, setStage] = useState<string | null>(null);
 
   // Compute the photo hash whenever the file changes. Cheap (a few ms for
   // typical phone photos) and runs only once per upload thanks to setPhotoHash
@@ -103,6 +105,7 @@ export function AiStyleSection({ presets }: Props) {
     }
 
     setBusyId(preset.id);
+    setStage("Förbereder din bild…");
     try {
       // Resolve a stable cache key first (the hash) — never the upload URL.
       const hash = await ensurePhotoHash();
@@ -116,16 +119,19 @@ export function AiStyleSection({ presets }: Props) {
       }
 
       // Cache miss → ensure the photo is uploaded so Replicate can fetch it.
+      setStage("Laddar upp din bild…");
       const imageUrl = await ensureUploadedPhotoUrl();
       if (!imageUrl) return;
 
       const designId = (crypto as any)?.randomUUID?.() ?? `${Date.now()}`;
+      setStage("Skapar din bild…");
       const { data, error } = await supabase.functions.invoke("replicate-style", {
         body: { imageUrl, prompt: preset.prompt, designId },
       });
       if (error) throw error;
+      setStage("Hämtar resultat…");
       const printFileUrl = (data as { printFileUrl?: string })?.printFileUrl;
-      if (!printFileUrl) throw new Error("AI-tjänsten returnerade ingen bild");
+      if (!printFileUrl) throw new Error("Tjänsten returnerade ingen bild");
       setAiPrintFileUrl(printFileUrl);
       if (hash) addAiResultToCache(hash, preset.id, preset.label, printFileUrl);
       toast.success(`Stil "${preset.label}" tillämpad`);
@@ -135,6 +141,7 @@ export function AiStyleSection({ presets }: Props) {
       toast.error("Kunde inte tillämpa stilen", { description: msg });
     } finally {
       setBusyId(null);
+      setStage(null);
     }
   };
 
@@ -210,6 +217,13 @@ export function AiStyleSection({ presets }: Props) {
           );
         })}
       </div>
+
+      <AiProgress
+        active={busyId !== null}
+        expectedSeconds={12}
+        label="Skapar bild"
+        stage={stage}
+      />
 
       {history.length > 0 && (
         <div className="space-y-2 pt-1">
