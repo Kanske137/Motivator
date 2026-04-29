@@ -300,12 +300,6 @@ export type MapStylePreset = z.infer<typeof mapStylePresetSchema>;
 export const productOptionsSchema = z.object({
   poster: posterOptionsSchema.optional(),
   canvas: canvasOptionsSchema.optional(),
-  /** Canvas wrap depth (cm) the admin DESIGNS against. Layer percentages in
-   *  `canvasLayout` are relative to the editor surface at this depth. When the
-   *  customer picks a different depth at checkout, the % auto-rescales — a
-   *  layer that covers half the wrap band at 2 cm covers half the (now wider)
-   *  wrap band at 4 cm. Optional; defaults to first allowedDepth or 2. */
-  canvasDesignDepthCm: z.number().min(0).max(10).optional(),
   /** Available AI style presets shown in the customer editor. Optional —
    *  when missing/empty the AI section is hidden. */
   aiStyles: z.array(aiStylePresetSchema).optional(),
