@@ -5,6 +5,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -143,7 +144,7 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
   const showAiPhotoSection = aiPhotoLayers.length > 0;
 
   return (
-    <Accordion type="single" collapsible defaultValue="plats" className="w-full space-y-3">
+    <Accordion type="single" collapsible defaultValue="karta" className="w-full space-y-3">
       {showImageSection && (
         <AccordionItem value="bild" className={cn(cardClass, "border-b-0")}>
           <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
@@ -198,38 +199,12 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
       )}
 
       {editableMaps.length > 0 && (
-        <AccordionItem value="plats" className={cn(cardClass, "border-b-0")}>
+        <AccordionItem value="karta" className={cn(cardClass, "border-b-0")}>
           <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
-            Plats
+            Karta
           </AccordionTrigger>
-          <AccordionContent className="pt-1 pb-4 space-y-5 overflow-visible">
-            {editableMaps.map((l, idx) => (
-              <PlaceLayerSection
-                key={l.id}
-                layer={l}
-                value={(layerValues[l.id] as MapLayerValue | undefined) ?? null}
-                heading={editableMaps.length > 1 ? `${l.name || `Karta ${idx + 1}`}` : null}
-              />
-            ))}
-          </AccordionContent>
-        </AccordionItem>
-      )}
-
-      {editableMaps.length > 0 && (
-        <AccordionItem value="kartstil" className={cn(cardClass, "border-b-0")}>
-          <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
-            Kartstil
-          </AccordionTrigger>
-          <AccordionContent className="pt-1 pb-4 space-y-6">
-            {editableMaps.map((l, idx) => (
-              <MapStyleLayerSection
-                key={l.id}
-                config={config}
-                layer={l}
-                value={(layerValues[l.id] as MapLayerValue | undefined) ?? null}
-                heading={editableMaps.length > 1 ? `${l.name || `Karta ${idx + 1}`}` : null}
-              />
-            ))}
+          <AccordionContent className="pt-1 pb-4 overflow-visible">
+            <MapTabs config={config} layers={editableMaps} layerValues={layerValues} />
           </AccordionContent>
         </AccordionItem>
       )}
@@ -262,6 +237,67 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
         </AccordionContent>
       </AccordionItem>
     </Accordion>
+  );
+}
+
+// ---------------- map tabs (place + style merged) ----------------
+
+function MapTabs({
+  config,
+  layers,
+  layerValues,
+}: {
+  config: ProductConfig;
+  layers: Array<Extract<TemplateLayer, { type: "map" }>>;
+  layerValues: Record<string, unknown>;
+}) {
+  const [activeId, setActiveId] = useState<string>(layers[0]?.id ?? "");
+
+  // If layers change (added/removed), make sure activeId still exists.
+  useEffect(() => {
+    if (!layers.some((l) => l.id === activeId)) {
+      setActiveId(layers[0]?.id ?? "");
+    }
+  }, [layers, activeId]);
+
+  const activeLayer = layers.find((l) => l.id === activeId) ?? layers[0];
+  if (!activeLayer) return null;
+
+  const renderForLayer = (l: Extract<TemplateLayer, { type: "map" }>) => (
+    <div className="space-y-6">
+      <PlaceLayerSection
+        layer={l}
+        value={(layerValues[l.id] as MapLayerValue | undefined) ?? null}
+        heading={null}
+      />
+      <div className="pt-4 border-t">
+        <MapStyleLayerSection
+          config={config}
+          layer={l}
+          value={(layerValues[l.id] as MapLayerValue | undefined) ?? null}
+          heading={null}
+        />
+      </div>
+    </div>
+  );
+
+  if (layers.length === 1) {
+    return renderForLayer(activeLayer);
+  }
+
+  return (
+    <div className="space-y-4">
+      <Tabs value={activeId} onValueChange={setActiveId}>
+        <TabsList className="w-full justify-start overflow-x-auto">
+          {layers.map((l, idx) => (
+            <TabsTrigger key={l.id} value={l.id} className="text-xs">
+              {l.name || `Karta ${idx + 1}`}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+      {renderForLayer(activeLayer)}
+    </div>
   );
 }
 
