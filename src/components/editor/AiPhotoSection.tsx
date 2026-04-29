@@ -172,6 +172,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
       return;
     }
     setBusy(true);
+    setStage("Förbereder din bild…");
     try {
       const hash = await ensureHash();
       const cacheRefSlot = refSlotFor(subjectKind, refUrl, selectedStyleId);
