@@ -1,33 +1,75 @@
-## Mål
+# Plan: Canvas-design med wrap-zoner och separat layout
 
-Slå ihop kundeditorns två accordion-flikar **"Plats"** och **"Kartstil"** till en enda flik som heter **"Karta"**. Innehållet inom fliken visar först **plats**-sektionen (sök/vald plats) och därefter **kartstil**-sektionen (stilväljare, etiketter, zoom etc.) — i den ordningen.
+## Vad som ska byggas
 
-När mallen har **flera kartlager** ska fliken "Karta" innehålla **underflikar** ("Karta 1", "Karta 2", …) där bara en underflik kan vara öppen åt gången. Varje underflik visar exakt samma layout (Plats-block överst, Kartstil-block under) fast för det specifika lagret.
+### 1. Separat layout för canvas i template-schemat
+Idag har `Template` ett `defaultLayout` (portrait + landscape) som delas mellan poster och canvas (samma sibling-mall propageras). Vi inför ett valfritt fält `canvasLayout` som speglar `defaultLayout` men är helt fristående. Poster fortsätter använda `defaultLayout` som idag.
 
-## Beteende
+### 2. Designyta i admin med wrap-zoner (endast för canvas)
+När admin redigerar en canvas-produkt visualiseras designytan på samma sätt som kundeditorn:
 
-- **Ett kartlager**: ingen underflik-rad visas — bara plats-blocket följt av kartstil-blocket direkt.
-- **Flera kartlager**: en `Tabs`-rad högst upp inuti accordion-innehållet med en knapp per karta. Standardvald = första kartan. Endast en synlig åt gången. Lagernamnet (eller "Karta N") används som etikett, precis som idag.
-- Förhandsvisningen påverkas inte; bara sidopanelens UI omorganiseras.
-- Ingen logik i `editorStore`, `template-schema` eller snapshot-koden ändras.
+```text
+┌─────────────────────────────┐  ← hela editor-canvasen (front + 2× wrap)
+│         WRAP (top)          │
+│   ┌─────────────────────┐   │
+│   │                     │   │
+│   │       FRONT-zon     │   │  ← markerad med streckad ram + label
+│   │   (synlig framsida) │   │
+│   │                     │   │
+│   └─────────────────────┘   │
+│         WRAP (bottom)       │
+└─────────────────────────────┘
+```
+
+Lager kan placeras var som helst i hela ytan (även ut i wrap-zonerna). Front-zonen markeras tydligt så admin ser var den synliga ytan slutar.
+
+### 3. Procentuell auto-skalning vid djupändring
+Lager-koordinater i canvasLayout lagras (precis som idag) i procent av HELA editor-ytan (front + wrap × 2). När admin byter djup i `productOptions.canvas` (t.ex. 2 cm → 4 cm) ändras editor-ytans aspect, men eftersom alla lager redan är i `%` av denna yta så förblir de relativt korrekt placerade automatiskt — exakt det beteende du beskrev (1 cm täckning på 2 cm djup = 50 % av wrap-bandet, blir 2 cm av 4 cm efter ändring).
+
+För att detta ska gälla även i kundeditorn: kundeditorn använder redan samma %-system så samma layout fungerar 1:1.
 
 ## Tekniska detaljer
 
-**Fil som ändras:** `src/components/editor/ControlPanel.tsx`
+### Schema-ändringar (`src/lib/template-schema.ts`)
+- Lägg till valfritt `canvasLayout: { portrait, landscape }` med samma form som `defaultLayout`.
+- Lägg till `canvasDesignDepthCm` i `productOptions.canvas` (default = första värdet i `allowedDepths`, fallback 2). Anger vilket djup admin DESIGNAR mot. Lager-procenten är relativ till editor-ytan vid detta djup, vilket kunder sedan automatiskt skalas mot oavsett valt slutdjup.
 
-1. Ta bort de två separata `AccordionItem`-blocken med `value="plats"` och `value="kartstil"` (rad ~200–235).
-2. Lägg till ett nytt `AccordionItem value="karta"` med rubrik **"Karta"** som standardöppen (`defaultValue="karta"` i `<Accordion>`).
-3. Inuti `AccordionContent`:
-   - Om `editableMaps.length === 1`: rendera `<PlaceLayerSection layer=... heading={null} />` följt av `<MapStyleLayerSection layer=... heading={null} />` för det lagret. Inga rubriker — accordion-titeln räcker.
-   - Om `editableMaps.length > 1`: rendera en `<Tabs>` med `TabsList`/`TabsTrigger` (en per karta, etikett = `layer.name || "Karta N"`). Under flikraden visas plats- + kartstil-blocken för **endast** den valda kartan (lokal `useState` för aktiv karta, default = första lagrets id). Detta uppfyller kravet "endast en underflik öppen åt gången" utan att vi behöver `TabsContent` per lager — vi villkorsrenderar valt lager.
-4. `PlaceLayerSection` och `MapStyleLayerSection` behåller nuvarande signatur. När de renderas inuti underflikarna skickar vi `heading={null}` eftersom underflik-namnet redan identifierar kartan.
-5. Importera `Tabs`, `TabsList`, `TabsTrigger` från `@/components/ui/tabs` (samma mönster som `DesignerPage`).
+### Migrering (`src/lib/template-migrate.ts`)
+- Om `canvasLayout` saknas på en mall som har `productOptions.canvas.enabled = true` → seed:a den genom att djup-kopiera `defaultLayout` (admin får samma start som idag, kan därefter ändra fritt).
 
-## Edge cases
+### Designsida (`src/pages/admin/DesignerPage.tsx`)
+- Avgör `isCanvasProduct = config.product_type === "canvas"`.
+- För canvas: läs/skriv `canvasLayout[orientation]` istället för `defaultLayout[orientation]`. För poster: oförändrat.
+- Vid sibling-propagering: synka `canvasLayout` separat så poster-syskon inte skriver över det och vice versa.
+- Lägg en liten infobar ovanför `LayerCanvas` som visar t.ex. "Canvas-design · djup 2 cm · grå zon = wrap" när canvas.
 
-- Om ett kartlager läggs till/tas bort dynamiskt och nuvarande aktiva underflik försvinner: en liten `useEffect` återställer aktivt id till första tillgängliga karta.
-- Default-värdet för accordion ändras från `"plats"` → `"karta"` så fliken är öppen vid sidladdning, exakt som idag.
+### LayerCanvas (`src/components/admin/LayerCanvas.tsx`)
+- Ny prop `wrapInsetPct?: { x: number; y: number }` (0 för poster, beräknat för canvas).
+- När `wrapInsetPct` är satt:
+  - Aspect-ratio på editor-ytan beräknas från `(frontW + 2·wrap) × (frontH + 2·wrap)` istället för rena front-aspekten.
+  - Rendera en streckad rektangel som markerar front-zonen (samma stil som kundeditorn) med liten label "Synlig framsida".
+  - Rendera ljust skuggade band runt fronten för att tydligt visa wrap.
+  - Snap-grid + alignment-guides justeras så centrum-snap fortfarande gäller hela ytan (önskat — admin vill ofta centrera mot hela canvas).
 
-## Filer som ändras
+### Renderingsspeglar
+- `MapPreview` i kundeditorn behöver ingen ändring — den hämtar redan `wrapCm` och behandlar layers som %-av-hela-ytan.
+- `EditorPage`: när templaten har `canvasLayout`, läs lager från det istället för `defaultLayout` när `isCanvas`. Annars fall tillbaka till `defaultLayout` (bakåtkompatibelt).
+- Snapshot/print-pipeline: ändra ingenting, samma %-koordinatsystem hela vägen.
 
-- `src/components/editor/ControlPanel.tsx` (enda filen)
+### Sibling-spridning vid spara
+- Poster-syskon: spara endast `defaultLayout` + delade fält (productOptions.aiStyles, mapStyles, allowedFonts). Behåll syskonets eget `canvasLayout` om det finns.
+- Canvas-syskon: motsvarande omvänt.
+- Båda behåller sin egen `productOptions.poster`/`canvas` (som idag).
+
+## Vad som INTE ändras
+- Kundeditorns rendering, AI-flöde, print-fil-generering, Shopify-sync.
+- Poster-flödet i admin är oförändrat — ingen wrap-zon, inga nya kontroller.
+- Default-djup för canvas i kundeditorn (`wrapCm: 2`) — bytet av valt djup i kundeditorn använder fortfarande %-skalning.
+
+## Filer som rörs
+- `src/lib/template-schema.ts` — nya fält
+- `src/lib/template-migrate.ts` — seeda canvasLayout
+- `src/pages/admin/DesignerPage.tsx` — välj rätt layout, sibling-logik
+- `src/components/admin/LayerCanvas.tsx` — wrap-zon + front-markering
+- `src/pages/EditorPage.tsx` — välj canvasLayout när tillgängligt
+- (ev.) `src/lib/editor-snapshot.ts` / `template-snapshot.ts` om de läser `defaultLayout` direkt — kontrolleras vid implementation
