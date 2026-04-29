@@ -578,13 +578,7 @@ export default function DesignerPage() {
                   <button
                     key={c}
                     type="button"
-                    onClick={() => commitTemplate({
-                      ...template,
-                      defaultLayout: {
-                        ...template.defaultLayout,
-                        [orientation]: { ...layout, background: { color: c } },
-                      },
-                    })}
+                    onClick={() => setLayoutBackground(c)}
                     className={`h-7 w-7 rounded-full transition border ${
                       selected
                         ? "ring-2 ring-primary ring-offset-2 ring-offset-card border-transparent"
