@@ -176,8 +176,12 @@ export default function DesignerPage() {
     })();
   }, [handle]);
 
-  // Active orientation layout
-  const layout = template?.defaultLayout[orientation] ?? null;
+  // For canvas products we edit `canvasLayout` (separate from poster).
+  const isCanvasProduct = config?.product_type === "canvas";
+  const layoutBlock = template
+    ? (isCanvasProduct && template.canvasLayout) || template.defaultLayout
+    : null;
+  const layout = layoutBlock?.[orientation] ?? null;
   const layers = useMemo(() => layout?.layers ?? [], [layout]);
   const selectedLayer = useMemo(
     () => layers.find((l) => l.id === selectedId) ?? null,
@@ -187,15 +191,47 @@ export default function DesignerPage() {
   // ---------- mutators ----------
   function setLayers(next: TemplateLayer[]) {
     if (!template) return;
-    commitTemplate({
-      ...template,
-      defaultLayout: {
-        ...template.defaultLayout,
-        [orientation]: { ...template.defaultLayout[orientation], layers: next },
-      },
-    });
+    if (isCanvasProduct) {
+      const cl = template.canvasLayout ?? template.defaultLayout;
+      commitTemplate({
+        ...template,
+        canvasLayout: {
+          ...cl,
+          [orientation]: { ...cl[orientation], layers: next },
+        },
+      });
+    } else {
+      commitTemplate({
+        ...template,
+        defaultLayout: {
+          ...template.defaultLayout,
+          [orientation]: { ...template.defaultLayout[orientation], layers: next },
+        },
+      });
+    }
   }
 
+  function setLayoutBackground(color: string) {
+    if (!template || !layout) return;
+    if (isCanvasProduct) {
+      const cl = template.canvasLayout ?? template.defaultLayout;
+      commitTemplate({
+        ...template,
+        canvasLayout: {
+          ...cl,
+          [orientation]: { ...cl[orientation], background: { color } },
+        },
+      });
+    } else {
+      commitTemplate({
+        ...template,
+        defaultLayout: {
+          ...template.defaultLayout,
+          [orientation]: { ...layout, background: { color } },
+        },
+      });
+    }
+  }
   function addLayer(type: LayerType) {
     const nextLayer = createLayer(type, layers);
     setLayers(normaliseZIndex([...layers, nextLayer]));
@@ -315,8 +351,19 @@ export default function DesignerPage() {
         await Promise.all(
           siblings.map((s) => {
             const sibTemplate = (s.template ?? {}) as Template;
+            // Per-row layouts must NOT cross-contaminate: poster siblings
+            // own `defaultLayout`, canvas siblings own `canvasLayout`. We
+            // only propagate the layout block matching THIS row's product
+            // type and otherwise keep the sibling's existing block.
+            const isCurrentCanvas = isCanvasProduct;
             const mergedSibling: Template = {
               ...finalTemplate,
+              defaultLayout: isCurrentCanvas
+                ? (sibTemplate.defaultLayout ?? finalTemplate.defaultLayout)
+                : finalTemplate.defaultLayout,
+              canvasLayout: isCurrentCanvas
+                ? finalTemplate.canvasLayout
+                : (sibTemplate.canvasLayout ?? finalTemplate.canvasLayout),
               productOptions: {
                 ...(finalTemplate.productOptions ?? {}),
                 poster: sibTemplate.productOptions?.poster ?? finalTemplate.productOptions?.poster,
@@ -542,13 +589,7 @@ export default function DesignerPage() {
                   <button
                     key={c}
                     type="button"
-                    onClick={() => commitTemplate({
-                      ...template,
-                      defaultLayout: {
-                        ...template.defaultLayout,
-                        [orientation]: { ...layout, background: { color: c } },
-                      },
-                    })}
+                    onClick={() => setLayoutBackground(c)}
                     className={`h-7 w-7 rounded-full transition border ${
                       selected
                         ? "ring-2 ring-primary ring-offset-2 ring-offset-card border-transparent"
@@ -563,13 +604,7 @@ export default function DesignerPage() {
                 <input
                   type="color"
                   value={layout.background.color}
-                  onChange={(e) => commitTemplate({
-                    ...template,
-                    defaultLayout: {
-                      ...template.defaultLayout,
-                      [orientation]: { ...layout, background: { color: e.target.value } },
-                    },
-                  })}
+                  onChange={(e) => setLayoutBackground(e.target.value)}
                   className="absolute inset-0 opacity-0 cursor-pointer"
                 />
                 <span className="text-[10px] text-muted-foreground">+</span>
@@ -580,6 +615,26 @@ export default function DesignerPage() {
             </span>
           </div>
 
+          {isCanvasProduct && (() => {
+            const designDepthCm = template?.productOptions?.canvas?.canvasDesignDepthCm
+              ?? (() => {
+                const allowed = template?.productOptions?.canvas?.allowedDepths ?? [];
+                for (const v of allowed) {
+                  const m = v.match(/(\d+(?:[.,]\d+)?)/);
+                  if (m) {
+                    const n = parseFloat(m[1].replace(",", "."));
+                    if (n > 0) return n;
+                  }
+                }
+                return 2;
+              })();
+            return (
+              <div className="text-[11px] text-muted-foreground mb-2 flex items-center gap-2">
+                <span className="inline-block h-2 w-2 rounded-sm bg-muted border" />
+                Canvas-design · djup {designDepthCm} cm · grå zon = wrap (motivet syns runt kanten)
+              </div>
+            );
+          })()}
           <div className="relative">
             <LayerCanvas
               aspect={layout.aspect}
@@ -588,6 +643,18 @@ export default function DesignerPage() {
               selectedId={selectedId}
               onSelect={setSelectedId}
               onChange={updateLayer}
+              wrapInsetPctX={(() => {
+                if (!isCanvasProduct) return 0;
+                const sizeCm = orientation === "portrait" ? 30 : 40;
+                const depth = template?.productOptions?.canvas?.canvasDesignDepthCm ?? 2;
+                return depth / (sizeCm + 2 * depth);
+              })()}
+              wrapInsetPctY={(() => {
+                if (!isCanvasProduct) return 0;
+                const sizeCm = orientation === "portrait" ? 40 : 30;
+                const depth = template?.productOptions?.canvas?.canvasDesignDepthCm ?? 2;
+                return depth / (sizeCm + 2 * depth);
+              })()}
             />
             {layers.length === 0 && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">

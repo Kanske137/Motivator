@@ -274,6 +274,11 @@ const canvasOptionsSchema = z.object({
   enabled: z.boolean(),
   allowedSizes: z.array(z.string()),
   allowedDepths: z.array(z.string()),
+  /** Canvas wrap depth (cm) the admin DESIGNS against. Layer % in
+   *  `canvasLayout` are relative to the editor surface at this depth. When the
+   *  customer picks a different depth, % auto-rescales — a layer that covers
+   *  half the wrap band at 2 cm covers half the (wider) band at 4 cm. */
+  canvasDesignDepthCm: z.number().min(0).max(10).optional(),
 });
 export const aiStylePresetSchema = z.object({
   id: z.string().min(1),
@@ -318,6 +323,15 @@ export const templateSchema = z
       portrait: orientationLayoutSchema,
       landscape: orientationLayoutSchema,
     }),
+    /** Optional canvas-specific layout. When present and the active product
+     *  type is "canvas", runtime + admin use this instead of `defaultLayout`.
+     *  Layer % are relative to the FULL editor surface (front + 2× wrap). */
+    canvasLayout: z
+      .object({
+        portrait: orientationLayoutSchema,
+        landscape: orientationLayoutSchema,
+      })
+      .optional(),
     sizeOverrides: z.record(z.string(), sizeOverrideSchema).default({}),
   })
   .superRefine((tpl, ctx) => {
@@ -362,4 +376,34 @@ export function isEmptyTemplate(value: unknown): boolean {
   if (!value || typeof value !== "object") return true;
   const v = value as Record<string, unknown>;
   return Object.keys(v).length === 0;
+}
+
+/**
+ * Pick the layout block (portrait+landscape) the active product type should
+ * render. Canvas products use `canvasLayout` when present so the wrap-zone
+ * layout doesn't bleed onto poster siblings; everything else falls back to
+ * `defaultLayout`.
+ */
+export function getActiveLayoutBlock(
+  template: Template,
+  productType: string | null | undefined,
+): { portrait: OrientationLayout; landscape: OrientationLayout } {
+  const isCanvas = productType === "canvas";
+  if (isCanvas && template.canvasLayout) return template.canvasLayout;
+  return template.defaultLayout;
+}
+
+/** Resolve the depth (cm) the canvas template was DESIGNED against. */
+export function getCanvasDesignDepthCm(template: Template): number {
+  const explicit = template.productOptions.canvas?.canvasDesignDepthCm;
+  if (typeof explicit === "number" && explicit > 0) return explicit;
+  const allowed = template.productOptions.canvas?.allowedDepths ?? [];
+  for (const v of allowed) {
+    const m = v.match(/(\d+(?:[.,]\d+)?)/);
+    if (m) {
+      const n = parseFloat(m[1].replace(",", "."));
+      if (n > 0) return n;
+    }
+  }
+  return 2;
 }

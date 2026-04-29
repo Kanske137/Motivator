@@ -130,6 +130,7 @@ export default function EditorPage() {
     const baseTemplateInput = {
       template,
       orientation,
+      productType: config?.product_type,
       size,
       layerValues,
       layerTransforms,
@@ -270,7 +271,12 @@ export default function EditorPage() {
       <div className="flex-1 flex flex-col md:flex-row min-h-0">
         {/* Preview */}
         <div className="paper-grain flex items-center justify-center h-[60vh] md:h-auto md:flex-1 md:min-h-[70vh]">
-          <MapPreview frameColor={frameColor} frameWidthCm={FRAME_WIDTH_CM} wrapCm={canvasDepthCm} />
+          <MapPreview
+            frameColor={frameColor}
+            frameWidthCm={FRAME_WIDTH_CM}
+            wrapCm={canvasDepthCm}
+            layersIncludeWrap={isCanvas && !!template?.canvasLayout}
+          />
         </div>
 
         {/* Control panel */}

@@ -15,6 +15,7 @@
 import mapboxgl from "mapbox-gl";
 import { getMapboxToken, styleUrl } from "./mapbox";
 import type { Template, TemplateLayer } from "./template-schema";
+import { getActiveLayoutBlock } from "./template-schema";
 import type { LayerValue } from "@/stores/editorStore";
 import { getActiveMarginInsetsPct, expandRectForRemovedMargin } from "./layer-utils";
 
@@ -22,6 +23,9 @@ export interface TemplateSnapshotInput {
   template: Template;
   orientation: "portrait" | "landscape";
   size: string; // "30x40"
+  /** "poster" | "canvas" — determines whether the canvasLayout (if any) is
+   *  used instead of defaultLayout. */
+  productType?: string | null;
 
   // Per-layer values keyed by layer id. When provided, these override the
   // legacy live* fields. Falls back to layer.defaults when missing.
@@ -507,11 +511,16 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
   const h = Math.round(hCm * PX_PER_CM * scale);
   const pxPerMm = (PX_PER_CM * scale) / 10;
 
-  // Front-zone rect (where layer % coords live)
-  const frontPxX = Math.round(extraCm * PX_PER_CM * scale);
-  const frontPxY = Math.round(extraCm * PX_PER_CM * scale);
-  const frontPxW = Math.round(frontWcm * PX_PER_CM * scale);
-  const frontPxH = Math.round(frontHcm * PX_PER_CM * scale);
+  // Front-zone rect (where layer % coords live for poster). For canvas
+  // templates with a dedicated canvasLayout, layer % are anchored to the
+  // FULL editor surface (front + 2× wrap + bleed), so the rect spans the
+  // entire output.
+  const layersIncludeWrap =
+    input.productType === "canvas" && !!input.template.canvasLayout;
+  const frontPxX = layersIncludeWrap ? 0 : Math.round(extraCm * PX_PER_CM * scale);
+  const frontPxY = layersIncludeWrap ? 0 : Math.round(extraCm * PX_PER_CM * scale);
+  const frontPxW = layersIncludeWrap ? w : Math.round(frontWcm * PX_PER_CM * scale);
+  const frontPxH = layersIncludeWrap ? h : Math.round(frontHcm * PX_PER_CM * scale);
 
   const out = document.createElement("canvas");
   out.width = w;
@@ -526,7 +535,7 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
   ctx.fillRect(0, 0, w, h);
 
   // Sort layers by zIndex
-  const layout = input.template.defaultLayout[input.orientation];
+  const layout = getActiveLayoutBlock(input.template, input.productType)[input.orientation];
   const sortedByZ = [...layout.layers].sort((a, b) => a.zIndex - b.zIndex);
   // Margin must always render visually on top of all other layers, regardless
   // of its zIndex. Reorder so margin layers are drawn last.

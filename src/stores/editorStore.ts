@@ -3,6 +3,7 @@ import type { Orientation, ProductConfig } from "@/lib/product-config";
 import { getEffectiveSizes } from "@/lib/product-config";
 import type { DesignSource } from "@/lib/print-pipeline";
 import type { ProductOptions, Template, TemplateLayer } from "@/lib/template-schema";
+import { getActiveLayoutBlock } from "@/lib/template-schema";
 import { resolveTemplate } from "@/lib/template-migrate";
 import { clampLayerRect } from "@/lib/layer-utils";
 import {
@@ -247,8 +248,12 @@ function buildAutoText(args: ApplyPlaceArgs, fields?: AutoTextFields): string {
 }
 
 
-function hydrateLayerValues(template: Template, orientation: Orientation): Record<string, LayerValue> {
-  const layout = template.defaultLayout[orientation];
+function hydrateLayerValues(
+  template: Template,
+  orientation: Orientation,
+  productType: string | null | undefined,
+): Record<string, LayerValue> {
+  const layout = getActiveLayoutBlock(template, productType)[orientation];
   const out: Record<string, LayerValue> = {};
   if (!layout) return out;
   for (const l of layout.layers) {
@@ -292,8 +297,12 @@ function hydrateLayerValues(template: Template, orientation: Orientation): Recor
 }
 
 /** Recompute legacy "first map / first text" mirrors from layerValues. */
-function mirrorLegacy(state: Pick<EditorState, "template" | "orientation" | "layerValues">) {
-  const layout = state.template?.defaultLayout[state.orientation];
+function mirrorLegacy(
+  state: Pick<EditorState, "template" | "orientation" | "layerValues" | "config">,
+) {
+  const layout = state.template
+    ? getActiveLayoutBlock(state.template, state.config?.product_type)[state.orientation]
+    : undefined;
   const firstMap = layout?.layers.find((l) => l.type === "map");
   const firstText = layout?.layers.find((l) => l.type === "text");
   const m = firstMap ? (state.layerValues[firstMap.id] as MapLayerValue | undefined) : undefined;
@@ -391,8 +400,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     const orientation = state.orientation;
     const isFirstLoad = state.config === null;
-    const layerValues = hydrateLayerValues(template, orientation);
-    const layout = template.defaultLayout[orientation];
+    const layerValues = hydrateLayerValues(template, orientation, config.product_type);
+    const layout = getActiveLayoutBlock(template, config.product_type)[orientation];
 
     const next = {
       config,
@@ -407,14 +416,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ? { posterBgColor: layout.background.color }
         : {}),
     };
-    set({ ...next, ...mirrorLegacy({ template, orientation, layerValues }) });
+    set({ ...next, ...mirrorLegacy({ template, orientation, layerValues, config }) });
   },
 
   setPosterBgColor: (posterBgColor) => set({ posterBgColor }),
   setWhiteMarginEnabled: (whiteMarginEnabled) => set({ whiteMarginEnabled }),
   setLayerTransform: (id, patch) => {
     const state = get();
-    const layer = state.template?.defaultLayout[state.orientation].layers.find((l) => l.id === id);
+    const layer = state.template
+      ? getActiveLayoutBlock(state.template, state.config?.product_type)[state.orientation].layers.find((l) => l.id === id)
+      : undefined;
     if (!layer) return;
     const cur = state.layerTransforms[id] ?? {};
     const merged = {
@@ -452,10 +463,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   setVariant: (variant) => set({ variant }),
   setOrientation: (orientation) => {
-    const { template } = get();
+    const { template, config } = get();
     if (!template) return set({ orientation });
-    const layerValues = hydrateLayerValues(template, orientation);
-    set({ orientation, layerValues, layerTransforms: {}, whiteMarginEnabled: true, ...mirrorLegacy({ template, orientation, layerValues }) });
+    const layerValues = hydrateLayerValues(template, orientation, config?.product_type);
+    set({ orientation, layerValues, layerTransforms: {}, whiteMarginEnabled: true, ...mirrorLegacy({ template, orientation, layerValues, config }) });
   },
 
   setPhotoSource: (file, previewUrl) => {
@@ -702,9 +713,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     return config?.layouts[orientation] ?? null;
   },
   templateLayers: () => {
-    const { template, orientation } = get();
+    const { template, orientation, config } = get();
     if (!template) return [];
-    return [...template.defaultLayout[orientation].layers].sort((a, b) => a.zIndex - b.zIndex);
+    return [...getActiveLayoutBlock(template, config?.product_type)[orientation].layers].sort((a, b) => a.zIndex - b.zIndex);
   },
   firstMapLayerId: () => {
     const layers = get().templateLayers();
@@ -734,7 +745,7 @@ function updateMap(set: SetFn, get: GetFn, id: string, patch: Partial<MapLayerVa
   if (!cur || cur.kind !== "map") return;
   const next: MapLayerValue = { ...cur, ...patch };
   const layerValues = { ...state.layerValues, [id]: next };
-  set({ layerValues, ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues }) });
+  set({ layerValues, ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues, config: state.config }) });
 }
 
 function updateText(set: SetFn, get: GetFn, id: string, patch: Partial<TextLayerValue>) {
@@ -743,9 +754,8 @@ function updateText(set: SetFn, get: GetFn, id: string, patch: Partial<TextLayer
   if (!cur || cur.kind !== "text") return;
   const next: TextLayerValue = { ...cur, ...patch };
   const layerValues = { ...state.layerValues, [id]: next };
-  set({ layerValues, ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues }) });
+  set({ layerValues, ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues, config: state.config }) });
 }
-
 function updatePhoto(set: SetFn, get: GetFn, id: string, patch: Partial<PhotoLayerValue>) {
   const state = get();
   const cur = state.layerValues[id];
@@ -788,7 +798,7 @@ function applyPlaceInternal(
   // promise is upheld by the migration step in template-migrate.ts which
   // back-fills `linkedMapLayerId` for single-map+single-text templates.
   const layers = state.template
-    ? state.template.defaultLayout[state.orientation].layers
+    ? getActiveLayoutBlock(state.template, state.config?.product_type)[state.orientation].layers
     : [];
   const newLayerValues: Record<string, LayerValue> = {
     ...state.layerValues,
@@ -804,6 +814,6 @@ function applyPlaceInternal(
 
   set({
     layerValues: newLayerValues,
-    ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues: newLayerValues }),
+    ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues: newLayerValues, config: state.config }),
   });
 }

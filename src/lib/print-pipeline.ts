@@ -13,6 +13,7 @@ import {
   renderHiresTemplateSnapshotSafe,
   type TemplateSnapshotInput,
 } from "./template-snapshot";
+import { getActiveLayoutBlock } from "./template-schema";
 import { uploadPrintFile } from "./upload-preview";
 
 export type DesignSource = "map" | "photo" | "ai";
@@ -32,8 +33,10 @@ export async function getPrintFileUrl(args: PrintPipelineArgs): Promise<string> 
   // Photo/AI sources require the template to actually have a photo layer
   // (otherwise the uploaded image has nowhere to land).
   if (source === "ai" || source === "photo") {
-    const layers =
-      templateInput.template.defaultLayout[templateInput.orientation]?.layers;
+    const layers = getActiveLayoutBlock(
+      templateInput.template,
+      templateInput.productType,
+    )[templateInput.orientation]?.layers;
     const hasPhotoLayer = !!layers?.some((l) => l.type === "photo");
     if (!hasPhotoLayer) {
       throw new Error(

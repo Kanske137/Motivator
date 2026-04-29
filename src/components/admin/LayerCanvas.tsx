@@ -35,6 +35,11 @@ interface Props {
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onChange: (next: TemplateLayer) => void;
+  /** Canvas wrap depth as a fraction of the editor surface short side
+   *  (e.g. 2 cm wrap on a 30 cm short side → 0.0667). When > 0, the
+   *  designer renders the front-zone marker and shaded wrap bands. */
+  wrapInsetPctX?: number;
+  wrapInsetPctY?: number;
 }
 
 const aspectToRatio: Record<Aspect, string> = {
@@ -50,6 +55,8 @@ export default function LayerCanvas({
   selectedId,
   onSelect,
   onChange,
+  wrapInsetPctX = 0,
+  wrapInsetPctY = 0,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -209,6 +216,44 @@ export default function LayerCanvas({
           }}
         />
 
+        {/* Canvas wrap-zone visualisation: shaded bands + dashed front marker */}
+        {(wrapInsetPctX > 0 || wrapInsetPctY > 0) && (
+          <>
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background: `linear-gradient(hsl(var(--muted) / 0.55), hsl(var(--muted) / 0.55))`,
+                clipPath: `polygon(
+                  0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%,
+                  ${wrapInsetPctX * 100}% ${wrapInsetPctY * 100}%,
+                  ${wrapInsetPctX * 100}% ${(1 - wrapInsetPctY) * 100}%,
+                  ${(1 - wrapInsetPctX) * 100}% ${(1 - wrapInsetPctY) * 100}%,
+                  ${(1 - wrapInsetPctX) * 100}% ${wrapInsetPctY * 100}%,
+                  ${wrapInsetPctX * 100}% ${wrapInsetPctY * 100}%
+                )`,
+              }}
+            />
+            <div
+              className="pointer-events-none absolute border-2 border-dashed border-primary/70"
+              style={{
+                left: `${wrapInsetPctX * 100}%`,
+                top: `${wrapInsetPctY * 100}%`,
+                right: `${wrapInsetPctX * 100}%`,
+                bottom: `${wrapInsetPctY * 100}%`,
+              }}
+            />
+            <div
+              className="pointer-events-none absolute text-[9px] font-medium text-primary uppercase tracking-wider bg-background/85 px-1.5 py-0.5 rounded"
+              style={{
+                left: `${wrapInsetPctX * 100}%`,
+                top: `calc(${wrapInsetPctY * 100}% + 4px)`,
+                transform: "translateX(4px)",
+              }}
+            >
+              Synlig framsida
+            </div>
+          </>
+        )}
         {sortedLayers.map((layer) => {
           const isSelected = selectedId === layer.id;
           const showName = isSelected || hoverId === layer.id;

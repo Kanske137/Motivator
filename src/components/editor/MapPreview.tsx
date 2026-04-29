@@ -13,6 +13,10 @@ interface Props {
   innerPadding?: string;
   /** Canvas wrap depth in cm. */
   wrapCm?: number;
+  /** When true, layer % are anchored to the FULL editor surface (front + 2×wrap)
+   *  rather than just the front zone. Used by canvas templates that have a
+   *  separate canvasLayout designed against the wrap-extended editor. */
+  layersIncludeWrap?: boolean;
 }
 
 function parseCm(size: string | null): { w: number; h: number } | null {
@@ -96,7 +100,7 @@ function useCircleClip(enabled: boolean): {
   return { ref, clipPath };
 }
 
-export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm = 0 }: Props) {
+export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm = 0, layersIncludeWrap = false }: Props) {
   const frameRef = useRef<HTMLDivElement>(null);
   const [borderPx, setBorderPx] = useState(0);
   const [frameShortPx, setFrameShortPx] = useState(0);
@@ -141,8 +145,8 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   const editorW = frontW + 2 * wrapCm;
   const editorH = frontH + 2 * wrapCm;
   const posterAspect = editorW / editorH;
-  const frontInsetX = wrapCm > 0 ? wrapCm / editorW : 0;
-  const frontInsetY = wrapCm > 0 ? wrapCm / editorH : 0;
+  const frontInsetX = wrapCm > 0 && !layersIncludeWrap ? wrapCm / editorW : 0;
+  const frontInsetY = wrapCm > 0 && !layersIncludeWrap ? wrapCm / editorH : 0;
 
   // Derive margin insets and (when customer hides margin) filter the margin
   // layer + remap remaining layers so they fill the freed-up area.
@@ -248,12 +252,16 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   );
 
   const isWrap = wrapCm > 0;
+  // Visual marker for the synlig front zone — always reflects wrapCm regardless
+  // of whether layers are anchored to front or full-area.
+  const frontMarkerInsetX = wrapCm > 0 ? wrapCm / editorW : 0;
+  const frontMarkerInsetY = wrapCm > 0 ? wrapCm / editorH : 0;
   const frontZoneStyle: React.CSSProperties = {
     position: "absolute",
-    left: `${frontInsetX * 100}%`,
-    top: `${frontInsetY * 100}%`,
-    right: `${frontInsetX * 100}%`,
-    bottom: `${frontInsetY * 100}%`,
+    left: `${frontMarkerInsetX * 100}%`,
+    top: `${frontMarkerInsetY * 100}%`,
+    right: `${frontMarkerInsetX * 100}%`,
+    bottom: `${frontMarkerInsetY * 100}%`,
   };
 
   return (
