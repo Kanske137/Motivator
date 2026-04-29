@@ -137,7 +137,9 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
   const setWhiteMarginEnabled = useEditorStore((s) => s.setWhiteMarginEnabled);
   const BG_SWATCHES = ["#EFE7D6","#FFFFFF","#F8F4EC","#E5E5E5","#D9CDB5","#D6E4D2","#CFE0EA","#1A1A1A"];
 
-  const hasMarginLayer = (template?.defaultLayout?.[orientation]?.layers ?? []).some(
+  const activeLayoutBlock =
+    template && (isCanvas && template.canvasLayout ? template.canvasLayout : template.defaultLayout);
+  const hasMarginLayer = (activeLayoutBlock?.[orientation]?.layers ?? []).some(
     (l) => l.type === "margin",
   );
 
