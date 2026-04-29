@@ -100,7 +100,7 @@ function useCircleClip(enabled: boolean): {
   return { ref, clipPath };
 }
 
-export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm = 0 }: Props) {
+export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm = 0, layersIncludeWrap = false }: Props) {
   const frameRef = useRef<HTMLDivElement>(null);
   const [borderPx, setBorderPx] = useState(0);
   const [frameShortPx, setFrameShortPx] = useState(0);
