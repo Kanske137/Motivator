@@ -135,6 +135,15 @@ export const textDefaultsSchema = z.object({
   // referenced map layer (city/country/coords). Customer manual edits override
   // the auto-text until the field is cleared.
   linkedMapLayerId: z.string().nullable().optional(),
+  // Which place-derived rows are included when the text is linked to a map.
+  // Optional — when missing all three fields are included (legacy behaviour).
+  linkedMapFields: z
+    .object({
+      city: z.boolean().default(true),
+      country: z.boolean().default(true),
+      coordinates: z.boolean().default(true),
+    })
+    .optional(),
 });
 export type TextDefaults = z.infer<typeof textDefaultsSchema>;
 
