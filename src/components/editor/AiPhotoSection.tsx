@@ -25,6 +25,7 @@ import { hashFile } from "@/lib/ai-cache-storage";
 import type { TemplateLayer, AiStylePreset } from "@/lib/template-schema";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { AiProgress } from "./AiProgress";
 
 type AiPhotoLayer = Extract<TemplateLayer, { type: "aiPhoto" }>;
 
