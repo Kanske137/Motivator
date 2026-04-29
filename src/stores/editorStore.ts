@@ -297,8 +297,12 @@ function hydrateLayerValues(
 }
 
 /** Recompute legacy "first map / first text" mirrors from layerValues. */
-function mirrorLegacy(state: Pick<EditorState, "template" | "orientation" | "layerValues">) {
-  const layout = state.template?.defaultLayout[state.orientation];
+function mirrorLegacy(
+  state: Pick<EditorState, "template" | "orientation" | "layerValues" | "config">,
+) {
+  const layout = state.template
+    ? getActiveLayoutBlock(state.template, state.config?.product_type)[state.orientation]
+    : undefined;
   const firstMap = layout?.layers.find((l) => l.type === "map");
   const firstText = layout?.layers.find((l) => l.type === "text");
   const m = firstMap ? (state.layerValues[firstMap.id] as MapLayerValue | undefined) : undefined;
