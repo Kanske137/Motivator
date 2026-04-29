@@ -51,6 +51,7 @@ export function AiStyleSection({ presets }: Props) {
   const aiResultCache = useEditorStore((s) => s.aiResultCache);
 
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [stage, setStage] = useState<string | null>(null);
 
   // Compute the photo hash whenever the file changes. Cheap (a few ms for
   // typical phone photos) and runs only once per upload thanks to setPhotoHash
