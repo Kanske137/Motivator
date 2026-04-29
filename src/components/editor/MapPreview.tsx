@@ -50,6 +50,8 @@ function StarClipDef({ id }: { id: string }) {
 
 function shapeClipPath(shape: string, heartId: string, starId: string): string | undefined {
   switch (shape) {
+    case "rect":
+      return undefined;
     case "circle":
       // Fallback only — for perfect-circle in non-square containers, callers
       // should use `useCircleClip` to get a px-based radius instead.
