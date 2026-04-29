@@ -34,6 +34,7 @@ import { hasGelatoSku } from "@/lib/gelato-catalog";
 import { DEFAULT_AI_STYLES } from "@/lib/ai-style-defaults";
 import { MAP_STYLE_CATALOG } from "@/lib/map-style-catalog";
 import { uploadCartPreview } from "@/lib/upload-preview";
+import { FONT_CATALOG, FONT_CATEGORY_LABELS, FONT_FAMILIES, type FontCategory } from "@/lib/font-catalog";
 import { toast } from "sonner";
 
 interface Props {
