@@ -34,6 +34,7 @@ import { applyAdminPlaceToLinkedTexts } from "@/lib/template-migrate";
 import { MAP_STYLE_CATALOG } from "@/lib/map-style-catalog";
 import { defaultPromptFor } from "@/lib/ai-photo-prompts";
 import { uploadAiReferenceImage } from "@/lib/ai-reference-upload";
+import { FONT_CATALOG, FONT_CATEGORY_LABELS, type FontCategory } from "@/lib/font-catalog";
 
 interface Props {
   config: ProductConfig;
