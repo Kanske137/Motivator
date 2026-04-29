@@ -224,7 +224,7 @@ export default function LayerCanvas({
             <div
               className="pointer-events-none absolute inset-0"
               style={{
-                zIndex: 9998,
+                zIndex: 40,
                 background: `linear-gradient(hsl(var(--muted) / 0.55), hsl(var(--muted) / 0.55))`,
                 clipPath: `polygon(
                   0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%,
@@ -245,7 +245,7 @@ export default function LayerCanvas({
                 bottom: `${wrapInsetPctY * 100}%`,
                 borderColor: "hsl(var(--primary))",
                 boxShadow: "0 0 0 1px hsl(var(--background) / 0.9), inset 0 0 0 1px hsl(var(--background) / 0.9)",
-                zIndex: 9999,
+                zIndex: 41,
               }}
             />
             <div
@@ -256,7 +256,7 @@ export default function LayerCanvas({
                 transform: "translateX(4px)",
                 background: "hsl(var(--primary))",
                 color: "hsl(var(--primary-foreground))",
-                zIndex: 10000,
+                zIndex: 42,
               }}
             >
               Synlig framsida

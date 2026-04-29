@@ -286,7 +286,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             top: `${rect.top}%`,
             width: `${rect.width}%`,
             height: `${rect.height}%`,
-            zIndex: l.type === "margin" ? 9999 : l.zIndex,
+            zIndex: l.type === "margin" ? 40 : l.zIndex,
           };
           const movable = !l.locks.move && (l.type === "map" || l.type === "photo" || l.type === "aiPhoto" || l.type === "text" || l.type === "image");
           const moveHandle = movable ? (
@@ -294,7 +294,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
               type="button"
               onPointerDown={(e) => onDragStart(l, e)}
               className="absolute w-7 h-7 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center text-[12px] cursor-move touch-none ring-2 ring-background"
-              style={{ top: -14, left: -14, zIndex: 9998 }}
+              style={{ top: -14, left: -14, zIndex: 39 }}
               aria-label="Flytta lager"
               title="Dra för att flytta lagret"
             >
@@ -514,7 +514,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
               ...frontZoneStyle,
               borderColor: "hsl(var(--primary))",
               boxShadow: "0 0 0 1px hsl(var(--background) / 0.9), inset 0 0 0 1px hsl(var(--background) / 0.9)",
-              zIndex: 9999,
+              zIndex: 41,
             }}
           >
             <span
@@ -522,7 +522,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
               style={{
                 background: "hsl(var(--primary))",
                 color: "hsl(var(--primary-foreground))",
-                zIndex: 10000,
+                zIndex: 42,
               }}
             >
               Synlig framsida · innehållet här viks om på sidorna
