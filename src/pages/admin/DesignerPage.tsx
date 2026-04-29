@@ -232,7 +232,7 @@ export default function DesignerPage() {
       });
     }
   }
-
+  function addLayer(type: LayerType) {
     const nextLayer = createLayer(type, layers);
     setLayers(normaliseZIndex([...layers, nextLayer]));
     setSelectedId(nextLayer.id);
