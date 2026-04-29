@@ -400,8 +400,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     const orientation = state.orientation;
     const isFirstLoad = state.config === null;
-    const layerValues = hydrateLayerValues(template, orientation);
-    const layout = template.defaultLayout[orientation];
+    const layerValues = hydrateLayerValues(template, orientation, config.product_type);
+    const layout = getActiveLayoutBlock(template, config.product_type)[orientation];
 
     const next = {
       config,
@@ -416,7 +416,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ? { posterBgColor: layout.background.color }
         : {}),
     };
-    set({ ...next, ...mirrorLegacy({ template, orientation, layerValues }) });
+    set({ ...next, ...mirrorLegacy({ template, orientation, layerValues, config }) });
   },
 
   setPosterBgColor: (posterBgColor) => set({ posterBgColor }),
