@@ -227,13 +227,25 @@ interface EditorState {
   textVisible: boolean;
 }
 
-function buildAutoText(args: ApplyPlaceArgs): string {
+interface AutoTextFields {
+  city?: boolean;
+  country?: boolean;
+  coordinates?: boolean;
+}
+
+function buildAutoText(args: ApplyPlaceArgs, fields?: AutoTextFields): string {
+  const showCity = fields?.city ?? true;
+  const showCountry = fields?.country ?? true;
+  const showCoords = fields?.coordinates ?? true;
   const [lng, lat] = args.center;
-  const cityLine = (args.city ?? args.placeName.split(",")[0] ?? "").trim().toUpperCase();
-  const countryLine = args.country?.trim() ?? "";
-  const coordLine = `${lat.toFixed(4)}°N · ${lng.toFixed(4)}°E`;
+  const cityLine = showCity
+    ? (args.city ?? args.placeName.split(",")[0] ?? "").trim().toUpperCase()
+    : "";
+  const countryLine = showCountry ? (args.country?.trim() ?? "") : "";
+  const coordLine = showCoords ? `${lat.toFixed(4)}°N · ${lng.toFixed(4)}°E` : "";
   return [cityLine, countryLine, coordLine].filter(Boolean).join("\n");
 }
+
 
 function hydrateLayerValues(template: Template, orientation: Orientation): Record<string, LayerValue> {
   const layout = template.defaultLayout[orientation];
