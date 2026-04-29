@@ -275,6 +275,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
       toast.error("Kunde inte skapa bilden", { description: msg });
     } finally {
       setBusy(false);
+      setStage(null);
     }
   };
 
