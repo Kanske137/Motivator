@@ -226,6 +226,12 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
         value={value.aiStyles ?? []}
         onChange={(aiStyles) => onChange({ ...value, aiStyles })}
       />
+
+      {/* Allowed fonts — per-template customer font picker */}
+      <AllowedFontsEditor
+        value={value.allowedFonts}
+        onChange={(allowedFonts) => onChange({ ...value, allowedFonts })}
+      />
     </div>
   );
 }
