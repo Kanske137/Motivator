@@ -130,6 +130,7 @@ export default function EditorPage() {
     const baseTemplateInput = {
       template,
       orientation,
+      productType: config?.product_type,
       size,
       layerValues,
       layerTransforms,
