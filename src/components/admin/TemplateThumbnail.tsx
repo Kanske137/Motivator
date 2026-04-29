@@ -11,14 +11,31 @@ interface Props {
   template: Template | null;
   width?: number;
   height?: number;
+  /** "poster" | "canvas" — when "canvas" and the template has a canvasLayout,
+   *  render the wrap-extended layout and overlay a dashed front-zone marker. */
+  productType?: string | null;
 }
 
-export default function TemplateThumbnail({ template, width = 120, height = 160 }: Props) {
-  const layout = template?.defaultLayout.portrait ?? null;
+export default function TemplateThumbnail({ template, width = 120, height = 160, productType }: Props) {
+  const isCanvas = productType === "canvas";
+  const useCanvasLayout = isCanvas && !!template?.canvasLayout;
+  const layoutBlock = useCanvasLayout ? template?.canvasLayout : template?.defaultLayout;
+  const layout = layoutBlock?.portrait ?? null;
   const layers = useMemo(
     () => (layout ? [...layout.layers].sort((a, b) => a.zIndex - b.zIndex) : []),
     [layout],
   );
+
+  // For canvas with canvasLayout: layer % cover the FULL surface (front + 2× wrap).
+  // Compute the front-zone rect inside the thumbnail so we can draw a dashed marker.
+  const designDepthCm = template?.productOptions?.canvas?.canvasDesignDepthCm ?? 2;
+  const frontInsetPct = useCanvasLayout
+    ? // assume design surface = front + 2× depth at admin's design size; we
+      // approximate the inset proportionally (depth / (front+2*depth)).
+      // Front fraction is unknown without size, so use a stable visual: 2cm wrap
+      // on a 30cm side ≈ 2/(30+4) ≈ 6%. Use designDepth as scaling hint.
+      Math.min(20, Math.max(4, (designDepthCm / (designDepthCm * 2 + 30)) * 100))
+    : 0;
 
   if (!layout) {
     return (
@@ -150,6 +167,18 @@ export default function TemplateThumbnail({ template, width = 120, height = 160 
         }
         return null;
       })}
+      {useCanvasLayout && (
+        <div
+          className="absolute pointer-events-none border border-dashed border-primary/70"
+          style={{
+            left: `${frontInsetPct}%`,
+            top: `${frontInsetPct}%`,
+            right: `${frontInsetPct}%`,
+            bottom: `${frontInsetPct}%`,
+          }}
+          aria-hidden
+        />
+      )}
     </div>
   );
 }

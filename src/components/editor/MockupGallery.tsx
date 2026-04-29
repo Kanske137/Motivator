@@ -63,6 +63,7 @@ export function MockupGallery() {
           template,
           orientation,
           size,
+          productType: config.product_type,
           layerValues,
           layerTransforms,
           whiteMarginEnabled,

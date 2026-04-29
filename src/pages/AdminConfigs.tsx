@@ -160,7 +160,7 @@ export default function AdminConfigs() {
             {configs.map((c) => (
               <Card key={c.id} className="p-5">
                 <div className="flex gap-4">
-                  <TemplateThumbnail template={c.__template} />
+                  <TemplateThumbnail template={c.__template} productType={c.product_type} />
                   <div className="flex-1 min-w-0 space-y-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -172,7 +172,12 @@ export default function AdminConfigs() {
                       </span>
                     </div>
                     <div className="text-xs text-muted-foreground space-y-0.5">
-                      <div>{c.__template.defaultLayout.portrait.layers.length} lager (stående)</div>
+                      <div>{
+                        (c.product_type === "canvas" && c.__template.canvasLayout
+                          ? c.__template.canvasLayout
+                          : c.__template.defaultLayout
+                        ).portrait.layers.length
+                      } lager (stående)</div>
                       <div>
                         {[
                           c.__template.productOptions.poster?.enabled && "poster",

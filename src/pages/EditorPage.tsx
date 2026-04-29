@@ -144,7 +144,9 @@ export default function EditorPage() {
       liveText: text,
       liveTextFont: textFont,
       liveTextVisible: textVisible,
-      wrapCm: isCanvas ? 2 : 0,
+      wrapCm: isCanvas
+        ? (variant?.match(/(\d+)/)?.[1] ? parseInt(variant.match(/(\d+)/)![1], 10) : 2)
+        : 0,
       bleedCm: isCanvas ? 0.3 : 0,
       photoOverlayUrl:
         designSource === "ai"
