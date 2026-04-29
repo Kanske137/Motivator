@@ -176,8 +176,12 @@ export default function DesignerPage() {
     })();
   }, [handle]);
 
-  // Active orientation layout
-  const layout = template?.defaultLayout[orientation] ?? null;
+  // For canvas products we edit `canvasLayout` (separate from poster).
+  const isCanvasProduct = config?.product_type === "canvas";
+  const layoutBlock = template
+    ? (isCanvasProduct && template.canvasLayout) || template.defaultLayout
+    : null;
+  const layout = layoutBlock?.[orientation] ?? null;
   const layers = useMemo(() => layout?.layers ?? [], [layout]);
   const selectedLayer = useMemo(
     () => layers.find((l) => l.id === selectedId) ?? null,
@@ -187,13 +191,24 @@ export default function DesignerPage() {
   // ---------- mutators ----------
   function setLayers(next: TemplateLayer[]) {
     if (!template) return;
-    commitTemplate({
-      ...template,
-      defaultLayout: {
-        ...template.defaultLayout,
-        [orientation]: { ...template.defaultLayout[orientation], layers: next },
-      },
-    });
+    if (isCanvasProduct) {
+      const cl = template.canvasLayout ?? template.defaultLayout;
+      commitTemplate({
+        ...template,
+        canvasLayout: {
+          ...cl,
+          [orientation]: { ...cl[orientation], layers: next },
+        },
+      });
+    } else {
+      commitTemplate({
+        ...template,
+        defaultLayout: {
+          ...template.defaultLayout,
+          [orientation]: { ...template.defaultLayout[orientation], layers: next },
+        },
+      });
+    }
   }
 
   function addLayer(type: LayerType) {
