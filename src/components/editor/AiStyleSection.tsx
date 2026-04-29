@@ -218,6 +218,13 @@ export function AiStyleSection({ presets }: Props) {
         })}
       </div>
 
+      <AiProgress
+        active={busyId !== null}
+        expectedSeconds={12}
+        label="Skapar bild"
+        stage={stage}
+      />
+
       {history.length > 0 && (
         <div className="space-y-2 pt-1">
           <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
