@@ -429,7 +429,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             const effectiveText = tv?.text ?? d.text;
             const effectiveFont = tv?.font || d.font;
             return (
-              <div key={l.id} style={wrapStyle}>
+              <div key={l.id} style={{ ...wrapStyle, containerType: "size" }}>
                 <div
                   className="absolute inset-0 whitespace-pre-line leading-tight"
                   style={{
@@ -442,7 +442,6 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
                     justifyContent:
                       d.align === "left" ? "flex-start" : d.align === "right" ? "flex-end" : "center",
                     padding: "0 4px",
-                    containerType: "size",
                     pointerEvents: "none",
                   }}
                 >
