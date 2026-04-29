@@ -409,6 +409,13 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
           </>
         )}
       </Button>
+
+      <AiProgress
+        active={busy}
+        expectedSeconds={expectedSeconds}
+        label="Skapar bild"
+        stage={stage}
+      />
     </div>
   );
 }
