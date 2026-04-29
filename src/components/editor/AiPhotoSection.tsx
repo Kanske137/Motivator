@@ -227,6 +227,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         }
       }
 
+      setStage("Skapar din bild…");
       const { data, error } = await supabase.functions.invoke("replicate-face-swap", {
         body: {
           referenceImageUrl: refUrl,
@@ -241,6 +242,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         },
       });
       if (error) throw error;
+      setStage("Hämtar resultat…");
       const payload = data as {
         printFileUrl?: string;
         error?: string;
