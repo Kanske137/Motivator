@@ -252,12 +252,16 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   );
 
   const isWrap = wrapCm > 0;
+  // Visual marker for the synlig front zone — always reflects wrapCm regardless
+  // of whether layers are anchored to front or full-area.
+  const frontMarkerInsetX = wrapCm > 0 ? wrapCm / editorW : 0;
+  const frontMarkerInsetY = wrapCm > 0 ? wrapCm / editorH : 0;
   const frontZoneStyle: React.CSSProperties = {
     position: "absolute",
-    left: `${frontInsetX * 100}%`,
-    top: `${frontInsetY * 100}%`,
-    right: `${frontInsetX * 100}%`,
-    bottom: `${frontInsetY * 100}%`,
+    left: `${frontMarkerInsetX * 100}%`,
+    top: `${frontMarkerInsetY * 100}%`,
+    right: `${frontMarkerInsetX * 100}%`,
+    bottom: `${frontMarkerInsetY * 100}%`,
   };
 
   return (
