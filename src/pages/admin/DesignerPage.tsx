@@ -604,6 +604,26 @@ export default function DesignerPage() {
             </span>
           </div>
 
+          {isCanvasProduct && (() => {
+            const designDepthCm = template?.productOptions?.canvas?.canvasDesignDepthCm
+              ?? (() => {
+                const allowed = template?.productOptions?.canvas?.allowedDepths ?? [];
+                for (const v of allowed) {
+                  const m = v.match(/(\d+(?:[.,]\d+)?)/);
+                  if (m) {
+                    const n = parseFloat(m[1].replace(",", "."));
+                    if (n > 0) return n;
+                  }
+                }
+                return 2;
+              })();
+            return (
+              <div className="text-[11px] text-muted-foreground mb-2 flex items-center gap-2">
+                <span className="inline-block h-2 w-2 rounded-sm bg-muted border" />
+                Canvas-design · djup {designDepthCm} cm · grå zon = wrap (motivet syns runt kanten)
+              </div>
+            );
+          })()}
           <div className="relative">
             <LayerCanvas
               aspect={layout.aspect}
@@ -612,6 +632,18 @@ export default function DesignerPage() {
               selectedId={selectedId}
               onSelect={setSelectedId}
               onChange={updateLayer}
+              wrapInsetPctX={(() => {
+                if (!isCanvasProduct) return 0;
+                const sizeCm = orientation === "portrait" ? 30 : 40;
+                const depth = template?.productOptions?.canvas?.canvasDesignDepthCm ?? 2;
+                return depth / (sizeCm + 2 * depth);
+              })()}
+              wrapInsetPctY={(() => {
+                if (!isCanvasProduct) return 0;
+                const sizeCm = orientation === "portrait" ? 40 : 30;
+                const depth = template?.productOptions?.canvas?.canvasDesignDepthCm ?? 2;
+                return depth / (sizeCm + 2 * depth);
+              })()}
             />
             {layers.length === 0 && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
