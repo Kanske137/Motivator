@@ -248,8 +248,12 @@ function buildAutoText(args: ApplyPlaceArgs, fields?: AutoTextFields): string {
 }
 
 
-function hydrateLayerValues(template: Template, orientation: Orientation): Record<string, LayerValue> {
-  const layout = template.defaultLayout[orientation];
+function hydrateLayerValues(
+  template: Template,
+  orientation: Orientation,
+  productType: string | null | undefined,
+): Record<string, LayerValue> {
+  const layout = getActiveLayoutBlock(template, productType)[orientation];
   const out: Record<string, LayerValue> = {};
   if (!layout) return out;
   for (const l of layout.layers) {
