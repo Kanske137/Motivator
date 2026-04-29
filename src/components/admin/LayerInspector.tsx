@@ -251,11 +251,28 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
               value={layer.defaults.font}
               onValueChange={(v) => updateDefaults({ font: v })}
             >
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {config.text_config.fonts.map((f) => (
-                  <SelectItem key={f} value={f}>{f}</SelectItem>
-                ))}
+              <SelectTrigger>
+                <SelectValue style={{ fontFamily: `"${layer.defaults.font}", system-ui, sans-serif` }} />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                {(["sans", "serif", "display", "script", "mono"] as FontCategory[]).map((cat) => {
+                  const items = FONT_CATALOG.filter((f) => f.category === cat);
+                  if (items.length === 0) return null;
+                  return (
+                    <SelectGroup key={cat}>
+                      <SelectLabel>{FONT_CATEGORY_LABELS[cat]}</SelectLabel>
+                      {items.map((f) => (
+                        <SelectItem
+                          key={f.family}
+                          value={f.family}
+                          style={{ fontFamily: `"${f.family}", system-ui, sans-serif` }}
+                        >
+                          {f.family}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  );
+                })}
               </SelectContent>
             </Select>
           </Field>
@@ -311,10 +328,35 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
               </SelectContent>
             </Select>
           </Field>
+          {layer.defaults.linkedMapLayerId && (
+            <div className="rounded-md border bg-muted/30 p-3 space-y-2 -mt-1">
+              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                Visa rader
+              </p>
+              {(["city", "country", "coordinates"] as const).map((key) => {
+                const labels = { city: "Stad / ort", country: "Land", coordinates: "Koordinater" };
+                const fields = layer.defaults.linkedMapFields ?? { city: true, country: true, coordinates: true };
+                const checked = fields[key] ?? true;
+                return (
+                  <label key={key} className="flex items-center gap-2 text-xs cursor-pointer">
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={(c) =>
+                        updateDefaults({
+                          linkedMapFields: { ...fields, [key]: c === true },
+                        })
+                      }
+                    />
+                    <span>{labels[key]}</span>
+                  </label>
+                );
+              })}
+            </div>
+          )}
           <p className="text-[11px] text-muted-foreground -mt-2">
-            När länkad uppdateras texten automatiskt med stad / koordinater när
-            kunden ändrar plats på den valda kartan (om kunden inte har ändrat
-            texten manuellt). Olänkade texter rörs aldrig av kartan.
+            När länkad uppdateras texten automatiskt med valda rader (stad / land /
+            koordinater) när kunden ändrar plats på den valda kartan, så länge kunden
+            inte har redigerat texten manuellt.
           </p>
         </div>
       )}
