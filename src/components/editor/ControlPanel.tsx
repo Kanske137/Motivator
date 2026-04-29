@@ -240,6 +240,67 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
   );
 }
 
+// ---------------- map tabs (place + style merged) ----------------
+
+function MapTabs({
+  config,
+  layers,
+  layerValues,
+}: {
+  config: ProductConfig;
+  layers: Array<Extract<TemplateLayer, { type: "map" }>>;
+  layerValues: Record<string, unknown>;
+}) {
+  const [activeId, setActiveId] = useState<string>(layers[0]?.id ?? "");
+
+  // If layers change (added/removed), make sure activeId still exists.
+  useEffect(() => {
+    if (!layers.some((l) => l.id === activeId)) {
+      setActiveId(layers[0]?.id ?? "");
+    }
+  }, [layers, activeId]);
+
+  const activeLayer = layers.find((l) => l.id === activeId) ?? layers[0];
+  if (!activeLayer) return null;
+
+  const renderForLayer = (l: Extract<TemplateLayer, { type: "map" }>) => (
+    <div className="space-y-6">
+      <PlaceLayerSection
+        layer={l}
+        value={(layerValues[l.id] as MapLayerValue | undefined) ?? null}
+        heading={null}
+      />
+      <div className="pt-4 border-t">
+        <MapStyleLayerSection
+          config={config}
+          layer={l}
+          value={(layerValues[l.id] as MapLayerValue | undefined) ?? null}
+          heading={null}
+        />
+      </div>
+    </div>
+  );
+
+  if (layers.length === 1) {
+    return renderForLayer(activeLayer);
+  }
+
+  return (
+    <div className="space-y-4">
+      <Tabs value={activeId} onValueChange={setActiveId}>
+        <TabsList className="w-full justify-start overflow-x-auto">
+          {layers.map((l, idx) => (
+            <TabsTrigger key={l.id} value={l.id} className="text-xs">
+              {l.name || `Karta ${idx + 1}`}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+      {renderForLayer(activeLayer)}
+    </div>
+  );
+}
+
 // ---------------- per-layer sub-sections ----------------
 
 function PlaceLayerSection({
