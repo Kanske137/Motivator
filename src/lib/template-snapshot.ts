@@ -22,6 +22,9 @@ export interface TemplateSnapshotInput {
   template: Template;
   orientation: "portrait" | "landscape";
   size: string; // "30x40"
+  /** "poster" | "canvas" — determines whether the canvasLayout (if any) is
+   *  used instead of defaultLayout. */
+  productType?: string | null;
 
   // Per-layer values keyed by layer id. When provided, these override the
   // legacy live* fields. Falls back to layer.defaults when missing.
