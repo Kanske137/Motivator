@@ -351,8 +351,19 @@ export default function DesignerPage() {
         await Promise.all(
           siblings.map((s) => {
             const sibTemplate = (s.template ?? {}) as Template;
+            // Per-row layouts must NOT cross-contaminate: poster siblings
+            // own `defaultLayout`, canvas siblings own `canvasLayout`. We
+            // only propagate the layout block matching THIS row's product
+            // type and otherwise keep the sibling's existing block.
+            const isCurrentCanvas = isCanvasProduct;
             const mergedSibling: Template = {
               ...finalTemplate,
+              defaultLayout: isCurrentCanvas
+                ? (sibTemplate.defaultLayout ?? finalTemplate.defaultLayout)
+                : finalTemplate.defaultLayout,
+              canvasLayout: isCurrentCanvas
+                ? finalTemplate.canvasLayout
+                : (sibTemplate.canvasLayout ?? finalTemplate.canvasLayout),
               productOptions: {
                 ...(finalTemplate.productOptions ?? {}),
                 poster: sibTemplate.productOptions?.poster ?? finalTemplate.productOptions?.poster,
