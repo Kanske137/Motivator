@@ -531,3 +531,89 @@ function ChecklistGroup({
     </div>
   );
 }
+
+function AllowedFontsEditor({
+  value,
+  onChange,
+}: {
+  value: string[] | undefined;
+  onChange: (next: string[]) => void;
+}) {
+  // Undefined / empty array → all fonts allowed (legacy behaviour).
+  const allAllowed = !value || value.length === 0;
+  const isAllowed = (family: string) => allAllowed || value!.includes(family);
+  const enabledCount = allAllowed ? FONT_FAMILIES.length : value!.length;
+
+  const toggle = (family: string, enabled: boolean) => {
+    const current = allAllowed ? [...FONT_FAMILIES] : [...value!];
+    const next = enabled
+      ? Array.from(new Set([...current, family]))
+      : current.filter((f) => f !== family);
+    onChange(next);
+  };
+
+  const enableAll = () => onChange([]);
+  const disableAll = () => onChange([FONT_FAMILIES[0]]);
+
+  return (
+    <Card className="p-0 overflow-hidden">
+      <Accordion type="single" collapsible defaultValue="">
+        <AccordionItem value="allowed-fonts" className="border-0">
+          <AccordionTrigger className="px-5 py-4 hover:no-underline">
+            <div className="text-left">
+              <h2 className="text-base font-semibold">Tillåtna typsnitt</h2>
+              <p className="text-xs text-muted-foreground font-normal">
+                {enabledCount} av {FONT_FAMILIES.length} aktiverade. Typsnitt kunden
+                kan välja för text-lager.
+              </p>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-5 pb-5 space-y-3">
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={enableAll}>
+                Aktivera alla
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={disableAll}>
+                Avaktivera alla
+              </Button>
+            </div>
+            {(["sans", "serif", "display", "script", "mono"] as FontCategory[]).map((cat) => {
+              const items = FONT_CATALOG.filter((f) => f.category === cat);
+              if (items.length === 0) return null;
+              return (
+                <div key={cat} className="space-y-2">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    {FONT_CATEGORY_LABELS[cat]}
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {items.map((f) => {
+                      const checked = isAllowed(f.family);
+                      return (
+                        <label
+                          key={f.family}
+                          className="flex items-center gap-3 rounded-md border bg-background p-2 cursor-pointer"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(c) => toggle(f.family, c === true)}
+                          />
+                          <span
+                            className={`text-sm flex-1 ${checked ? "" : "text-muted-foreground line-through"}`}
+                            style={{ fontFamily: `"${f.family}", system-ui, sans-serif` }}
+                          >
+                            {f.family}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    </Card>
+  );
+}
+
