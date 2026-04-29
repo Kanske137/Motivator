@@ -530,7 +530,7 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
   ctx.fillRect(0, 0, w, h);
 
   // Sort layers by zIndex
-  const layout = input.template.defaultLayout[input.orientation];
+  const layout = getActiveLayoutBlock(input.template, input.productType)[input.orientation];
   const sortedByZ = [...layout.layers].sort((a, b) => a.zIndex - b.zIndex);
   // Margin must always render visually on top of all other layers, regardless
   // of its zIndex. Reorder so margin layers are drawn last.
