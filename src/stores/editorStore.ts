@@ -423,7 +423,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setWhiteMarginEnabled: (whiteMarginEnabled) => set({ whiteMarginEnabled }),
   setLayerTransform: (id, patch) => {
     const state = get();
-    const layer = state.template?.defaultLayout[state.orientation].layers.find((l) => l.id === id);
+    const layer = state.template
+      ? getActiveLayoutBlock(state.template, state.config?.product_type)[state.orientation].layers.find((l) => l.id === id)
+      : undefined;
     if (!layer) return;
     const cur = state.layerTransforms[id] ?? {};
     const merged = {
