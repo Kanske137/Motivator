@@ -145,8 +145,8 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   const editorW = frontW + 2 * wrapCm;
   const editorH = frontH + 2 * wrapCm;
   const posterAspect = editorW / editorH;
-  const frontInsetX = wrapCm > 0 ? wrapCm / editorW : 0;
-  const frontInsetY = wrapCm > 0 ? wrapCm / editorH : 0;
+  const frontInsetX = wrapCm > 0 && !layersIncludeWrap ? wrapCm / editorW : 0;
+  const frontInsetY = wrapCm > 0 && !layersIncludeWrap ? wrapCm / editorH : 0;
 
   // Derive margin insets and (when customer hides margin) filter the margin
   // layer + remap remaining layers so they fill the freed-up area.
