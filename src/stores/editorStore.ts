@@ -743,16 +743,7 @@ function updateMap(set: SetFn, get: GetFn, id: string, patch: Partial<MapLayerVa
   if (!cur || cur.kind !== "map") return;
   const next: MapLayerValue = { ...cur, ...patch };
   const layerValues = { ...state.layerValues, [id]: next };
-  set({ layerValues, ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues }) });
-}
-
-function updateText(set: SetFn, get: GetFn, id: string, patch: Partial<TextLayerValue>) {
-  const state = get();
-  const cur = state.layerValues[id];
-  if (!cur || cur.kind !== "text") return;
-  const next: TextLayerValue = { ...cur, ...patch };
-  const layerValues = { ...state.layerValues, [id]: next };
-  set({ layerValues, ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues }) });
+  set({ layerValues, ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues, config: state.config }) });
 }
 
 function updatePhoto(set: SetFn, get: GetFn, id: string, patch: Partial<PhotoLayerValue>) {
