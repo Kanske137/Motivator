@@ -64,7 +64,7 @@ export function buildTemplateFromLegacy(config: ProductConfig): Template {
 function migrateLayer(layer: TemplateLayer): TemplateLayer {
   if (layer.type === "map") {
     const s = layer.defaults.shape as string;
-    if (s !== "circle" && s !== "heart" && s !== "star") {
+    if (s !== "rect" && s !== "circle" && s !== "heart" && s !== "star") {
       return {
         ...layer,
         defaults: { ...layer.defaults, shape: "circle" },
@@ -205,7 +205,7 @@ export function resolveTemplate(
       for (const l of layout.layers) {
         if (l?.type === "map" && l?.defaults?.shape) {
           const s = l.defaults.shape;
-          if (s !== "circle" && s !== "heart" && s !== "star") l.defaults.shape = "circle";
+          if (s !== "rect" && s !== "circle" && s !== "heart" && s !== "star") l.defaults.shape = "circle";
         }
       }
     }
