@@ -511,11 +511,16 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
   const h = Math.round(hCm * PX_PER_CM * scale);
   const pxPerMm = (PX_PER_CM * scale) / 10;
 
-  // Front-zone rect (where layer % coords live)
-  const frontPxX = Math.round(extraCm * PX_PER_CM * scale);
-  const frontPxY = Math.round(extraCm * PX_PER_CM * scale);
-  const frontPxW = Math.round(frontWcm * PX_PER_CM * scale);
-  const frontPxH = Math.round(frontHcm * PX_PER_CM * scale);
+  // Front-zone rect (where layer % coords live for poster). For canvas
+  // templates with a dedicated canvasLayout, layer % are anchored to the
+  // FULL editor surface (front + 2× wrap + bleed), so the rect spans the
+  // entire output.
+  const layersIncludeWrap =
+    input.productType === "canvas" && !!input.template.canvasLayout;
+  const frontPxX = layersIncludeWrap ? 0 : Math.round(extraCm * PX_PER_CM * scale);
+  const frontPxY = layersIncludeWrap ? 0 : Math.round(extraCm * PX_PER_CM * scale);
+  const frontPxW = layersIncludeWrap ? w : Math.round(frontWcm * PX_PER_CM * scale);
+  const frontPxH = layersIncludeWrap ? h : Math.round(frontHcm * PX_PER_CM * scale);
 
   const out = document.createElement("canvas");
   out.width = w;
