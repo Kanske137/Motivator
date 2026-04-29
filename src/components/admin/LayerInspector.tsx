@@ -173,6 +173,7 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
+                <SelectItem value="rect">Fyll lager (rektangel)</SelectItem>
                 <SelectItem value="circle">Cirkel</SelectItem>
                 <SelectItem value="heart">Hjärta</SelectItem>
                 <SelectItem value="star">Stjärna</SelectItem>
