@@ -1,28 +1,42 @@
-Jag förstår korrigeringen: thumbnails är nu rätt, men det saknas i själva admin-designytan (`/admin/designer/...`) för akrylmallar. Dessutom ligger kundeditorns akryl-overlay för högt och hamnar ovanpå thumbnail/lightbox-element, vilket ska stoppas utan att skruvarna hamnar bakom designlagren.
+Jag hittade problemet: själva testordern kommer in, printfilen finns, men order-webhooken som skickar till Gelato känner fortfarande bara igen `poster` och `canvas`.
 
-Plan:
+Aktuell order #1018 stoppades därför med:
 
-1. Lägg till akrylskruvar i admin-designytan
-- Uppdatera `LayerCanvas` så den kan veta vilken produkttyp som redigeras.
-- För `product_type === "acrylic"` renderas samma `AcrylicCornerOverlay` ovanpå admin-canvasen.
-- Overlayn ska vara `pointer-events: none`, så den inte stör drag/drop, markering eller resize av lager.
-- Den ska ligga över mallens lager i adminytan, men under adminens egna guider/selection-hjälp där det behövs.
+```text
+sku_not_found: unknown product type for handle="testglas-acrylic"
+```
 
-2. Skicka produkttyp från admin-sidan
-- Uppdatera `DesignerPage` så `LayerCanvas` får `productType={config.product_type}`.
-- Canvas-logiken för canvas-wrap lämnas oförändrad.
-- Poster, canvas och aluminium påverkas inte visuellt.
+Det betyder: SKU:erna som vi lade in är rätt sparade i frontend/shared mapping, men `shopify-order-webhook` har en äldre/inlinad SKU-resolver som inte har uppdaterats för `acrylic` och `aluminum`. Därför försöker den inte ens slå upp de nya SKU:erna.
 
-3. Begränsa z-index på kundeditorns skruvar
-- Ändra `MapPreview` så akrylskruvarna bara skapar en lokal stacking context inne i själva produkt-/printytan.
-- Sänk z-index från dagens nivå (`60`) till en nivå som fortfarande är över alla designlager, marginaler och former i själva printytan, men inte konkurrerar med dialoger, thumbnails, lightbox, controls eller övriga UI-element.
-- Sätt vid behov `isolation: isolate` på produktens ram/container så interna z-index inte kan “läcka” över externa UI-element.
+## Plan
 
-4. Behåll rätt exportbeteende
-- Ingen ändring i tryckfilsgenerering: skruvarna ska fortsatt inte hamna i högupplöst tryckfil.
-- Snapshot/mockup/cart-bild ska fortsatt kunna visa skruvarna som tidigare fix.
+1. Uppdatera `supabase/functions/shopify-order-webhook/index.ts`
+   - Lägg till stöd för produkttyperna `aluminum` och `acrylic` i `productTypeFromHandle`.
+   - Utöka den inlinade `GELATO_SKU_MAP` med de nya SKU:erna för:
+     - Aluminium: 20x30, 30x40, 40x50, 50x70, 70x100 i portrait/landscape
+     - Akryl: 20x30, 30x40, 40x50, 50x70, 70x100 i portrait/landscape
+   - Säkerställ att `Standard` för akryl och aluminium matchar kartans nycklar, så orderraden `size=20x30 variant=Standard orient=portrait` resolve:ar till rätt `acrylic_..._ver` UID.
 
-Teknisk riktning:
-- Återanvänd `src/components/editor/AcrylicCornerOverlay.tsx` i adminytan för att få samma proportioner: centrum ca 1.4 cm från kant och diameter ca 1.5 cm.
-- I adminytan används en rimlig designstorlek baserat på orientering/aspect, t.ex. 30×40 cm för stående 3:4 och 40×30 cm för liggande 4:3, så storleken blir proportionellt korrekt.
-- I kundeditorn läggs overlayn inne i produktens relativa container och hålls inom en lokal stacking context.
+2. Göra resolver-logiken mer robust
+   - Om `gelato_sku_map` finns på `product_configs` men inte matchar dagens nested-format, ska webhooken ändå kunna falla tillbaka på den lokala mappen.
+   - Behåll befintligt beteende för posters/canvas oförändrat.
+
+3. Deploya order-webhooken
+   - Deploya `shopify-order-webhook` så att den kör uppdaterad logik i backend.
+   - Ingen Shopify-sync behövs för detta specifika fel, eftersom produkten redan skickar `_product_handle`, `_size`, `_variant`, `_orientation` och `_print_file_url` korrekt.
+
+4. Verifiera efter ändringen
+   - Kontrollera senaste `gelato_orders` och webhook-loggar.
+   - För en ny akryltestorder ska loggen ändras från:
+
+```text
+source=missing uid=NONE
+```
+
+till ungefär:
+
+```text
+source=local-exact uid=acrylic_200x300-mm-8x12-inch_4-mm_4-0_ver
+```
+
+Därefter ska ordern kunna gå vidare till Gelato. De två redan misslyckade testordrarna (#1017 och #1018) kommer inte automatiskt skickas om av denna ändring; enklast är att göra en ny testorder efter fixen, alternativt kan vi senare lägga till/bygga en manuell retry för sådana ordrar.

@@ -136,6 +136,20 @@ const GELATO_SKU_MAP: Record<string, Record<string, { portrait: string; landscap
       landscape: "frame_and_poster_mounted_product_frs_700x1000-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
     },
   },
+  aluminum: {
+    "20x30|Standard": { portrait: "metallic_200x300-mm-8x12-inch_3-mm_4-0_ver", landscape: "metallic_200x300-mm-8x12-inch_3-mm_4-0_hor" },
+    "30x40|Standard": { portrait: "metallic_300x400-mm-12x16-inch_3-mm_4-0_ver", landscape: "metallic_300x400-mm-12x16-inch_3-mm_4-0_hor" },
+    "40x50|Standard": { portrait: "metallic_400x500-mm-16x20-inch_3-mm_4-0_ver", landscape: "metallic_400x500-mm-16x20-inch_3-mm_4-0_hor" },
+    "50x70|Standard": { portrait: "metallic_500x700-mm-20x28-inch_3-mm_4-0_ver", landscape: "metallic_500x700-mm-20x28-inch_3-mm_4-0_hor" },
+    "70x100|Standard": { portrait: "metallic_700x1000-mm-28x40-inch_3-mm_4-0_ver", landscape: "metallic_700x1000-mm-28x40-inch_3-mm_4-0_hor" },
+  },
+  acrylic: {
+    "20x30|Standard": { portrait: "acrylic_200x300-mm-8x12-inch_4-mm_4-0_ver", landscape: "acrylic_200x300-mm-8x12-inch_4-mm_4-0_hor" },
+    "30x40|Standard": { portrait: "acrylic_300x400-mm-12x16-inch_4-mm_4-0_ver", landscape: "acrylic_300x400-mm-12x16-inch_4-mm_4-0_hor" },
+    "40x50|Standard": { portrait: "acrylic_400x500-mm-16x20-inch_4-mm_4-0_ver", landscape: "acrylic_400x500-mm-16x20-inch_4-mm_4-0_hor" },
+    "50x70|Standard": { portrait: "acrylic_500x700-mm-20x28-inch_4-mm_4-0_ver", landscape: "acrylic_500x700-mm-20x28-inch_4-mm_4-0_hor" },
+    "70x100|Standard": { portrait: "acrylic_700x1000-mm-28x40-inch_4-mm_4-0_ver", landscape: "acrylic_700x1000-mm-28x40-inch_4-mm_4-0_hor" },
+  },
   canvas: {
     "20x25|2cm": { portrait: "canvas_product_cf_200x250-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver", landscape: "canvas_product_cf_200x250-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor" },
     "20x25|4cm": { portrait: "canvas_product_cf_200x250-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver", landscape: "canvas_product_cf_200x250-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor" },
@@ -156,8 +170,10 @@ const GELATO_SKU_MAP: Record<string, Record<string, { portrait: string; landscap
   },
 };
 
-function productTypeFromHandle(handle: string): "posters" | "canvas" | null {
+function productTypeFromHandle(handle: string): "posters" | "canvas" | "aluminum" | "acrylic" | null {
   const h = (handle || "").toLowerCase();
+  if (h.endsWith("-acrylic") || h.includes("acrylic") || h.includes("akryl")) return "acrylic";
+  if (h.endsWith("-aluminum") || h.includes("aluminum") || h.includes("aluminium") || h.includes("metallic")) return "aluminum";
   if (h.includes("canvas")) return "canvas";
   if (h.includes("poster") || h.includes("karta")) return "posters";
   return null;
