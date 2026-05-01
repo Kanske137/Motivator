@@ -93,6 +93,7 @@ export function MockupGallery() {
           liveTextVisible: textVisible,
           wrapCm: isCanvas ? canvasDepthCm : 0,
           bleedCm: isCanvas ? BLEED_CM : 0,
+          acrylicCorners: config.product_type === "acrylic",
           photoOverlayUrl:
             designSource === "ai"
               ? aiPrintFileUrl ?? undefined
