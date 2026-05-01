@@ -223,52 +223,58 @@ function Scene({
 }
 
 export function Canvas3DPreview({
-  printUrl, loading, error, widthCm, heightCm, depthCm, bleedCm = 0.3,
+  printUrl, loading, error, widthCm, heightCm, depthCm, bleedCm = 0.3, embedded = false,
 }: Canvas3DPreviewProps) {
+  const inner = (
+    <div
+      className="w-full rounded-2xl overflow-hidden bg-card border relative"
+      style={{ height: embedded ? "min(75vh, 640px)" : "min(60vh, 520px)" }}
+    >
+      {loading || !printUrl ? (
+        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/40 animate-pulse">
+          {error ? (
+            <div className="flex flex-col items-center text-destructive text-xs p-4 text-center gap-2">
+              <AlertCircle className="h-5 w-5" />
+              <span className="line-clamp-3">{error}</span>
+            </div>
+          ) : (
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          )}
+        </div>
+      ) : (
+        <Canvas
+          shadows
+          dpr={[1, 2]}
+          camera={{ position: [0, 0, 3.6], fov: 35 }}
+          gl={{ preserveDrawingBuffer: false, antialias: true }}
+        >
+          <color attach="background" args={["#f5f2ec"]} />
+          <Suspense fallback={null}>
+            <Scene
+              printUrl={printUrl}
+              widthCm={widthCm}
+              heightCm={heightCm}
+              depthCm={depthCm}
+              bleedCm={bleedCm}
+            />
+          </Suspense>
+        </Canvas>
+      )}
+      <div className="absolute bottom-2 right-3 text-[11px] text-muted-foreground bg-background/80 backdrop-blur-sm px-2 py-1 rounded-full pointer-events-none">
+        dra för att rotera
+      </div>
+    </div>
+  );
+
+  if (embedded) return inner;
+
   return (
     <div className="border-t bg-[hsl(var(--paper))]">
       <div className="px-4 py-3">
         <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-3">
           3D-förhandsvisning
         </h3>
-        <div
-          className="w-full rounded-2xl overflow-hidden bg-card border relative"
-          style={{ height: "min(60vh, 520px)" }}
-        >
-          {loading || !printUrl ? (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/40 animate-pulse">
-              {error ? (
-                <div className="flex flex-col items-center text-destructive text-xs p-4 text-center gap-2">
-                  <AlertCircle className="h-5 w-5" />
-                  <span className="line-clamp-3">{error}</span>
-                </div>
-              ) : (
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              )}
-            </div>
-          ) : (
-            <Canvas
-              shadows
-              dpr={[1, 2]}
-              camera={{ position: [0, 0, 3.6], fov: 35 }}
-              gl={{ preserveDrawingBuffer: false, antialias: true }}
-            >
-              <color attach="background" args={["#f5f2ec"]} />
-              <Suspense fallback={null}>
-                <Scene
-                  printUrl={printUrl}
-                  widthCm={widthCm}
-                  heightCm={heightCm}
-                  depthCm={depthCm}
-                  bleedCm={bleedCm}
-                />
-              </Suspense>
-            </Canvas>
-          )}
-          <div className="absolute bottom-2 right-3 text-[11px] text-muted-foreground bg-background/80 backdrop-blur-sm px-2 py-1 rounded-full pointer-events-none">
-            dra för att rotera
-          </div>
-        </div>
+        {inner}
       </div>
     </div>
   );
