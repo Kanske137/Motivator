@@ -24,6 +24,7 @@ import MapLayerPreview from "./MapLayerPreview";
 import TextLayerPreview from "./TextLayerPreview";
 import { LineLayerView, MarginLayerView } from "@/components/editor/layers/StaticLayers";
 import { ShapeLayerView } from "@/components/editor/layers/ShapeLayerView";
+import { AcrylicCornerOverlay } from "@/components/editor/AcrylicCornerOverlay";
 
 const SNAP_PCT = 1.25;
 const GUIDE_TOLERANCE_PCT = 1.5;
@@ -40,6 +41,9 @@ interface Props {
    *  designer renders the front-zone marker and shaded wrap bands. */
   wrapInsetPctX?: number;
   wrapInsetPctY?: number;
+  /** Active product type — used to overlay product-specific decoration
+   *  (e.g. acrylic corner screws) on top of the design surface. */
+  productType?: string | null;
 }
 
 const aspectToRatio: Record<Aspect, string> = {
@@ -57,7 +61,17 @@ export default function LayerCanvas({
   onChange,
   wrapInsetPctX = 0,
   wrapInsetPctY = 0,
+  productType = null,
 }: Props) {
+  const isAcrylic = productType === "acrylic";
+  // Derive an approximate front size in cm from the aspect so the overlay's
+  // 1.4 cm inset / 1.5 cm disc translate to reasonable %-positions in admin.
+  const acrylicFrontCm =
+    aspect === "1:1"
+      ? { w: 30, h: 30 }
+      : aspect === "4:3"
+      ? { w: 40, h: 30 }
+      : { w: 30, h: 40 };
   const wrapRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [guides, setGuides] = useState<{ v: number[]; h: number[] }>({ v: [], h: [] });

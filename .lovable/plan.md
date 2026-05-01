@@ -1,31 +1,28 @@
-# Fix: Akryl-skruvar saknas i preview/editor
+Jag förstår korrigeringen: thumbnails är nu rätt, men det saknas i själva admin-designytan (`/admin/designer/...`) för akrylmallar. Dessutom ligger kundeditorns akryl-overlay för högt och hamnar ovanpå thumbnail/lightbox-element, vilket ska stoppas utan att skruvarna hamnar bakom designlagren.
 
-## Problem
-De fyra silverskruvarna (1.5 cm diameter, 1.4 cm in från hörnen) som rendreras IRL på Gelatos akrylglas-print syns inte:
+Plan:
 
-1. **Mockup-gallerietsförhandsbilder** (`MockupGallery.tsx`) – snapshoten som komponeras in i rumsmiljöerna saknar skruvarna eftersom `acrylicCorners`-flaggan aldrig skickas till `renderTemplateSnapshot`.
-2. **Designytan i editorn** (`MapPreview.tsx`) – `<AcrylicCornerOverlay/>` renderas redan villkorligt på `isAcrylic`, men i praktiken syns den inte. Trolig orsak: `padding: innerPadding` på frame-divens style + att overlayns parent-div har `position: relative` men overlayn använder `inset-0` – verifierat att den ligger högst upp (zIndex 50). Vi förstärker positioneringen så den alltid täcker hela frame-rektangeln, även när padding/border finns, och garanterar att den ritas över alla interna lager.
+1. Lägg till akrylskruvar i admin-designytan
+- Uppdatera `LayerCanvas` så den kan veta vilken produkttyp som redigeras.
+- För `product_type === "acrylic"` renderas samma `AcrylicCornerOverlay` ovanpå admin-canvasen.
+- Overlayn ska vara `pointer-events: none`, så den inte stör drag/drop, markering eller resize av lager.
+- Den ska ligga över mallens lager i adminytan, men under adminens egna guider/selection-hjälp där det behövs.
 
-## Ändringar
+2. Skicka produkttyp från admin-sidan
+- Uppdatera `DesignerPage` så `LayerCanvas` får `productType={config.product_type}`.
+- Canvas-logiken för canvas-wrap lämnas oförändrad.
+- Poster, canvas och aluminium påverkas inte visuellt.
 
-### 1. `src/components/editor/MockupGallery.tsx`
-Skicka med `acrylicCorners: config.product_type === "acrylic"` till `renderTemplateSnapshot` (rad ~77). Då bakas skruvarna in i den snapshot som sedan komponeras in i alla mockup-scener — exakt samma flöde som cart-bilden i `EditorPage`.
+3. Begränsa z-index på kundeditorns skruvar
+- Ändra `MapPreview` så akrylskruvarna bara skapar en lokal stacking context inne i själva produkt-/printytan.
+- Sänk z-index från dagens nivå (`60`) till en nivå som fortfarande är över alla designlager, marginaler och former i själva printytan, men inte konkurrerar med dialoger, thumbnails, lightbox, controls eller övriga UI-element.
+- Sätt vid behov `isolation: isolate` på produktens ram/container så interna z-index inte kan “läcka” över externa UI-element.
 
-### 2. `src/components/editor/MapPreview.tsx`
-- Säkerställ att `<AcrylicCornerOverlay/>` ligger som **sista barn** i frame-diven så den alltid renderas över allt annat innehåll (är redan i botten av JSX, men double-check efter alignment-guides).
-- Höj overlays `zIndex` till `60` så den inte krockar med ev. dragghandtag (zIndex 39) eller margin (40) eller guides (10000 — den ska ligga UNDER guides).
-- Justera så overlayns absoluta position räknas mot själva frame-rektangelns inner-content-box (om `padding`/`border` finns) genom att lägga overlayn i en wrapper med `position:absolute; inset:0; pointer-events:none` direkt under frame-diven, snarare än att förlita sig på `<AcrylicCornerOverlay/>`s eget `inset-0` som påverkas av padding.
+4. Behåll rätt exportbeteende
+- Ingen ändring i tryckfilsgenerering: skruvarna ska fortsatt inte hamna i högupplöst tryckfil.
+- Snapshot/mockup/cart-bild ska fortsatt kunna visa skruvarna som tidigare fix.
 
-### 3. (Bonus) `src/components/admin/TemplateThumbnail.tsx`
-Lägg till stöd för `productType === "acrylic"`: rendera 4 små grå cirklar i hörnen så även admin-thumbnailen visar att det är akryl. Mycket lätt – återanvänd `AcrylicCornerOverlay` med `frontWcm/frontHcm` baserat på en standardstorlek (30×40).
-
-## Vad som INTE ändras
-- `template-snapshot.ts` – logiken för att rita skruvarna finns redan och fungerar; vi ska bara aktivera `acrylicCorners`-flaggan från fler call sites.
-- Print-pipeline / hires-snapshots – skruvarna fortsätter att vara explicit avstängda i tryckfiler (`acrylicCorners: false`).
-- Posters/canvas/aluminium berörs inte alls.
-
-## Verifiering efter implementation
-1. Skapa eller öppna en akryl-mall i editorn → fyra silverdiskar ska synas i hörnen i designytan.
-2. Mockup-galleriet längre ner ska visa rummet med en akryl-tavla där skruvarna också syns.
-3. Cart-bilden (när man lägger i varukorg) visar redan skruvarna – ingen regression där.
-4. Tryckfilen som skickas till Gelato ska INTE innehålla skruvar.
+Teknisk riktning:
+- Återanvänd `src/components/editor/AcrylicCornerOverlay.tsx` i adminytan för att få samma proportioner: centrum ca 1.4 cm från kant och diameter ca 1.5 cm.
+- I adminytan används en rimlig designstorlek baserat på orientering/aspect, t.ex. 30×40 cm för stående 3:4 och 40×30 cm för liggande 4:3, så storleken blir proportionellt korrekt.
+- I kundeditorn läggs overlayn inne i produktens relativa container och hålls inom en lokal stacking context.
