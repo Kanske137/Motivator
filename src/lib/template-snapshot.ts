@@ -623,10 +623,17 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
         const shape = (av?.shape ?? layer.defaults.shape) as "rect" | "circle" | "heart" | "star";
         const offsetX = av?.offsetX ?? 0;
         const offsetY = av?.offsetY ?? 0;
-        // For AI removeBackground results, force `contain` so the entire
-        // generated subject lands on the print file with white padding on
-        // any side that doesn't match the layer aspect — never crop.
-        const fit = aiResultUrl ? "contain" : layer.defaults.fit;
+        // Only force `contain` for removeBackground results (Nano Banana 2
+        // may not perfectly match target aspect; its white padding blends in).
+        // For human face-swap (Replicate preserves reference dimensions) and
+        // pet swap (prompt enforces same aspect as reference), use the
+        // layer's default fit so the print fills the layer exactly like the
+        // reference image — matches the editor preview, no empty edges.
+        const aiSubjectKind = layer.defaults.subjectKind ?? "human";
+        const fit =
+          aiResultUrl && aiSubjectKind === "removeBackground"
+            ? "contain"
+            : layer.defaults.fit;
         try {
           await drawPhotoLayer(ctx, rect, url, shape, fit, offsetX, offsetY);
         } catch (e) {

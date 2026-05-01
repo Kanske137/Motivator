@@ -1,53 +1,44 @@
-## Min analys
+## Problem
 
-Jag har spårat hur kanterna mappas hela vägen: editor → tryckfil (`renderTemplateSnapshot`) → 3D (`Canvas3DPreview` → `CanvasMesh.materials`).
+När en kund kör face-swap (human) får hen tillbaka en bild från Replicate som har **samma dimensioner som referensbilden**. Trots det visas den i editorn med tomma/vita kanter och samma sak hamnar på print-filen.
 
-Tryckfilen är korrekt — den läggs ut top-left som
-`[bleed | wrap | FRONT | wrap | bleed]` på båda axlarna och samma fil används av både cart-thumbnail, print-pipeline och 3D.
+Orsaken: vi tvingar idag `fit = "contain"` så fort det finns ett AI-resultat, oavsett vilken modell som genererade det.
 
-Problemet sitter i **3D-mappningen**. Kommentarerna i `CanvasMesh` om Three.js BoxGeometrys default-UV stämmer inte med faktisk Three.js-källkod, vilket gör att flera flippar går åt fel håll.
+```ts
+// src/components/editor/MapPreview.tsx (rad 402)
+const effectiveFit = aiResultUrl ? "contain" : l.defaults.fit;
 
-### Vad Three.js `BoxGeometry` faktiskt ger (verifierat i `node_modules/three/src/geometries/BoxGeometry.js`)
+// src/lib/template-snapshot.ts (rad 629)
+const fit = aiResultUrl ? "contain" : layer.defaults.fit;
+```
 
-| Face | U=0 ligger vid | V=0 ligger vid |
-|------|----------------|----------------|
-| `+Z` front | -X (vänster) | -Y (botten) |
-| `+X` höger | **+Z (front)** | -Y (botten) |
-| `-X` vänster | **-Z (back)** | -Y (botten) |
-| `+Y` topp | -X (vänster) | **+Z (front)** |
-| `-Y` botten | -X (vänster) | **-Z (back)** |
+`contain` är rätt val för `removeBackground` (Nano Banana 2 håller inte alltid målad aspect, och dess vita bakgrund smälter in). Men för `human` (Replicate face-swap) och `pet` (Nano Banana 2 med uttrycklig "same aspect ratio as image #1"-instruktion) ska bilden alltid fylla layret precis som referensbilden gjorde — alltså samma `fit` som `layer.defaults.fit` (typiskt `cover`).
 
-Koden i `Canvas3DPreview.tsx` antar motsatsen för +X/-X/+Y/-Y, vilket gör att:
+## Lösning
 
-- **Topp** flippas i Y när den inte ska → övre wrap-strippen renderas upp-och-ner mot front-kanten. Det är därför du ser den som "definitivt avvikande".
-- **Botten** flippas i Y när den inte ska → spegelvänd, men ofta svår att upptäcka eftersom motiv på bottenkanten är mindre framträdande.
-- **Höger/vänster** har också fel flippkonvention i X. Att sidorna "ser nästan rätt ut" beror på att kartor och liknande motiv är ungefärligt symmetriska kring lodlinjen, så en horisontell spegelvändning av ett ~2 cm tunt band syns knappt.
+Begränsa "tvinga contain"-regeln till **endast** `subjectKind === "removeBackground"`. För `human` och `pet` används layerns `defaults.fit` (samma som referensbilden använder före face-swap), så resultatet fyller layret utan tomma kanter.
 
-Sömmen mot fronten är vad som gör buggen synligast: när närmaste-pixel-mot-fronten flippas hamnar den motsatta sidan av strippen mot front-kanten, vilket bryter den seamlessa fortsättningen.
+### Ändringar
 
-## Fix
+**`src/components/editor/MapPreview.tsx`** (kring rad 393-402)
+- Läs `subjectKind` från `l.defaults.subjectKind`.
+- Sätt `effectiveFit = (aiResultUrl && subjectKind === "removeBackground") ? "contain" : l.defaults.fit`.
 
-Endast en fil: `src/components/editor/Canvas3DPreview.tsx`, materials-blocket i `CanvasMesh`.
+**`src/lib/template-snapshot.ts`** (kring rad 617-631)
+- Läs `subjectKind` från `layer.defaults.subjectKind`.
+- Sätt `fit = (aiResultUrl && subjectKind === "removeBackground") ? "contain" : layer.defaults.fit`.
 
-Korrigera UV-flipparna baserat på faktisk Three.js-konvention:
+Detta är symmetriskt mellan editor-preview och hires-print, så vad kunden ser är vad hen får.
 
-| Face | flipX | flipY |
-|------|-------|-------|
-| `+Z` front | nej | nej (oförändrad) |
-| `+X` höger | **ja** (var: nej) | nej |
-| `-X` vänster | **nej** (var: ja) | nej |
-| `+Y` topp | nej | **nej** (var: ja) |
-| `-Y` botten | nej | **nej** (var: ja) |
-| `-Z` back | n/a (solid neutral) | n/a |
+### Varför det räcker
 
-Uppdatera även kommentarerna ovanför varje `make(...)`-anrop så att de speglar faktisk BoxGeometry-mappning, så att framtida ändringar inte introducerar samma misstag.
+- **Human face-swap (Replicate `cdingram/face-swap`)**: returnerar bilden med exakt samma pixelmått som `input_image` (referensbilden). Eftersom referensbilden redan passar layret enligt `defaults.fit` kommer face-swap-resultatet också göra det.
+- **Pet (Nano Banana 2)**: prompten kräver explicit "same aspect ratio as image #1" och dimensions-sanity-checken i edge-funktionen avvisar collage. I praktiken matchar resultatet referensens form, så `defaults.fit` (cover) fyller layret korrekt.
+- **removeBackground**: behåller dagens beteende (`contain` + vit padding) — bilden ska aldrig beskäras eftersom motivet redan är inramat med vit halo.
 
-## Verifiering
+Inga ändringar i edge-funktionen, prompten eller print-pipelinen behövs.
 
-Efter ändringen kontrollerar jag i preview att:
-1. Översta wrap-strippen fortsätter motivet seamless över front-kanten (testa med en karta som har distinkta gator nära överkanten).
-2. Bottenstrippen likadant.
-3. Höger/vänster-strippar fortsätter seamless (testa med text eller en marker nära kanten).
-4. Inga sidor är upp-och-ner eller spegelvända längre.
+### Filer som ändras
 
-Inga andra filer behöver röras — tryckfilen, cart-thumbnailen och admin-previewen är redan korrekta.
+- `src/components/editor/MapPreview.tsx`
+- `src/lib/template-snapshot.ts`
