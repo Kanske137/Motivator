@@ -123,11 +123,15 @@ export async function loadAllConfigs(): Promise<ProductConfig[]> {
 import {
   POSTER_PRICES,
   CANVAS_PRICES,
+  ALUMINUM_PRICES,
+  ACRYLIC_PRICES,
 } from "@/lib/pricing";
 
 interface ProductOptionsLike {
   poster?: { enabled?: boolean; allowedSizes?: string[]; allowedFrames?: string[] };
   canvas?: { enabled?: boolean; allowedSizes?: string[]; allowedDepths?: string[] };
+  aluminum?: { enabled?: boolean; allowedSizes?: string[]; allowedMaterials?: string[] };
+  acrylic?: { enabled?: boolean; allowedSizes?: string[]; allowedFinishes?: string[] };
 }
 
 /** Build a SizeDef[] for a config from its template's productOptions when
@@ -139,14 +143,34 @@ export function getEffectiveSizes(
 ): SizeDef[] {
   if (config.sizes && config.sizes.length > 0) return config.sizes;
   if (!productOptions) return [];
-  const isCanvas = config.product_type === "canvas";
-  const block = isCanvas ? productOptions.canvas : productOptions.poster;
-  if (!block?.enabled) return [];
-  const sizes = block.allowedSizes ?? [];
-  const variantNames = isCanvas
-    ? (productOptions.canvas?.allowedDepths ?? [])
-    : (productOptions.poster?.allowedFrames ?? []);
-  const priceTable = isCanvas ? CANVAS_PRICES : POSTER_PRICES;
+  let sizes: string[] = [];
+  let variantNames: string[] = [];
+  let priceTable: Record<string, Record<string, number>> = {};
+  if (config.product_type === "canvas") {
+    const block = productOptions.canvas;
+    if (!block?.enabled) return [];
+    sizes = block.allowedSizes ?? [];
+    variantNames = block.allowedDepths ?? [];
+    priceTable = CANVAS_PRICES;
+  } else if (config.product_type === "aluminum") {
+    const block = productOptions.aluminum;
+    if (!block?.enabled) return [];
+    sizes = block.allowedSizes ?? [];
+    variantNames = block.allowedMaterials ?? [];
+    priceTable = ALUMINUM_PRICES;
+  } else if (config.product_type === "acrylic") {
+    const block = productOptions.acrylic;
+    if (!block?.enabled) return [];
+    sizes = block.allowedSizes ?? [];
+    variantNames = block.allowedFinishes ?? [];
+    priceTable = ACRYLIC_PRICES;
+  } else {
+    const block = productOptions.poster;
+    if (!block?.enabled) return [];
+    sizes = block.allowedSizes ?? [];
+    variantNames = block.allowedFrames ?? [];
+    priceTable = POSTER_PRICES;
+  }
   const out: SizeDef[] = [];
   for (const size of sizes) {
     const variants: SizeVariant[] = [];
