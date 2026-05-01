@@ -43,7 +43,7 @@ interface Props {
   onChange: (next: ProductOptions) => void;
 }
 
-type Kind = "poster" | "canvas";
+type Kind = "poster" | "canvas" | "aluminum" | "acrylic";
 
 export default function ProductOptionsSection({ config, value, onChange }: Props) {
   // Variant names from config (used so Gelato-mapped variants always appear)
@@ -70,6 +70,22 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
     () => mergeUnique(configVariantNames, DEFAULT_PRODUCT_VARIANTS.canvas.depths),
     [configVariantNames],
   );
+  const aluminumSizes = useMemo(
+    () => mergeUnique(configSizes, DEFAULT_PRODUCT_VARIANTS.aluminum.sizes),
+    [configSizes],
+  );
+  const aluminumMaterials = useMemo(
+    () => mergeUnique(configVariantNames, DEFAULT_PRODUCT_VARIANTS.aluminum.materials),
+    [configVariantNames],
+  );
+  const acrylicSizes = useMemo(
+    () => mergeUnique(configSizes, DEFAULT_PRODUCT_VARIANTS.acrylic.sizes),
+    [configSizes],
+  );
+  const acrylicFinishes = useMemo(
+    () => mergeUnique(configVariantNames, DEFAULT_PRODUCT_VARIANTS.acrylic.finishes),
+    [configVariantNames],
+  );
 
   function toggleEnabled(kind: Kind, enabled: boolean) {
     const next: ProductOptions = { ...value };
@@ -85,7 +101,7 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
             ? value.poster.allowedFrames
             : [...DEFAULT_PRODUCT_VARIANTS.poster.frames],
       };
-    } else {
+    } else if (kind === "canvas") {
       next.canvas = {
         enabled,
         allowedSizes:
@@ -97,13 +113,37 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
             ? value.canvas.allowedDepths
             : [...DEFAULT_PRODUCT_VARIANTS.canvas.depths],
       };
+    } else if (kind === "aluminum") {
+      next.aluminum = {
+        enabled,
+        allowedSizes:
+          value.aluminum?.allowedSizes && value.aluminum.allowedSizes.length > 0
+            ? value.aluminum.allowedSizes
+            : [...DEFAULT_PRODUCT_VARIANTS.aluminum.sizes],
+        allowedMaterials:
+          value.aluminum?.allowedMaterials && value.aluminum.allowedMaterials.length > 0
+            ? value.aluminum.allowedMaterials
+            : [...DEFAULT_PRODUCT_VARIANTS.aluminum.materials],
+      };
+    } else {
+      next.acrylic = {
+        enabled,
+        allowedSizes:
+          value.acrylic?.allowedSizes && value.acrylic.allowedSizes.length > 0
+            ? value.acrylic.allowedSizes
+            : [...DEFAULT_PRODUCT_VARIANTS.acrylic.sizes],
+        allowedFinishes:
+          value.acrylic?.allowedFinishes && value.acrylic.allowedFinishes.length > 0
+            ? value.acrylic.allowedFinishes
+            : [...DEFAULT_PRODUCT_VARIANTS.acrylic.finishes],
+      };
     }
     onChange(next);
   }
 
   function toggleListItem(
     kind: Kind,
-    field: "allowedSizes" | "allowedFrames" | "allowedDepths",
+    field: "allowedSizes" | "allowedFrames" | "allowedDepths" | "allowedMaterials" | "allowedFinishes",
     item: string,
     checked: boolean,
   ) {
@@ -128,6 +168,20 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
       for (const s of value.canvas.allowedSizes ?? []) {
         for (const d of value.canvas.allowedDepths ?? []) {
           if (!hasGelatoSku("canvas", s, d)) out.push({ kind: "canvas", size: s, variant: d });
+        }
+      }
+    }
+    if (value.aluminum?.enabled) {
+      for (const s of value.aluminum.allowedSizes ?? []) {
+        for (const m of value.aluminum.allowedMaterials ?? []) {
+          if (!hasGelatoSku("aluminum", s, m)) out.push({ kind: "aluminum", size: s, variant: m });
+        }
+      }
+    }
+    if (value.acrylic?.enabled) {
+      for (const s of value.acrylic.allowedSizes ?? []) {
+        for (const f of value.acrylic.allowedFinishes ?? []) {
+          if (!hasGelatoSku("acrylic", s, f)) out.push({ kind: "acrylic", size: s, variant: f });
         }
       }
     }
@@ -208,6 +262,62 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
                   all={canvasDepths}
                   selected={value.canvas.allowedDepths}
                   onToggle={(item, c) => toggleListItem("canvas", "allowedDepths", item, c)}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {config.product_type === "aluminum" && (
+          <div className="space-y-3 rounded-md border p-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">Aluminium</Label>
+              <Switch
+                checked={value.aluminum?.enabled ?? false}
+                onCheckedChange={(c) => toggleEnabled("aluminum", c)}
+              />
+            </div>
+            {value.aluminum?.enabled && (
+              <div className="grid gap-4 md:grid-cols-2">
+                <ChecklistGroup
+                  title="Tillåtna storlekar"
+                  all={aluminumSizes}
+                  selected={value.aluminum.allowedSizes}
+                  onToggle={(item, c) => toggleListItem("aluminum", "allowedSizes", item, c)}
+                />
+                <ChecklistGroup
+                  title="Material"
+                  all={aluminumMaterials}
+                  selected={value.aluminum.allowedMaterials}
+                  onToggle={(item, c) => toggleListItem("aluminum", "allowedMaterials", item, c)}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {config.product_type === "acrylic" && (
+          <div className="space-y-3 rounded-md border p-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">Akryl</Label>
+              <Switch
+                checked={value.acrylic?.enabled ?? false}
+                onCheckedChange={(c) => toggleEnabled("acrylic", c)}
+              />
+            </div>
+            {value.acrylic?.enabled && (
+              <div className="grid gap-4 md:grid-cols-2">
+                <ChecklistGroup
+                  title="Tillåtna storlekar"
+                  all={acrylicSizes}
+                  selected={value.acrylic.allowedSizes}
+                  onToggle={(item, c) => toggleListItem("acrylic", "allowedSizes", item, c)}
+                />
+                <ChecklistGroup
+                  title="Finish"
+                  all={acrylicFinishes}
+                  selected={value.acrylic.allowedFinishes}
+                  onToggle={(item, c) => toggleListItem("acrylic", "allowedFinishes", item, c)}
                 />
               </div>
             )}

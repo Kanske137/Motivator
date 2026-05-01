@@ -56,6 +56,8 @@ export interface TemplateSnapshotInput {
   frameColor?: string;
   frameWidthCm?: number;
   canvasWrap?: boolean;
+  /** Akryl-skruvar i hörnen (preview/cart only — aldrig i tryckfil). */
+  acrylicCorners?: boolean;
 
   /** Customer-uploaded photo or AI result. Rendered into every `photo` layer. */
   photoOverlayUrl?: string;
@@ -688,6 +690,38 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
     ctx.restore();
   }
 
+  // Akryl-skruvar i hörnen (preview/cart only).
+  if (!input.hires && input.acrylicCorners && extraCm === 0) {
+    const insetX = 1.4 * PX_PER_CM * scale;
+    const insetY = 1.4 * PX_PER_CM * scale;
+    const r = (1.5 / 2) * PX_PER_CM * scale;
+    const centers: [number, number][] = [
+      [insetX, insetY],
+      [w - insetX, insetY],
+      [insetX, h - insetY],
+      [w - insetX, h - insetY],
+    ];
+    for (const [cx, cy] of centers) {
+      const grad = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.4, r * 0.1, cx, cy, r);
+      grad.addColorStop(0, "#f5f5f5");
+      grad.addColorStop(0.35, "#d8d8d8");
+      grad.addColorStop(0.7, "#a8a8a8");
+      grad.addColorStop(1, "#7a7a7a");
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.shadowColor = "rgba(0,0,0,0.35)";
+      ctx.shadowBlur = Math.max(1, r * 0.2);
+      ctx.shadowOffsetY = Math.max(1, r * 0.08);
+      ctx.lineWidth = Math.max(0.5, r * 0.05);
+      ctx.strokeStyle = "rgba(0,0,0,0.15)";
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
   const dataUrl = out.toDataURL("image/jpeg", 0.95);
   if (!dataUrl || dataUrl.length < 1000) {
     throw new Error("Empty template snapshot");
@@ -712,10 +746,11 @@ export async function renderHiresTemplateSnapshotSafe(
         ...input,
         hires: true,
         maxPxOverride: maxPx,
-        // Never bake frame/wrap into print files.
+        // Never bake frame/wrap/acrylic-corners into print files.
         frameColor: undefined,
         frameWidthCm: undefined,
         canvasWrap: false,
+        acrylicCorners: false,
       });
       const base64 = dataUrl.split(",")[1] ?? "";
       const sizeBytes = Math.round((base64.length * 3) / 4);

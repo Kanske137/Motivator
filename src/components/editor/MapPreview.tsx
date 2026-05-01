@@ -6,6 +6,7 @@ import { MapLayerInstance } from "./layers/MapLayerInstance";
 import { ImageLayerView, LineLayerView, MarginLayerView } from "./layers/StaticLayers";
 import { ShapeLayerView } from "./layers/ShapeLayerView";
 import { lineThicknessPxFromCanvas, effectiveLayerRect, clampLayerRect, getActiveMarginInsetsPct } from "@/lib/layer-utils";
+import { AcrylicCornerOverlay } from "./AcrylicCornerOverlay";
 
 interface Props {
   frameColor?: string;
@@ -108,6 +109,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   const starIdRef = useRef(`star-${Math.random().toString(36).slice(2)}`);
 
   const {
+    config,
     orientation,
     size,
     posterBgColor,
@@ -121,6 +123,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
     aiPhotoResults,
     whiteMarginEnabled,
   } = useEditorStore();
+  const isAcrylic = config?.product_type === "acrylic";
 
   const allLayers = templateLayers();
   // Center-alignment guides shown while dragging a layer (in % of editor).
@@ -542,6 +545,9 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
         )}
         {guides.h && (
           <div className="absolute pointer-events-none left-0 right-0 top-1/2 -translate-y-1/2 border-t border-dashed border-primary" style={{ zIndex: 10000 }} />
+        )}
+        {isAcrylic && (
+          <AcrylicCornerOverlay frontWcm={frontW} frontHcm={frontH} />
         )}
       </div>
       {allLayers.some((l) => l.type === "map") && (

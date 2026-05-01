@@ -81,15 +81,25 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
   if (!config) return null;
 
   const isCanvas = config.product_type === "canvas";
+  const isAluminum = config.product_type === "aluminum";
+  const isAcrylic = config.product_type === "acrylic";
 
   // Filter sizes/variants by template's productOptions (admin-controlled).
   // Falls back to all sizes/variants from config when template is missing/empty.
   const allowedSizes = isCanvas
     ? productOptions?.canvas?.allowedSizes
-    : productOptions?.poster?.allowedSizes;
+    : isAluminum
+      ? productOptions?.aluminum?.allowedSizes
+      : isAcrylic
+        ? productOptions?.acrylic?.allowedSizes
+        : productOptions?.poster?.allowedSizes;
   const allowedVariants = isCanvas
     ? productOptions?.canvas?.allowedDepths
-    : productOptions?.poster?.allowedFrames;
+    : isAluminum
+      ? productOptions?.aluminum?.allowedMaterials
+      : isAcrylic
+        ? productOptions?.acrylic?.allowedFinishes
+        : productOptions?.poster?.allowedFrames;
 
   // Effective sizes: legacy `config.sizes` if populated, otherwise derived
   // from productOptions × pricing tables. Then filtered to the admin-allowed
@@ -105,22 +115,34 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
 
   const currentVariantPrice = sizeDef?.variants.find((v) => v.name === variant)?.price ?? 0;
 
-  // Build a stable Poster/Canvas toggle from the template group (each kind
-  // shows up at most once even if multiple configs leak in).
-  type Kind = "poster" | "canvas";
+  // Build a stable Produkt toggle from the template group (each kind shows up
+  // at most once even if multiple configs leak in).
+  type Kind = "poster" | "canvas" | "aluminum" | "acrylic";
+  const PRODUCT_TYPE_TO_KIND: Record<string, Kind> = {
+    posters: "poster",
+    canvas: "canvas",
+    aluminum: "aluminum",
+    acrylic: "acrylic",
+  };
+  const KIND_LABEL: Record<Kind, string> = {
+    poster: "Poster",
+    canvas: "Canvas",
+    aluminum: "Aluminium",
+    acrylic: "Akryl",
+  };
   const kindToConfig = new Map<Kind, ProductConfig>();
   for (const c of sameTemplateConfigs) {
-    const k: Kind = c.product_type === "canvas" ? "canvas" : "poster";
-    if (!kindToConfig.has(k)) kindToConfig.set(k, c);
+    const k = PRODUCT_TYPE_TO_KIND[c.product_type];
+    if (k && !kindToConfig.has(k)) kindToConfig.set(k, c);
   }
 
   const toggleEntries: { kind: Kind; label: string; handle: string; active: boolean }[] = [];
-  for (const k of ["poster", "canvas"] as Kind[]) {
+  for (const k of ["poster", "canvas", "aluminum", "acrylic"] as Kind[]) {
     const c = kindToConfig.get(k);
     if (!c) continue;
     toggleEntries.push({
       kind: k,
-      label: k === "poster" ? "Poster" : "Canvas",
+      label: KIND_LABEL[k],
       handle: c.shopify_handle,
       active: c.shopify_handle === activeHandle,
     });
@@ -263,29 +285,31 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
         </Select>
       </div>
 
-      {/* Ram / Djup */}
-      <div className="space-y-2">
-        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-          {isCanvas ? "Djup" : "Ram"}
-        </Label>
-        <div className={`grid gap-2 ${isCanvas ? "grid-cols-2" : "grid-cols-3"}`}>
-          {visibleVariants.map((v) => {
-            const diff = v.price - currentVariantPrice;
-            const isNoFrame = v.name.toLowerCase() === "ingen";
-            return (
-              <FrameOption
-                key={v.name}
-                name={v.name}
-                thumbnail={isCanvas ? undefined : isNoFrame ? undefined : FRAME_THUMBS[v.name]}
-                svg={isCanvas ? <DepthIcon depth={v.name} /> : isNoFrame ? <NoFrameIcon /> : undefined}
-                selected={v.name === variant}
-                onClick={() => setVariant(v.name)}
-                priceLabel={formatDiff(diff)}
-              />
-            );
-          })}
+      {/* Ram / Djup — döljs när det bara finns en variant (aluminium/akryl) */}
+      {visibleVariants.length > 1 && (
+        <div className="space-y-2">
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
+            {isCanvas ? "Djup" : isAluminum ? "Material" : isAcrylic ? "Finish" : "Ram"}
+          </Label>
+          <div className={`grid gap-2 ${isCanvas ? "grid-cols-2" : "grid-cols-3"}`}>
+            {visibleVariants.map((v) => {
+              const diff = v.price - currentVariantPrice;
+              const isNoFrame = v.name.toLowerCase() === "ingen";
+              return (
+                <FrameOption
+                  key={v.name}
+                  name={v.name}
+                  thumbnail={isCanvas || isAluminum || isAcrylic ? undefined : isNoFrame ? undefined : FRAME_THUMBS[v.name]}
+                  svg={isCanvas ? <DepthIcon depth={v.name} /> : isNoFrame ? <NoFrameIcon /> : undefined}
+                  selected={v.name === variant}
+                  onClick={() => setVariant(v.name)}
+                  priceLabel={formatDiff(diff)}
+                />
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Orientering — segmented pill (hidden when only one orientation is allowed) */}
       {allowedOrientations.length > 1 && (

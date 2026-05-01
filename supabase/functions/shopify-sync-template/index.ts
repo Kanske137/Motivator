@@ -42,16 +42,44 @@ const CANVAS_PRICES: Record<string, Record<string, number>> = {
   "70x100": { "2cm": 1299, "4cm": 1399 },
 };
 
+const ALUMINUM_PRICES: Record<string, Record<string, number>> = {
+  "20x30": { Standard: 399 },
+  "30x40": { Standard: 499 },
+  "40x50": { Standard: 649 },
+  "50x70": { Standard: 849 },
+  "70x100": { Standard: 1199 },
+};
+
+const ACRYLIC_PRICES: Record<string, Record<string, number>> = {
+  "20x30": { Standard: 499 },
+  "30x40": { Standard: 699 },
+  "40x50": { Standard: 899 },
+  "50x70": { Standard: 1099 },
+  "70x100": { Standard: 1599 },
+};
+
+type Kind = "poster" | "canvas" | "aluminum" | "acrylic";
+const KIND_TO_SKU_KEY: Record<Kind, string> = {
+  poster: "posters",
+  canvas: "canvas",
+  aluminum: "aluminum",
+  acrylic: "acrylic",
+};
+
 type SkuMap = Record<string, Record<string, { portrait: string; landscape: string }>>;
 const SKUS = skuMap as SkuMap;
 
-function getUid(kind: "poster" | "canvas", size: string, variant: string): string | null {
-  const block = SKUS[kind === "poster" ? "posters" : "canvas"] ?? {};
+function getUid(kind: Kind, size: string, variant: string): string | null {
+  const block = SKUS[KIND_TO_SKU_KEY[kind]] ?? {};
   return block[`${size}|${variant}`]?.portrait ?? null;
 }
 
-function getPrice(kind: "poster" | "canvas", size: string, variant: string): number {
-  const table = kind === "poster" ? POSTER_PRICES : CANVAS_PRICES;
+function getPrice(kind: Kind, size: string, variant: string): number {
+  const table =
+    kind === "poster" ? POSTER_PRICES
+    : kind === "canvas" ? CANVAS_PRICES
+    : kind === "aluminum" ? ALUMINUM_PRICES
+    : ACRYLIC_PRICES;
   return table[size]?.[variant] ?? 0;
 }
 
@@ -74,9 +102,9 @@ interface PlannedVariant {
 }
 
 interface PlannedGroup {
-  kind: "poster" | "canvas";
+  kind: Kind;
   productType: string;
-  variantOptionName: string; // "Ram" or "Djup"
+  variantOptionName: string; // "Ram" / "Djup" / "Material" / "Finish"
   variants: PlannedVariant[];
   skipped: { size: string; variant: string; reason: string }[];
 }
@@ -84,55 +112,42 @@ interface PlannedGroup {
 function plan(template: any): PlannedGroup[] {
   const groups: PlannedGroup[] = [];
   const opts = template?.productOptions ?? {};
-  if (opts.poster?.enabled) {
-    const g: PlannedGroup = {
-      kind: "poster",
-      productType: "Poster",
-      variantOptionName: "Ram",
-      variants: [],
-      skipped: [],
-    };
-    for (const size of opts.poster.allowedSizes ?? []) {
-      for (const frame of opts.poster.allowedFrames ?? []) {
-        const sku = getUid("poster", size, frame);
-        const price = getPrice("poster", size, frame);
-        if (!sku) {
-          g.skipped.push({ size, variant: frame, reason: "no Gelato SKU" });
-          continue;
-        }
-        if (!price) {
-          g.skipped.push({ size, variant: frame, reason: "no price" });
-          continue;
-        }
-        g.variants.push({ size, variant: frame, sku, price });
+
+  const buildGroup = (
+    kind: Kind,
+    productType: string,
+    variantOptionName: string,
+    sizes: string[],
+    variants: string[],
+  ): PlannedGroup => {
+    const g: PlannedGroup = { kind, productType, variantOptionName, variants: [], skipped: [] };
+    for (const size of sizes) {
+      for (const v of variants) {
+        const sku = getUid(kind, size, v);
+        const price = getPrice(kind, size, v);
+        if (!sku) { g.skipped.push({ size, variant: v, reason: "no Gelato SKU" }); continue; }
+        if (!price) { g.skipped.push({ size, variant: v, reason: "no price" }); continue; }
+        g.variants.push({ size, variant: v, sku, price });
       }
     }
-    groups.push(g);
+    return g;
+  };
+
+  if (opts.poster?.enabled) {
+    groups.push(buildGroup("poster", "Poster", "Ram",
+      opts.poster.allowedSizes ?? [], opts.poster.allowedFrames ?? []));
   }
   if (opts.canvas?.enabled) {
-    const g: PlannedGroup = {
-      kind: "canvas",
-      productType: "Canvas",
-      variantOptionName: "Djup",
-      variants: [],
-      skipped: [],
-    };
-    for (const size of opts.canvas.allowedSizes ?? []) {
-      for (const depth of opts.canvas.allowedDepths ?? []) {
-        const sku = getUid("canvas", size, depth);
-        const price = getPrice("canvas", size, depth);
-        if (!sku) {
-          g.skipped.push({ size, variant: depth, reason: "no Gelato SKU" });
-          continue;
-        }
-        if (!price) {
-          g.skipped.push({ size, variant: depth, reason: "no price" });
-          continue;
-        }
-        g.variants.push({ size, variant: depth, sku, price });
-      }
-    }
-    groups.push(g);
+    groups.push(buildGroup("canvas", "Canvas", "Djup",
+      opts.canvas.allowedSizes ?? [], opts.canvas.allowedDepths ?? []));
+  }
+  if (opts.aluminum?.enabled) {
+    groups.push(buildGroup("aluminum", "Aluminium", "Material",
+      opts.aluminum.allowedSizes ?? [], opts.aluminum.allowedMaterials ?? []));
+  }
+  if (opts.acrylic?.enabled) {
+    groups.push(buildGroup("acrylic", "Akryl", "Finish",
+      opts.acrylic.allowedSizes ?? [], opts.acrylic.allowedFinishes ?? []));
   }
   return groups;
 }
@@ -239,9 +254,11 @@ const GET_PRODUCT_FULL = `
 // Shopify Standard Product Taxonomy GIDs.
 // Posters: gid://shopify/TaxonomyCategory/ap-2-1-3 ("Posters")
 // Canvas:  gid://shopify/TaxonomyCategory/ap-2-1-1 ("Decorative Paintings")
-const DEFAULT_CATEGORY_GID: Record<"poster" | "canvas", string> = {
+const DEFAULT_CATEGORY_GID: Record<Kind, string> = {
   poster: "gid://shopify/TaxonomyCategory/ap-2-1-3",
   canvas: "gid://shopify/TaxonomyCategory/ap-2-1-1",
+  aluminum: "gid://shopify/TaxonomyCategory/ap-2-1-3",
+  acrylic: "gid://shopify/TaxonomyCategory/ap-2-1-3",
 };
 
 function buildVariantInput(
@@ -407,7 +424,7 @@ Deno.serve(async (req) => {
     // template_slug = mall-id som binder ihop poster+canvas-varianter
     const templateSlug: string =
       (cfg as { template_slug?: string }).template_slug ??
-      cfg.shopify_handle.replace(/-(poster|posters|canvas)$/i, "");
+      cfg.shopify_handle.replace(/-(poster|posters|canvas|aluminum|acrylic)$/i, "");
 
     const groups = plan(cfg.template);
     const totalVariants = groups.reduce((n, g) => n + g.variants.length, 0);
@@ -453,7 +470,7 @@ Deno.serve(async (req) => {
     const nextSyncedPayload: Record<string, Record<string, unknown>> = {};
 
     for (const group of groups) {
-      const baseHandleHasNoSuffix = !/-(poster|posters|canvas)$/i.test(cfg.shopify_handle);
+      const baseHandleHasNoSuffix = !/-(poster|posters|canvas|aluminum|acrylic)$/i.test(cfg.shopify_handle);
       const handleForKind = groups.length === 1 && baseHandleHasNoSuffix
         ? cfg.shopify_handle
         : `${templateSlug}-${group.kind}`;
