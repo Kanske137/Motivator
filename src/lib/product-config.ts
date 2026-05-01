@@ -59,9 +59,10 @@ export interface ProductConfig {
   seo_description?: string | null;
 }
 
-/** Strip -poster / -canvas suffix to get the template-grouping slug. */
+/** Strip -poster / -canvas / -aluminum / -acrylic suffix to get the
+ *  template-grouping slug. */
 export function deriveTemplateSlug(handleOrSlug: string): string {
-  return handleOrSlug.replace(/-(poster|posters|canvas)$/i, "");
+  return handleOrSlug.replace(/-(poster|posters|canvas|aluminum|acrylic)$/i, "");
 }
 
 /** Resolve a config by either its real handle OR its template_slug. When
