@@ -107,6 +107,25 @@ const CANVAS_DEPTHS = [
   ["wood-fsc-4-cm", "4cm"],
 ];
 
+// Aluminium (Gelato catalog: "metallic" → MetallicSubstrateColor=aluminium).
+// 5 storlekar enligt vår initiala plan; admin kan filtrera per mall.
+const ALUMINUM_SIZES = [
+  ["200x300-mm", "20x30"],
+  ["300x400-mm", "30x40"],
+  ["400x500-mm", "40x50"],
+  ["500x700-mm", "50x70"],
+  ["700x1000-mm", "70x100"],
+];
+
+// Akryl (Gelato catalog: "acrylic" → AcrylicGlassThickness=4-mm).
+const ACRYLIC_SIZES = [
+  ["200x300-mm", "20x30"],
+  ["300x400-mm", "30x40"],
+  ["400x500-mm", "40x50"],
+  ["500x700-mm", "50x70"],
+  ["700x1000-mm", "70x100"],
+];
+
 const ORIENTATIONS = [
   ["ver", "Portrait"],
   ["hor", "Landscape"],
