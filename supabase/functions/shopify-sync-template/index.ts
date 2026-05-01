@@ -424,7 +424,7 @@ Deno.serve(async (req) => {
     // template_slug = mall-id som binder ihop poster+canvas-varianter
     const templateSlug: string =
       (cfg as { template_slug?: string }).template_slug ??
-      cfg.shopify_handle.replace(/-(poster|posters|canvas)$/i, "");
+      cfg.shopify_handle.replace(/-(poster|posters|canvas|aluminum|acrylic)$/i, "");
 
     const groups = plan(cfg.template);
     const totalVariants = groups.reduce((n, g) => n + g.variants.length, 0);
@@ -470,7 +470,7 @@ Deno.serve(async (req) => {
     const nextSyncedPayload: Record<string, Record<string, unknown>> = {};
 
     for (const group of groups) {
-      const baseHandleHasNoSuffix = !/-(poster|posters|canvas)$/i.test(cfg.shopify_handle);
+      const baseHandleHasNoSuffix = !/-(poster|posters|canvas|aluminum|acrylic)$/i.test(cfg.shopify_handle);
       const handleForKind = groups.length === 1 && baseHandleHasNoSuffix
         ? cfg.shopify_handle
         : `${templateSlug}-${group.kind}`;

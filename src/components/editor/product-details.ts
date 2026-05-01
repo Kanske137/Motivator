@@ -25,5 +25,7 @@ const CANVAS_DETAILS: ProductDetail[] = [
 ];
 
 export function getProductDetailsFor(productType: ProductType): ProductDetail[] {
-  return productType === "canvas" ? CANVAS_DETAILS : POSTER_DETAILS;
+  if (productType === "canvas") return CANVAS_DETAILS;
+  // Aluminium/akryl saknar egna detaljbilder än — visa poster-pappret som platshållare.
+  return POSTER_DETAILS;
 }

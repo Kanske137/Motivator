@@ -68,7 +68,9 @@ const POSTER_SCENES: MockupScene[] = [
 const CANVAS_SCENES: MockupScene[] = [];
 
 export function getScenesFor(productType: ProductType): MockupScene[] {
-  return productType === "canvas" ? CANVAS_SCENES : POSTER_SCENES;
+  if (productType === "canvas") return CANVAS_SCENES;
+  // Aluminium & akryl återanvänder poster-scenerna (samma 2D-rektangel på vägg).
+  return POSTER_SCENES;
 }
 
 /** Parse "21x30" / "50x70" → {wCm, hCm}. */
