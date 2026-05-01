@@ -349,10 +349,11 @@ async function processOrder(supabase: any, order: any) {
     console.log(`[shopify-webhook] line ${li.id}: using client print file ${printUrl}`);
 
 
-    // 2) Resolve productUid
+    // 2) Resolve productUid — alltid prio på admin-DB-mappen, sedan handle-baserad fallback.
     const cfg = configByHandle[handle];
     const resolved = resolveProductUid({
       handle,
+      productTypeOverride: configProductTypeToMapKey(cfg?.product_type),
       size: size!,
       variant,
       orientation,
