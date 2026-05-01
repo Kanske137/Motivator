@@ -16,6 +16,24 @@ interface MockupSlot {
   error?: string;
 }
 
+// Synthetic scenes for the close-up product shots (poster paper corner /
+// canvas wrap corner). They reuse the MockupSlot shape so the existing
+// thumbnail row + lightbox handle them with no extra code.
+const POSTER_SHOT_SCENE: MockupScene = {
+  id: "product-shot-poster",
+  label: "Närbild",
+  src: "",
+  area: { x: 0, y: 0, w: 1024, h: 1024 },
+  referenceWidthCm: 100,
+};
+const CANVAS_SHOT_SCENE: MockupScene = {
+  id: "product-shot-canvas",
+  label: "Närbild",
+  src: "",
+  area: { x: 0, y: 0, w: 1024, h: 1024 },
+  referenceWidthCm: 100,
+};
+
 export function MockupGallery() {
   const {
     config, template, size, variant, orientation,
