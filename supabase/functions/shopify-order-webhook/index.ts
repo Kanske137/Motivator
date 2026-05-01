@@ -170,8 +170,10 @@ const GELATO_SKU_MAP: Record<string, Record<string, { portrait: string; landscap
   },
 };
 
-function productTypeFromHandle(handle: string): "posters" | "canvas" | null {
+function productTypeFromHandle(handle: string): "posters" | "canvas" | "aluminum" | "acrylic" | null {
   const h = (handle || "").toLowerCase();
+  if (h.endsWith("-acrylic") || h.includes("acrylic") || h.includes("akryl")) return "acrylic";
+  if (h.endsWith("-aluminum") || h.includes("aluminum") || h.includes("aluminium") || h.includes("metallic")) return "aluminum";
   if (h.includes("canvas")) return "canvas";
   if (h.includes("poster") || h.includes("karta")) return "posters";
   return null;
