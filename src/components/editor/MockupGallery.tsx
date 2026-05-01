@@ -115,7 +115,26 @@ export function MockupGallery() {
         setSnapshotUrl(newSnapshot);
         setSnapshotLoading(false);
 
-        if (isCanvas) return; // canvas uses 3D — no scene compositing needed
+        if (isCanvas) {
+          // Canvas → render close-up wrap-corner shot beside the 3D preview.
+          try {
+            const url = await renderCanvasCornerShot({
+              printUrl: newSnapshot,
+              orientation,
+              size,
+              depthCm: canvasDepthCm,
+              wrapCm: canvasDepthCm,
+              bleedCm: BLEED_CM,
+            });
+            if (myReq !== reqIdRef.current) return;
+            setCanvasShot({ scene: CANVAS_SHOT_SCENE, url, loading: false });
+          } catch (e) {
+            if (myReq !== reqIdRef.current) return;
+            const msg = e instanceof Error ? e.message : "Renderingen misslyckades";
+            setCanvasShot({ scene: CANVAS_SHOT_SCENE, url: null, loading: false, error: msg });
+          }
+          return;
+        }
 
         const sceneCanvasDepthCm = 2;
         const frameColor = frameColorFromVariant(variant);
@@ -123,6 +142,14 @@ export function MockupGallery() {
         const results = await Promise.all(
           scenes.map(async (scene) => {
             try {
+              if (scene.id === POSTER_SHOT_SCENE.id) {
+                const url = await renderPosterCornerShot({
+                  printUrl: newSnapshot,
+                  orientation,
+                  size,
+                });
+                return { scene, url, error: undefined as string | undefined };
+              }
               const url = await compositeMockup({
                 scene,
                 printUrl: newSnapshot,
