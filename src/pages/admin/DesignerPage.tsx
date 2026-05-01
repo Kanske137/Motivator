@@ -643,6 +643,7 @@ export default function DesignerPage() {
               selectedId={selectedId}
               onSelect={setSelectedId}
               onChange={updateLayer}
+              productType={config?.product_type}
               wrapInsetPctX={(() => {
                 if (!isCanvasProduct) return 0;
                 const sizeCm = orientation === "portrait" ? 30 : 40;
