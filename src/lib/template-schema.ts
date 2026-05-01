@@ -280,6 +280,21 @@ const canvasOptionsSchema = z.object({
    *  half the wrap band at 2 cm covers half the (wider) band at 4 cm. */
   canvasDesignDepthCm: z.number().min(0).max(10).optional(),
 });
+// Aluminium: bara material-namn ("Standard"/"Brushed" — vi använder bara
+// "Standard" idag men håller arrayen öppen för framtiden).
+const aluminumOptionsSchema = z.object({
+  enabled: z.boolean(),
+  allowedSizes: z.array(z.string()),
+  allowedMaterials: z.array(z.string()),
+});
+// Akryl: bara storlekar (4 mm är enda tjockleken — vi använder
+// "Standard"-finish internt för att hålla samma datamodell).
+const acrylicOptionsSchema = z.object({
+  enabled: z.boolean(),
+  allowedSizes: z.array(z.string()),
+  allowedFinishes: z.array(z.string()),
+});
+
 export const aiStylePresetSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
@@ -300,6 +315,8 @@ export type MapStylePreset = z.infer<typeof mapStylePresetSchema>;
 export const productOptionsSchema = z.object({
   poster: posterOptionsSchema.optional(),
   canvas: canvasOptionsSchema.optional(),
+  aluminum: aluminumOptionsSchema.optional(),
+  acrylic: acrylicOptionsSchema.optional(),
   /** Available AI style presets shown in the customer editor. Optional —
    *  when missing/empty the AI section is hidden. */
   aiStyles: z.array(aiStylePresetSchema).optional(),
