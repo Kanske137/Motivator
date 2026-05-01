@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Canvas3DPreview } from "./Canvas3DPreview";
 import { renderTemplateSnapshot } from "@/lib/template-snapshot";
+import { renderPosterCornerShot, renderCanvasCornerShot } from "@/lib/product-shot";
 
 interface MockupSlot {
   scene: MockupScene;
