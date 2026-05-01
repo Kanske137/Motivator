@@ -101,21 +101,6 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
             ? value.poster.allowedFrames
             : [...DEFAULT_PRODUCT_VARIANTS.poster.frames],
       };
-    } else {
-  function toggleEnabled(kind: Kind, enabled: boolean) {
-    const next: ProductOptions = { ...value };
-    if (kind === "poster") {
-      next.poster = {
-        enabled,
-        allowedSizes:
-          value.poster?.allowedSizes && value.poster.allowedSizes.length > 0
-            ? value.poster.allowedSizes
-            : [...DEFAULT_PRODUCT_VARIANTS.poster.sizes],
-        allowedFrames:
-          value.poster?.allowedFrames && value.poster.allowedFrames.length > 0
-            ? value.poster.allowedFrames
-            : [...DEFAULT_PRODUCT_VARIANTS.poster.frames],
-      };
     } else if (kind === "canvas") {
       next.canvas = {
         enabled,
