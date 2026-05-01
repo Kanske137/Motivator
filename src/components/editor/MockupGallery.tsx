@@ -50,7 +50,9 @@ export function MockupGallery() {
   const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null);
   const [snapshotLoading, setSnapshotLoading] = useState(false);
   const [snapshotError, setSnapshotError] = useState<string | undefined>();
+  const [canvasShot, setCanvasShot] = useState<MockupSlot | null>(null);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+  const [canvasShotOpen, setCanvasShotOpen] = useState(false);
   const debounceRef = useRef<number | null>(null);
   const reqIdRef = useRef(0);
 
