@@ -485,6 +485,7 @@ export default function DesignerPage() {
           config={config}
           value={template.productOptions}
           onChange={(productOptions) => commitTemplate({ ...template, productOptions })}
+          onConfigChange={updateConfigMeta}
         />
 
         <ShopifyPublishingSection config={config} onChange={updateConfigMeta} />
