@@ -354,7 +354,9 @@ export const templateSchema = z
   .superRefine((tpl, ctx) => {
     const anyEnabled =
       (tpl.productOptions.poster?.enabled ?? false) ||
-      (tpl.productOptions.canvas?.enabled ?? false);
+      (tpl.productOptions.canvas?.enabled ?? false) ||
+      (tpl.productOptions.aluminum?.enabled ?? false) ||
+      (tpl.productOptions.acrylic?.enabled ?? false);
     if (!anyEnabled) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -362,7 +364,7 @@ export const templateSchema = z
         path: ["productOptions"],
       });
     }
-    for (const key of ["poster", "canvas"] as const) {
+    for (const key of ["poster", "canvas", "aluminum", "acrylic"] as const) {
       const opt = tpl.productOptions[key];
       if (opt?.enabled && opt.allowedSizes.length === 0) {
         ctx.addIssue({
