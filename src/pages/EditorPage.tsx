@@ -175,6 +175,7 @@ export default function EditorPage() {
         frameColor: !isCanvas ? frameColor : undefined,
         frameWidthCm: !isCanvas ? FRAME_WIDTH_CM : undefined,
         canvasWrap: isCanvas,
+        acrylicCorners: config?.product_type === "acrylic",
       });
       previewUrl = await uploadCartPreview(thumbDataUrl, designId);
     } catch (err) {
