@@ -546,6 +546,9 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
         {guides.h && (
           <div className="absolute pointer-events-none left-0 right-0 top-1/2 -translate-y-1/2 border-t border-dashed border-primary" style={{ zIndex: 10000 }} />
         )}
+        {isAcrylic && (
+          <AcrylicCornerOverlay frontWcm={frontW} frontHcm={frontH} />
+        )}
       </div>
       {allLayers.some((l) => l.type === "map") && (
         <p className="text-[10px] text-muted-foreground">© Mapbox · © OpenStreetMap</p>
