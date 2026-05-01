@@ -65,44 +65,7 @@ const POSTER_SCENES: MockupScene[] = [
   },
 ];
 
-const CANVAS_SCENES: MockupScene[] = [
-  {
-    id: "canvas-livingroom",
-    label: "Vardagsrum",
-    src: canvasLivingroom,
-    area: { x: 140, y: 80, w: 700, h: 600 },
-    referenceWidthCm: 130,
-    shadow: { blur: 28, offsetY: 16, alpha: 0.22 },
-    canvasWrap: { angleDeg: 12 },
-  },
-  {
-    id: "canvas-side",
-    label: "Diagonal vy",
-    src: canvasSide,
-    area: { x: 200, y: 100, w: 720, h: 700 },
-    referenceWidthCm: 130,
-    shadow: { blur: 32, offsetY: 18, alpha: 0.25 },
-    canvasWrap: { angleDeg: 25 },
-  },
-  {
-    id: "canvas-bedroom",
-    label: "Sovrum",
-    src: bedroom,
-    area: { x: 180, y: 80, w: 700, h: 600 },
-    referenceWidthCm: 130,
-    shadow: { blur: 26, offsetY: 14, alpha: 0.20 },
-    canvasWrap: { angleDeg: 10 },
-  },
-  {
-    id: "canvas-wall",
-    label: "Närbild",
-    src: wall,
-    area: { x: 120, y: 80, w: 800, h: 700 },
-    referenceWidthCm: 130,
-    shadow: { blur: 28, offsetY: 14, alpha: 0.22 },
-    canvasWrap: { angleDeg: 18 },
-  },
-];
+const CANVAS_SCENES: MockupScene[] = [];
 
 export function getScenesFor(productType: ProductType): MockupScene[] {
   return productType === "canvas" ? CANVAS_SCENES : POSTER_SCENES;
