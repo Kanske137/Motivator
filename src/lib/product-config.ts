@@ -48,7 +48,11 @@ export interface ProductConfig {
   map_styles: string[];
   text_config: TextConfig;
   sizes: SizeDef[];
-  gelato_sku_map: Record<string, Record<string, string>>;
+  /** Manuellt ifyllda Gelato product UIDs per `size` × `variant`.
+   *  Värdet är antingen en sträng (samma UID för båda orientations — t.ex.
+   *  fyrkantiga storlekar eller produkter som auto-roterar) eller ett objekt
+   *  `{ portrait, landscape }` när orienteringen kräver olika SKU:er. */
+  gelato_sku_map: Record<string, Record<string, string | { portrait?: string; landscape?: string }>>;
   // Shopify publishing metadata (Fas 3)
   tags?: string[];
   category_gid?: string | null;

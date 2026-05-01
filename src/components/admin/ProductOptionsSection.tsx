@@ -7,7 +7,15 @@
 // This way the admin can enable e.g. canvas on a poster-only legacy config and
 // still see canvas-shaped sizes/depths instead of poster frames.
 import { useMemo, useRef, useState } from "react";
-import { Info, Plus, Trash2, Upload, Loader2 } from "lucide-react";
+import { Info, Plus, Trash2, Upload, Loader2, Pencil, CheckCircle2, AlertCircle } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -41,11 +49,14 @@ interface Props {
   config: ProductConfig;
   value: ProductOptions;
   onChange: (next: ProductOptions) => void;
+  /** Called when admin updates DB-level product config (currently used for
+   *  the per-handle Gelato SKU-map). Optional so older callers keep working. */
+  onConfigChange?: (patch: Partial<ProductConfig>) => void;
 }
 
 type Kind = "poster" | "canvas" | "aluminum" | "acrylic";
 
-export default function ProductOptionsSection({ config, value, onChange }: Props) {
+export default function ProductOptionsSection({ config, value, onChange, onConfigChange }: Props) {
   // Variant names from config (used so Gelato-mapped variants always appear)
   const configVariantNames = useMemo(
     () => Array.from(new Set(config.sizes.flatMap((s) => s.variants.map((v) => v.name)))),
@@ -324,6 +335,16 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
           </div>
         )}
       </Card>
+
+      {/* Gelato SKU-mappning per storlek + variant + orientering. Endast
+          synlig om föräldern (DesignerPage) har skickat ner en spar-callback. */}
+      {onConfigChange && (
+        <GelatoSkuMapEditor
+          config={config}
+          options={value}
+          onChange={(gelato_sku_map) => onConfigChange({ gelato_sku_map })}
+        />
+      )}
 
       {/* Map Styles — collapsible, per-template enabling */}
       <MapStylesEditor
@@ -724,6 +745,246 @@ function AllowedFontsEditor({
         </AccordionItem>
       </Accordion>
     </Card>
+  );
+}
+
+// ============================================================================
+// Gelato SKU-mappning
+// Listar alla aktiverade storlek+variant-kombinationer för aktuell produkttyp
+// och låter admin manuellt mata in Gelato productUid för portrait + landscape
+// via en dialog.
+// ============================================================================
+type SkuEntry = string | { portrait?: string; landscape?: string };
+
+function readEntry(entry: SkuEntry | undefined, orient: "portrait" | "landscape"): string {
+  if (!entry) return "";
+  if (typeof entry === "string") return entry;
+  return entry[orient] ?? "";
+}
+
+function entryHasBoth(entry: SkuEntry | undefined): boolean {
+  if (!entry) return false;
+  if (typeof entry === "string") return entry.trim().length > 0;
+  return Boolean((entry.portrait ?? "").trim()) && Boolean((entry.landscape ?? "").trim());
+}
+
+function entryHasAny(entry: SkuEntry | undefined): boolean {
+  if (!entry) return false;
+  if (typeof entry === "string") return entry.trim().length > 0;
+  return Boolean((entry.portrait ?? "").trim()) || Boolean((entry.landscape ?? "").trim());
+}
+
+interface SkuRow {
+  size: string;
+  variant: string;
+  variantLabel: string;
+}
+
+function GelatoSkuMapEditor({
+  config,
+  options,
+  onChange,
+}: {
+  config: ProductConfig;
+  options: ProductOptions;
+  onChange: (next: ProductConfig["gelato_sku_map"]) => void;
+}) {
+  const [editing, setEditing] = useState<SkuRow | null>(null);
+
+  // Bygg list av alla aktiverade kombinationer för den här produkttypen.
+  const rows = useMemo<SkuRow[]>(() => {
+    const out: SkuRow[] = [];
+    if (config.product_type === "posters" && options.poster?.enabled) {
+      for (const s of options.poster.allowedSizes ?? []) {
+        for (const f of options.poster.allowedFrames ?? []) {
+          out.push({ size: s, variant: f, variantLabel: `Ram: ${f}` });
+        }
+      }
+    } else if (config.product_type === "canvas" && options.canvas?.enabled) {
+      for (const s of options.canvas.allowedSizes ?? []) {
+        for (const d of options.canvas.allowedDepths ?? []) {
+          out.push({ size: s, variant: d, variantLabel: `Djup: ${d}` });
+        }
+      }
+    } else if (config.product_type === "aluminum" && options.aluminum?.enabled) {
+      for (const s of options.aluminum.allowedSizes ?? []) {
+        for (const m of options.aluminum.allowedMaterials ?? []) {
+          out.push({ size: s, variant: m, variantLabel: `Material: ${m}` });
+        }
+      }
+    } else if (config.product_type === "acrylic" && options.acrylic?.enabled) {
+      for (const s of options.acrylic.allowedSizes ?? []) {
+        for (const f of options.acrylic.allowedFinishes ?? []) {
+          out.push({ size: s, variant: f, variantLabel: `Finish: ${f}` });
+        }
+      }
+    }
+    return out;
+  }, [config.product_type, options]);
+
+  const skuMap = (config.gelato_sku_map ?? {}) as Record<string, Record<string, SkuEntry>>;
+
+  const filledCount = rows.filter((r) => entryHasBoth(skuMap[r.size]?.[r.variant])).length;
+  const partialCount = rows.filter(
+    (r) => entryHasAny(skuMap[r.size]?.[r.variant]) && !entryHasBoth(skuMap[r.size]?.[r.variant]),
+  ).length;
+
+  function saveEntry(size: string, variant: string, portrait: string, landscape: string) {
+    const next: Record<string, Record<string, SkuEntry>> = JSON.parse(JSON.stringify(skuMap));
+    if (!next[size]) next[size] = {};
+    const p = portrait.trim();
+    const l = landscape.trim();
+    if (!p && !l) {
+      // Empty → remove entry
+      delete next[size][variant];
+      if (Object.keys(next[size]).length === 0) delete next[size];
+    } else if (p && l && p === l) {
+      // Same UID for both → store as compact string
+      next[size][variant] = p;
+    } else {
+      next[size][variant] = { portrait: p || undefined, landscape: l || undefined };
+    }
+    onChange(next);
+  }
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card className="p-0 overflow-hidden">
+      <Accordion type="single" collapsible defaultValue="">
+        <AccordionItem value="sku-map" className="border-0">
+          <AccordionTrigger className="px-5 py-4 hover:no-underline">
+            <div className="text-left">
+              <h2 className="text-base font-semibold">Gelato-SKU per variant</h2>
+              <p className="text-xs text-muted-foreground font-normal">
+                {filledCount} av {rows.length} kombinationer ifyllda
+                {partialCount > 0 ? ` · ${partialCount} delvis` : ""}. Klicka på en rad för att mata in
+                Gelato product UID för stående och liggande.
+              </p>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-5 pb-5">
+            <div className="space-y-2">
+              {rows.map((r) => {
+                const entry = skuMap[r.size]?.[r.variant];
+                const both = entryHasBoth(entry);
+                const any = entryHasAny(entry);
+                return (
+                  <button
+                    key={`${r.size}|${r.variant}`}
+                    type="button"
+                    onClick={() => setEditing(r)}
+                    className="flex w-full items-center justify-between gap-3 rounded-md border bg-background p-3 text-left hover:bg-muted/50 transition"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm">{r.size}</span>
+                        <span className="text-xs text-muted-foreground">·</span>
+                        <span className="text-xs text-muted-foreground">{r.variantLabel}</span>
+                      </div>
+                      <div className="mt-1 flex items-center gap-2 text-[10px] font-mono text-muted-foreground truncate">
+                        <span>P: {readEntry(entry, "portrait") || "—"}</span>
+                        <span>·</span>
+                        <span>L: {readEntry(entry, "landscape") || "—"}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {both ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      ) : any ? (
+                        <AlertCircle className="h-4 w-4 text-amber-600" />
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground">tom</span>
+                      )}
+                      <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+
+      {editing && (
+        <SkuEditDialog
+          row={editing}
+          entry={skuMap[editing.size]?.[editing.variant]}
+          onClose={() => setEditing(null)}
+          onSave={(portrait, landscape) => {
+            saveEntry(editing.size, editing.variant, portrait, landscape);
+            setEditing(null);
+          }}
+        />
+      )}
+    </Card>
+  );
+}
+
+function SkuEditDialog({
+  row,
+  entry,
+  onClose,
+  onSave,
+}: {
+  row: SkuRow;
+  entry: SkuEntry | undefined;
+  onClose: () => void;
+  onSave: (portrait: string, landscape: string) => void;
+}) {
+  const [portrait, setPortrait] = useState(readEntry(entry, "portrait"));
+  const [landscape, setLandscape] = useState(readEntry(entry, "landscape"));
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>
+            Gelato-SKU · {row.size} · {row.variantLabel}
+          </DialogTitle>
+          <DialogDescription>
+            Klistra in Gelato <code className="font-mono text-xs">productUid</code> för respektive
+            orientering. Lämna tomt om en orientering inte säljs. Om båda är samma UID lagras det
+            kompakt.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Stående (portrait)</Label>
+            <Input
+              value={portrait}
+              onChange={(e) => setPortrait(e.target.value)}
+              placeholder="ex. acrylic_5mm_300x200_..."
+              className="font-mono text-xs"
+              autoFocus
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Liggande (landscape)</Label>
+            <Input
+              value={landscape}
+              onChange={(e) => setLandscape(e.target.value)}
+              placeholder="ex. acrylic_5mm_200x300_..."
+              className="font-mono text-xs"
+            />
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Tips: kopiera UID från Gelato-katalogen (Dashboard → Products → kopiera "Product UID").
+            Värdet sparas inte permanent förrän du klickar "Spara mall" eller "Publicera" i headern.
+          </p>
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-2">
+          <Button variant="outline" onClick={onClose}>
+            Avbryt
+          </Button>
+          <Button onClick={() => onSave(portrait, landscape)}>Spara</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
