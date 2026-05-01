@@ -452,6 +452,14 @@ export default function LayerCanvas({
         })}
 
         <AlignmentGuides vertical={guides.v} horizontal={guides.h} />
+
+        {isAcrylic && (
+          <AcrylicCornerOverlay
+            frontWcm={acrylicFrontCm.w}
+            frontHcm={acrylicFrontCm.h}
+            zIndex={45}
+          />
+        )}
       </div>
     </div>
   );
