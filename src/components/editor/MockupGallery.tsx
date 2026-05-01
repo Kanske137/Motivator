@@ -69,8 +69,11 @@ export function MockupGallery() {
     if (!config || !size || !template) return;
     // Invalidate any in-flight render synchronously so stale results never overwrite.
     reqIdRef.current++;
-    const scenes = isCanvas ? [] : getScenesFor(config.product_type);
+    const baseScenes = isCanvas ? [] : getScenesFor(config.product_type);
+    // Poster: prepend a synthetic close-up "Närbild" slot so it's the first thumbnail.
+    const scenes = isCanvas ? [] : [POSTER_SHOT_SCENE, ...baseScenes];
     setSlots(scenes.map((s) => ({ scene: s, url: null, loading: true })));
+    if (isCanvas) setCanvasShot({ scene: CANVAS_SHOT_SCENE, url: null, loading: true });
     setSnapshotLoading(true);
     setSnapshotError(undefined);
 
