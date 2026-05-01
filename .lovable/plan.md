@@ -1,85 +1,44 @@
-## Lösning: fyra fotografiska mockup-miljöer + 3D-renderad canvas inkomponerad
+## Problem
 
-Vi skaffar fyra nya bakgrundsfoton av tomma rum, var och en fotograferad från exakt den vinkel vi vill visa canvasen i. Sedan rendrar vi canvasen i Three.js (för korrekt UV-wrap av print-filen och rätt perspektiv) och komponerar in den i fotot. Eftersom fotot redan är taget från samma vinkel som canvasen renderas i kommer perspektiven matcha — canvasen ser ut att hänga på den fotograferade väggen.
+När en kund kör face-swap (human) får hen tillbaka en bild från Replicate som har **samma dimensioner som referensbilden**. Trots det visas den i editorn med tomma/vita kanter och samma sak hamnar på print-filen.
 
-### De fyra miljöerna
+Orsaken: vi tvingar idag `fit = "contain"` så fort det finns ett AI-resultat, oavsett vilken modell som genererade det.
 
-1. **Framifrån** — vägg fotograferad rakt fram, ögonhöjd. Tom väggyta i mitten.
-2. **Från höger** — samma typ av vägg, fotograferad ~20° från höger så att man tittar in mot väggen från sidan. Höger sida av en upphängd canvas skulle synas.
-3. **Från vänster** — spegelbild av ovan.
-4. **Underifrån** — vägg fotograferad från ~15° underifrån, så att ovansidan av canvasen skulle synas.
+```ts
+// src/components/editor/MapPreview.tsx (rad 402)
+const effectiveFit = aiResultUrl ? "contain" : l.defaults.fit;
 
-Stilen ska vara konsekvent: ljust, stilrent, skandinaviskt/Apple-likt minimalistiskt. Tomma rum, neutralt ljus, inga distraherande möbler i fokusområdet.
+// src/lib/template-snapshot.ts (rad 629)
+const fit = aiResultUrl ? "contain" : layer.defaults.fit;
+```
 
-### Hur bilderna skaffas
+`contain` är rätt val för `removeBackground` (Nano Banana 2 håller inte alltid målad aspect, och dess vita bakgrund smälter in). Men för `human` (Replicate face-swap) och `pet` (Nano Banana 2 med uttrycklig "same aspect ratio as image #1"-instruktion) ska bilden alltid fylla layret precis som referensbilden gjorde — alltså samma `fit` som `layer.defaults.fit` (typiskt `cover`).
 
-Generera dem via Lovable AI (`google/gemini-3-pro-image-preview` för bästa fotorealism). Fyra prompts, var och en specificerar exakt vinkel + tom vägg + att det INTE ska finnas någon tavla på väggen (vi lägger dit canvasen själva). Spara som JPG i `src/assets/mockups/`:
+## Lösning
 
-- `canvas-front.jpg`
-- `canvas-right.jpg`
-- `canvas-left.jpg`
-- `canvas-bottom.jpg`
+Begränsa "tvinga contain"-regeln till **endast** `subjectKind === "removeBackground"`. För `human` och `pet` används layerns `defaults.fit` (samma som referensbilden använder före face-swap), så resultatet fyller layret utan tomma kanter.
 
-Granska varje bild visuellt innan vi går vidare. Om någon bild ser konstig ut eller har fel vinkel → regenerera.
+### Ändringar
 
-### Hur canvasen komponeras in
+**`src/components/editor/MapPreview.tsx`** (kring rad 393-402)
+- Läs `subjectKind` från `l.defaults.subjectKind`.
+- Sätt `effectiveFit = (aiResultUrl && subjectKind === "removeBackground") ? "contain" : l.defaults.fit`.
 
-För varje miljö definierar vi i `mockup-scenes.ts`:
-- `viewKey` — vilken kameravinkel i Three.js-snapshotten som matchar (front/right/left/bottom)
-- `area` — de fyra hörnen i fotot där canvasen ska placeras (perspektiv-korrekt fyrhörning, inte bara en rektangel)
-- `referenceWidthCm` — hur många cm i verkligheten frontens bredd motsvarar
-- `shadow` — mjuk drop-shadow under canvasen
+**`src/lib/template-snapshot.ts`** (kring rad 617-631)
+- Läs `subjectKind` från `layer.defaults.subjectKind`.
+- Sätt `fit = (aiResultUrl && subjectKind === "removeBackground") ? "contain" : layer.defaults.fit`.
 
-Three.js-snapshotten:
-- En off-screen renderer med transparent bakgrund
-- Bara `CanvasMesh` (samma UV-mappning som dagens `Canvas3DPreview` har för front + 4 wrap-sidor)
-- Samma fyra fasta kameravinklar som matchar våra fotograferade miljöer
-- Exporterar PNG med transparens
+Detta är symmetriskt mellan editor-preview och hires-print, så vad kunden ser är vad hen får.
 
-Komposition:
-- Ladda foto-bakgrunden
-- Rita mjuk skugga på väggen där canvasen ska sitta
-- Rita den pre-renderade canvas-PNG:en (med transparens) på exakt rätt plats i `area`
-- Klart
+### Varför det räcker
 
-Eftersom canvasen är pre-renderad i samma vinkel som fotot är taget i, sitter den naturligt på väggen.
+- **Human face-swap (Replicate `cdingram/face-swap`)**: returnerar bilden med exakt samma pixelmått som `input_image` (referensbilden). Eftersom referensbilden redan passar layret enligt `defaults.fit` kommer face-swap-resultatet också göra det.
+- **Pet (Nano Banana 2)**: prompten kräver explicit "same aspect ratio as image #1" och dimensions-sanity-checken i edge-funktionen avvisar collage. I praktiken matchar resultatet referensens form, så `defaults.fit` (cover) fyller layret korrekt.
+- **removeBackground**: behåller dagens beteende (`contain` + vit padding) — bilden ska aldrig beskäras eftersom motivet redan är inramat med vit halo.
 
-## Tekniska ändringar
+Inga ändringar i edge-funktionen, prompten eller print-pipelinen behövs.
 
-### Bildgenerering
-- Edge function eller direktanrop till Lovable AI image-API för fyra bilder. Spara via `code--exec` till `src/assets/mockups/`.
-- QA varje genererad bild: kontrollera att vinkeln stämmer, väggen är tom där canvasen ska sitta, ljussättningen är konsekvent över de fyra. Regenerera vid behov.
+### Filer som ändras
 
-### Ny fil: `src/lib/canvas-3d-snapshot.ts`
-- `renderCanvas3DViews(printUrl, widthCm, heightCm, depthCm, bleedCm) → Promise<{ front, right, left, bottom }>`.
-- En `THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true })` återanvänd för alla fyra vyer.
-- Endast `CanvasMesh` i scenen (lyft ut logiken från `Canvas3DPreview.tsx` till denna fil och importera tillbaka i preview-komponenten — eller ta bort previewen helt enligt nedan).
-- Belysning: ambient + directional uppifrån-vänster, samma för alla vyer.
-- Fyra fördefinierade kameror: `[0, 0, 3.6]` (front), `[1.6, 0, 3.0]` (höger), `[-1.6, 0, 3.0]` (vänster), `[0, -1.4, 3.2]` (underifrån). Alla `lookAt(0,0,0)`.
-- Render-storlek 900×900 per vy, exporteras som PNG dataURL.
-
-### `src/lib/mockup-scenes.ts`
-- Ersätt `CANVAS_SCENES` med fyra nya entries pekande på de fyra fotona, med `viewKey` + `area`.
-- `MockupScene`-typen kompletteras med valfritt `viewKey?: "front" | "right" | "left" | "bottom"`.
-
-### `src/lib/mockup-composite.ts`
-- Lägg till canvas-gren som tar in en pre-renderad PNG istället för print-snapshotten.
-- För canvas: bara `bg → shadow → drawImage(prerenderedPng, x, y, w, h)`. Ingen 2D-skew, ingen wrap-fake.
-- Posters-vägen orörd.
-
-### `src/components/editor/MockupGallery.tsx`
-- Ta bort `if (isCanvas) return <Canvas3DPreview …/>`.
-- Behåll vanliga thumbnail-galleriet för canvas också.
-- Innan slot-rendering: anropa `renderCanvas3DViews(snapshotUrl, …)` en gång, mappa resultatet per `viewKey`, skicka in som extra parameter till `compositeMockup`.
-
-### `src/components/editor/Canvas3DPreview.tsx`
-- Tas bort. Den interaktiva 3D-vyn är slopad.
-
-### Beroenden
-- `three` finns redan. Inga nya paket.
-
-## Risker / öppna frågor
-
-- **AI-genererade bakgrunder kan se "AI" ut**. Vi väljer en stilren minimalistisk stil (vit/ljus vägg, naturligt fönsterljus, inga komplexa möbler) som AI-modeller är bra på. QA-steget är obligatoriskt — om en bild ser dålig ut, regenerera tills den känns äkta.
-- **Vinkel-matchning vägg/canvas** är kritisk. Om en bakgrundsbild visar sig ha fel vinkel mot vad vi specificerade, regenerera den, eller justera Three.js-kamerans position så det matchar vad bilden faktiskt visar.
-- **Skuggans riktning** måste matcha fotots ljuskälla. Vi specificerar i prompten "fönsterljus från vänster" så vi vet var skuggan ska falla, och spegelvänder skugg-offset för "från vänster"-vyn.
+- `src/components/editor/MapPreview.tsx`
+- `src/lib/template-snapshot.ts`
