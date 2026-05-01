@@ -1,6 +1,7 @@
 // Dialog for creating a new product template (config row).
-// Asks for title, auto-slugged Shopify handle, and a seed product type.
-// Inserts a near-empty product_configs row and redirects to the designer.
+// Asks for title, auto-slugged Shopify handle, and which product types to seed.
+// Inserts one product_configs row PER selected product type — they all share
+// the same template_slug so they appear together in the customer Format toggle.
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
@@ -16,17 +17,28 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { DEFAULT_PRODUCT_VARIANTS } from "@/lib/product-defaults";
 import type { Template } from "@/lib/template-schema";
+import type { ProductType } from "@/lib/product-config";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-type SeedKind = "poster" | "canvas" | "both";
+type Kind = "poster" | "canvas" | "aluminum" | "acrylic";
+
+const KIND_META: Record<
+  Kind,
+  { label: string; productType: ProductType; suffix: string; titleSuffix: string }
+> = {
+  poster:   { label: "Poster",    productType: "posters",  suffix: "-poster",   titleSuffix: " - Poster" },
+  canvas:   { label: "Canvas",    productType: "canvas",   suffix: "-canvas",   titleSuffix: " - Canvas" },
+  aluminum: { label: "Aluminium", productType: "aluminum", suffix: "-aluminum", titleSuffix: " - Aluminium" },
+  acrylic:  { label: "Akryl",     productType: "acrylic",  suffix: "-acrylic",  titleSuffix: " - Akryl" },
+};
 
 function slugify(s: string): string {
   return s
@@ -39,20 +51,31 @@ function slugify(s: string): string {
     .replace(/-+/gu, "-");
 }
 
-function buildSeedTemplate(kind: SeedKind): Template {
+function buildSeedTemplate(kind: Kind): Template {
   const productOptions: Template["productOptions"] = {};
-  if (kind === "poster" || kind === "both") {
+  if (kind === "poster") {
     productOptions.poster = {
       enabled: true,
       allowedSizes: [...DEFAULT_PRODUCT_VARIANTS.poster.sizes],
       allowedFrames: [...DEFAULT_PRODUCT_VARIANTS.poster.frames],
     };
-  }
-  if (kind === "canvas" || kind === "both") {
+  } else if (kind === "canvas") {
     productOptions.canvas = {
       enabled: true,
       allowedSizes: [...DEFAULT_PRODUCT_VARIANTS.canvas.sizes],
       allowedDepths: [...DEFAULT_PRODUCT_VARIANTS.canvas.depths],
+    };
+  } else if (kind === "aluminum") {
+    productOptions.aluminum = {
+      enabled: true,
+      allowedSizes: [...DEFAULT_PRODUCT_VARIANTS.aluminum.sizes],
+      allowedMaterials: [...DEFAULT_PRODUCT_VARIANTS.aluminum.materials],
+    };
+  } else {
+    productOptions.acrylic = {
+      enabled: true,
+      allowedSizes: [...DEFAULT_PRODUCT_VARIANTS.acrylic.sizes],
+      allowedFinishes: [...DEFAULT_PRODUCT_VARIANTS.acrylic.finishes],
     };
   }
   return {
@@ -73,7 +96,12 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
   const [title, setTitle] = useState("");
   const [handle, setHandle] = useState("");
   const [handleEdited, setHandleEdited] = useState(false);
-  const [kind, setKind] = useState<SeedKind>("both");
+  const [selected, setSelected] = useState<Record<Kind, boolean>>({
+    poster: true,
+    canvas: true,
+    aluminum: false,
+    acrylic: false,
+  });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -85,41 +113,39 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
       setTitle("");
       setHandle("");
       setHandleEdited(false);
-      setKind("both");
+      setSelected({ poster: true, canvas: true, aluminum: false, acrylic: false });
       setSaving(false);
     }
   }, [open]);
+
+  function toggleKind(kind: Kind, checked: boolean) {
+    setSelected((s) => ({ ...s, [kind]: checked }));
+  }
 
   async function handleCreate() {
     if (!title.trim() || !handle.trim()) {
       toast.error("Titel och handle krävs");
       return;
     }
+    const kinds = (Object.keys(selected) as Kind[]).filter((k) => selected[k]);
+    if (kinds.length === 0) {
+      toast.error("Välj minst en produkttyp");
+      return;
+    }
     setSaving(true);
 
-    // template_slug groups poster + canvas variants under one template.
+    // template_slug groups variants under one template.
     const trimmedHandle = handle.trim();
-    const templateSlug = trimmedHandle.replace(/-(poster|posters|canvas)$/i, "");
+    const templateSlug = trimmedHandle.replace(/-(poster|posters|canvas|aluminum|acrylic)$/i, "");
+    const onlyOne = kinds.length === 1;
 
-    // Decide which config rows to create. "Båda" → two rows sharing slug.
-    type Row = { kind: "poster" | "canvas"; handle: string; productType: "posters" | "canvas"; titleSuffix: string };
-    const rows: Row[] = [];
-    if (kind === "poster" || kind === "both") {
-      rows.push({
-        kind: "poster",
-        handle: `${templateSlug}-poster`,
-        productType: "posters",
-        titleSuffix: kind === "both" ? " - Poster" : "",
-      });
-    }
-    if (kind === "canvas" || kind === "both") {
-      rows.push({
-        kind: "canvas",
-        handle: `${templateSlug}-canvas`,
-        productType: "canvas",
-        titleSuffix: kind === "both" ? " - Canvas" : "",
-      });
-    }
+    type Row = { kind: Kind; handle: string; productType: ProductType; titleSuffix: string };
+    const rows: Row[] = kinds.map((kind) => ({
+      kind,
+      handle: `${templateSlug}${KIND_META[kind].suffix}`,
+      productType: KIND_META[kind].productType,
+      titleSuffix: onlyOne ? "" : KIND_META[kind].titleSuffix,
+    }));
 
     const baseTextConfig = {
       fonts: ["Inter", "Playfair Display"],
@@ -129,8 +155,6 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
     const baseStyles = ["light-v11", "dark-v11", "outdoors-v12", "satellite-v9"] as unknown as never;
 
     for (const r of rows) {
-      // Each row gets its own template enabling ONLY its product type — keeps
-      // the customer-side Format toggle clean and editor-state deterministic.
       const tpl = buildSeedTemplate(r.kind);
       const { error } = await supabase.from("product_configs").insert({
         title: title.trim() + r.titleSuffix,
@@ -151,7 +175,7 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
       }
     }
 
-    // Sync each new row to Shopify (best-effort). Failure here doesn't block.
+    // Sync each new row to Shopify (best-effort).
     let syncFailures = 0;
     for (const r of rows) {
       const { data: syncData, error: syncErr } = await supabase.functions.invoke(
@@ -172,8 +196,11 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
       });
     }
     onOpenChange(false);
-    // Open the poster row in the designer (or the only row if single-kind).
-    const openHandle = rows.find((r) => r.kind === "poster")?.handle ?? rows[0].handle;
+    // Open poster row first, else canvas, else first row.
+    const openHandle =
+      rows.find((r) => r.kind === "poster")?.handle ??
+      rows.find((r) => r.kind === "canvas")?.handle ??
+      rows[0].handle;
     navigate(`/admin/designer/${openHandle}`);
   }
 
@@ -214,21 +241,24 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
           </div>
 
           <div className="space-y-2">
-            <Label>Produkttyp</Label>
-            <RadioGroup value={kind} onValueChange={(v) => setKind(v as SeedKind)}>
-              <div className="flex items-center gap-2">
-                <RadioGroupItem value="poster" id="seed-poster" />
-                <Label htmlFor="seed-poster" className="font-normal cursor-pointer">Poster</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <RadioGroupItem value="canvas" id="seed-canvas" />
-                <Label htmlFor="seed-canvas" className="font-normal cursor-pointer">Canvas</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <RadioGroupItem value="both" id="seed-both" />
-                <Label htmlFor="seed-both" className="font-normal cursor-pointer">Båda</Label>
-              </div>
-            </RadioGroup>
+            <Label>Produkttyper</Label>
+            <p className="text-xs text-muted-foreground">
+              En separat Shopify-produkt skapas per vald typ. Alla delar samma mall (bilder, kartor, text).
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {(Object.keys(KIND_META) as Kind[]).map((k) => (
+                <label
+                  key={k}
+                  className="flex items-center gap-2 rounded-md border p-3 cursor-pointer hover:bg-muted/40"
+                >
+                  <Checkbox
+                    checked={selected[k]}
+                    onCheckedChange={(c) => toggleKind(k, c === true)}
+                  />
+                  <span className="text-sm font-medium">{KIND_META[k].label}</span>
+                </label>
+              ))}
+            </div>
           </div>
         </div>
 
