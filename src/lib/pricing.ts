@@ -25,6 +25,30 @@ export const CANVAS_PRICES: Record<string, Record<string, number>> = {
   "70x100": { "2cm": 1299, "4cm": 1399 },
 };
 
+// Aluminium (vanlig — ej brushed). Använder pseudo-variantnamn "Standard"
+// för att hålla samma datamodell (size × variant) som poster/canvas.
+export const ALUMINUM_SIZES = ["20x30", "30x40", "40x50", "50x70", "70x100"] as const;
+export const ALUMINUM_MATERIALS = ["Standard"] as const;
+export const ALUMINUM_PRICES: Record<string, Record<string, number>> = {
+  "20x30": { Standard: 399 },
+  "30x40": { Standard: 499 },
+  "40x50": { Standard: 649 },
+  "50x70": { Standard: 849 },
+  "70x100": { Standard: 1199 },
+};
+
+// Akryl (4 mm). Bara en finish — vi använder "Standard" som variantnamn
+// för att hålla samma datamodell.
+export const ACRYLIC_SIZES = ["20x30", "30x40", "40x50", "50x70", "70x100"] as const;
+export const ACRYLIC_FINISHES = ["Standard"] as const;
+export const ACRYLIC_PRICES: Record<string, Record<string, number>> = {
+  "20x30": { Standard: 499 },
+  "30x40": { Standard: 699 },
+  "40x50": { Standard: 899 },
+  "50x70": { Standard: 1099 },
+  "70x100": { Standard: 1599 },
+};
+
 export const STYLE_PRESETS = [
   { id: "none", label: "Original", prompt: "" },
   { id: "watercolor", label: "Akvarell", prompt: "Transform this image into a soft watercolor painting with delicate brush strokes and pastel colors, preserving the composition." },
