@@ -197,6 +197,9 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
     borderWidth: frameColor ? `${borderPx}px` : 0,
     padding: innerPadding,
     boxSizing: "border-box",
+    // Lokal stacking context — alla interna z-index (inkl. akrylskruvar)
+    // begränsas till ramen och kan inte krocka med dialoger / thumbnails.
+    isolation: "isolate",
   };
 
   const layerToEditorRect = (l: TemplateLayer) => {
@@ -549,10 +552,10 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
         {isAcrylic && (
           <div
             className="pointer-events-none absolute inset-0"
-            style={{ zIndex: 60 }}
+            style={{ zIndex: 45 }}
             aria-hidden
           >
-            <AcrylicCornerOverlay frontWcm={frontW} frontHcm={frontH} zIndex={60} />
+            <AcrylicCornerOverlay frontWcm={frontW} frontHcm={frontH} zIndex={45} />
           </div>
         )}
       </div>
