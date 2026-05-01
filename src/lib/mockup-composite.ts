@@ -14,16 +14,20 @@ function loadImage(src: string, crossOrigin = false): Promise<HTMLImageElement> 
 
 interface CompositArgs {
   scene: MockupScene;
+  /** Posters: print-snapshot. Canvas: ignoreras (vi använder prerenderedCanvasPng). */
   printUrl: string;
   size: string;
   orientation: Orientation;
   productType: ProductType;
-  /** Endast canvas: 2 eller 4 (cm). */
-  canvasDepthCm?: number;
   /** Hex-färg för ram, eller null för ingen ram (poster). */
   frameColor?: string | null;
   /** Ramens bredd i cm (verklig). Standard 2.5. */
   frameWidthCm?: number;
+  /**
+   * Endast canvas: en pre-renderad transparent PNG av canvasen från rätt
+   * vinkel (matchar `scene.viewKey`). Genereras av `renderCanvas3DViews`.
+   */
+  prerenderedCanvasPng?: string;
 }
 
 export async function compositeMockup({
@@ -32,9 +36,9 @@ export async function compositeMockup({
   size,
   orientation,
   productType,
-  canvasDepthCm = 2,
   frameColor = null,
   frameWidthCm = 2.5,
+  prerenderedCanvasPng,
 }: CompositArgs): Promise<string> {
   const sizeCm = parseSizeCm(size);
   if (!sizeCm) throw new Error(`Ogiltig storlek: ${size}`);
@@ -42,6 +46,85 @@ export async function compositeMockup({
   const realWcm = orientation === "landscape" ? sizeCm.hCm : sizeCm.wCm;
   const realHcm = orientation === "landscape" ? sizeCm.wCm : sizeCm.hCm;
 
+  // ============ CANVAS-VÄG ============
+  // Helt separat från poster-logiken: vi har redan en perspektiv-korrekt
+  // pre-renderad PNG med transparent bakgrund. Bara composit på fotot.
+  if (productType === "canvas") {
+    if (!prerenderedCanvasPng) {
+      throw new Error("Canvas-mockup kräver en pre-renderad PNG");
+    }
+    const [bg, fg] = await Promise.all([
+      loadImage(scene.src, false),
+      loadImage(prerenderedCanvasPng, false),
+    ]);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = bg.naturalWidth;
+    canvas.height = bg.naturalHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Kunde inte skapa 2D-context");
+
+    const sceneBase = 1024;
+    const sx = bg.naturalWidth / sceneBase;
+    const sy = bg.naturalHeight / sceneBase;
+    const area = {
+      x: scene.area.x * sx,
+      y: scene.area.y * sy,
+      w: scene.area.w * sx,
+      h: scene.area.h * sy,
+    };
+
+    // 1. Bakgrund (rummet)
+    ctx.drawImage(bg, 0, 0);
+
+    // 2. Skala canvasen efter REAL-bredd vs scenens referensbredd, så en
+    // 50 cm canvas ser större ut än en 30 cm canvas på samma vägg.
+    // Den pre-renderade PNG:en innehåller hela "bounding box" runt canvasen
+    // (front + synliga sidor), så vi behåller PNG:ns proportioner.
+    const targetFrontW = (realWcm / scene.referenceWidthCm) * area.w;
+    const pngAspect = fg.naturalWidth / fg.naturalHeight;
+    // Frontens andel av PNG:n varierar med vy, men eftersom hela PNG:n är
+    // tight croppad runt canvasen kan vi bara skala hela till mål-bredden
+    // och låta höjden följa naturligt.
+    let drawW = targetFrontW * 1.15; // +15% headroom för synliga sidor
+    let drawH = drawW / pngAspect;
+
+    // Säkerställ att PNG:n inte sprängs ur väggområdet
+    const maxH = area.h * 1.05;
+    if (drawH > maxH) {
+      const s = maxH / drawH;
+      drawH *= s;
+      drawW *= s;
+    }
+    const maxW = area.w * 1.15;
+    if (drawW > maxW) {
+      const s = maxW / drawW;
+      drawW *= s;
+      drawH *= s;
+    }
+
+    const cx = area.x + (area.w - drawW) / 2;
+    const cy = area.y + (area.h - drawH) / 2;
+
+    // 3. Mjuk skugga på väggen bakom canvasen
+    if (scene.shadow) {
+      ctx.save();
+      ctx.shadowColor = `rgba(0,0,0,${scene.shadow.alpha})`;
+      ctx.shadowBlur = scene.shadow.blur;
+      ctx.shadowOffsetY = scene.shadow.offsetY;
+      ctx.fillStyle = `rgba(0,0,0,${scene.shadow.alpha})`;
+      // Skuggrektangel approximerar canvasens silhuett (något indragen)
+      ctx.fillRect(cx + drawW * 0.06, cy + drawH * 0.06, drawW * 0.88, drawH * 0.88);
+      ctx.restore();
+    }
+
+    // 4. Den pre-renderade canvasen
+    ctx.drawImage(fg, cx, cy, drawW, drawH);
+
+    return canvas.toDataURL("image/jpeg", 0.92);
+  }
+
+  // ============ POSTER-VÄG (oförändrad) ============
   const [bg, fg] = await Promise.all([
     loadImage(scene.src, false),
     loadImage(printUrl, true),
@@ -66,11 +149,11 @@ export async function compositeMockup({
   // 1. Bakgrund
   ctx.drawImage(bg, 0, 0);
 
-  // 2. Poster-pixelstorlek inom area (skala efter referensbredd → trovärdig storlek)
+  // 2. Poster-pixelstorlek inom area
   let posterW = (realWcm / scene.referenceWidthCm) * area.w;
   let posterH = posterW * (realHcm / realWcm);
 
-  const frameWpx = frameColor && productType !== "canvas"
+  const frameWpx = frameColor
     ? (frameWidthCm / scene.referenceWidthCm) * area.w
     : 0;
 
@@ -90,27 +173,10 @@ export async function compositeMockup({
   const outerW = innerW + frameWpx * 2;
   const outerH = innerH + frameWpx * 2;
 
-  // Canvas-djup i scenpixlar
-  const depthPx = productType === "canvas"
-    ? (canvasDepthCm / scene.referenceWidthCm) * area.w
-    : 0;
-  const angle = scene.canvasWrap ? (scene.canvasWrap.angleDeg * Math.PI) / 180 : 0;
-  const sideVisibleW = productType === "canvas" ? depthPx * Math.sin(angle) : 0;
-  const topVisibleH = productType === "canvas" ? depthPx * Math.cos(angle) * 0.35 : 0;
-
-  // Total bounding för canvas = front + synlig sida + synlig topp
-  const canvasOuterW = posterW + sideVisibleW;
-  const canvasOuterH = posterH + topVisibleH;
-
-  // Centrera enheten i area
-  const ox = productType === "canvas"
-    ? area.x + (area.w - canvasOuterW) / 2
-    : area.x + (area.w - outerW) / 2;
-  const oy = productType === "canvas"
-    ? area.y + (area.h - canvasOuterH) / 2
-    : area.y + (area.h - outerH) / 2;
-  const px = productType === "canvas" ? ox : ox + frameWpx;
-  const py = productType === "canvas" ? oy + topVisibleH : oy + frameWpx;
+  const ox = area.x + (area.w - outerW) / 2;
+  const oy = area.y + (area.h - outerH) / 2;
+  const px = ox + frameWpx;
+  const py = oy + frameWpx;
 
   // 3. Skugga
   if (scene.shadow) {
@@ -119,78 +185,12 @@ export async function compositeMockup({
     ctx.shadowColor = `rgba(0,0,0,${scene.shadow.alpha})`;
     ctx.shadowBlur = scene.shadow.blur;
     ctx.shadowOffsetY = scene.shadow.offsetY;
-    if (productType === "canvas") {
-      ctx.fillRect(ox, oy, canvasOuterW, canvasOuterH);
-    } else {
-      ctx.fillRect(ox, oy, outerW, outerH);
-    }
+    ctx.fillRect(ox, oy, outerW, outerH);
     ctx.restore();
   }
 
-  // 4. Canvas: rita TOPP-wrap (sampla översta ~3% av bilden, sträck över top-trapets)
-  if (productType === "canvas" && scene.canvasWrap && topVisibleH > 0.5) {
-    const stripSrcH = Math.max(2, fg.naturalHeight * 0.03);
-    ctx.save();
-    // trapets ovanför postern: vänster topp = (px, py - topVisibleH), höger topp = (px+posterW+sideVisibleW, py-topVisibleH+sideTopOffset)
-    // approximation via clip + drawImage skewed
-    ctx.beginPath();
-    ctx.moveTo(px, py);
-    ctx.lineTo(px + posterW, py);
-    ctx.lineTo(px + posterW + sideVisibleW, py - topVisibleH);
-    ctx.lineTo(px + sideVisibleW * 0.15, py - topVisibleH);
-    ctx.closePath();
-    ctx.clip();
-    // skew så pixlar pressas in mot bakåt-perspektivet
-    const skewX = sideVisibleW / Math.max(topVisibleH, 1);
-    ctx.transform(1, 0, -skewX * 0.5, 1, 0, 0);
-    ctx.drawImage(
-      fg,
-      0, 0, fg.naturalWidth, stripSrcH,
-      px + py * skewX * 0.5, py - topVisibleH, posterW + sideVisibleW, topVisibleH,
-    );
-    // mörkning bakåt (gradient)
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    const topGrad = ctx.createLinearGradient(0, py - topVisibleH, 0, py);
-    topGrad.addColorStop(0, "rgba(0,0,0,0.35)");
-    topGrad.addColorStop(1, "rgba(0,0,0,0.05)");
-    ctx.fillStyle = topGrad;
-    ctx.fillRect(px - 5, py - topVisibleH, posterW + sideVisibleW + 10, topVisibleH + 1);
-    ctx.restore();
-  }
-
-  // 5. Canvas: rita HÖGER SIDO-wrap (sampla högra ~3% av bilden, sträck över sido-trapets)
-  if (productType === "canvas" && scene.canvasWrap && sideVisibleW > 0.5) {
-    const stripSrcW = Math.max(2, fg.naturalWidth * 0.03);
-    ctx.save();
-    // sido-trapets: vänster-topp=(px+posterW, py), höger-topp=(px+posterW+sideVisibleW, py-topVisibleH),
-    //                höger-bot=(px+posterW+sideVisibleW, py+posterH-topVisibleH*0.4), vänster-bot=(px+posterW, py+posterH)
-    ctx.beginPath();
-    ctx.moveTo(px + posterW, py);
-    ctx.lineTo(px + posterW + sideVisibleW, py - topVisibleH);
-    ctx.lineTo(px + posterW + sideVisibleW, py + posterH - topVisibleH * 0.4);
-    ctx.lineTo(px + posterW, py + posterH);
-    ctx.closePath();
-    ctx.clip();
-    // approximera perspektiv via horisontell sträckning av högra strippan
-    const skewY = -topVisibleH / Math.max(sideVisibleW, 1);
-    ctx.transform(1, skewY * 0.5, 0, 1, 0, 0);
-    ctx.drawImage(
-      fg,
-      fg.naturalWidth - stripSrcW, 0, stripSrcW, fg.naturalHeight,
-      px + posterW, py - (px + posterW) * skewY * 0.5, sideVisibleW, posterH,
-    );
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    // mörkare gradient mot bakkanten (höger)
-    const sideGrad = ctx.createLinearGradient(px + posterW, 0, px + posterW + sideVisibleW, 0);
-    sideGrad.addColorStop(0, "rgba(0,0,0,0.05)");
-    sideGrad.addColorStop(1, "rgba(0,0,0,0.42)");
-    ctx.fillStyle = sideGrad;
-    ctx.fillRect(px + posterW, py - topVisibleH, sideVisibleW + 1, posterH + topVisibleH);
-    ctx.restore();
-  }
-
-  // 6. Ram (endast poster med vald färg)
-  if (frameColor && frameWpx > 0 && productType !== "canvas") {
+  // 4. Ram (endast poster med vald färg)
+  if (frameColor && frameWpx > 0) {
     ctx.save();
     ctx.fillStyle = frameColor;
     ctx.fillRect(ox, oy, outerW, outerH);
@@ -208,22 +208,20 @@ export async function compositeMockup({
     ctx.restore();
   }
 
-  // 7. Front: postern själv — RAKT, ingen skew (innehåll ska aldrig förvrängas)
+  // 5. Front: postern själv
   ctx.drawImage(fg, px, py, posterW, posterH);
 
-  // 8. Diskret skugga i hörnen för att binda postern mot väggen
-  if (productType !== "canvas") {
-    ctx.save();
-    const cornerGrad = ctx.createRadialGradient(
-      px + posterW / 2, py + posterH / 2, posterW * 0.4,
-      px + posterW / 2, py + posterH / 2, posterW * 0.7,
-    );
-    cornerGrad.addColorStop(0, "rgba(0,0,0,0)");
-    cornerGrad.addColorStop(1, "rgba(0,0,0,0.08)");
-    ctx.fillStyle = cornerGrad;
-    ctx.fillRect(px, py, posterW, posterH);
-    ctx.restore();
-  }
+  // 6. Diskret skugga i hörnen för att binda postern mot väggen
+  ctx.save();
+  const cornerGrad = ctx.createRadialGradient(
+    px + posterW / 2, py + posterH / 2, posterW * 0.4,
+    px + posterW / 2, py + posterH / 2, posterW * 0.7,
+  );
+  cornerGrad.addColorStop(0, "rgba(0,0,0,0)");
+  cornerGrad.addColorStop(1, "rgba(0,0,0,0.08)");
+  ctx.fillStyle = cornerGrad;
+  ctx.fillRect(px, py, posterW, posterH);
+  ctx.restore();
 
   return canvas.toDataURL("image/jpeg", 0.9);
 }
