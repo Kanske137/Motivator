@@ -13,7 +13,7 @@ export type Orientation = z.infer<typeof orientationSchema>;
 export const aspectSchema = z.enum(["3:4", "4:3", "1:1"]);
 export type Aspect = z.infer<typeof aspectSchema>;
 
-export const productTypeSchema = z.enum(["poster", "canvas"]);
+export const productTypeSchema = z.enum(["poster", "canvas", "aluminum", "acrylic"]);
 export type TemplateProductType = z.infer<typeof productTypeSchema>;
 
 export const mapShapeSchema = z.enum(["rect", "circle", "heart", "star"]);
