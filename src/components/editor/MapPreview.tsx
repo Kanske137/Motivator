@@ -6,6 +6,7 @@ import { MapLayerInstance } from "./layers/MapLayerInstance";
 import { ImageLayerView, LineLayerView, MarginLayerView } from "./layers/StaticLayers";
 import { ShapeLayerView } from "./layers/ShapeLayerView";
 import { lineThicknessPxFromCanvas, effectiveLayerRect, clampLayerRect, getActiveMarginInsetsPct } from "@/lib/layer-utils";
+import { AcrylicCornerOverlay } from "./AcrylicCornerOverlay";
 
 interface Props {
   frameColor?: string;
