@@ -102,6 +102,21 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
             : [...DEFAULT_PRODUCT_VARIANTS.poster.frames],
       };
     } else {
+  function toggleEnabled(kind: Kind, enabled: boolean) {
+    const next: ProductOptions = { ...value };
+    if (kind === "poster") {
+      next.poster = {
+        enabled,
+        allowedSizes:
+          value.poster?.allowedSizes && value.poster.allowedSizes.length > 0
+            ? value.poster.allowedSizes
+            : [...DEFAULT_PRODUCT_VARIANTS.poster.sizes],
+        allowedFrames:
+          value.poster?.allowedFrames && value.poster.allowedFrames.length > 0
+            ? value.poster.allowedFrames
+            : [...DEFAULT_PRODUCT_VARIANTS.poster.frames],
+      };
+    } else if (kind === "canvas") {
       next.canvas = {
         enabled,
         allowedSizes:
@@ -113,13 +128,37 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
             ? value.canvas.allowedDepths
             : [...DEFAULT_PRODUCT_VARIANTS.canvas.depths],
       };
+    } else if (kind === "aluminum") {
+      next.aluminum = {
+        enabled,
+        allowedSizes:
+          value.aluminum?.allowedSizes && value.aluminum.allowedSizes.length > 0
+            ? value.aluminum.allowedSizes
+            : [...DEFAULT_PRODUCT_VARIANTS.aluminum.sizes],
+        allowedMaterials:
+          value.aluminum?.allowedMaterials && value.aluminum.allowedMaterials.length > 0
+            ? value.aluminum.allowedMaterials
+            : [...DEFAULT_PRODUCT_VARIANTS.aluminum.materials],
+      };
+    } else {
+      next.acrylic = {
+        enabled,
+        allowedSizes:
+          value.acrylic?.allowedSizes && value.acrylic.allowedSizes.length > 0
+            ? value.acrylic.allowedSizes
+            : [...DEFAULT_PRODUCT_VARIANTS.acrylic.sizes],
+        allowedFinishes:
+          value.acrylic?.allowedFinishes && value.acrylic.allowedFinishes.length > 0
+            ? value.acrylic.allowedFinishes
+            : [...DEFAULT_PRODUCT_VARIANTS.acrylic.finishes],
+      };
     }
     onChange(next);
   }
 
   function toggleListItem(
     kind: Kind,
-    field: "allowedSizes" | "allowedFrames" | "allowedDepths",
+    field: "allowedSizes" | "allowedFrames" | "allowedDepths" | "allowedMaterials" | "allowedFinishes",
     item: string,
     checked: boolean,
   ) {
