@@ -1,44 +1,24 @@
 ## Problem
+På canvas-3D:n ser höger sida (från ditt perspektiv) ut att inte följa motivet i editorn — den verkar speglad jämfört med vänster sida och toppen/botten.
 
-När en kund kör face-swap (human) får hen tillbaka en bild från Replicate som har **samma dimensioner som referensbilden**. Trots det visas den i editorn med tomma/vita kanter och samma sak hamnar på print-filen.
+## Orsak
+I `src/components/editor/Canvas3DPreview.tsx`, `CanvasMesh`-materialen, har höger sida (+X) `flipX = true`, medan vänster (-X), topp (+Y) och botten (-Y) inte flippas. Kommentaren resonerar fel om Three.js BoxGeometry's UV-orientering för +X-facet.
 
-Orsaken: vi tvingar idag `fit = "contain"` så fort det finns ett AI-resultat, oavsett vilken modell som genererade det.
+I praktiken: BoxGeometry +X-facet har U=0 vid bakkanten och U=1 vid framkanten (motsatt det som står i koden). Default-mappningen utan flip skulle då redan landa wrap-strippens "närmast-fronten"-pixelkolumn vid framkanten — precis som vänster sida fungerar. Det extra flippet vänder strippen och skapar den speglade effekten du ser.
 
-```ts
-// src/components/editor/MapPreview.tsx (rad 402)
-const effectiveFit = aiResultUrl ? "contain" : l.defaults.fit;
+Vänster, topp och botten ser korrekta ut just för att de använder default-mappning utan flip — så symmetriskt borde +X också göra det.
 
-// src/lib/template-snapshot.ts (rad 629)
-const fit = aiResultUrl ? "contain" : layer.defaults.fit;
-```
+## Åtgärd
+Endast en rad ändras i `src/components/editor/Canvas3DPreview.tsx`:
 
-`contain` är rätt val för `removeBackground` (Nano Banana 2 håller inte alltid målad aspect, och dess vita bakgrund smälter in). Men för `human` (Replicate face-swap) och `pet` (Nano Banana 2 med uttrycklig "same aspect ratio as image #1"-instruktion) ska bilden alltid fylla layret precis som referensbilden gjorde — alltså samma `fit` som `layer.defaults.fit` (typiskt `cover`).
+- I `right`-materialet (rad ~128-132): ta bort `flipX` (sätt `true` → `false`, eller släpp argumentet helt så det defaultar till `false`). Uppdatera kommentaren så den beskriver det faktiska beteendet.
 
-## Lösning
+Inget annat behöver ändras: front, vänster, topp, botten och bak förblir som de är. Print-filen (snapshot med wrap+bleed) påverkas inte. Editorn påverkas inte. Mockup-galleriets 2D-composit påverkas inte.
 
-Begränsa "tvinga contain"-regeln till **endast** `subjectKind === "removeBackground"`. För `human` och `pet` används layerns `defaults.fit` (samma som referensbilden använder före face-swap), så resultatet fyller layret utan tomma kanter.
+## Verifiering
+Efter ändringen ska:
+- Höger wrap-strip vara en direkt fortsättning av motivets högerkant (inte speglad).
+- Pixlarna närmast framkanten matcha exakt mot frontens högerkant — sömlöst hörn precis som vänster sida redan är.
+- Topp/botten/vänster fortsätta se identiska ut som idag.
 
-### Ändringar
-
-**`src/components/editor/MapPreview.tsx`** (kring rad 393-402)
-- Läs `subjectKind` från `l.defaults.subjectKind`.
-- Sätt `effectiveFit = (aiResultUrl && subjectKind === "removeBackground") ? "contain" : l.defaults.fit`.
-
-**`src/lib/template-snapshot.ts`** (kring rad 617-631)
-- Läs `subjectKind` från `layer.defaults.subjectKind`.
-- Sätt `fit = (aiResultUrl && subjectKind === "removeBackground") ? "contain" : layer.defaults.fit`.
-
-Detta är symmetriskt mellan editor-preview och hires-print, så vad kunden ser är vad hen får.
-
-### Varför det räcker
-
-- **Human face-swap (Replicate `cdingram/face-swap`)**: returnerar bilden med exakt samma pixelmått som `input_image` (referensbilden). Eftersom referensbilden redan passar layret enligt `defaults.fit` kommer face-swap-resultatet också göra det.
-- **Pet (Nano Banana 2)**: prompten kräver explicit "same aspect ratio as image #1" och dimensions-sanity-checken i edge-funktionen avvisar collage. I praktiken matchar resultatet referensens form, så `defaults.fit` (cover) fyller layret korrekt.
-- **removeBackground**: behåller dagens beteende (`contain` + vit padding) — bilden ska aldrig beskäras eftersom motivet redan är inramat med vit halo.
-
-Inga ändringar i edge-funktionen, prompten eller print-pipelinen behövs.
-
-### Filer som ändras
-
-- `src/components/editor/MapPreview.tsx`
-- `src/lib/template-snapshot.ts`
+Test: ladda en bild med tydlig text eller ansikte nära högerkanten i editorn, byt till canvas, rotera 3D:n åt höger och bekräfta att texten/ansiktet fortsätter naturligt runt kanten utan spegling.

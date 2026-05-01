@@ -120,15 +120,17 @@ function CanvasMesh({
     );
 
     // RIGHT (+X): wrap strip immediately to the right of the front in the
-    // print file. Three.js BoxGeometry +X UVs: U=0 at +Z (FRONT edge),
-    // U=1 at -Z (back edge); V=0 at bottom. The strip's leftmost pixel
+    // print file. Three.js BoxGeometry +X UVs: U=0 at -Z (back edge),
+    // U=1 at +Z (FRONT edge); V=0 at bottom. The strip's leftmost pixel
     // column (in print-file space) is closest to the front and must land at
-    // U=0 (the face-edge that meets the front). Default mapping puts the
-    // strip's leftmost pixel at U=0 → flip X to align it with the front edge.
+    // the U=1 edge (which meets the front). Default mapping puts the strip's
+    // rightmost pixel at U=1 — but our strip's "near-front" column is its
+    // LEFT column, so without any flip the wrapping continues seamlessly
+    // (the rightmost back-edge pixel lands at the back side). No flip needed,
+    // mirroring left-side behaviour.
     const right = make(
       fBleedX + fWrapX + fFrontX, fBleedY + fWrapY,
       fWrapX, fFrontY,
-      true, false,
     );
 
     // LEFT (-X): wrap strip immediately to the left of the front.
