@@ -11,13 +11,15 @@ interface Props {
   template: Template | null;
   width?: number;
   height?: number;
-  /** "poster" | "canvas" — when "canvas" and the template has a canvasLayout,
-   *  render the wrap-extended layout and overlay a dashed front-zone marker. */
+  /** "poster" | "canvas" | "aluminum" | "acrylic" — when "canvas" and the template
+   *  has a canvasLayout, render the wrap-extended layout and overlay a dashed
+   *  front-zone marker. When "acrylic", overlay 4 silver corner discs. */
   productType?: string | null;
 }
 
 export default function TemplateThumbnail({ template, width = 120, height = 160, productType }: Props) {
   const isCanvas = productType === "canvas";
+  const isAcrylic = productType === "acrylic";
   const useCanvasLayout = isCanvas && !!template?.canvasLayout;
   const layoutBlock = useCanvasLayout ? template?.canvasLayout : template?.defaultLayout;
   const layout = layoutBlock?.portrait ?? null;
@@ -178,6 +180,30 @@ export default function TemplateThumbnail({ template, width = 120, height = 160,
           }}
           aria-hidden
         />
+      )}
+      {isAcrylic && (
+        <>
+          {[
+            { top: "6%", left: "6%" },
+            { top: "6%", right: "6%" },
+            { bottom: "6%", left: "6%" },
+            { bottom: "6%", right: "6%" },
+          ].map((pos, i) => (
+            <div
+              key={i}
+              className="absolute rounded-full pointer-events-none"
+              style={{
+                width: "8%",
+                height: "6%",
+                ...pos,
+                background:
+                  "radial-gradient(circle at 35% 30%, #f5f5f5 0%, #c8c8c8 60%, #8a8a8a 100%)",
+                boxShadow: "0 0.5px 1px rgba(0,0,0,0.4)",
+              }}
+              aria-hidden
+            />
+          ))}
+        </>
       )}
     </div>
   );

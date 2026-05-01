@@ -547,7 +547,13 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
           <div className="absolute pointer-events-none left-0 right-0 top-1/2 -translate-y-1/2 border-t border-dashed border-primary" style={{ zIndex: 10000 }} />
         )}
         {isAcrylic && (
-          <AcrylicCornerOverlay frontWcm={frontW} frontHcm={frontH} />
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{ zIndex: 60 }}
+            aria-hidden
+          >
+            <AcrylicCornerOverlay frontWcm={frontW} frontHcm={frontH} zIndex={60} />
+          </div>
         )}
       </div>
       {allLayers.some((l) => l.type === "map") && (
