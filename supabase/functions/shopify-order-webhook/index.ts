@@ -156,88 +156,40 @@ const GELATO_SKU_MAP: Record<string, Record<string, { portrait: string; landscap
   },
 };
 
-function productTypeFromHandle(handle: string): "posters" | "canvas" | "acrylic" | "aluminum" | null {
+function productTypeFromHandle(handle: string): "posters" | "canvas" | null {
   const h = (handle || "").toLowerCase();
-  if (h.includes("acrylic") || h.includes("akryl")) return "acrylic";
-  if (h.includes("aluminum") || h.includes("aluminium")) return "aluminum";
   if (h.includes("canvas")) return "canvas";
   if (h.includes("poster") || h.includes("karta")) return "posters";
   return null;
 }
 
-/** Translate the `product_type` stored in `product_configs` (singular form,
- *  e.g. "poster"/"acrylic") to the plural key used in the local SKU map. */
-function configProductTypeToMapKey(t?: string | null): "posters" | "canvas" | "acrylic" | "aluminum" | null {
-  switch ((t ?? "").toLowerCase()) {
-    case "poster":
-    case "posters":
-      return "posters";
-    case "canvas":
-      return "canvas";
-    case "acrylic":
-      return "acrylic";
-    case "aluminum":
-    case "aluminium":
-      return "aluminum";
-    default:
-      return null;
-  }
-}
-
 interface ResolveResult {
   productUid: string | null;
-  source: "db" | "db-fallback-orientation" | "local-exact" | "local-size-fallback" | "missing";
+  source: "db" | "local-exact" | "local-size-fallback" | "missing";
   detail: string;
-}
-
-/** Read a UID from the per-handle DB map. Tolerates both the legacy string
- *  format and the new `{portrait, landscape}` object. Returns `{uid, fallback}`
- *  where `fallback` indicates the requested orientation was missing and the
- *  other orientation was used. */
-function readDbUid(
-  entry: unknown,
-  orientation: "portrait" | "landscape",
-): { uid: string | null; fallback: boolean } {
-  if (typeof entry === "string" && entry.trim()) return { uid: entry.trim(), fallback: false };
-  if (entry && typeof entry === "object") {
-    const obj = entry as Record<string, unknown>;
-    const wanted = obj[orientation];
-    if (typeof wanted === "string" && wanted.trim()) return { uid: wanted.trim(), fallback: false };
-    const other = orientation === "portrait" ? obj.landscape : obj.portrait;
-    if (typeof other === "string" && other.trim()) return { uid: other.trim(), fallback: true };
-  }
-  return { uid: null, fallback: false };
 }
 
 function resolveProductUid(args: {
   handle: string;
-  productTypeOverride?: "posters" | "canvas" | "acrylic" | "aluminum" | null;
   size: string;
   variant?: string | null;
   orientation: "portrait" | "landscape";
-  dbMap?: Record<string, Record<string, unknown>> | null;
+  dbMap?: Record<string, Record<string, string>> | null;
 }): ResolveResult {
-  const { handle, productTypeOverride, size, variant, orientation, dbMap } = args;
+  const { handle, size, variant, orientation, dbMap } = args;
 
-  // 1) DB-mapping (per-handle override) — manuellt ifyllt i admin
-  if (variant && dbMap?.[size]?.[variant] !== undefined) {
-    const { uid, fallback } = readDbUid(dbMap[size][variant], orientation);
-    if (uid) {
-      return {
-        productUid: uid,
-        source: fallback ? "db-fallback-orientation" : "db",
-        detail: `${size}|${variant}${fallback ? ` (fallback to other orientation)` : ""}`,
-      };
-    }
+  // 1) DB-mapping (per-handle override)
+  if (variant && dbMap?.[size]?.[variant]) {
+    return { productUid: dbMap[size][variant], source: "db", detail: `${size}|${variant}` };
   }
 
-  // 2) Local SKU-map (lookup product type from DB-config first, then from handle)
-  const ptype = productTypeOverride ?? productTypeFromHandle(handle);
+  const ptype = productTypeFromHandle(handle);
   if (!ptype) {
     return { productUid: null, source: "missing", detail: `unknown product type for handle="${handle}"` };
   }
   const localForType = GELATO_SKU_MAP[ptype] ?? {};
 
+  // 2) Local exact size|variant
   if (variant && localForType[`${size}|${variant}`]?.[orientation]) {
     return {
       productUid: localForType[`${size}|${variant}`][orientation],
@@ -246,6 +198,7 @@ function resolveProductUid(args: {
     };
   }
 
+  // 3) Any variant for the same size
   const sizeMatch = Object.entries(localForType).find(([k]) => k.startsWith(`${size}|`));
   if (sizeMatch && sizeMatch[1]?.[orientation]) {
     return {
@@ -303,9 +256,7 @@ async function processOrder(supabase: any, order: any) {
   }
 
   // Load DB overrides per handle
-  const { data: configs } = await supabase
-    .from("product_configs")
-    .select("shopify_handle, gelato_sku_map, product_type");
+  const { data: configs } = await supabase.from("product_configs").select("shopify_handle, gelato_sku_map");
   const configByHandle: Record<string, any> = {};
   (configs ?? []).forEach((c: any) => { configByHandle[c.shopify_handle] = c; });
 
@@ -349,11 +300,10 @@ async function processOrder(supabase: any, order: any) {
     console.log(`[shopify-webhook] line ${li.id}: using client print file ${printUrl}`);
 
 
-    // 2) Resolve productUid — alltid prio på admin-DB-mappen, sedan handle-baserad fallback.
+    // 2) Resolve productUid
     const cfg = configByHandle[handle];
     const resolved = resolveProductUid({
       handle,
-      productTypeOverride: configProductTypeToMapKey(cfg?.product_type),
       size: size!,
       variant,
       orientation,

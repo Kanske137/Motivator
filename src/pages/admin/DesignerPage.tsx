@@ -330,7 +330,6 @@ export default function DesignerPage() {
         description_html: config.description_html ?? null,
         seo_title: config.seo_title ?? null,
         seo_description: config.seo_description ?? null,
-        gelato_sku_map: (config.gelato_sku_map ?? {}) as unknown as never,
         map_styles: enabledMapStyleIds.length > 0 ? (enabledMapStyleIds as unknown as never) : ([] as unknown as never),
       })
       .eq("shopify_handle", handle);
@@ -485,7 +484,6 @@ export default function DesignerPage() {
           config={config}
           value={template.productOptions}
           onChange={(productOptions) => commitTemplate({ ...template, productOptions })}
-          onConfigChange={updateConfigMeta}
         />
 
         <ShopifyPublishingSection config={config} onChange={updateConfigMeta} />
