@@ -285,29 +285,31 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
         </Select>
       </div>
 
-      {/* Ram / Djup */}
-      <div className="space-y-2">
-        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-          {isCanvas ? "Djup" : "Ram"}
-        </Label>
-        <div className={`grid gap-2 ${isCanvas ? "grid-cols-2" : "grid-cols-3"}`}>
-          {visibleVariants.map((v) => {
-            const diff = v.price - currentVariantPrice;
-            const isNoFrame = v.name.toLowerCase() === "ingen";
-            return (
-              <FrameOption
-                key={v.name}
-                name={v.name}
-                thumbnail={isCanvas ? undefined : isNoFrame ? undefined : FRAME_THUMBS[v.name]}
-                svg={isCanvas ? <DepthIcon depth={v.name} /> : isNoFrame ? <NoFrameIcon /> : undefined}
-                selected={v.name === variant}
-                onClick={() => setVariant(v.name)}
-                priceLabel={formatDiff(diff)}
-              />
-            );
-          })}
+      {/* Ram / Djup — döljs när det bara finns en variant (aluminium/akryl) */}
+      {visibleVariants.length > 1 && (
+        <div className="space-y-2">
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
+            {isCanvas ? "Djup" : isAluminum ? "Material" : isAcrylic ? "Finish" : "Ram"}
+          </Label>
+          <div className={`grid gap-2 ${isCanvas ? "grid-cols-2" : "grid-cols-3"}`}>
+            {visibleVariants.map((v) => {
+              const diff = v.price - currentVariantPrice;
+              const isNoFrame = v.name.toLowerCase() === "ingen";
+              return (
+                <FrameOption
+                  key={v.name}
+                  name={v.name}
+                  thumbnail={isCanvas || isAluminum || isAcrylic ? undefined : isNoFrame ? undefined : FRAME_THUMBS[v.name]}
+                  svg={isCanvas ? <DepthIcon depth={v.name} /> : isNoFrame ? <NoFrameIcon /> : undefined}
+                  selected={v.name === variant}
+                  onClick={() => setVariant(v.name)}
+                  priceLabel={formatDiff(diff)}
+                />
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Orientering — segmented pill (hidden when only one orientation is allowed) */}
       {allowedOrientations.length > 1 && (
