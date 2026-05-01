@@ -303,7 +303,9 @@ async function processOrder(supabase: any, order: any) {
   }
 
   // Load DB overrides per handle
-  const { data: configs } = await supabase.from("product_configs").select("shopify_handle, gelato_sku_map");
+  const { data: configs } = await supabase
+    .from("product_configs")
+    .select("shopify_handle, gelato_sku_map, product_type");
   const configByHandle: Record<string, any> = {};
   (configs ?? []).forEach((c: any) => { configByHandle[c.shopify_handle] = c; });
 
