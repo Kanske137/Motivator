@@ -56,6 +56,8 @@ export interface TemplateSnapshotInput {
   frameColor?: string;
   frameWidthCm?: number;
   canvasWrap?: boolean;
+  /** Akryl-skruvar i hörnen (preview/cart only — aldrig i tryckfil). */
+  acrylicCorners?: boolean;
 
   /** Customer-uploaded photo or AI result. Rendered into every `photo` layer. */
   photoOverlayUrl?: string;
