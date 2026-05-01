@@ -41,6 +41,9 @@ interface Props {
   config: ProductConfig;
   value: ProductOptions;
   onChange: (next: ProductOptions) => void;
+  /** Called when admin updates DB-level product config (currently used for
+   *  the per-handle Gelato SKU-map). Optional so older callers keep working. */
+  onConfigChange?: (patch: Partial<ProductConfig>) => void;
 }
 
 type Kind = "poster" | "canvas" | "aluminum" | "acrylic";
