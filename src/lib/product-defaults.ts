@@ -5,6 +5,10 @@ import {
   getPosterFrames,
   getCanvasSizes,
   getCanvasDepths,
+  getAluminumSizes,
+  getAluminumMaterials,
+  getAcrylicSizes,
+  getAcrylicFinishes,
 } from "./gelato-catalog";
 
 export const DEFAULT_PRODUCT_VARIANTS = {
@@ -24,9 +28,25 @@ export const DEFAULT_PRODUCT_VARIANTS = {
       return getCanvasDepths();
     },
   },
+  aluminum: {
+    get sizes() {
+      return getAluminumSizes();
+    },
+    get materials() {
+      return getAluminumMaterials();
+    },
+  },
+  acrylic: {
+    get sizes() {
+      return getAcrylicSizes();
+    },
+    get finishes() {
+      return getAcrylicFinishes();
+    },
+  },
 } as const;
 
-export type DefaultProductKind = "poster" | "canvas";
+export type DefaultProductKind = "poster" | "canvas" | "aluminum" | "acrylic";
 
 /** Union of values from config + defaults, preserving order (config first). */
 export function mergeUnique(fromConfig: string[], fromDefaults: readonly string[]): string[] {

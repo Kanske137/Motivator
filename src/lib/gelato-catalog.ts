@@ -6,11 +6,13 @@ import skuMapJson from "./gelato-sku-map.json";
 type SkuMap = Record<string, Record<string, { portrait: string; landscape: string }>>;
 const MAP = skuMapJson as SkuMap;
 
-export type CatalogKind = "poster" | "canvas";
+export type CatalogKind = "poster" | "canvas" | "aluminum" | "acrylic";
 
 const KIND_TO_KEY: Record<CatalogKind, string> = {
   poster: "posters",
   canvas: "canvas",
+  aluminum: "aluminum",
+  acrylic: "acrylic",
 };
 
 // Preserve a sane sort order: numeric sizes ascending by first dimension.
@@ -23,6 +25,7 @@ function sortSizes(a: string, b: string): number {
 // Preferred frame/depth ordering — items not in this list keep insertion order at the end.
 const FRAME_ORDER = ["Ingen", "Vit", "Svart", "Ek", "Valnöt"];
 const DEPTH_ORDER = ["2cm", "4cm"];
+const SINGLE_VARIANT_ORDER = ["Standard"];
 
 function deriveSizesAndVariants(kind: CatalogKind): { sizes: string[]; variants: string[] } {
   const block = MAP[KIND_TO_KEY[kind]] ?? {};
@@ -34,7 +37,10 @@ function deriveSizesAndVariants(kind: CatalogKind): { sizes: string[]; variants:
     if (variant) variantSet.add(variant);
   }
   const sizes = [...sizeSet].sort(sortSizes);
-  const order = kind === "poster" ? FRAME_ORDER : DEPTH_ORDER;
+  const order =
+    kind === "poster" ? FRAME_ORDER
+    : kind === "canvas" ? DEPTH_ORDER
+    : SINGLE_VARIANT_ORDER;
   const variants = [...variantSet].sort((a, b) => {
     const ai = order.indexOf(a);
     const bi = order.indexOf(b);
@@ -48,6 +54,8 @@ function deriveSizesAndVariants(kind: CatalogKind): { sizes: string[]; variants:
 
 const POSTER = deriveSizesAndVariants("poster");
 const CANVAS = deriveSizesAndVariants("canvas");
+const ALUMINUM = deriveSizesAndVariants("aluminum");
+const ACRYLIC = deriveSizesAndVariants("acrylic");
 
 export function getPosterSizes(): string[] {
   return [...POSTER.sizes];
@@ -60,6 +68,18 @@ export function getCanvasSizes(): string[] {
 }
 export function getCanvasDepths(): string[] {
   return [...CANVAS.variants];
+}
+export function getAluminumSizes(): string[] {
+  return [...ALUMINUM.sizes];
+}
+export function getAluminumMaterials(): string[] {
+  return [...ALUMINUM.variants];
+}
+export function getAcrylicSizes(): string[] {
+  return [...ACRYLIC.sizes];
+}
+export function getAcrylicFinishes(): string[] {
+  return [...ACRYLIC.variants];
 }
 
 export function hasGelatoSku(kind: CatalogKind, size: string, variant: string): boolean {

@@ -186,5 +186,49 @@
       "portrait": "canvas_product_cf_700x1000-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver",
       "landscape": "canvas_product_cf_700x1000-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor"
     }
+  },
+  "aluminum": {
+    "20x30|Standard": {
+      "portrait": "metallic_product_mt_aluminium_mf_200x300-mm_cl_4-0_ver",
+      "landscape": "metallic_product_mt_aluminium_mf_200x300-mm_cl_4-0_hor"
+    },
+    "30x40|Standard": {
+      "portrait": "metallic_product_mt_aluminium_mf_300x400-mm_cl_4-0_ver",
+      "landscape": "metallic_product_mt_aluminium_mf_300x400-mm_cl_4-0_hor"
+    },
+    "40x50|Standard": {
+      "portrait": "metallic_product_mt_aluminium_mf_400x500-mm_cl_4-0_ver",
+      "landscape": "metallic_product_mt_aluminium_mf_400x500-mm_cl_4-0_hor"
+    },
+    "50x70|Standard": {
+      "portrait": "metallic_product_mt_aluminium_mf_500x700-mm_cl_4-0_ver",
+      "landscape": "metallic_product_mt_aluminium_mf_500x700-mm_cl_4-0_hor"
+    },
+    "70x100|Standard": {
+      "portrait": "metallic_product_mt_aluminium_mf_700x1000-mm_cl_4-0_ver",
+      "landscape": "metallic_product_mt_aluminium_mf_700x1000-mm_cl_4-0_hor"
+    }
+  },
+  "acrylic": {
+    "20x30|Standard": {
+      "portrait": "acrylic_product_at_acrylic-glass-4-mm_af_200x300-mm_cl_4-0_ver",
+      "landscape": "acrylic_product_at_acrylic-glass-4-mm_af_200x300-mm_cl_4-0_hor"
+    },
+    "30x40|Standard": {
+      "portrait": "acrylic_product_at_acrylic-glass-4-mm_af_300x400-mm_cl_4-0_ver",
+      "landscape": "acrylic_product_at_acrylic-glass-4-mm_af_300x400-mm_cl_4-0_hor"
+    },
+    "40x50|Standard": {
+      "portrait": "acrylic_product_at_acrylic-glass-4-mm_af_400x500-mm_cl_4-0_ver",
+      "landscape": "acrylic_product_at_acrylic-glass-4-mm_af_400x500-mm_cl_4-0_hor"
+    },
+    "50x70|Standard": {
+      "portrait": "acrylic_product_at_acrylic-glass-4-mm_af_500x700-mm_cl_4-0_ver",
+      "landscape": "acrylic_product_at_acrylic-glass-4-mm_af_500x700-mm_cl_4-0_hor"
+    },
+    "70x100|Standard": {
+      "portrait": "acrylic_product_at_acrylic-glass-4-mm_af_700x1000-mm_cl_4-0_ver",
+      "landscape": "acrylic_product_at_acrylic-glass-4-mm_af_700x1000-mm_cl_4-0_hor"
+    }
   }
 }

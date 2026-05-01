@@ -13,7 +13,7 @@ export type Orientation = z.infer<typeof orientationSchema>;
 export const aspectSchema = z.enum(["3:4", "4:3", "1:1"]);
 export type Aspect = z.infer<typeof aspectSchema>;
 
-export const productTypeSchema = z.enum(["poster", "canvas"]);
+export const productTypeSchema = z.enum(["poster", "canvas", "aluminum", "acrylic"]);
 export type TemplateProductType = z.infer<typeof productTypeSchema>;
 
 export const mapShapeSchema = z.enum(["rect", "circle", "heart", "star"]);
@@ -280,6 +280,21 @@ const canvasOptionsSchema = z.object({
    *  half the wrap band at 2 cm covers half the (wider) band at 4 cm. */
   canvasDesignDepthCm: z.number().min(0).max(10).optional(),
 });
+// Aluminium: bara material-namn ("Standard"/"Brushed" — vi använder bara
+// "Standard" idag men håller arrayen öppen för framtiden).
+const aluminumOptionsSchema = z.object({
+  enabled: z.boolean(),
+  allowedSizes: z.array(z.string()),
+  allowedMaterials: z.array(z.string()),
+});
+// Akryl: bara storlekar (4 mm är enda tjockleken — vi använder
+// "Standard"-finish internt för att hålla samma datamodell).
+const acrylicOptionsSchema = z.object({
+  enabled: z.boolean(),
+  allowedSizes: z.array(z.string()),
+  allowedFinishes: z.array(z.string()),
+});
+
 export const aiStylePresetSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
@@ -300,6 +315,8 @@ export type MapStylePreset = z.infer<typeof mapStylePresetSchema>;
 export const productOptionsSchema = z.object({
   poster: posterOptionsSchema.optional(),
   canvas: canvasOptionsSchema.optional(),
+  aluminum: aluminumOptionsSchema.optional(),
+  acrylic: acrylicOptionsSchema.optional(),
   /** Available AI style presets shown in the customer editor. Optional —
    *  when missing/empty the AI section is hidden. */
   aiStyles: z.array(aiStylePresetSchema).optional(),
@@ -337,7 +354,9 @@ export const templateSchema = z
   .superRefine((tpl, ctx) => {
     const anyEnabled =
       (tpl.productOptions.poster?.enabled ?? false) ||
-      (tpl.productOptions.canvas?.enabled ?? false);
+      (tpl.productOptions.canvas?.enabled ?? false) ||
+      (tpl.productOptions.aluminum?.enabled ?? false) ||
+      (tpl.productOptions.acrylic?.enabled ?? false);
     if (!anyEnabled) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -345,7 +364,7 @@ export const templateSchema = z
         path: ["productOptions"],
       });
     }
-    for (const key of ["poster", "canvas"] as const) {
+    for (const key of ["poster", "canvas", "aluminum", "acrylic"] as const) {
       const opt = tpl.productOptions[key];
       if (opt?.enabled && opt.allowedSizes.length === 0) {
         ctx.addIssue({
