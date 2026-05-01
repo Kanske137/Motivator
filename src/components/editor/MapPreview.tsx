@@ -108,6 +108,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
   const starIdRef = useRef(`star-${Math.random().toString(36).slice(2)}`);
 
   const {
+    config,
     orientation,
     size,
     posterBgColor,
@@ -121,6 +122,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
     aiPhotoResults,
     whiteMarginEnabled,
   } = useEditorStore();
+  const isAcrylic = config?.product_type === "acrylic";
 
   const allLayers = templateLayers();
   // Center-alignment guides shown while dragging a layer (in % of editor).
