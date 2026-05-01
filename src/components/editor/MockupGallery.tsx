@@ -5,8 +5,8 @@ import { getScenesFor, frameColorFromVariant, type MockupScene } from "@/lib/moc
 import { compositeMockup } from "@/lib/mockup-composite";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Canvas3DPreview } from "./Canvas3DPreview";
 import { renderTemplateSnapshot } from "@/lib/template-snapshot";
+import { renderCanvas3DViews, type CanvasViewSet } from "@/lib/canvas-3d-snapshot";
 
 interface MockupSlot {
   scene: MockupScene;
@@ -28,37 +28,29 @@ export function MockupGallery() {
     whiteMarginEnabled,
   } = useEditorStore();
   const [slots, setSlots] = useState<MockupSlot[]>([]);
-  const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null);
-  const [snapshotLoading, setSnapshotLoading] = useState(false);
-  const [snapshotError, setSnapshotError] = useState<string | undefined>();
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
   const debounceRef = useRef<number | null>(null);
   const reqIdRef = useRef(0);
 
   const isCanvas = config?.product_type === "canvas";
 
-  // Compute canvas wrap depth from variant (e.g. "2 cm" → 2). Used both for
-  // the snapshot (extends print area with wrap+bleed) AND the 3D preview UVs.
+  // Canvas wrap-djup från variant ("2 cm" → 2). Används både till
+  // print-snapshotten (extra wrap+bleed-yta) och till 3D-renderingen.
   const canvasDepthCm = isCanvas
     ? (variant?.match(/(\d+)/)?.[1] ? parseInt(variant!.match(/(\d+)/)![1], 10) : 2)
     : 0;
-  const BLEED_CM = 0.3; // Gelato canvas bleed per side
+  const BLEED_CM = 0.3;
 
   useEffect(() => {
     if (!config || !size || !template) return;
-    // Invalidate any in-flight render synchronously so stale results never overwrite.
     reqIdRef.current++;
-    const scenes = isCanvas ? [] : getScenesFor(config.product_type);
+    const scenes = getScenesFor(config.product_type);
     setSlots(scenes.map((s) => ({ scene: s, url: null, loading: true })));
-    setSnapshotLoading(true);
-    setSnapshotError(undefined);
 
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
     debounceRef.current = window.setTimeout(async () => {
       const myReq = ++reqIdRef.current;
       try {
-        // Multi-layer snapshot: walks template layers (all maps + texts + lines
-        // + margins + images) using per-layer values from the store.
         const newSnapshot = await renderTemplateSnapshot({
           template,
           orientation,
@@ -88,25 +80,39 @@ export function MockupGallery() {
         });
         if (myReq !== reqIdRef.current) return;
 
-        setSnapshotUrl(newSnapshot);
-        setSnapshotLoading(false);
+        // För canvas: pre-rendra de fyra 3D-vyerna en gång och återanvänd
+        // för alla scener. För posters: ingen pre-rendering behövs.
+        let canvasViews: CanvasViewSet | null = null;
+        if (isCanvas) {
+          const [a, b] = size.split("x").map(Number);
+          const widthCm = orientation === "portrait" ? Math.min(a, b) : Math.max(a, b);
+          const heightCm = orientation === "portrait" ? Math.max(a, b) : Math.min(a, b);
+          canvasViews = await renderCanvas3DViews({
+            printUrl: newSnapshot,
+            widthCm,
+            heightCm,
+            depthCm: canvasDepthCm,
+            bleedCm: BLEED_CM,
+          });
+          if (myReq !== reqIdRef.current) return;
+        }
 
-        if (isCanvas) return; // canvas uses 3D — no scene compositing needed
-
-        const sceneCanvasDepthCm = 2;
         const frameColor = frameColorFromVariant(variant);
 
         const results = await Promise.all(
           scenes.map(async (scene) => {
             try {
+              const prerenderedCanvasPng = canvasViews && scene.viewKey
+                ? canvasViews[scene.viewKey]
+                : undefined;
               const url = await compositeMockup({
                 scene,
                 printUrl: newSnapshot,
                 size,
                 orientation,
                 productType: config.product_type,
-                canvasDepthCm: sceneCanvasDepthCm,
                 frameColor,
+                prerenderedCanvasPng,
               });
               return { scene, url, error: undefined as string | undefined };
             } catch (e) {
@@ -129,8 +135,6 @@ export function MockupGallery() {
         if (myReq !== reqIdRef.current) return;
         console.error("[MockupGallery] failed", e);
         const msg = e instanceof Error ? e.message : "Något gick fel";
-        setSnapshotError(msg);
-        setSnapshotLoading(false);
         setSlots(scenes.map((s) => ({ scene: s, url: null, loading: false, error: msg })));
       }
     }, 600);
@@ -148,24 +152,6 @@ export function MockupGallery() {
   ]);
 
   if (!config) return null;
-
-  // Canvas → Three.js 3D preview, no scene composites
-  if (isCanvas) {
-    const [a, b] = (size ?? "30x40").split("x").map(Number);
-    const widthCm = orientation === "portrait" ? Math.min(a, b) : Math.max(a, b);
-    const heightCm = orientation === "portrait" ? Math.max(a, b) : Math.min(a, b);
-    return (
-      <Canvas3DPreview
-        printUrl={snapshotUrl}
-        loading={snapshotLoading}
-        error={snapshotError}
-        widthCm={widthCm}
-        heightCm={heightCm}
-        depthCm={canvasDepthCm}
-        bleedCm={BLEED_CM}
-      />
-    );
-  }
 
   const validSlots = slots.filter((s) => s.url);
   const lightboxSlot = lightboxIdx !== null ? validSlots[lightboxIdx] : null;
