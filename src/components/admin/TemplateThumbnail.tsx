@@ -181,6 +181,30 @@ export default function TemplateThumbnail({ template, width = 120, height = 160,
           aria-hidden
         />
       )}
+      {isAcrylic && (
+        <>
+          {[
+            { top: "6%", left: "6%" },
+            { top: "6%", right: "6%" },
+            { bottom: "6%", left: "6%" },
+            { bottom: "6%", right: "6%" },
+          ].map((pos, i) => (
+            <div
+              key={i}
+              className="absolute rounded-full pointer-events-none"
+              style={{
+                width: "8%",
+                height: "6%",
+                ...pos,
+                background:
+                  "radial-gradient(circle at 35% 30%, #f5f5f5 0%, #c8c8c8 60%, #8a8a8a 100%)",
+                boxShadow: "0 0.5px 1px rgba(0,0,0,0.4)",
+              }}
+              aria-hidden
+            />
+          ))}
+        </>
+      )}
     </div>
   );
 }
