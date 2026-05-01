@@ -189,46 +189,46 @@
   },
   "aluminum": {
     "20x30|Standard": {
-      "portrait": "metallic_product_mt_aluminium_mf_200x300-mm_cl_4-0_ver",
-      "landscape": "metallic_product_mt_aluminium_mf_200x300-mm_cl_4-0_hor"
+      "portrait": "metallic_200x300-mm-8x12-inch_3-mm_4-0_ver",
+      "landscape": "metallic_200x300-mm-8x12-inch_3-mm_4-0_hor"
     },
     "30x40|Standard": {
-      "portrait": "metallic_product_mt_aluminium_mf_300x400-mm_cl_4-0_ver",
-      "landscape": "metallic_product_mt_aluminium_mf_300x400-mm_cl_4-0_hor"
+      "portrait": "metallic_300x400-mm-12x16-inch_3-mm_4-0_ver",
+      "landscape": "metallic_300x400-mm-12x16-inch_3-mm_4-0_hor"
     },
     "40x50|Standard": {
-      "portrait": "metallic_product_mt_aluminium_mf_400x500-mm_cl_4-0_ver",
-      "landscape": "metallic_product_mt_aluminium_mf_400x500-mm_cl_4-0_hor"
+      "portrait": "metallic_400x500-mm-16x20-inch_3-mm_4-0_ver",
+      "landscape": "metallic_400x500-mm-16x20-inch_3-mm_4-0_hor"
     },
     "50x70|Standard": {
-      "portrait": "metallic_product_mt_aluminium_mf_500x700-mm_cl_4-0_ver",
-      "landscape": "metallic_product_mt_aluminium_mf_500x700-mm_cl_4-0_hor"
+      "portrait": "metallic_500x700-mm-20x28-inch_3-mm_4-0_ver",
+      "landscape": "metallic_500x700-mm-20x28-inch_3-mm_4-0_hor"
     },
     "70x100|Standard": {
-      "portrait": "metallic_product_mt_aluminium_mf_700x1000-mm_cl_4-0_ver",
-      "landscape": "metallic_product_mt_aluminium_mf_700x1000-mm_cl_4-0_hor"
+      "portrait": "metallic_700x1000-mm-28x40-inch_3-mm_4-0_ver",
+      "landscape": "metallic_700x1000-mm-28x40-inch_3-mm_4-0_hor"
     }
   },
   "acrylic": {
     "20x30|Standard": {
-      "portrait": "acrylic_product_at_acrylic-glass-4-mm_af_200x300-mm_cl_4-0_ver",
-      "landscape": "acrylic_product_at_acrylic-glass-4-mm_af_200x300-mm_cl_4-0_hor"
+      "portrait": "acrylic_200x300-mm-8x12-inch_4-mm_4-0_ver",
+      "landscape": "acrylic_200x300-mm-8x12-inch_4-mm_4-0_hor"
     },
     "30x40|Standard": {
-      "portrait": "acrylic_product_at_acrylic-glass-4-mm_af_300x400-mm_cl_4-0_ver",
-      "landscape": "acrylic_product_at_acrylic-glass-4-mm_af_300x400-mm_cl_4-0_hor"
+      "portrait": "acrylic_300x400-mm-12x16-inch_4-mm_4-0_ver",
+      "landscape": "acrylic_300x400-mm-12x16-inch_4-mm_4-0_hor"
     },
     "40x50|Standard": {
-      "portrait": "acrylic_product_at_acrylic-glass-4-mm_af_400x500-mm_cl_4-0_ver",
-      "landscape": "acrylic_product_at_acrylic-glass-4-mm_af_400x500-mm_cl_4-0_hor"
+      "portrait": "acrylic_400x500-mm-16x20-inch_4-mm_4-0_ver",
+      "landscape": "acrylic_400x500-mm-16x20-inch_4-mm_4-0_hor"
     },
     "50x70|Standard": {
-      "portrait": "acrylic_product_at_acrylic-glass-4-mm_af_500x700-mm_cl_4-0_ver",
-      "landscape": "acrylic_product_at_acrylic-glass-4-mm_af_500x700-mm_cl_4-0_hor"
+      "portrait": "acrylic_500x700-mm-20x28-inch_4-mm_4-0_ver",
+      "landscape": "acrylic_500x700-mm-20x28-inch_4-mm_4-0_hor"
     },
     "70x100|Standard": {
-      "portrait": "acrylic_product_at_acrylic-glass-4-mm_af_700x1000-mm_cl_4-0_ver",
-      "landscape": "acrylic_product_at_acrylic-glass-4-mm_af_700x1000-mm_cl_4-0_hor"
+      "portrait": "acrylic_700x1000-mm-28x40-inch_4-mm_4-0_ver",
+      "landscape": "acrylic_700x1000-mm-28x40-inch_4-mm_4-0_hor"
     }
   }
 }
