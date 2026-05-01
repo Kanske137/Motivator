@@ -1,24 +1,51 @@
-## Problem
-På canvas-3D:n ser höger sida (från ditt perspektiv) ut att inte följa motivet i editorn — den verkar speglad jämfört med vänster sida och toppen/botten.
+## Mål
+1. Ta bort den stora 3D-sektionen för canvas och göra 3D-previewn till en thumbnail i samma rad som de övriga mockup-thumbnails. Klick → öppna i samma lightbox/dialog.
+2. Lägga till statiska "produktdetalj"-thumbnails i samma rad:
+   - Canvas: 2 st (de uppladdade närbilderna på canvasens hörn/baksida).
+   - Poster: 1 st (den uppladdade närbilden på papperskvalitén).
+   Dessa visar produktkvaliteten generellt — de komponeras inte med användarens motiv.
 
-## Orsak
-I `src/components/editor/Canvas3DPreview.tsx`, `CanvasMesh`-materialen, har höger sida (+X) `flipX = true`, medan vänster (-X), topp (+Y) och botten (-Y) inte flippas. Kommentaren resonerar fel om Three.js BoxGeometry's UV-orientering för +X-facet.
+## Layout (efter ändringen)
 
-I praktiken: BoxGeometry +X-facet har U=0 vid bakkanten och U=1 vid framkanten (motsatt det som står i koden). Default-mappningen utan flip skulle då redan landa wrap-strippens "närmast-fronten"-pixelkolumn vid framkanten — precis som vänster sida fungerar. Det extra flippet vänder strippen och skapar den speglade effekten du ser.
+För **poster**:
+```text
+[Mockup vardagsrum] [Mockup sovrum] [Mockup kontor] [Mockup vägg] [Pappersdetalj]
+```
 
-Vänster, topp och botten ser korrekta ut just för att de använder default-mappning utan flip — så symmetriskt borde +X också göra det.
+För **canvas**:
+```text
+[3D-preview] [Mockup vardagsrum] [Mockup diagonal] [Mockup sovrum] [Mockup närbild] [Canvas-detalj 1] [Canvas-detalj 2]
+```
 
-## Åtgärd
-Endast en rad ändras i `src/components/editor/Canvas3DPreview.tsx`:
+Alla är samma storlek (32×32 / 40×40 som idag), horisontellt scrollande rad. Klick på vilken som helst → samma lightbox-dialog som redan finns. 3D-thumbnailen visar en statisk render (samma snapshot, men med en liten 3D-ikon som overlay) och öppnar då en dialog med den interaktiva Three.js-vyn istället för en bild.
 
-- I `right`-materialet (rad ~128-132): ta bort `flipX` (sätt `true` → `false`, eller släpp argumentet helt så det defaultar till `false`). Uppdatera kommentaren så den beskriver det faktiska beteendet.
+## Filer att ändra/skapa
 
-Inget annat behöver ändras: front, vänster, topp, botten och bak förblir som de är. Print-filen (snapshot med wrap+bleed) påverkas inte. Editorn påverkas inte. Mockup-galleriets 2D-composit påverkas inte.
+**Nya assets** (kopieras från uppladdningar till `src/assets/product-details/`):
+- `canvas-corner.webp` (Canvas1-2.webp)
+- `canvas-back.webp` (Canvas2.webp)
+- `poster-paper.webp` (Posterthumbnail-2.webp)
+
+**Ny komponent**: `src/components/editor/ProductDetailScene.ts` (eller liknande) — exporterar en lista med statiska detalj-thumbnails per produkttyp. Enkel struktur: `{ id, label, src, productType }`.
+
+**Ändras**: `src/components/editor/MockupGallery.tsx`
+- För canvas: rendera även mockup-scenerna (idag returneras `null` → 3D direkt). Lägg till en "3D"-thumbnail som första item.
+- För båda: appenda statiska detalj-thumbnails sist i raden.
+- Lightbox-dialogen utökas så att om vald slot är "3D" så renderas `<Canvas3DPreview>` (utan dess egen border/header), annars en `<img>` som idag.
+
+**Ändras**: `src/pages/EditorPage.tsx`
+- 3D-sektionen (`<Canvas3DPreview>`) tas bort som egen sektion under editorn — den lever nu enbart i lightboxen via `MockupGallery`.
+
+**Ändras**: `src/components/editor/Canvas3DPreview.tsx`
+- Lägg till en "compact" eller "embedded" prop som tar bort den yttre `border-t`-wrappern och rubriken "3D-förhandsvisning" så komponenten kan renderas rent inuti en dialog. Behåll bakåtkompatibilitet.
+
+## Tekniska detaljer
+
+- Canvas-mockup-scenerna (`CANVAS_SCENES` i `mockup-scenes.ts`) finns redan men används inte idag eftersom `MockupGallery` returnerar tidigt med 3D för canvas. De återanvänds nu via samma `compositeMockup`-pipeline som för posters.
+- 3D-thumbnailen: enklast är att visa `snapshotUrl` (snapshot inkl. wrap+bleed) cropad till frontens area som "preview" plus en liten "3D"-badge (lucide `Box`-ikon i hörn). Klick öppnar dialog → renderar `<Canvas3DPreview embedded printUrl={snapshotUrl} ... />`.
+- Detalj-thumbnails: bara `<img>`. När de öppnas i lightboxen visas samma bild i full storlek, ingen Three.js.
+- Dialogens befintliga prev/next-navigering ska fungera över alla typer av slots (mockup, 3D, detalj).
 
 ## Verifiering
-Efter ändringen ska:
-- Höger wrap-strip vara en direkt fortsättning av motivets högerkant (inte speglad).
-- Pixlarna närmast framkanten matcha exakt mot frontens högerkant — sömlöst hörn precis som vänster sida redan är.
-- Topp/botten/vänster fortsätta se identiska ut som idag.
-
-Test: ladda en bild med tydlig text eller ansikte nära högerkanten i editorn, byt till canvas, rotera 3D:n åt höger och bekräfta att texten/ansiktet fortsätter naturligt runt kanten utan spegling.
+- Poster: 4 mockups + 1 pappersdetalj i thumbnail-raden. Lightbox prev/next loopar genom alla 5.
+- Canvas: 1 3D + 4 mockups + 2 detaljer i raden. Klick på 3D-thumbnail → interaktiv 3D-vy i dialog (rotera fungerar). Klick på övriga → bild i dialog. Editor-sidan har inte längre den fasta 3D-sektionen under editorn.
