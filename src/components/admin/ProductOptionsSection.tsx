@@ -186,6 +186,20 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
         }
       }
     }
+    if (value.aluminum?.enabled) {
+      for (const s of value.aluminum.allowedSizes ?? []) {
+        for (const m of value.aluminum.allowedMaterials ?? []) {
+          if (!hasGelatoSku("aluminum", s, m)) out.push({ kind: "aluminum", size: s, variant: m });
+        }
+      }
+    }
+    if (value.acrylic?.enabled) {
+      for (const s of value.acrylic.allowedSizes ?? []) {
+        for (const f of value.acrylic.allowedFinishes ?? []) {
+          if (!hasGelatoSku("acrylic", s, f)) out.push({ kind: "acrylic", size: s, variant: f });
+        }
+      }
+    }
     return out;
   }, [value]);
 
