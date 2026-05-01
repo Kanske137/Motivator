@@ -15,6 +15,11 @@ interface Canvas3DPreviewProps {
   depthCm: number;
   /** Bleed in cm per side outside the wrap zone (Gelato canvas = 0.3). */
   bleedCm?: number;
+  /**
+   * När true: rendera bara själva 3D-canvasen utan yttre sektion/rubrik
+   * (för användning inuti en dialog/lightbox).
+   */
+  embedded?: boolean;
 }
 
 /** Shared cache so each thumbnail doesn't re-download the same texture. */
