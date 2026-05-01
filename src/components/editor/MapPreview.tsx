@@ -394,12 +394,18 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
             // empty placeholder.
             const aiResultUrl = aiPhotoResults[l.id] ?? null;
             const src = aiResultUrl ?? l.defaults.referenceImageUrl ?? null;
-            // For AI-generated removeBackground results, force `contain` so
-            // the whole subject is always visible inside the layer — Nano
-            // Banana 2 doesn't always honor a target aspect ratio, and the
-            // pure-white padding blends seamlessly into the layer's white
-            // background. Admin reference images keep their default fit.
-            const effectiveFit = aiResultUrl ? "contain" : l.defaults.fit;
+            // Only force `contain` for removeBackground (Nano Banana 2 doesn't
+            // always honor target aspect ratio, and its pure-white padding
+            // blends seamlessly into the layer). For human face-swap (Replicate
+            // returns the same dimensions as the reference image) and pet swap
+            // (prompt enforces same aspect ratio as the reference), use the
+            // layer's default fit so the result fills the layer exactly like
+            // the reference image did — no empty edges.
+            const aiSubjectKind = l.defaults.subjectKind ?? "human";
+            const effectiveFit =
+              aiResultUrl && aiSubjectKind === "removeBackground"
+                ? "contain"
+                : l.defaults.fit;
             return (
               <div key={l.id} style={wrapStyle}>
                 {src ? (
