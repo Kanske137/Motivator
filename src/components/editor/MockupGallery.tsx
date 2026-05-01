@@ -7,7 +7,6 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Canvas3DPreview } from "./Canvas3DPreview";
 import { renderTemplateSnapshot } from "@/lib/template-snapshot";
-import { renderPosterCornerShot, renderCanvasCornerShot } from "@/lib/product-shot";
 
 interface MockupSlot {
   scene: MockupScene;
@@ -15,24 +14,6 @@ interface MockupSlot {
   loading: boolean;
   error?: string;
 }
-
-// Synthetic scenes for the close-up product shots (poster paper corner /
-// canvas wrap corner). They reuse the MockupSlot shape so the existing
-// thumbnail row + lightbox handle them with no extra code.
-const POSTER_SHOT_SCENE: MockupScene = {
-  id: "product-shot-poster",
-  label: "Närbild",
-  src: "",
-  area: { x: 0, y: 0, w: 1024, h: 1024 },
-  referenceWidthCm: 100,
-};
-const CANVAS_SHOT_SCENE: MockupScene = {
-  id: "product-shot-canvas",
-  label: "Närbild",
-  src: "",
-  area: { x: 0, y: 0, w: 1024, h: 1024 },
-  referenceWidthCm: 100,
-};
 
 export function MockupGallery() {
   const {
@@ -50,9 +31,7 @@ export function MockupGallery() {
   const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null);
   const [snapshotLoading, setSnapshotLoading] = useState(false);
   const [snapshotError, setSnapshotError] = useState<string | undefined>();
-  const [canvasShot, setCanvasShot] = useState<MockupSlot | null>(null);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
-  const [canvasShotOpen, setCanvasShotOpen] = useState(false);
   const debounceRef = useRef<number | null>(null);
   const reqIdRef = useRef(0);
 
@@ -69,11 +48,8 @@ export function MockupGallery() {
     if (!config || !size || !template) return;
     // Invalidate any in-flight render synchronously so stale results never overwrite.
     reqIdRef.current++;
-    const baseScenes = isCanvas ? [] : getScenesFor(config.product_type);
-    // Poster: prepend a synthetic close-up "Närbild" slot so it's the first thumbnail.
-    const scenes = isCanvas ? [] : [POSTER_SHOT_SCENE, ...baseScenes];
+    const scenes = isCanvas ? [] : getScenesFor(config.product_type);
     setSlots(scenes.map((s) => ({ scene: s, url: null, loading: true })));
-    if (isCanvas) setCanvasShot({ scene: CANVAS_SHOT_SCENE, url: null, loading: true });
     setSnapshotLoading(true);
     setSnapshotError(undefined);
 
@@ -115,26 +91,7 @@ export function MockupGallery() {
         setSnapshotUrl(newSnapshot);
         setSnapshotLoading(false);
 
-        if (isCanvas) {
-          // Canvas → render close-up wrap-corner shot beside the 3D preview.
-          try {
-            const url = await renderCanvasCornerShot({
-              printUrl: newSnapshot,
-              orientation,
-              size,
-              depthCm: canvasDepthCm,
-              wrapCm: canvasDepthCm,
-              bleedCm: BLEED_CM,
-            });
-            if (myReq !== reqIdRef.current) return;
-            setCanvasShot({ scene: CANVAS_SHOT_SCENE, url, loading: false });
-          } catch (e) {
-            if (myReq !== reqIdRef.current) return;
-            const msg = e instanceof Error ? e.message : "Renderingen misslyckades";
-            setCanvasShot({ scene: CANVAS_SHOT_SCENE, url: null, loading: false, error: msg });
-          }
-          return;
-        }
+        if (isCanvas) return; // canvas uses 3D — no scene compositing needed
 
         const sceneCanvasDepthCm = 2;
         const frameColor = frameColorFromVariant(variant);
@@ -142,14 +99,6 @@ export function MockupGallery() {
         const results = await Promise.all(
           scenes.map(async (scene) => {
             try {
-              if (scene.id === POSTER_SHOT_SCENE.id) {
-                const url = await renderPosterCornerShot({
-                  printUrl: newSnapshot,
-                  orientation,
-                  size,
-                });
-                return { scene, url, error: undefined as string | undefined };
-              }
               const url = await compositeMockup({
                 scene,
                 printUrl: newSnapshot,
@@ -183,7 +132,6 @@ export function MockupGallery() {
         setSnapshotError(msg);
         setSnapshotLoading(false);
         setSlots(scenes.map((s) => ({ scene: s, url: null, loading: false, error: msg })));
-        if (isCanvas) setCanvasShot({ scene: CANVAS_SHOT_SCENE, url: null, loading: false, error: msg });
       }
     }, 600);
 
@@ -201,83 +149,21 @@ export function MockupGallery() {
 
   if (!config) return null;
 
-  // Canvas → Three.js 3D preview + close-up wrap-corner thumbnail row
+  // Canvas → Three.js 3D preview, no scene composites
   if (isCanvas) {
     const [a, b] = (size ?? "30x40").split("x").map(Number);
     const widthCm = orientation === "portrait" ? Math.min(a, b) : Math.max(a, b);
     const heightCm = orientation === "portrait" ? Math.max(a, b) : Math.min(a, b);
     return (
-      <>
-        <Canvas3DPreview
-          printUrl={snapshotUrl}
-          loading={snapshotLoading}
-          error={snapshotError}
-          widthCm={widthCm}
-          heightCm={heightCm}
-          depthCm={canvasDepthCm}
-          bleedCm={BLEED_CM}
-        />
-        <div className="border-t bg-[hsl(var(--paper))]">
-          <div className="px-4 py-3">
-            <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-3">
-              Närbild
-            </h3>
-            <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
-              <button
-                type="button"
-                disabled={!canvasShot?.url}
-                onClick={() => canvasShot?.url && setCanvasShotOpen(true)}
-                className="group flex-shrink-0 w-32 h-32 md:w-40 md:h-40 rounded-2xl overflow-hidden bg-card border snap-start relative disabled:cursor-default cursor-zoom-in"
-                aria-label="Förstora närbild"
-              >
-                {!canvasShot || canvasShot.loading ? (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/40 animate-pulse">
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                  </div>
-                ) : canvasShot.url ? (
-                  <>
-                    <img
-                      src={canvasShot.url}
-                      alt="Närbild"
-                      className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                      loading="lazy"
-                    />
-                    <span className="absolute top-1.5 right-1.5 inline-flex items-center justify-center h-6 w-6 rounded-full bg-background/85 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition">
-                      <Maximize2 className="h-3.5 w-3.5" />
-                    </span>
-                  </>
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-destructive/5 text-destructive text-[10px] p-2 text-center gap-1">
-                    <AlertCircle className="h-4 w-4" />
-                    <span className="line-clamp-3">{canvasShot.error ?? "Ingen bild"}</span>
-                  </div>
-                )}
-                <div className="absolute bottom-0 inset-x-0 bg-background/85 backdrop-blur-sm text-[11px] py-1 text-center font-medium pointer-events-none">
-                  Närbild
-                </div>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <Dialog open={canvasShotOpen} onOpenChange={setCanvasShotOpen}>
-          <DialogContent className="max-w-[95vw] md:max-w-4xl p-0 bg-background border-0 overflow-hidden">
-            <DialogTitle className="sr-only">Närbild</DialogTitle>
-            {canvasShot?.url && (
-              <div className="relative bg-muted">
-                <img
-                  src={canvasShot.url}
-                  alt="Närbild"
-                  className="w-full h-auto max-h-[85vh] object-contain"
-                />
-                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent text-background px-4 py-3 text-sm font-medium">
-                  Närbild
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-      </>
+      <Canvas3DPreview
+        printUrl={snapshotUrl}
+        loading={snapshotLoading}
+        error={snapshotError}
+        widthCm={widthCm}
+        heightCm={heightCm}
+        depthCm={canvasDepthCm}
+        bleedCm={BLEED_CM}
+      />
     );
   }
 
