@@ -282,6 +282,62 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
             )}
           </div>
         )}
+
+        {config.product_type === "aluminum" && (
+          <div className="space-y-3 rounded-md border p-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">Aluminium</Label>
+              <Switch
+                checked={value.aluminum?.enabled ?? false}
+                onCheckedChange={(c) => toggleEnabled("aluminum", c)}
+              />
+            </div>
+            {value.aluminum?.enabled && (
+              <div className="grid gap-4 md:grid-cols-2">
+                <ChecklistGroup
+                  title="Tillåtna storlekar"
+                  all={aluminumSizes}
+                  selected={value.aluminum.allowedSizes}
+                  onToggle={(item, c) => toggleListItem("aluminum", "allowedSizes", item, c)}
+                />
+                <ChecklistGroup
+                  title="Material"
+                  all={aluminumMaterials}
+                  selected={value.aluminum.allowedMaterials}
+                  onToggle={(item, c) => toggleListItem("aluminum", "allowedMaterials", item, c)}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {config.product_type === "acrylic" && (
+          <div className="space-y-3 rounded-md border p-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">Akryl</Label>
+              <Switch
+                checked={value.acrylic?.enabled ?? false}
+                onCheckedChange={(c) => toggleEnabled("acrylic", c)}
+              />
+            </div>
+            {value.acrylic?.enabled && (
+              <div className="grid gap-4 md:grid-cols-2">
+                <ChecklistGroup
+                  title="Tillåtna storlekar"
+                  all={acrylicSizes}
+                  selected={value.acrylic.allowedSizes}
+                  onToggle={(item, c) => toggleListItem("acrylic", "allowedSizes", item, c)}
+                />
+                <ChecklistGroup
+                  title="Finish"
+                  all={acrylicFinishes}
+                  selected={value.acrylic.allowedFinishes}
+                  onToggle={(item, c) => toggleListItem("acrylic", "allowedFinishes", item, c)}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </Card>
 
       {/* Map Styles — collapsible, per-template enabling */}
