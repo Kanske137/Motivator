@@ -254,9 +254,11 @@ const GET_PRODUCT_FULL = `
 // Shopify Standard Product Taxonomy GIDs.
 // Posters: gid://shopify/TaxonomyCategory/ap-2-1-3 ("Posters")
 // Canvas:  gid://shopify/TaxonomyCategory/ap-2-1-1 ("Decorative Paintings")
-const DEFAULT_CATEGORY_GID: Record<"poster" | "canvas", string> = {
+const DEFAULT_CATEGORY_GID: Record<Kind, string> = {
   poster: "gid://shopify/TaxonomyCategory/ap-2-1-3",
   canvas: "gid://shopify/TaxonomyCategory/ap-2-1-1",
+  aluminum: "gid://shopify/TaxonomyCategory/ap-2-1-3",
+  acrylic: "gid://shopify/TaxonomyCategory/ap-2-1-3",
 };
 
 function buildVariantInput(
