@@ -43,7 +43,7 @@ interface Props {
   onChange: (next: ProductOptions) => void;
 }
 
-type Kind = "poster" | "canvas";
+type Kind = "poster" | "canvas" | "aluminum" | "acrylic";
 
 export default function ProductOptionsSection({ config, value, onChange }: Props) {
   // Variant names from config (used so Gelato-mapped variants always appear)
