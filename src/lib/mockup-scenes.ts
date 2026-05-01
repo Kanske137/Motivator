@@ -4,8 +4,10 @@ import livingroom from "@/assets/mockups/poster-livingroom.jpg";
 import bedroom from "@/assets/mockups/poster-bedroom.jpg";
 import office from "@/assets/mockups/poster-office.jpg";
 import wall from "@/assets/mockups/poster-wall.jpg";
-import canvasLivingroom from "@/assets/mockups/canvas-livingroom.jpg";
-import canvasSide from "@/assets/mockups/canvas-side.jpg";
+import canvasFront from "@/assets/mockups/canvas-front.jpg";
+import canvasRight from "@/assets/mockups/canvas-right.jpg";
+import canvasLeft from "@/assets/mockups/canvas-left.jpg";
+import canvasBottom from "@/assets/mockups/canvas-bottom.jpg";
 
 /**
  * Mockup-scen för composit på klienten.
@@ -14,7 +16,10 @@ import canvasSide from "@/assets/mockups/canvas-side.jpg";
  * vilken postern centreras. `referenceWidthCm` = hur många cm av en
  * verklig vägg som area.w motsvarar — så postern skalas trovärdigt.
  *
- * För canvas: `canvasWrap.angleDeg` används för perspektivlutning + djup-strip.
+ * För canvas: `viewKey` pekar på vilken pre-renderad Three.js-vy som ska
+ * användas (front/right/left/bottom). Varje canvas-scen är fotograferad
+ * från SAMMA vinkel som motsvarande Three.js-kamera, så perspektiven
+ * matchar — canvasen ser ut att hänga på den fotograferade väggen.
  */
 export interface MockupScene {
   id: string;
@@ -26,8 +31,8 @@ export interface MockupScene {
   referenceWidthCm: number;
   /** Skugga under postern. */
   shadow?: { blur: number; offsetY: number; alpha: number };
-  /** Endast canvas: rita 3D-djup på höger sida. */
-  canvasWrap?: { angleDeg: number };
+  /** Endast canvas: vilken pre-renderad 3D-vy som ska komponeras in. */
+  viewKey?: "front" | "right" | "left" | "bottom";
 }
 
 const POSTER_SCENES: MockupScene[] = [
@@ -65,42 +70,51 @@ const POSTER_SCENES: MockupScene[] = [
   },
 ];
 
+/**
+ * Canvas-scener: fyra fotograferade tomma rum från olika vinklar. Den
+ * pre-renderade Three.js-canvasen (med transparent bakgrund) komponeras
+ * in i `area`. Eftersom rummet är fotograferat från samma vinkel som
+ * Three.js-kameran, ser canvasen ut att hänga naturligt på väggen.
+ *
+ * `area`-rektanglar är finjusterade per bild så de hamnar mitt på den
+ * tomma väggytan (där en riktig tavla skulle hänga, ögonhöjd).
+ */
 const CANVAS_SCENES: MockupScene[] = [
   {
-    id: "canvas-livingroom",
-    label: "Vardagsrum",
-    src: canvasLivingroom,
-    area: { x: 140, y: 80, w: 700, h: 600 },
+    id: "canvas-front",
+    label: "Framifrån",
+    src: canvasFront,
+    area: { x: 360, y: 230, w: 420, h: 480 },
     referenceWidthCm: 130,
-    shadow: { blur: 28, offsetY: 16, alpha: 0.22 },
-    canvasWrap: { angleDeg: 12 },
+    shadow: { blur: 30, offsetY: 14, alpha: 0.22 },
+    viewKey: "front",
   },
   {
-    id: "canvas-side",
-    label: "Diagonal vy",
-    src: canvasSide,
-    area: { x: 200, y: 100, w: 720, h: 700 },
-    referenceWidthCm: 130,
-    shadow: { blur: 32, offsetY: 18, alpha: 0.25 },
-    canvasWrap: { angleDeg: 25 },
-  },
-  {
-    id: "canvas-bedroom",
-    label: "Sovrum",
-    src: bedroom,
-    area: { x: 180, y: 80, w: 700, h: 600 },
-    referenceWidthCm: 130,
-    shadow: { blur: 26, offsetY: 14, alpha: 0.20 },
-    canvasWrap: { angleDeg: 10 },
-  },
-  {
-    id: "canvas-wall",
-    label: "Närbild",
-    src: wall,
-    area: { x: 120, y: 80, w: 800, h: 700 },
+    id: "canvas-right",
+    label: "Från höger",
+    src: canvasRight,
+    area: { x: 280, y: 240, w: 380, h: 440 },
     referenceWidthCm: 130,
     shadow: { blur: 28, offsetY: 14, alpha: 0.22 },
-    canvasWrap: { angleDeg: 18 },
+    viewKey: "right",
+  },
+  {
+    id: "canvas-left",
+    label: "Från vänster",
+    src: canvasLeft,
+    area: { x: 380, y: 240, w: 380, h: 440 },
+    referenceWidthCm: 130,
+    shadow: { blur: 28, offsetY: 14, alpha: 0.22 },
+    viewKey: "left",
+  },
+  {
+    id: "canvas-bottom",
+    label: "Underifrån",
+    src: canvasBottom,
+    area: { x: 320, y: 220, w: 420, h: 380 },
+    referenceWidthCm: 140,
+    shadow: { blur: 32, offsetY: 16, alpha: 0.24 },
+    viewKey: "bottom",
   },
 ];
 
