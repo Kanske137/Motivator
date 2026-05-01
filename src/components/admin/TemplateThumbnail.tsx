@@ -11,13 +11,15 @@ interface Props {
   template: Template | null;
   width?: number;
   height?: number;
-  /** "poster" | "canvas" — when "canvas" and the template has a canvasLayout,
-   *  render the wrap-extended layout and overlay a dashed front-zone marker. */
+  /** "poster" | "canvas" | "aluminum" | "acrylic" — when "canvas" and the template
+   *  has a canvasLayout, render the wrap-extended layout and overlay a dashed
+   *  front-zone marker. When "acrylic", overlay 4 silver corner discs. */
   productType?: string | null;
 }
 
 export default function TemplateThumbnail({ template, width = 120, height = 160, productType }: Props) {
   const isCanvas = productType === "canvas";
+  const isAcrylic = productType === "acrylic";
   const useCanvasLayout = isCanvas && !!template?.canvasLayout;
   const layoutBlock = useCanvasLayout ? template?.canvasLayout : template?.defaultLayout;
   const layout = layoutBlock?.portrait ?? null;
