@@ -183,6 +183,7 @@ export function MockupGallery() {
         setSnapshotError(msg);
         setSnapshotLoading(false);
         setSlots(scenes.map((s) => ({ scene: s, url: null, loading: false, error: msg })));
+        if (isCanvas) setCanvasShot({ scene: CANVAS_SHOT_SCENE, url: null, loading: false, error: msg });
       }
     }, 600);
 
