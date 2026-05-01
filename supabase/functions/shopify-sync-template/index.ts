@@ -42,16 +42,44 @@ const CANVAS_PRICES: Record<string, Record<string, number>> = {
   "70x100": { "2cm": 1299, "4cm": 1399 },
 };
 
+const ALUMINUM_PRICES: Record<string, Record<string, number>> = {
+  "20x30": { Standard: 399 },
+  "30x40": { Standard: 499 },
+  "40x50": { Standard: 649 },
+  "50x70": { Standard: 849 },
+  "70x100": { Standard: 1199 },
+};
+
+const ACRYLIC_PRICES: Record<string, Record<string, number>> = {
+  "20x30": { Standard: 499 },
+  "30x40": { Standard: 699 },
+  "40x50": { Standard: 899 },
+  "50x70": { Standard: 1099 },
+  "70x100": { Standard: 1599 },
+};
+
+type Kind = "poster" | "canvas" | "aluminum" | "acrylic";
+const KIND_TO_SKU_KEY: Record<Kind, string> = {
+  poster: "posters",
+  canvas: "canvas",
+  aluminum: "aluminum",
+  acrylic: "acrylic",
+};
+
 type SkuMap = Record<string, Record<string, { portrait: string; landscape: string }>>;
 const SKUS = skuMap as SkuMap;
 
-function getUid(kind: "poster" | "canvas", size: string, variant: string): string | null {
-  const block = SKUS[kind === "poster" ? "posters" : "canvas"] ?? {};
+function getUid(kind: Kind, size: string, variant: string): string | null {
+  const block = SKUS[KIND_TO_SKU_KEY[kind]] ?? {};
   return block[`${size}|${variant}`]?.portrait ?? null;
 }
 
-function getPrice(kind: "poster" | "canvas", size: string, variant: string): number {
-  const table = kind === "poster" ? POSTER_PRICES : CANVAS_PRICES;
+function getPrice(kind: Kind, size: string, variant: string): number {
+  const table =
+    kind === "poster" ? POSTER_PRICES
+    : kind === "canvas" ? CANVAS_PRICES
+    : kind === "aluminum" ? ALUMINUM_PRICES
+    : ACRYLIC_PRICES;
   return table[size]?.[variant] ?? 0;
 }
 
@@ -74,9 +102,9 @@ interface PlannedVariant {
 }
 
 interface PlannedGroup {
-  kind: "poster" | "canvas";
+  kind: Kind;
   productType: string;
-  variantOptionName: string; // "Ram" or "Djup"
+  variantOptionName: string; // "Ram" / "Djup" / "Material" / "Finish"
   variants: PlannedVariant[];
   skipped: { size: string; variant: string; reason: string }[];
 }
