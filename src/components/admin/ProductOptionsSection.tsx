@@ -70,6 +70,22 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
     () => mergeUnique(configVariantNames, DEFAULT_PRODUCT_VARIANTS.canvas.depths),
     [configVariantNames],
   );
+  const aluminumSizes = useMemo(
+    () => mergeUnique(configSizes, DEFAULT_PRODUCT_VARIANTS.aluminum.sizes),
+    [configSizes],
+  );
+  const aluminumMaterials = useMemo(
+    () => mergeUnique(configVariantNames, DEFAULT_PRODUCT_VARIANTS.aluminum.materials),
+    [configVariantNames],
+  );
+  const acrylicSizes = useMemo(
+    () => mergeUnique(configSizes, DEFAULT_PRODUCT_VARIANTS.acrylic.sizes),
+    [configSizes],
+  );
+  const acrylicFinishes = useMemo(
+    () => mergeUnique(configVariantNames, DEFAULT_PRODUCT_VARIANTS.acrylic.finishes),
+    [configVariantNames],
+  );
 
   function toggleEnabled(kind: Kind, enabled: boolean) {
     const next: ProductOptions = { ...value };
