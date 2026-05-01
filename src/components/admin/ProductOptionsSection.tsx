@@ -328,6 +328,16 @@ export default function ProductOptionsSection({ config, value, onChange, onConfi
         )}
       </Card>
 
+      {/* Gelato SKU-mappning per storlek + variant + orientering. Endast
+          synlig om föräldern (DesignerPage) har skickat ner en spar-callback. */}
+      {onConfigChange && (
+        <GelatoSkuMapEditor
+          config={config}
+          options={value}
+          onChange={(gelato_sku_map) => onConfigChange({ gelato_sku_map })}
+        />
+      )}
+
       {/* Map Styles — collapsible, per-template enabling */}
       <MapStylesEditor
         config={config}
