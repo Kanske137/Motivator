@@ -746,10 +746,11 @@ export async function renderHiresTemplateSnapshotSafe(
         ...input,
         hires: true,
         maxPxOverride: maxPx,
-        // Never bake frame/wrap into print files.
+        // Never bake frame/wrap/acrylic-corners into print files.
         frameColor: undefined,
         frameWidthCm: undefined,
         canvasWrap: false,
+        acrylicCorners: false,
       });
       const base64 = dataUrl.split(",")[1] ?? "";
       const sizeBytes = Math.round((base64.length * 3) / 4);
