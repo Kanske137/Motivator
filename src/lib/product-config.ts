@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export type ProductType = "posters" | "canvas";
+export type ProductType = "posters" | "canvas" | "aluminum" | "acrylic";
 export type Orientation = "portrait" | "landscape";
 
 export interface LayerDef {
