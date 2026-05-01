@@ -201,21 +201,83 @@ export function MockupGallery() {
 
   if (!config) return null;
 
-  // Canvas → Three.js 3D preview, no scene composites
+  // Canvas → Three.js 3D preview + close-up wrap-corner thumbnail row
   if (isCanvas) {
     const [a, b] = (size ?? "30x40").split("x").map(Number);
     const widthCm = orientation === "portrait" ? Math.min(a, b) : Math.max(a, b);
     const heightCm = orientation === "portrait" ? Math.max(a, b) : Math.min(a, b);
     return (
-      <Canvas3DPreview
-        printUrl={snapshotUrl}
-        loading={snapshotLoading}
-        error={snapshotError}
-        widthCm={widthCm}
-        heightCm={heightCm}
-        depthCm={canvasDepthCm}
-        bleedCm={BLEED_CM}
-      />
+      <>
+        <Canvas3DPreview
+          printUrl={snapshotUrl}
+          loading={snapshotLoading}
+          error={snapshotError}
+          widthCm={widthCm}
+          heightCm={heightCm}
+          depthCm={canvasDepthCm}
+          bleedCm={BLEED_CM}
+        />
+        <div className="border-t bg-[hsl(var(--paper))]">
+          <div className="px-4 py-3">
+            <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-3">
+              Närbild
+            </h3>
+            <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
+              <button
+                type="button"
+                disabled={!canvasShot?.url}
+                onClick={() => canvasShot?.url && setCanvasShotOpen(true)}
+                className="group flex-shrink-0 w-32 h-32 md:w-40 md:h-40 rounded-2xl overflow-hidden bg-card border snap-start relative disabled:cursor-default cursor-zoom-in"
+                aria-label="Förstora närbild"
+              >
+                {!canvasShot || canvasShot.loading ? (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/40 animate-pulse">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : canvasShot.url ? (
+                  <>
+                    <img
+                      src={canvasShot.url}
+                      alt="Närbild"
+                      className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                      loading="lazy"
+                    />
+                    <span className="absolute top-1.5 right-1.5 inline-flex items-center justify-center h-6 w-6 rounded-full bg-background/85 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition">
+                      <Maximize2 className="h-3.5 w-3.5" />
+                    </span>
+                  </>
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-destructive/5 text-destructive text-[10px] p-2 text-center gap-1">
+                    <AlertCircle className="h-4 w-4" />
+                    <span className="line-clamp-3">{canvasShot.error ?? "Ingen bild"}</span>
+                  </div>
+                )}
+                <div className="absolute bottom-0 inset-x-0 bg-background/85 backdrop-blur-sm text-[11px] py-1 text-center font-medium pointer-events-none">
+                  Närbild
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <Dialog open={canvasShotOpen} onOpenChange={setCanvasShotOpen}>
+          <DialogContent className="max-w-[95vw] md:max-w-4xl p-0 bg-background border-0 overflow-hidden">
+            <DialogTitle className="sr-only">Närbild</DialogTitle>
+            {canvasShot?.url && (
+              <div className="relative bg-muted">
+                <img
+                  src={canvasShot.url}
+                  alt="Närbild"
+                  className="w-full h-auto max-h-[85vh] object-contain"
+                />
+                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent text-background px-4 py-3 text-sm font-medium">
+                  Närbild
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      </>
     );
   }
 
