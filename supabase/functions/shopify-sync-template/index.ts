@@ -112,55 +112,42 @@ interface PlannedGroup {
 function plan(template: any): PlannedGroup[] {
   const groups: PlannedGroup[] = [];
   const opts = template?.productOptions ?? {};
-  if (opts.poster?.enabled) {
-    const g: PlannedGroup = {
-      kind: "poster",
-      productType: "Poster",
-      variantOptionName: "Ram",
-      variants: [],
-      skipped: [],
-    };
-    for (const size of opts.poster.allowedSizes ?? []) {
-      for (const frame of opts.poster.allowedFrames ?? []) {
-        const sku = getUid("poster", size, frame);
-        const price = getPrice("poster", size, frame);
-        if (!sku) {
-          g.skipped.push({ size, variant: frame, reason: "no Gelato SKU" });
-          continue;
-        }
-        if (!price) {
-          g.skipped.push({ size, variant: frame, reason: "no price" });
-          continue;
-        }
-        g.variants.push({ size, variant: frame, sku, price });
+
+  const buildGroup = (
+    kind: Kind,
+    productType: string,
+    variantOptionName: string,
+    sizes: string[],
+    variants: string[],
+  ): PlannedGroup => {
+    const g: PlannedGroup = { kind, productType, variantOptionName, variants: [], skipped: [] };
+    for (const size of sizes) {
+      for (const v of variants) {
+        const sku = getUid(kind, size, v);
+        const price = getPrice(kind, size, v);
+        if (!sku) { g.skipped.push({ size, variant: v, reason: "no Gelato SKU" }); continue; }
+        if (!price) { g.skipped.push({ size, variant: v, reason: "no price" }); continue; }
+        g.variants.push({ size, variant: v, sku, price });
       }
     }
-    groups.push(g);
+    return g;
+  };
+
+  if (opts.poster?.enabled) {
+    groups.push(buildGroup("poster", "Poster", "Ram",
+      opts.poster.allowedSizes ?? [], opts.poster.allowedFrames ?? []));
   }
   if (opts.canvas?.enabled) {
-    const g: PlannedGroup = {
-      kind: "canvas",
-      productType: "Canvas",
-      variantOptionName: "Djup",
-      variants: [],
-      skipped: [],
-    };
-    for (const size of opts.canvas.allowedSizes ?? []) {
-      for (const depth of opts.canvas.allowedDepths ?? []) {
-        const sku = getUid("canvas", size, depth);
-        const price = getPrice("canvas", size, depth);
-        if (!sku) {
-          g.skipped.push({ size, variant: depth, reason: "no Gelato SKU" });
-          continue;
-        }
-        if (!price) {
-          g.skipped.push({ size, variant: depth, reason: "no price" });
-          continue;
-        }
-        g.variants.push({ size, variant: depth, sku, price });
-      }
-    }
-    groups.push(g);
+    groups.push(buildGroup("canvas", "Canvas", "Djup",
+      opts.canvas.allowedSizes ?? [], opts.canvas.allowedDepths ?? []));
+  }
+  if (opts.aluminum?.enabled) {
+    groups.push(buildGroup("aluminum", "Aluminium", "Material",
+      opts.aluminum.allowedSizes ?? [], opts.aluminum.allowedMaterials ?? []));
+  }
+  if (opts.acrylic?.enabled) {
+    groups.push(buildGroup("acrylic", "Akryl", "Finish",
+      opts.acrylic.allowedSizes ?? [], opts.acrylic.allowedFinishes ?? []));
   }
   return groups;
 }
