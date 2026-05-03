@@ -1,42 +1,48 @@
-Jag hittade problemet: själva testordern kommer in, printfilen finns, men order-webhooken som skickar till Gelato känner fortfarande bara igen `poster` och `canvas`.
+## Mål
+Ramen som ritas runt postern i kundeditorns preview ska se ut som de riktiga Gelato-ramarna — inkl. träåder för Ek/Valnöt och korrekt matt vit/svart — istället för dagens platta CSS-färger. Storlek, bredd (1.2 cm), proportioner, layout och allt annat lämnas orört.
 
-Aktuell order #1018 stoppades därför med:
+## Vad som ändras
 
-```text
-sku_not_found: unknown product type for handle="testglas-acrylic"
+### 1. `src/pages/EditorPage.tsx`
+Byt `FRAME_COLORS` (Record av HSL-strängar) mot `FRAME_STYLES` som returnerar både en fallback-färg och en textur-URL hämtad från `src/assets/frames/frame-{white|oak|walnut|black}.jpg` (samma filer som redan används för thumbnail-knapparna, så materialet är identiskt med Gelatos prover).
+
+```ts
+const FRAME_STYLES: Record<string, { color: string; texture?: string }> = {
+  Ingen:  { color: "" },
+  Vit:    { color: "hsl(0 0% 98%)",  texture: frameWhite },
+  Svart:  { color: "hsl(0 0% 8%)",   texture: frameBlack },
+  Ek:     { color: "hsl(30 35% 55%)", texture: frameOak },
+  Valnöt: { color: "hsl(20 25% 25%)", texture: frameWalnut },
+};
 ```
 
-Det betyder: SKU:erna som vi lade in är rätt sparade i frontend/shared mapping, men `shopify-order-webhook` har en äldre/inlinad SKU-resolver som inte har uppdaterats för `acrylic` och `aluminum`. Därför försöker den inte ens slå upp de nya SKU:erna.
+Skicka både `frameColor` och nytt prop `frameTexture` vidare till `MapPreview`.
 
-## Plan
+### 2. `src/components/editor/MapPreview.tsx`
+Lägg till `frameTexture?: string` i Props. När den finns, applicera den som `border-image` på samma `<div>` som idag har CSS-bordern — inga ändringar av `borderWidth`/`borderPx`-uträkningen, så ram­bredden förblir exakt 1.2 cm i alla storlekar:
 
-1. Uppdatera `supabase/functions/shopify-order-webhook/index.ts`
-   - Lägg till stöd för produkttyperna `aluminum` och `acrylic` i `productTypeFromHandle`.
-   - Utöka den inlinade `GELATO_SKU_MAP` med de nya SKU:erna för:
-     - Aluminium: 20x30, 30x40, 40x50, 50x70, 70x100 i portrait/landscape
-     - Akryl: 20x30, 30x40, 40x50, 50x70, 70x100 i portrait/landscape
-   - Säkerställ att `Standard` för akryl och aluminium matchar kartans nycklar, så orderraden `size=20x30 variant=Standard orient=portrait` resolve:ar till rätt `acrylic_..._ver` UID.
-
-2. Göra resolver-logiken mer robust
-   - Om `gelato_sku_map` finns på `product_configs` men inte matchar dagens nested-format, ska webhooken ändå kunna falla tillbaka på den lokala mappen.
-   - Behåll befintligt beteende för posters/canvas oförändrat.
-
-3. Deploya order-webhooken
-   - Deploya `shopify-order-webhook` så att den kör uppdaterad logik i backend.
-   - Ingen Shopify-sync behövs för detta specifika fel, eftersom produkten redan skickar `_product_handle`, `_size`, `_variant`, `_orientation` och `_print_file_url` korrekt.
-
-4. Verifiera efter ändringen
-   - Kontrollera senaste `gelato_orders` och webhook-loggar.
-   - För en ny akryltestorder ska loggen ändras från:
-
-```text
-source=missing uid=NONE
+```ts
+const frameStyle: React.CSSProperties = {
+  ...,
+  borderStyle: frameColor ? "solid" : undefined,
+  borderColor: frameColor,                 // fallback om bilden inte laddat
+  borderWidth: frameColor ? `${borderPx}px` : 0,
+  ...(frameTexture ? {
+    borderImageSource: `url(${frameTexture})`,
+    borderImageSlice: 80,        // klipper ut mittpartiet ur texturen
+    borderImageRepeat: "round",  // upprepa runt långsidor utan att stretcha
+    borderImageWidth: `${borderPx}px`,
+  } : {}),
+};
 ```
 
-till ungefär:
+`border-image-repeat: round` ger ett kontinuerligt mönster runt hela ramen och hörnen får automatiskt rätt orientering — vilket är det som idag saknas och får Ek/Valnöt att se "platt brun" ut.
 
-```text
-source=local-exact uid=acrylic_200x300-mm-8x12-inch_4-mm_4-0_ver
-```
+### 3. Inget annat rörs
+- Ramknapparna under "Format" (`FrameOption` / `FRAME_THUMBS`) behålls oförändrade.
+- 3D-canvas-previewn (`Canvas3DPreview`) berörs inte (canvas har ingen ram).
+- `frameWidthCm`, `borderPx`-beräkningen, layoutens `frontInset`, mockups och Gelato-SKU-mapping rörs inte.
+- `aluminum` / `acrylic` (som inte har ram) påverkas inte — `frameTexture` skickas bara när `product_type === "posters"`.
 
-Därefter ska ordern kunna gå vidare till Gelato. De två redan misslyckade testordrarna (#1017 och #1018) kommer inte automatiskt skickas om av denna ändring; enklast är att göra en ny testorder efter fixen, alternativt kan vi senare lägga till/bygga en manuell retry för sådana ordrar.
+## Resultat
+Vit ram → matt vit yta. Svart ram → matt mörk yta. Ek/Valnöt → faktisk träådring som matchar Gelatos produktbilder, eftersom vi återanvänder exakt samma bildfiler som redan visas på ramväljaren. Bredd och proportioner identiska med idag.
