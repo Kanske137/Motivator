@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useEditorStore } from "@/stores/editorStore";
 import { Loader2, AlertCircle, ChevronLeft, ChevronRight, Maximize2, Box } from "lucide-react";
-import { getScenesFor, frameColorFromVariant, type MockupScene } from "@/lib/mockup-scenes";
+import { getScenesFor, frameColorFromVariant, hangerColorFromVariant, type MockupScene } from "@/lib/mockup-scenes";
 import { compositeMockup } from "@/lib/mockup-composite";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
