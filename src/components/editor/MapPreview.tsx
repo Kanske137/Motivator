@@ -560,6 +560,9 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
             <AcrylicCornerOverlay frontWcm={frontW} frontHcm={frontH} zIndex={45} />
           </div>
         )}
+        {hangerColor && (
+          <HangerOverlay color={hangerColor} />
+        )}
       </div>
       {allLayers.some((l) => l.type === "map") && (
         <p className="text-[10px] text-muted-foreground">© Mapbox · © OpenStreetMap</p>
