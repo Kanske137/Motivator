@@ -55,6 +55,8 @@ export interface TemplateSnapshotInput {
   // Optional frame / canvas-wrap overlay (drawn ON TOP of layers — preview/cart only).
   frameColor?: string;
   frameWidthCm?: number;
+  /** Posterhängare (trälist topp+botten + snöre). Endast preview/cart. */
+  hangerColor?: string;
   canvasWrap?: boolean;
   /** Akryl-skruvar i hörnen (preview/cart only — aldrig i tryckfil). */
   acrylicCorners?: boolean;
