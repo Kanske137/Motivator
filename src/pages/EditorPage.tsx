@@ -114,7 +114,9 @@ export default function EditorPage() {
     setConfig(next);
   };
 
-  const frameColor = config?.product_type === "posters" ? FRAME_COLORS[variant ?? "Ingen"] : "";
+  const frameStyle = config?.product_type === "posters" ? FRAME_STYLES[variant ?? "Ingen"] : undefined;
+  const frameColor = frameStyle?.color ?? "";
+  const frameTexture = frameStyle?.texture;
   const isCanvas = config?.product_type === "canvas";
   const canvasDepthCm = isCanvas
     ? (variant?.match(/(\d+)/)?.[1] ? parseInt(variant!.match(/(\d+)/)![1], 10) : 2)
