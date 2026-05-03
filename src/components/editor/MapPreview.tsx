@@ -11,6 +11,8 @@ import { AcrylicCornerOverlay } from "./AcrylicCornerOverlay";
 interface Props {
   frameColor?: string;
   frameWidthCm?: number;
+  /** Posterhängare (trälist topp+botten + snöre) — preview only. */
+  hangerColor?: string;
   innerPadding?: string;
   /** Canvas wrap depth in cm. */
   wrapCm?: number;
