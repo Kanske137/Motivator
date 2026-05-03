@@ -176,6 +176,7 @@ export default function EditorPage() {
         ...baseTemplateInput,
         frameColor: !isCanvas ? frameColor : undefined,
         frameWidthCm: !isCanvas ? FRAME_WIDTH_CM : undefined,
+        hangerColor: hangerColor ?? undefined,
         canvasWrap: isCanvas,
         acrylicCorners: config?.product_type === "acrylic",
       });
