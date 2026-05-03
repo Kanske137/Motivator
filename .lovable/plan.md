@@ -1,42 +1,66 @@
-Jag hittade problemet: själva testordern kommer in, printfilen finns, men order-webhooken som skickar till Gelato känner fortfarande bara igen `poster` och `canvas`.
+# Posterhängare — 4 nya varianter i poster-flödet
 
-Aktuell order #1018 stoppades därför med:
+## Vad som byggs
+4 nya "hängare"-varianter som beter sig som ramvarianter i poster-flödet, men ritas som **trälist topp + botten + snöre** istället för en omslutande ram. Samma storleksval som befintliga posters. Visas i editor-Preview, mockups och cart-bilder. **Aldrig** bakade i tryckfilen.
+
+## Varianter
+- **Hängare Ek** — `#c8a371`
+- **Hängare Valnöt** — `#5a3a26`
+- **Hängare Svart** — `#1a1a1a`
+- **Hängare Vit** — `#f5f5f2`
+
+Pris (tills vidare): samma som motsvarande befintlig ram per storlek (Ek/Valnöt/Svart/Vit). Lätt att uppdatera senare i `pricing.ts`.
+
+## Tekniska ändringar
+
+### 1. `src/lib/pricing.ts`
+- Utöka `POSTER_FRAMES` till `["Ingen","Vit","Svart","Ek","Valnöt","Hängare Ek","Hängare Valnöt","Hängare Svart","Hängare Vit"]`.
+- Lägg till de 4 nya nycklarna i varje rad i `POSTER_PRICES` med samma värde som motsv. ram-färg.
+
+### 2. Variantigenkänning
+- Ny helper `isHangerVariant(name)` i `src/lib/mockup-scenes.ts`.
+- Ny helper `hangerColorFromVariant(name)` som returnerar hex för listen (samma 4 färger som ramarna).
+- `frameColorFromVariant` returnerar **null** för hängare (så ingen omslutande ram ritas).
+
+### 3. Procedural rendering — `src/lib/template-snapshot.ts`
+Efter befintligt frame-block (rad ~660), lägg till ett `hanger`-block som körs när `input.hangerColor` är satt och `input.hires === false`:
+- Topp-list: rektangel `width = posterW`, `height ≈ 0.6 cm × PX_PER_CM × scale`, placerad strax ovanför postern.
+- Botten-list: identisk, strax under postern.
+- Snöre: tunn båge (quadratic curve) från topp-listens vänsterkant till högerkant, böjd uppåt ~1.5 cm.
+- Färg från `hangerColor`. Vit list får tunn grå kontur för synlighet på vit bakgrund.
+- I print-grenen (rad ~750): tvinga `hangerColor: undefined` precis som `frameColor` — säkerställer att tryckfilen är ren.
+
+### 4. Mockup-composite — `src/lib/mockup-composite.ts`
+- Ta emot `hangerColor` i input, sätt `frameWpx = 0` när hängare används (postern ska ligga direkt mot scenen utan ram-padding).
+- Efter att postern ritats (efter rad ~193), rita topp/botten-list + snöre med samma proportioner som template-snapshot.
+
+### 5. Editor-UI — `src/components/editor/FormatSection.tsx` + `FrameOption.tsx`
+- `FRAME_THUMBS`: lägg till 4 hängar-thumbnails (procedurella SVG:er inline, eller återanvänd ram-thumbnails som färgreferens).
+- Ändra label från "Ram" till "Ram / Hängare" när poster har hängar-varianter aktiva.
+- Grid: byt till `grid-cols-3` när antal varianter > 6 (annars överfullt på mobil).
+
+### 6. Anrops-uppdateringar
+- `MockupGallery.tsx`: läs `hangerColor = hangerColorFromVariant(variant)`, skicka med i composite-anropet.
+- `MapPreview.tsx` / `editor-snapshot.ts`: skicka `hangerColor` till `renderTemplateSnapshot` (preview/cart-pipeline). Print-pipeline rör vi inte — den passerar redan `hires: true` och nollställer overlays.
+
+### 7. Admin (ProductOptionsSection)
+- `allowedFrames` för poster bör nu kunna inkludera de 4 nya namnen — verifiera att admin-listan plockar upp dem från `POSTER_FRAMES` automatiskt (den läser konstanten).
+
+## Vad som INTE ändras
+- `src/lib/print-pipeline.ts` och `template-snapshot` print-grenen — hängare bakas aldrig i tryckfilen.
+- Gelato SKU-map — du fyller på senare. Webhook kommer svara `sku_not_found` för hängar-ordrar tills dess (medvetet val).
+- Storleks-/orienteringslogik — oförändrad.
+
+## ASCII av hur en hängare ser ut i preview
 
 ```text
-sku_not_found: unknown product type for handle="testglas-acrylic"
+   ╭──────────────────╮      ← snöre (tunn båge)
+   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓      ← topp-list (färgad)
+   │                  │
+   │     POSTER       │
+   │                  │
+   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓      ← botten-list (färgad)
 ```
 
-Det betyder: SKU:erna som vi lade in är rätt sparade i frontend/shared mapping, men `shopify-order-webhook` har en äldre/inlinad SKU-resolver som inte har uppdaterats för `acrylic` och `aluminum`. Därför försöker den inte ens slå upp de nya SKU:erna.
-
-## Plan
-
-1. Uppdatera `supabase/functions/shopify-order-webhook/index.ts`
-   - Lägg till stöd för produkttyperna `aluminum` och `acrylic` i `productTypeFromHandle`.
-   - Utöka den inlinade `GELATO_SKU_MAP` med de nya SKU:erna för:
-     - Aluminium: 20x30, 30x40, 40x50, 50x70, 70x100 i portrait/landscape
-     - Akryl: 20x30, 30x40, 40x50, 50x70, 70x100 i portrait/landscape
-   - Säkerställ att `Standard` för akryl och aluminium matchar kartans nycklar, så orderraden `size=20x30 variant=Standard orient=portrait` resolve:ar till rätt `acrylic_..._ver` UID.
-
-2. Göra resolver-logiken mer robust
-   - Om `gelato_sku_map` finns på `product_configs` men inte matchar dagens nested-format, ska webhooken ändå kunna falla tillbaka på den lokala mappen.
-   - Behåll befintligt beteende för posters/canvas oförändrat.
-
-3. Deploya order-webhooken
-   - Deploya `shopify-order-webhook` så att den kör uppdaterad logik i backend.
-   - Ingen Shopify-sync behövs för detta specifika fel, eftersom produkten redan skickar `_product_handle`, `_size`, `_variant`, `_orientation` och `_print_file_url` korrekt.
-
-4. Verifiera efter ändringen
-   - Kontrollera senaste `gelato_orders` och webhook-loggar.
-   - För en ny akryltestorder ska loggen ändras från:
-
-```text
-source=missing uid=NONE
-```
-
-till ungefär:
-
-```text
-source=local-exact uid=acrylic_200x300-mm-8x12-inch_4-mm_4-0_ver
-```
-
-Därefter ska ordern kunna gå vidare till Gelato. De två redan misslyckade testordrarna (#1017 och #1018) kommer inte automatiskt skickas om av denna ändring; enklast är att göra en ny testorder efter fixen, alternativt kan vi senare lägga till/bygga en manuell retry för sådana ordrar.
+## Resultat
+Kund väljer "Hängare Ek" i ram-väljaren → preview, mockups och cart-bilder visar postern med träliste-hängare i vald färg. Tryckfil = bara motivet. Pris matchar motsvarande ram tills du levererar slutgiltig prislista.
