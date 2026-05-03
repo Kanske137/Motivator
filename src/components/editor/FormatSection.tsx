@@ -309,18 +309,27 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
       {visibleVariants.length > 1 && (
         <div className="space-y-2">
           <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-            {isCanvas ? "Djup" : isAluminum ? "Material" : isAcrylic ? "Finish" : "Ram"}
+            {isCanvas ? "Djup" : isAluminum ? "Material" : isAcrylic ? "Finish" : "Ram / Hängare"}
           </Label>
           <div className={`grid gap-2 ${isCanvas ? "grid-cols-2" : "grid-cols-3"}`}>
             {visibleVariants.map((v) => {
               const diff = v.price - currentVariantPrice;
               const isNoFrame = v.name.toLowerCase() === "ingen";
+              const hangerHex = HANGER_HEX[v.name];
               return (
                 <FrameOption
                   key={v.name}
                   name={v.name}
-                  thumbnail={isCanvas || isAluminum || isAcrylic ? undefined : isNoFrame ? undefined : FRAME_THUMBS[v.name]}
-                  svg={isCanvas ? <DepthIcon depth={v.name} /> : isNoFrame ? <NoFrameIcon /> : undefined}
+                  thumbnail={isCanvas || isAluminum || isAcrylic || hangerHex ? undefined : isNoFrame ? undefined : FRAME_THUMBS[v.name]}
+                  svg={
+                    isCanvas
+                      ? <DepthIcon depth={v.name} />
+                      : hangerHex
+                        ? <HangerIcon color={hangerHex} />
+                        : isNoFrame
+                          ? <NoFrameIcon />
+                          : undefined
+                  }
                   selected={v.name === variant}
                   onClick={() => setVariant(v.name)}
                   priceLabel={formatDiff(diff)}
