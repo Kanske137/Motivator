@@ -283,6 +283,7 @@ export default function EditorPage() {
         <div className="paper-grain flex items-center justify-center h-[60vh] md:h-auto md:flex-1 md:min-h-[70vh]">
           <MapPreview
             frameColor={frameColor}
+            frameTexture={frameTexture}
             frameWidthCm={FRAME_WIDTH_CM}
             wrapCm={canvasDepthCm}
             layersIncludeWrap={isCanvas && !!template?.canvasLayout}
