@@ -196,6 +196,14 @@ export function MapPreview({ frameColor, frameTexture, frameWidthCm = 2, innerPa
     borderStyle: frameColor ? "solid" : undefined,
     borderColor: frameColor,
     borderWidth: frameColor ? `${borderPx}px` : 0,
+    ...(frameColor && frameTexture
+      ? {
+          borderImageSource: `url(${frameTexture})`,
+          borderImageSlice: 80,
+          borderImageRepeat: "round",
+          borderImageWidth: `${borderPx}px`,
+        }
+      : {}),
     padding: innerPadding,
     boxSizing: "border-box",
     // Lokal stacking context — alla interna z-index (inkl. akrylskruvar)
