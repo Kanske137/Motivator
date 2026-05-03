@@ -109,6 +109,7 @@ export function MockupGallery() {
 
         const sceneCanvasDepthCm = 2;
         const frameColor = frameColorFromVariant(variant);
+        const hangerColor = hangerColorFromVariant(variant);
 
         const results = await Promise.all(
           scenes.map(async (scene) => {
@@ -121,6 +122,7 @@ export function MockupGallery() {
                 productType: config.product_type,
                 canvasDepthCm: sceneCanvasDepthCm,
                 frameColor,
+                hangerColor,
               });
               return { scene, url, error: undefined as string | undefined };
             } catch (e) {
