@@ -80,10 +80,11 @@ export function parseSizeCm(size: string): { wCm: number; hCm: number } | null {
   return { wCm: parseInt(m[1], 10), hCm: parseInt(m[2], 10) };
 }
 
-/** Mappa variant-namn → ramfärg (hex) eller null om ingen ram. */
+/** Mappa variant-namn → ramfärg (hex) eller null. Hängare räknas EJ som ram. */
 export function frameColorFromVariant(variant: string | null | undefined): string | null {
   if (!variant) return null;
   const v = variant.toLowerCase();
+  if (v.includes("hängare") || v.includes("hanger")) return null; // hanteras separat
   if (v.includes("ingen") || v.includes("no frame") || v.includes("utan ram")) return null;
   if (v.includes("svart") || v.includes("black")) return "#1a1a1a";
   if (v.includes("vit") || v.includes("white")) return "#f5f5f2";
@@ -91,4 +92,22 @@ export function frameColorFromVariant(variant: string | null | undefined): strin
   if (v.includes("valnöt") || v.includes("walnut")) return "#5a3a26";
   if (v.includes("ram") || v.includes("frame")) return "#1a1a1a";
   return null;
+}
+
+/** Returnerar färg för posterhängare (trälist topp+botten) eller null. */
+export function hangerColorFromVariant(variant: string | null | undefined): string | null {
+  if (!variant) return null;
+  const v = variant.toLowerCase();
+  if (!(v.includes("hängare") || v.includes("hanger"))) return null;
+  if (v.includes("svart") || v.includes("black")) return "#1a1a1a";
+  if (v.includes("vit") || v.includes("white")) return "#f5f5f2";
+  if (v.includes("ek") || v.includes("oak")) return "#c8a371";
+  if (v.includes("valnöt") || v.includes("walnut")) return "#5a3a26";
+  return "#c8a371";
+}
+
+export function isHangerVariant(variant: string | null | undefined): boolean {
+  if (!variant) return false;
+  const v = variant.toLowerCase();
+  return v.includes("hängare") || v.includes("hanger");
 }
