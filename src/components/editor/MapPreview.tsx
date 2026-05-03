@@ -10,6 +10,7 @@ import { AcrylicCornerOverlay } from "./AcrylicCornerOverlay";
 
 interface Props {
   frameColor?: string;
+  frameTexture?: string;
   frameWidthCm?: number;
   innerPadding?: string;
   /** Canvas wrap depth in cm. */
