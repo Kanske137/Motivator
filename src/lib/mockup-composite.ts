@@ -24,6 +24,8 @@ interface CompositArgs {
   frameColor?: string | null;
   /** Ramens bredd i cm (verklig). Standard 2.5. */
   frameWidthCm?: number;
+  /** Hex-färg för posterhängare (trälist topp+botten). Aldrig samtidigt som ram. */
+  hangerColor?: string | null;
 }
 
 export async function compositeMockup({
@@ -35,6 +37,7 @@ export async function compositeMockup({
   canvasDepthCm = 2,
   frameColor = null,
   frameWidthCm = 2.5,
+  hangerColor = null,
 }: CompositArgs): Promise<string> {
   const sizeCm = parseSizeCm(size);
   if (!sizeCm) throw new Error(`Ogiltig storlek: ${size}`);
