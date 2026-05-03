@@ -794,6 +794,7 @@ export async function renderHiresTemplateSnapshotSafe(
         maxPxOverride: maxPx,
         // Never bake frame/wrap/acrylic-corners into print files.
         frameColor: undefined,
+        hangerColor: undefined,
         frameWidthCm: undefined,
         canvasWrap: false,
         acrylicCorners: false,
