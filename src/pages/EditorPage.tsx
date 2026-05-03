@@ -19,6 +19,7 @@ import { renderTemplateSnapshot } from "@/lib/template-snapshot";
 import { uploadCartPreview } from "@/lib/upload-preview";
 import { getPrintFileUrl } from "@/lib/print-pipeline";
 import { resolveShopifyVariantId } from "@/lib/shopify-variant-resolver";
+import { hangerColorFromVariant } from "@/lib/mockup-scenes";
 import { toast } from "sonner";
 
 const FRAME_COLORS: Record<string, string> = {
