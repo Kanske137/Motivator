@@ -280,6 +280,7 @@ export default function EditorPage() {
           <MapPreview
             frameColor={frameColor}
             frameWidthCm={FRAME_WIDTH_CM}
+            hangerColor={hangerColor ?? undefined}
             wrapCm={canvasDepthCm}
             layersIncludeWrap={isCanvas && !!template?.canvasLayout}
           />
