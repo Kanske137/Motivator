@@ -19,6 +19,7 @@ import { renderTemplateSnapshot } from "@/lib/template-snapshot";
 import { uploadCartPreview } from "@/lib/upload-preview";
 import { getPrintFileUrl } from "@/lib/print-pipeline";
 import { resolveShopifyVariantId } from "@/lib/shopify-variant-resolver";
+import { hangerColorFromVariant } from "@/lib/mockup-scenes";
 import { toast } from "sonner";
 
 const FRAME_COLORS: Record<string, string> = {
@@ -110,6 +111,7 @@ export default function EditorPage() {
   };
 
   const frameColor = config?.product_type === "posters" ? FRAME_COLORS[variant ?? "Ingen"] : "";
+  const hangerColor = config?.product_type === "posters" ? hangerColorFromVariant(variant) : null;
   const isCanvas = config?.product_type === "canvas";
   const canvasDepthCm = isCanvas
     ? (variant?.match(/(\d+)/)?.[1] ? parseInt(variant!.match(/(\d+)/)![1], 10) : 2)
@@ -174,6 +176,7 @@ export default function EditorPage() {
         ...baseTemplateInput,
         frameColor: !isCanvas ? frameColor : undefined,
         frameWidthCm: !isCanvas ? FRAME_WIDTH_CM : undefined,
+        hangerColor: hangerColor ?? undefined,
         canvasWrap: isCanvas,
         acrylicCorners: config?.product_type === "acrylic",
       });
@@ -277,6 +280,7 @@ export default function EditorPage() {
           <MapPreview
             frameColor={frameColor}
             frameWidthCm={FRAME_WIDTH_CM}
+            hangerColor={hangerColor ?? undefined}
             wrapCm={canvasDepthCm}
             layersIncludeWrap={isCanvas && !!template?.canvasLayout}
           />

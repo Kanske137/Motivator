@@ -11,6 +11,8 @@ import { AcrylicCornerOverlay } from "./AcrylicCornerOverlay";
 interface Props {
   frameColor?: string;
   frameWidthCm?: number;
+  /** Posterhängare (trälist topp+botten + snöre) — preview only. */
+  hangerColor?: string;
   innerPadding?: string;
   /** Canvas wrap depth in cm. */
   wrapCm?: number;
@@ -40,7 +42,48 @@ function HeartClipDef({ id }: { id: string }) {
   );
 }
 
-/** Stable star-clip SVG def (5-point star). */
+/** Posterhängare: tunna trälister topp+botten + snöre. */
+function HangerOverlay({ color }: { color: string }) {
+  const isWhite = color.toLowerCase() === "#f5f5f2";
+  const slatStyle: React.CSSProperties = {
+    position: "absolute",
+    left: "-2%",
+    right: "-2%",
+    height: "3.2%",
+    background: color,
+    backgroundImage:
+      "linear-gradient(to bottom, rgba(255,255,255,0.22), rgba(255,255,255,0) 50%, rgba(0,0,0,0.28))",
+    boxShadow: "0 4px 8px rgba(0,0,0,0.28)",
+    border: isWhite ? "1px solid rgba(0,0,0,0.18)" : undefined,
+  };
+  return (
+    <div
+      className="pointer-events-none absolute inset-0"
+      style={{ zIndex: 46, overflow: "visible" }}
+      aria-hidden
+    >
+      <svg
+        className="absolute"
+        style={{ left: 0, right: 0, top: "-12%", width: "100%", height: "14%", overflow: "visible" }}
+        viewBox="0 0 100 14"
+        preserveAspectRatio="none"
+      >
+        <path
+          d="M 4 13 Q 50 -2 96 13"
+          fill="none"
+          stroke="rgba(40,30,20,0.78)"
+          strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
+          style={{ strokeWidth: 2 }}
+        />
+      </svg>
+      <div style={{ ...slatStyle, top: 0 }} />
+      <div style={{ ...slatStyle, bottom: 0 }} />
+    </div>
+  );
+}
+
+
 function StarClipDef({ id }: { id: string }) {
   return (
     <svg width="0" height="0" className="absolute pointer-events-none">
@@ -101,7 +144,7 @@ function useCircleClip(enabled: boolean): {
   return { ref, clipPath };
 }
 
-export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm = 0, layersIncludeWrap = false }: Props) {
+export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPadding, wrapCm = 0, layersIncludeWrap = false }: Props) {
   const frameRef = useRef<HTMLDivElement>(null);
   const [borderPx, setBorderPx] = useState(0);
   const [frameShortPx, setFrameShortPx] = useState(0);
@@ -557,6 +600,9 @@ export function MapPreview({ frameColor, frameWidthCm = 2, innerPadding, wrapCm 
           >
             <AcrylicCornerOverlay frontWcm={frontW} frontHcm={frontH} zIndex={45} />
           </div>
+        )}
+        {hangerColor && (
+          <HangerOverlay color={hangerColor} />
         )}
       </div>
       {allLayers.some((l) => l.type === "map") && (

@@ -28,6 +28,26 @@ const FRAME_THUMBS: Record<string, string> = {
   Svart: frameBlack,
 };
 
+const HANGER_HEX: Record<string, string> = {
+  "Hängare Ek": "#c8a371",
+  "Hängare Valnöt": "#5a3a26",
+  "Hängare Svart": "#1a1a1a",
+  "Hängare Vit": "#f5f5f2",
+};
+
+const HangerIcon = forwardRef<SVGSVGElement, { color: string }>(({ color }, ref) => {
+  const isWhite = color.toLowerCase() === "#f5f5f2";
+  return (
+    <svg ref={ref} viewBox="0 0 40 40" className="w-full h-full" preserveAspectRatio="xMidYMid meet">
+      <path d="M 6 8 Q 20 0 34 8" fill="none" stroke="#3a2a1a" strokeWidth="1.2" strokeLinecap="round" />
+      <rect x="4" y="8" width="32" height="3.2" fill={color} stroke={isWhite ? "rgba(0,0,0,0.25)" : "none"} strokeWidth="0.5" />
+      <rect x="6" y="11.2" width="28" height="20" fill="#f3eee4" stroke="rgba(0,0,0,0.08)" strokeWidth="0.4" />
+      <rect x="4" y="31.2" width="32" height="3.2" fill={color} stroke={isWhite ? "rgba(0,0,0,0.25)" : "none"} strokeWidth="0.5" />
+    </svg>
+  );
+});
+HangerIcon.displayName = "HangerIcon";
+
 function formatDiff(diff: number): string {
   if (diff === 0) return "+0 kr";
   if (diff > 0) return `+${diff} kr`;
@@ -289,18 +309,27 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
       {visibleVariants.length > 1 && (
         <div className="space-y-2">
           <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-            {isCanvas ? "Djup" : isAluminum ? "Material" : isAcrylic ? "Finish" : "Ram"}
+            {isCanvas ? "Djup" : isAluminum ? "Material" : isAcrylic ? "Finish" : "Ram / Hängare"}
           </Label>
           <div className={`grid gap-2 ${isCanvas ? "grid-cols-2" : "grid-cols-3"}`}>
             {visibleVariants.map((v) => {
               const diff = v.price - currentVariantPrice;
               const isNoFrame = v.name.toLowerCase() === "ingen";
+              const hangerHex = HANGER_HEX[v.name];
               return (
                 <FrameOption
                   key={v.name}
                   name={v.name}
-                  thumbnail={isCanvas || isAluminum || isAcrylic ? undefined : isNoFrame ? undefined : FRAME_THUMBS[v.name]}
-                  svg={isCanvas ? <DepthIcon depth={v.name} /> : isNoFrame ? <NoFrameIcon /> : undefined}
+                  thumbnail={isCanvas || isAluminum || isAcrylic || hangerHex ? undefined : isNoFrame ? undefined : FRAME_THUMBS[v.name]}
+                  svg={
+                    isCanvas
+                      ? <DepthIcon depth={v.name} />
+                      : hangerHex
+                        ? <HangerIcon color={hangerHex} />
+                        : isNoFrame
+                          ? <NoFrameIcon />
+                          : undefined
+                  }
                   selected={v.name === variant}
                   onClick={() => setVariant(v.name)}
                   priceLabel={formatDiff(diff)}

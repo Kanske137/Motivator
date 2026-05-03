@@ -55,6 +55,8 @@ export interface TemplateSnapshotInput {
   // Optional frame / canvas-wrap overlay (drawn ON TOP of layers — preview/cart only).
   frameColor?: string;
   frameWidthCm?: number;
+  /** Posterhängare (trälist topp+botten + snöre). Endast preview/cart. */
+  hangerColor?: string;
   canvasWrap?: boolean;
   /** Akryl-skruvar i hörnen (preview/cart only — aldrig i tryckfil). */
   acrylicCorners?: boolean;
@@ -722,6 +724,50 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
     }
   }
 
+  // Posterhängare — trälist topp+botten + snöre (preview/cart only).
+  if (!input.hires && input.hangerColor && extraCm === 0) {
+    const color = input.hangerColor;
+    const slatH = Math.max(4, Math.round(0.6 * PX_PER_CM * scale));
+    const slatOverhang = Math.round(slatH * 0.25); // sticker ut lite på sidorna
+    const cordRise = Math.max(slatH * 1.6, Math.round(1.4 * PX_PER_CM * scale));
+    ctx.save();
+    const drawSlat = (yTop: number) => {
+      // skugga
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.28)";
+      ctx.shadowBlur = Math.max(2, slatH * 0.4);
+      ctx.shadowOffsetY = Math.max(1, slatH * 0.15);
+      ctx.fillStyle = color;
+      ctx.fillRect(-slatOverhang, yTop, w + 2 * slatOverhang, slatH);
+      ctx.restore();
+      // ljus topp-glans
+      const grad = ctx.createLinearGradient(0, yTop, 0, yTop + slatH);
+      grad.addColorStop(0, "rgba(255,255,255,0.22)");
+      grad.addColorStop(0.5, "rgba(255,255,255,0)");
+      grad.addColorStop(1, "rgba(0,0,0,0.28)");
+      ctx.fillStyle = grad;
+      ctx.fillRect(-slatOverhang, yTop, w + 2 * slatOverhang, slatH);
+      // mörk hairline för vit list så den syns mot vit bakgrund
+      if (color.toLowerCase() === "#f5f5f2") {
+        ctx.strokeStyle = "rgba(0,0,0,0.2)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(-slatOverhang + 0.5, yTop + 0.5, w + 2 * slatOverhang - 1, slatH - 1);
+      }
+    };
+    drawSlat(0);
+    drawSlat(h - slatH);
+
+    // Snöre (båge ovanför topp-listen)
+    ctx.beginPath();
+    ctx.moveTo(-slatOverhang + slatH * 0.5, slatH * 0.5);
+    ctx.quadraticCurveTo(w / 2, -cordRise, w + slatOverhang - slatH * 0.5, slatH * 0.5);
+    ctx.lineWidth = Math.max(1.5, slatH * 0.18);
+    ctx.strokeStyle = "rgba(40,30,20,0.78)";
+    ctx.lineCap = "round";
+    ctx.stroke();
+    ctx.restore();
+  }
+
   const dataUrl = out.toDataURL("image/jpeg", 0.95);
   if (!dataUrl || dataUrl.length < 1000) {
     throw new Error("Empty template snapshot");
@@ -748,6 +794,7 @@ export async function renderHiresTemplateSnapshotSafe(
         maxPxOverride: maxPx,
         // Never bake frame/wrap/acrylic-corners into print files.
         frameColor: undefined,
+        hangerColor: undefined,
         frameWidthCm: undefined,
         canvasWrap: false,
         acrylicCorners: false,

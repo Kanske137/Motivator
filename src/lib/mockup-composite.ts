@@ -24,6 +24,8 @@ interface CompositArgs {
   frameColor?: string | null;
   /** Ramens bredd i cm (verklig). Standard 2.5. */
   frameWidthCm?: number;
+  /** Hex-färg för posterhängare (trälist topp+botten). Aldrig samtidigt som ram. */
+  hangerColor?: string | null;
 }
 
 export async function compositeMockup({
@@ -35,6 +37,7 @@ export async function compositeMockup({
   canvasDepthCm = 2,
   frameColor = null,
   frameWidthCm = 2.5,
+  hangerColor = null,
 }: CompositArgs): Promise<string> {
   const sizeCm = parseSizeCm(size);
   if (!sizeCm) throw new Error(`Ogiltig storlek: ${size}`);
@@ -222,6 +225,48 @@ export async function compositeMockup({
     cornerGrad.addColorStop(1, "rgba(0,0,0,0.08)");
     ctx.fillStyle = cornerGrad;
     ctx.fillRect(px, py, posterW, posterH);
+    ctx.restore();
+  }
+
+  // 9. Posterhängare (trälist topp+botten + snöre)
+  if (hangerColor && productType === "posters") {
+    const slatH = Math.max(3, (0.6 / scene.referenceWidthCm) * area.w);
+    const overhang = slatH * 0.25;
+    const cordRise = Math.max(slatH * 1.6, (1.4 / scene.referenceWidthCm) * area.w);
+    const x0 = px - overhang;
+    const x1 = px + posterW + overhang;
+
+    const drawSlat = (yTop: number) => {
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.3)";
+      ctx.shadowBlur = slatH * 0.5;
+      ctx.shadowOffsetY = slatH * 0.2;
+      ctx.fillStyle = hangerColor;
+      ctx.fillRect(x0, yTop, x1 - x0, slatH);
+      ctx.restore();
+      const grad = ctx.createLinearGradient(0, yTop, 0, yTop + slatH);
+      grad.addColorStop(0, "rgba(255,255,255,0.22)");
+      grad.addColorStop(0.5, "rgba(255,255,255,0)");
+      grad.addColorStop(1, "rgba(0,0,0,0.28)");
+      ctx.fillStyle = grad;
+      ctx.fillRect(x0, yTop, x1 - x0, slatH);
+      if (hangerColor.toLowerCase() === "#f5f5f2") {
+        ctx.strokeStyle = "rgba(0,0,0,0.2)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x0 + 0.5, yTop + 0.5, x1 - x0 - 1, slatH - 1);
+      }
+    };
+    drawSlat(py);
+    drawSlat(py + posterH - slatH);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x0 + slatH * 0.5, py + slatH * 0.5);
+    ctx.quadraticCurveTo((x0 + x1) / 2, py - cordRise, x1 - slatH * 0.5, py + slatH * 0.5);
+    ctx.lineWidth = Math.max(1.5, slatH * 0.18);
+    ctx.strokeStyle = "rgba(40,30,20,0.78)";
+    ctx.lineCap = "round";
+    ctx.stroke();
     ctx.restore();
   }
 
