@@ -21,17 +21,12 @@ import { getPrintFileUrl } from "@/lib/print-pipeline";
 import { resolveShopifyVariantId } from "@/lib/shopify-variant-resolver";
 import { toast } from "sonner";
 
-import frameWhiteTex from "@/assets/frames/frame-white.jpg";
-import frameOakTex from "@/assets/frames/frame-oak.jpg";
-import frameWalnutTex from "@/assets/frames/frame-walnut.jpg";
-import frameBlackTex from "@/assets/frames/frame-black.jpg";
-
-const FRAME_STYLES: Record<string, { color: string; texture?: string }> = {
-  Ingen: { color: "" },
-  Vit: { color: "hsl(0 0% 98%)", texture: frameWhiteTex },
-  Svart: { color: "hsl(0 0% 8%)", texture: frameBlackTex },
-  Ek: { color: "hsl(30 35% 55%)", texture: frameOakTex },
-  Valnöt: { color: "hsl(20 25% 25%)", texture: frameWalnutTex },
+const FRAME_COLORS: Record<string, string> = {
+  Ingen: "",
+  Vit: "hsl(0 0% 98%)",
+  Svart: "hsl(0 0% 8%)",
+  Ek: "hsl(30 35% 55%)",
+  Valnöt: "hsl(20 25% 25%)",
 };
 const FRAME_WIDTH_CM = 1.2; // matchar Gelato frp_w12xt22-mm (12mm front)
 
@@ -114,9 +109,7 @@ export default function EditorPage() {
     setConfig(next);
   };
 
-  const frameStyle = config?.product_type === "posters" ? FRAME_STYLES[variant ?? "Ingen"] : undefined;
-  const frameColor = frameStyle?.color ?? "";
-  const frameTexture = frameStyle?.texture;
+  const frameColor = config?.product_type === "posters" ? FRAME_COLORS[variant ?? "Ingen"] : "";
   const isCanvas = config?.product_type === "canvas";
   const canvasDepthCm = isCanvas
     ? (variant?.match(/(\d+)/)?.[1] ? parseInt(variant!.match(/(\d+)/)![1], 10) : 2)
@@ -283,7 +276,6 @@ export default function EditorPage() {
         <div className="paper-grain flex items-center justify-center h-[60vh] md:h-auto md:flex-1 md:min-h-[70vh]">
           <MapPreview
             frameColor={frameColor}
-            frameTexture={frameTexture}
             frameWidthCm={FRAME_WIDTH_CM}
             wrapCm={canvasDepthCm}
             layersIncludeWrap={isCanvas && !!template?.canvasLayout}
