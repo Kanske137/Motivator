@@ -1,14 +1,25 @@
 // Pricing-tabeller (SEK) speglar Shopify-produkterna
 export const POSTER_SIZES = ["13x18", "21x30", "30x40", "40x50", "50x70", "70x100"] as const;
-export const POSTER_FRAMES = ["Ingen", "Vit", "Svart", "Ek", "Valnöt"] as const;
+export const POSTER_FRAMES = [
+  "Ingen",
+  "Vit",
+  "Svart",
+  "Ek",
+  "Valnöt",
+  "Hängare Ek",
+  "Hängare Valnöt",
+  "Hängare Svart",
+  "Hängare Vit",
+] as const;
 
+// Hängare prissätts (tills vidare) som motsvarande träram med samma färg.
 export const POSTER_PRICES: Record<string, Record<string, number>> = {
-  "13x18": { Ingen: 199, Vit: 349, Svart: 349, Ek: 369, Valnöt: 369 },
-  "21x30": { Ingen: 239, Vit: 399, Svart: 399, Ek: 429, Valnöt: 429 },
-  "30x40": { Ingen: 259, Vit: 559, Svart: 559, Ek: 589, Valnöt: 589 },
-  "40x50": { Ingen: 289, Vit: 749, Svart: 749, Ek: 789, Valnöt: 789 },
-  "50x70": { Ingen: 329, Vit: 919, Svart: 919, Ek: 969, Valnöt: 969 },
-  "70x100": { Ingen: 429, Vit: 1249, Svart: 1249, Ek: 1299, Valnöt: 1299 },
+  "13x18": { Ingen: 199, Vit: 349, Svart: 349, Ek: 369, Valnöt: 369, "Hängare Ek": 369, "Hängare Valnöt": 369, "Hängare Svart": 349, "Hängare Vit": 349 },
+  "21x30": { Ingen: 239, Vit: 399, Svart: 399, Ek: 429, Valnöt: 429, "Hängare Ek": 429, "Hängare Valnöt": 429, "Hängare Svart": 399, "Hängare Vit": 399 },
+  "30x40": { Ingen: 259, Vit: 559, Svart: 559, Ek: 589, Valnöt: 589, "Hängare Ek": 589, "Hängare Valnöt": 589, "Hängare Svart": 559, "Hängare Vit": 559 },
+  "40x50": { Ingen: 289, Vit: 749, Svart: 749, Ek: 789, Valnöt: 789, "Hängare Ek": 789, "Hängare Valnöt": 789, "Hängare Svart": 749, "Hängare Vit": 749 },
+  "50x70": { Ingen: 329, Vit: 919, Svart: 919, Ek: 969, Valnöt: 969, "Hängare Ek": 969, "Hängare Valnöt": 969, "Hängare Svart": 919, "Hängare Vit": 919 },
+  "70x100": { Ingen: 429, Vit: 1249, Svart: 1249, Ek: 1299, Valnöt: 1299, "Hängare Ek": 1299, "Hängare Valnöt": 1299, "Hängare Svart": 1249, "Hängare Vit": 1249 },
 };
 
 export const CANVAS_SIZES = ["20x25", "20x30", "30x40", "40x50", "40x60", "50x70", "60x80", "70x100"] as const;
