@@ -42,14 +42,31 @@ function HeartClipDef({ id }: { id: string }) {
   );
 }
 
-/** Posterhängare: tunna trälister topp+botten + snöre. */
-function HangerOverlay({ color }: { color: string }) {
+/**
+ * Posterhängare: tunna trälister topp+botten + snöre.
+ * Listerna placeras UTANFÖR motivets topp/botten så de inte täcker tryckytan.
+ * Tjockleken skalas efter motivets verkliga höjd: Gelatos hängare har fast
+ * 14 mm front (oavsett posterstorlek), så större postrar → relativt tunnare list.
+ */
+function HangerOverlay({
+  color,
+  motifHeightCm,
+}: {
+  color: string;
+  motifHeightCm: number;
+}) {
   const isWhite = color.toLowerCase() === "#f5f5f2";
+  // 14 mm = 1.4 cm fysisk listhöjd. Procent av motivets höjd.
+  const slatPct = Math.max(0.8, (1.4 / Math.max(motifHeightCm, 1)) * 100);
+  // Snörets båghöjd: ~3× listen, lite mer för små postrar (där listen är
+  // procentuellt stor) och avtagande för stora.
+  const cordRisePct = slatPct * 1.8;
+
   const slatStyle: React.CSSProperties = {
     position: "absolute",
     left: "-2%",
     right: "-2%",
-    height: "3.2%",
+    height: `${slatPct}%`,
     background: color,
     backgroundImage:
       "linear-gradient(to bottom, rgba(255,255,255,0.22), rgba(255,255,255,0) 50%, rgba(0,0,0,0.28))",
@@ -62,9 +79,17 @@ function HangerOverlay({ color }: { color: string }) {
       style={{ zIndex: 46, overflow: "visible" }}
       aria-hidden
     >
+      {/* Snöre — ovanför topp-listen */}
       <svg
         className="absolute"
-        style={{ left: 0, right: 0, top: "-12%", width: "100%", height: "14%", overflow: "visible" }}
+        style={{
+          left: 0,
+          right: 0,
+          top: `calc(-${slatPct}% - ${cordRisePct}%)`,
+          width: "100%",
+          height: `${cordRisePct}%`,
+          overflow: "visible",
+        }}
         viewBox="0 0 100 14"
         preserveAspectRatio="none"
       >
@@ -77,8 +102,10 @@ function HangerOverlay({ color }: { color: string }) {
           style={{ strokeWidth: 2 }}
         />
       </svg>
-      <div style={{ ...slatStyle, top: 0 }} />
-      <div style={{ ...slatStyle, bottom: 0 }} />
+      {/* Trälist UTANFÖR motivets topp */}
+      <div style={{ ...slatStyle, top: `-${slatPct}%` }} />
+      {/* Trälist UTANFÖR motivets botten */}
+      <div style={{ ...slatStyle, bottom: `-${slatPct}%` }} />
     </div>
   );
 }
@@ -602,7 +629,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
           </div>
         )}
         {hangerColor && (
-          <HangerOverlay color={hangerColor} />
+          <HangerOverlay color={hangerColor} motifHeightCm={frontH} />
         )}
       </div>
       {allLayers.some((l) => l.type === "map") && (

@@ -230,9 +230,9 @@ export async function compositeMockup({
 
   // 9. Posterhängare (trälist topp+botten + snöre)
   if (hangerColor && productType === "posters") {
-    const slatH = Math.max(3, (0.6 / scene.referenceWidthCm) * area.w);
-    const overhang = slatH * 0.25;
-    const cordRise = Math.max(slatH * 1.6, (1.4 / scene.referenceWidthCm) * area.w);
+    const slatH = Math.max(3, (1.4 / scene.referenceWidthCm) * area.w);
+    const overhang = slatH * 0.35;
+    const cordRise = Math.max(slatH * 1.8, (1.6 / scene.referenceWidthCm) * area.w);
     const x0 = px - overhang;
     const x1 = px + posterW + overhang;
 
