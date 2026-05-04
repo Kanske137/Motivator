@@ -62,20 +62,24 @@ function resolveProductUid(args: {
     };
   }
 
-  // 3) Any variant for the same size
-  const sizeMatch = Object.entries(localForType).find(([k]) => k.startsWith(`${size}|`));
-  if (sizeMatch && sizeMatch[1]?.[orientation]) {
-    return {
-      productUid: sizeMatch[1][orientation],
-      source: "local-size-fallback",
-      detail: `${ptype} ${sizeMatch[0]} ${orientation} (fallback from variant="${variant}")`,
-    };
+  // 3) Size-only fallback ONLY if variant is missing entirely.
+  // If a variant was specified but didn't match exactly, we MUST fail loudly
+  // instead of silently shipping the wrong product (e.g. "Hängare Ek" → flat poster).
+  if (!variant) {
+    const sizeMatch = Object.entries(localForType).find(([k]) => k.startsWith(`${size}|`));
+    if (sizeMatch && sizeMatch[1]?.[orientation]) {
+      return {
+        productUid: sizeMatch[1][orientation],
+        source: "local-size-fallback",
+        detail: `${ptype} ${sizeMatch[0]} ${orientation} (no variant supplied)`,
+      };
+    }
   }
 
   return {
     productUid: null,
     source: "missing",
-    detail: `no SKU for ${ptype} size=${size} variant=${variant} orientation=${orientation}`,
+    detail: `no exact SKU for ${ptype} size=${size} variant=${variant ?? "(none)"} orientation=${orientation}`,
   };
 }
 
