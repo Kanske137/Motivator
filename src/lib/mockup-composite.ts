@@ -1,7 +1,6 @@
 import type { MockupScene } from "./mockup-scenes";
 import { parseSizeCm } from "./mockup-scenes";
 import type { Orientation, ProductType } from "./product-config";
-import oakTextureUrl from "@/assets/textures/wood-oak.jpg";
 
 function loadImage(src: string, crossOrigin = false): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -11,17 +10,6 @@ function loadImage(src: string, crossOrigin = false): Promise<HTMLImageElement> 
     img.onerror = () => reject(new Error(`Bild kunde inte laddas: ${src}`));
     img.src = src;
   });
-}
-
-let oakTextureCache: HTMLImageElement | null = null;
-async function getOakTexture(): Promise<HTMLImageElement> {
-  if (oakTextureCache) return oakTextureCache;
-  oakTextureCache = await loadImage(oakTextureUrl, false);
-  return oakTextureCache;
-}
-
-function isOak(hex: string | null | undefined): boolean {
-  return !!hex && hex.toLowerCase() === "#c8a371";
 }
 
 interface CompositArgs {
@@ -207,21 +195,7 @@ export async function compositeMockup({
   // 6. Ram (endast poster med vald färg)
   if (frameColor && frameWpx > 0 && productType !== "canvas") {
     ctx.save();
-    if (isOak(frameColor)) {
-      try {
-        const tex = await getOakTexture();
-        const pat = ctx.createPattern(tex, "repeat");
-        if (pat) {
-          ctx.fillStyle = pat as CanvasPattern;
-        } else {
-          ctx.fillStyle = frameColor;
-        }
-      } catch {
-        ctx.fillStyle = frameColor;
-      }
-    } else {
-      ctx.fillStyle = frameColor;
-    }
+    ctx.fillStyle = frameColor;
     ctx.fillRect(ox, oy, outerW, outerH);
 
     const grad = ctx.createLinearGradient(ox, oy, ox + outerW, oy + outerH);
@@ -238,32 +212,7 @@ export async function compositeMockup({
   }
 
   // 7. Front: postern själv — RAKT, ingen skew (innehåll ska aldrig förvrängas)
-  // När hängare är vald simulerar vi pappersmarginal: motivet krymps i höjd
-  // så listerna kan klämma fast pappret utan att täcka motivet.
-  const hasHanger = !!hangerColor && productType === "posters";
-  const slatHForMargin = hasHanger ? Math.max(3, (0.6 / scene.referenceWidthCm) * area.w) : 0;
-  const paperMarginY = hasHanger ? slatHForMargin * 1.15 : 0;
-
-  if (hasHanger) {
-    // Vit pappersbakgrund över hela paper-arean
-    ctx.save();
-    ctx.fillStyle = "#fafaf7";
-    ctx.fillRect(px, py, posterW, posterH);
-    ctx.restore();
-
-    const motifH = posterH - paperMarginY * 2;
-    const motifAspect = posterW / posterH;
-    let motifW = motifH * motifAspect;
-    let motifX = px + (posterW - motifW) / 2;
-    if (motifW > posterW) {
-      motifW = posterW;
-      motifX = px;
-    }
-    ctx.drawImage(fg, motifX, py + paperMarginY, motifW, motifH);
-  } else {
-    ctx.drawImage(fg, px, py, posterW, posterH);
-  }
-
+  ctx.drawImage(fg, px, py, posterW, posterH);
 
   // 8. Diskret skugga i hörnen för att binda postern mot väggen
   if (productType !== "canvas") {
@@ -279,30 +228,20 @@ export async function compositeMockup({
     ctx.restore();
   }
 
-  // 9. Posterhängare (trälist topp+botten + snöre i trekant)
+  // 9. Posterhängare (trälist topp+botten + snöre)
   if (hangerColor && productType === "posters") {
     const slatH = Math.max(3, (0.6 / scene.referenceWidthCm) * area.w);
     const overhang = slatH * 0.25;
-    const cordRise = Math.max(slatH * 1.8, (1.8 / scene.referenceWidthCm) * area.w);
+    const cordRise = Math.max(slatH * 1.6, (1.4 / scene.referenceWidthCm) * area.w);
     const x0 = px - overhang;
     const x1 = px + posterW + overhang;
-
-    let oakPattern: CanvasPattern | null = null;
-    if (isOak(hangerColor)) {
-      try {
-        const tex = await getOakTexture();
-        oakPattern = ctx.createPattern(tex, "repeat");
-      } catch {
-        oakPattern = null;
-      }
-    }
 
     const drawSlat = (yTop: number) => {
       ctx.save();
       ctx.shadowColor = "rgba(0,0,0,0.3)";
       ctx.shadowBlur = slatH * 0.5;
       ctx.shadowOffsetY = slatH * 0.2;
-      ctx.fillStyle = oakPattern ?? hangerColor;
+      ctx.fillStyle = hangerColor;
       ctx.fillRect(x0, yTop, x1 - x0, slatH);
       ctx.restore();
       const grad = ctx.createLinearGradient(0, yTop, 0, yTop + slatH);
@@ -320,32 +259,14 @@ export async function compositeMockup({
     drawSlat(py);
     drawSlat(py + posterH - slatH);
 
-    // Snöre i trekant — två räta linjer som möts vid en topp-punkt (spiken)
-    const cordY = py + slatH * 0.5;
-    const apexX = (x0 + x1) / 2;
-    const apexY = py - cordRise;
     ctx.save();
     ctx.beginPath();
-    ctx.moveTo(x0 + slatH * 0.5, cordY);
-    ctx.lineTo(apexX, apexY);
-    ctx.lineTo(x1 - slatH * 0.5, cordY);
+    ctx.moveTo(x0 + slatH * 0.5, py + slatH * 0.5);
+    ctx.quadraticCurveTo((x0 + x1) / 2, py - cordRise, x1 - slatH * 0.5, py + slatH * 0.5);
     ctx.lineWidth = Math.max(1.5, slatH * 0.18);
     ctx.strokeStyle = "rgba(40,30,20,0.78)";
     ctx.lineCap = "round";
-    ctx.lineJoin = "round";
     ctx.stroke();
-
-    // Spik vid spetsen
-    const nailR = Math.max(1.5, slatH * 0.32);
-    ctx.beginPath();
-    ctx.arc(apexX, apexY, nailR, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(70,55,45,0.95)";
-    ctx.fill();
-    // liten highlight på spiken
-    ctx.beginPath();
-    ctx.arc(apexX - nailR * 0.3, apexY - nailR * 0.3, nailR * 0.35, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.fill();
     ctx.restore();
   }
 

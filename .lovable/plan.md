@@ -1,79 +1,66 @@
-## Sammanfattning av dina fyra punkter
+# Posterhängare — 4 nya varianter i poster-flödet
 
-Ja, jag är med på allt. Här är planen — 3 åtgärder + svar/åtgärd på fråga 4.
+## Vad som byggs
+4 nya "hängare"-varianter som beter sig som ramvarianter i poster-flödet, men ritas som **trälist topp + botten + snöre** istället för en omslutande ram. Samma storleksval som befintliga posters. Visas i editor-Preview, mockups och cart-bilder. **Aldrig** bakade i tryckfilen.
 
----
+## Varianter
+- **Hängare Ek** — `#c8a371`
+- **Hängare Valnöt** — `#5a3a26`
+- **Hängare Svart** — `#1a1a1a`
+- **Hängare Vit** — `#f5f5f2`
 
-### 1. Snöret — från båge till trekant
+Pris (tills vidare): samma som motsvarande befintlig ram per storlek (Ek/Valnöt/Svart/Vit). Lätt att uppdatera senare i `pricing.ts`.
 
-Just nu ritas snöret med `quadraticCurveTo` (mjuk båge). Jag byter till två räta linjer som möts i en topp-punkt med en liten spik/prick där, så det ser ut som att snöret hänger på en spik — precis som i Gelato-bilden.
+## Tekniska ändringar
 
-**Fil:** `src/lib/mockup-composite.ts` (rad ~262–270)
+### 1. `src/lib/pricing.ts`
+- Utöka `POSTER_FRAMES` till `["Ingen","Vit","Svart","Ek","Valnöt","Hängare Ek","Hängare Valnöt","Hängare Svart","Hängare Vit"]`.
+- Lägg till de 4 nya nycklarna i varje rad i `POSTER_PRICES` med samma värde som motsv. ram-färg.
 
-Pseudo:
+### 2. Variantigenkänning
+- Ny helper `isHangerVariant(name)` i `src/lib/mockup-scenes.ts`.
+- Ny helper `hangerColorFromVariant(name)` som returnerar hex för listen (samma 4 färger som ramarna).
+- `frameColorFromVariant` returnerar **null** för hängare (så ingen omslutande ram ritas).
+
+### 3. Procedural rendering — `src/lib/template-snapshot.ts`
+Efter befintligt frame-block (rad ~660), lägg till ett `hanger`-block som körs när `input.hangerColor` är satt och `input.hires === false`:
+- Topp-list: rektangel `width = posterW`, `height ≈ 0.6 cm × PX_PER_CM × scale`, placerad strax ovanför postern.
+- Botten-list: identisk, strax under postern.
+- Snöre: tunn båge (quadratic curve) från topp-listens vänsterkant till högerkant, böjd uppåt ~1.5 cm.
+- Färg från `hangerColor`. Vit list får tunn grå kontur för synlighet på vit bakgrund.
+- I print-grenen (rad ~750): tvinga `hangerColor: undefined` precis som `frameColor` — säkerställer att tryckfilen är ren.
+
+### 4. Mockup-composite — `src/lib/mockup-composite.ts`
+- Ta emot `hangerColor` i input, sätt `frameWpx = 0` när hängare används (postern ska ligga direkt mot scenen utan ram-padding).
+- Efter att postern ritats (efter rad ~193), rita topp/botten-list + snöre med samma proportioner som template-snapshot.
+
+### 5. Editor-UI — `src/components/editor/FormatSection.tsx` + `FrameOption.tsx`
+- `FRAME_THUMBS`: lägg till 4 hängar-thumbnails (procedurella SVG:er inline, eller återanvänd ram-thumbnails som färgreferens).
+- Ändra label från "Ram" till "Ram / Hängare" när poster har hängar-varianter aktiva.
+- Grid: byt till `grid-cols-3` när antal varianter > 6 (annars överfullt på mobil).
+
+### 6. Anrops-uppdateringar
+- `MockupGallery.tsx`: läs `hangerColor = hangerColorFromVariant(variant)`, skicka med i composite-anropet.
+- `MapPreview.tsx` / `editor-snapshot.ts`: skicka `hangerColor` till `renderTemplateSnapshot` (preview/cart-pipeline). Print-pipeline rör vi inte — den passerar redan `hires: true` och nollställer overlays.
+
+### 7. Admin (ProductOptionsSection)
+- `allowedFrames` för poster bör nu kunna inkludera de 4 nya namnen — verifiera att admin-listan plockar upp dem från `POSTER_FRAMES` automatiskt (den läser konstanten).
+
+## Vad som INTE ändras
+- `src/lib/print-pipeline.ts` och `template-snapshot` print-grenen — hängare bakas aldrig i tryckfilen.
+- Gelato SKU-map — du fyller på senare. Webhook kommer svara `sku_not_found` för hängar-ordrar tills dess (medvetet val).
+- Storleks-/orienteringslogik — oförändrad.
+
+## ASCII av hur en hängare ser ut i preview
+
 ```text
-moveTo(vänster fästpunkt)
-lineTo(mittpunkt, py - cordRise)   ← spetsen
-lineTo(höger fästpunkt)
-+ liten cirkel på spetsen = spiken
+   ╭──────────────────╮      ← snöre (tunn båge)
+   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓      ← topp-list (färgad)
+   │                  │
+   │     POSTER       │
+   │                  │
+   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓      ← botten-list (färgad)
 ```
 
-Samma uppdatering görs i `HangerIcon`-SVG:n i `FormatSection.tsx` (rad 42) så miniatyren i variantväljaren matchar.
-
----
-
-### 2. Visa hängarval på 13x18 men inaktiverade
-
-Idag filtreras varianter bort helt om priset saknas i `POSTER_PRICES["13x18"]` (där hängare inte finns). Jag ändrar så att hängarvarianterna ALLTID visas i listan när produkttypen är poster, men:
-
-- Om vald storlek saknar pris för varianten → knappen renderas `disabled`, dimmad (~40% opacity), inte klickbar.
-- Prisetiketten ersätts med texten **"Ej för denna storlek"** (liten, muted).
-- Tooltip/hover-hint: *"Hängare finns inte i 13x18 — välj 21x30 eller större."*
-
-**Filer:**
-- `src/components/editor/FormatSection.tsx` — släpp filtreringen för hängar-varianter, skicka `disabled`-prop.
-- `src/components/editor/FrameOption.tsx` — stöd för `disabled` (visuellt + `pointer-events-none`).
-
-Säkerhetsnät: om någon ändå har "Hängare …" som vald variant och byter till 13x18, auto-hopp till `Ingen` (redan halva logiken finns för orientering).
-
----
-
-### 3. Ny ek-textur (för både ram och hängare)
-
-Den uppladdade bilden (`image-13.png`) är en ren ljus ek-träfiber. Jag:
-
-1. Sparar den som `src/assets/textures/wood-oak.jpg` (ramminiatyr finns redan i `frameOak`, men den är annan stil — jag ersätter den med den nya så hela appen blir konsistent).
-2. Ändrar `HANGER_HEX["Hängare Ek"]` från flat `#c8a371` till en bildbaserad fyllning. I canvas-rendern (`mockup-composite.ts` `drawSlat`) byter jag `ctx.fillStyle = hangerColor` mot en `createPattern(oakImage, "repeat")` när varianten är ek. Samma för ramen i `frame`-renderingen.
-3. För variantväljarens svg-ikon (`HangerIcon` / ramminiatyr) använder jag bilden som bakgrund i en `<image>`-tagg inom SVG:n.
-
-Valnöt, svart, vit förblir solida hex-färger som idag (de matchar redan bra). Endast ek byts till textur eftersom det är där flatfärgen sticker ut mest.
-
-**Filer:**
-- `src/assets/textures/wood-oak.jpg` (ny, från upload)
-- `src/lib/mockup-composite.ts` — pattern-fill för ek-slat & ek-ram
-- `src/components/editor/FormatSection.tsx` — `HangerIcon` använder texturen för ek
-- Ev. `src/assets/frames/frame-oak.jpg` ersätts
-
----
-
-### 4. Frågan — täcker hängaren motivet?
-
-Bra observation. Svaret: **i verkligheten ligger trälisten ovanpå pappret men inte ovanpå motivet**, eftersom Gelato trycker hela A4/storleken med vit marginal i topp och botten där listen klämmer fast pappret. Pappret sticker alltså inte ut förbi listen — listen sitter på pappret — men motivet är centrerat innanför listen med ~1–1.5 cm whitespace över/under.
-
-**Vår mockup gör fel idag**: den lägger listen direkt ovanpå motivets över- och nederkant utan whitespace, så det ser ut som att motivet kapas. Åtgärd:
-
-- I `compositeMockup`, när `hangerColor` är satt, krymp motivets effektiva höjd med ~`slatH * 1.2` i topp + botten och rita motivet centrerat innanför. Listerna ritas sedan på papprets ytterkanter (samma position som idag), och en svag papper-vit rektangel (`#fafaf7`) ritas mellan motivets kant och listen så det ser ut som om hela arket är vitt papper med motivet centrerat.
-- Resultat: motivet kapas inte längre, listen ligger på "papper", precis som Gelato-bilden.
-
-**Fil:** `src/lib/mockup-composite.ts` (rad ~72–95 + ~232–260)
-
----
-
-### Teknisk ordning
-
-1. Spara ny ek-textur → `src/assets/textures/wood-oak.jpg`
-2. Uppdatera `mockup-composite.ts`: snöre-trekant, ek-pattern-fill, paper-margin runt motiv vid hängare
-3. Uppdatera `FrameOption.tsx`: `disabled` state
-4. Uppdatera `FormatSection.tsx`: visa alla hängarvarianter alltid, disabled på 13x18, ny `HangerIcon` med trekantsnöre + ek-textur, auto-fallback till "Ingen" om inkompatibel kombination väljs
-
-Inga DB-ändringar, inga prisändringar, inga nya Gelato-UIDs.
+## Resultat
+Kund väljer "Hängare Ek" i ram-väljaren → preview, mockups och cart-bilder visar postern med träliste-hängare i vald färg. Tryckfil = bara motivet. Pris matchar motsvarande ram tills du levererar slutgiltig prislista.

@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useMemo } from "react";
+import { forwardRef, useMemo } from "react";
 import { useEditorStore } from "@/stores/editorStore";
 import { Label } from "@/components/ui/label";
 import {
@@ -11,9 +11,9 @@ import {
 import { deriveTemplateSlug, getEffectiveSizes, type ProductConfig } from "@/lib/product-config";
 import { FrameOption } from "./FrameOption";
 import frameWhite from "@/assets/frames/frame-white.jpg";
+import frameOak from "@/assets/frames/frame-oak.jpg";
 import frameWalnut from "@/assets/frames/frame-walnut.jpg";
 import frameBlack from "@/assets/frames/frame-black.jpg";
-import oakTexture from "@/assets/textures/wood-oak.jpg";
 
 interface Props {
   configs: ProductConfig[];
@@ -23,7 +23,7 @@ interface Props {
 
 const FRAME_THUMBS: Record<string, string> = {
   Vit: frameWhite,
-  Ek: oakTexture,
+  Ek: frameOak,
   Valnöt: frameWalnut,
   Svart: frameBlack,
 };
@@ -35,32 +35,14 @@ const HANGER_HEX: Record<string, string> = {
   "Hängare Vit": "#f5f5f2",
 };
 
-const ALL_HANGER_NAMES = ["Hängare Vit", "Hängare Svart", "Hängare Ek", "Hängare Valnöt"] as const;
-
-const HangerIcon = forwardRef<SVGSVGElement, { color: string; name?: string }>(({ color, name }, ref) => {
+const HangerIcon = forwardRef<SVGSVGElement, { color: string }>(({ color }, ref) => {
   const isWhite = color.toLowerCase() === "#f5f5f2";
-  const isOak = name === "Hängare Ek";
-  const slatFillId = `slat-${(name ?? color).replace(/[^a-z0-9]/gi, "")}`;
   return (
     <svg ref={ref} viewBox="0 0 40 40" className="w-full h-full" preserveAspectRatio="xMidYMid meet">
-      {isOak && (
-        <defs>
-          <pattern id={slatFillId} patternUnits="userSpaceOnUse" width="40" height="40">
-            <image href={oakTexture} x="0" y="0" width="40" height="40" preserveAspectRatio="xMidYMid slice" />
-          </pattern>
-        </defs>
-      )}
-      {/* snöre i trekant */}
-      <path d="M 6 9.5 L 20 2.5 L 34 9.5" fill="none" stroke="#3a2a1a" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
-      {/* spik */}
-      <circle cx="20" cy="2.5" r="1.4" fill="#46372d" />
-      <circle cx="19.5" cy="2.0" r="0.5" fill="rgba(255,255,255,0.7)" />
-      {/* topplist */}
-      <rect x="4" y="9.5" width="32" height="3.2" fill={isOak ? `url(#${slatFillId})` : color} stroke={isWhite ? "rgba(0,0,0,0.25)" : "none"} strokeWidth="0.5" />
-      {/* papper */}
-      <rect x="6" y="12.7" width="28" height="18.5" fill="#f3eee4" stroke="rgba(0,0,0,0.08)" strokeWidth="0.4" />
-      {/* bottenlist */}
-      <rect x="4" y="31.2" width="32" height="3.2" fill={isOak ? `url(#${slatFillId})` : color} stroke={isWhite ? "rgba(0,0,0,0.25)" : "none"} strokeWidth="0.5" />
+      <path d="M 6 8 Q 20 0 34 8" fill="none" stroke="#3a2a1a" strokeWidth="1.2" strokeLinecap="round" />
+      <rect x="4" y="8" width="32" height="3.2" fill={color} stroke={isWhite ? "rgba(0,0,0,0.25)" : "none"} strokeWidth="0.5" />
+      <rect x="6" y="11.2" width="28" height="20" fill="#f3eee4" stroke="rgba(0,0,0,0.08)" strokeWidth="0.4" />
+      <rect x="4" y="31.2" width="32" height="3.2" fill={color} stroke={isWhite ? "rgba(0,0,0,0.25)" : "none"} strokeWidth="0.5" />
     </svg>
   );
 });
@@ -147,37 +129,9 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
     (s) => !allowedSizes || allowedSizes.length === 0 || allowedSizes.includes(s.size),
   );
   const sizeDef = visibleSizes.find((s) => s.size === size) ?? effectiveSizes.find((s) => s.size === size);
-  const isPoster = !isCanvas && !isAluminum && !isAcrylic;
-  const baseVisibleVariants = (sizeDef?.variants ?? []).filter(
+  const visibleVariants = (sizeDef?.variants ?? []).filter(
     (v) => !allowedVariants || allowedVariants.length === 0 || allowedVariants.includes(v.name),
   );
-
-  // För poster: visa ALLA hängarvarianter alltid (även om storleken saknar
-  // pris för dem). Saknade renderas som disabled.
-  type VisibleVariant = { name: string; price: number; disabled?: boolean };
-  const visibleVariants: VisibleVariant[] = (() => {
-    if (!isPoster) return baseVisibleVariants.map((v) => ({ name: v.name, price: v.price }));
-    const out: VisibleVariant[] = baseVisibleVariants.map((v) => ({ name: v.name, price: v.price }));
-    const present = new Set(out.map((v) => v.name));
-    for (const hangerName of ALL_HANGER_NAMES) {
-      if (allowedVariants && allowedVariants.length > 0 && !allowedVariants.includes(hangerName)) continue;
-      if (!present.has(hangerName)) {
-        out.push({ name: hangerName, price: 0, disabled: true });
-      }
-    }
-    return out;
-  })();
-
-  // Auto-fallback: om vald variant är en hängare men nuvarande storlek saknar den.
-  useEffect(() => {
-    if (!variant || !sizeDef) return;
-    if (!variant.startsWith("Hängare")) return;
-    const exists = sizeDef.variants.some((v) => v.name === variant);
-    if (!exists) {
-      const fallback = sizeDef.variants.find((v) => v.name === "Ingen") ?? sizeDef.variants[0];
-      if (fallback) setVariant(fallback.name);
-    }
-  }, [variant, sizeDef, setVariant]);
 
   const currentVariantPrice = sizeDef?.variants.find((v) => v.name === variant)?.price ?? 0;
 
@@ -362,8 +316,6 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
               const diff = v.price - currentVariantPrice;
               const isNoFrame = v.name.toLowerCase() === "ingen";
               const hangerHex = HANGER_HEX[v.name];
-              const isDisabled = !!v.disabled;
-              const priceLabel = isDisabled ? "Ej för denna storlek" : formatDiff(diff);
               return (
                 <FrameOption
                   key={v.name}
@@ -373,16 +325,14 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
                     isCanvas
                       ? <DepthIcon depth={v.name} />
                       : hangerHex
-                        ? <HangerIcon color={hangerHex} name={v.name} />
+                        ? <HangerIcon color={hangerHex} />
                         : isNoFrame
                           ? <NoFrameIcon />
                           : undefined
                   }
                   selected={v.name === variant}
                   onClick={() => setVariant(v.name)}
-                  priceLabel={priceLabel}
-                  disabled={isDisabled}
-                  disabledReason={isDisabled ? `${v.name} finns inte i ${size} — välj en större storlek.` : undefined}
+                  priceLabel={formatDiff(diff)}
                 />
               );
             })}
