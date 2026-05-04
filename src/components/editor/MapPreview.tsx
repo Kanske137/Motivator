@@ -56,8 +56,8 @@ function HangerOverlay({
   motifHeightCm: number;
 }) {
   const isWhite = color.toLowerCase() === "#f5f5f2";
-  // 14 mm = 1.4 cm fysisk listhöjd. Procent av motivets höjd.
-  const slatPct = Math.max(0.8, (1.4 / Math.max(motifHeightCm, 1)) * 100);
+  // 21 mm = 2.1 cm fysisk listhöjd (Gelato-spec). Procent av motivets höjd.
+  const slatPct = Math.max(0.8, (2.1 / Math.max(motifHeightCm, 1)) * 100);
   // Snörets båghöjd i cm, beroende av posterstorlek (men begränsad så det
   // varken blir för platt på stora eller för högt på små postrar).
   const cordRiseCm = Math.min(6, Math.max(2.5, motifHeightCm * 0.06));
@@ -82,13 +82,13 @@ function HangerOverlay({
       style={{ zIndex: 46, overflow: "visible" }}
       aria-hidden
     >
-      {/* Snöre — fäst på topp-listens ÖVERKANT, triangulär form (spik) */}
+      {/* Snöre — fäst på topp-listens ÖVERKANT (= motivets överkant), triangulär form (spik) */}
       <svg
         className="absolute"
         style={{
           left: "-2%",
           width: "104%",
-          top: `calc(-${slatPct}% - ${cordRisePct}%)`,
+          top: `-${cordRisePct}%`,
           height: `${cordRisePct}%`,
           overflow: "visible",
         }}
@@ -105,10 +105,10 @@ function HangerOverlay({
           style={{ strokeWidth: Math.max(1.5, slatPct * 1.2) }}
         />
       </svg>
-      {/* Trälist UTANFÖR motivets topp */}
-      <div style={{ ...slatStyle, top: `-${slatPct}%` }} />
-      {/* Trälist UTANFÖR motivets botten */}
-      <div style={{ ...slatStyle, bottom: `-${slatPct}%` }} />
+      {/* Trälist OVANPÅ motivets topp (täcker översta 21mm av tryckytan) */}
+      <div style={{ ...slatStyle, top: 0 }} />
+      {/* Trälist OVANPÅ motivets botten (täcker nedersta 21mm av tryckytan) */}
+      <div style={{ ...slatStyle, bottom: 0 }} />
     </div>
   );
 }
