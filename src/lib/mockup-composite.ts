@@ -207,7 +207,21 @@ export async function compositeMockup({
   // 6. Ram (endast poster med vald färg)
   if (frameColor && frameWpx > 0 && productType !== "canvas") {
     ctx.save();
-    ctx.fillStyle = frameColor;
+    if (isOak(frameColor)) {
+      try {
+        const tex = await getOakTexture();
+        const pat = ctx.createPattern(tex, "repeat");
+        if (pat) {
+          ctx.fillStyle = pat as CanvasPattern;
+        } else {
+          ctx.fillStyle = frameColor;
+        }
+      } catch {
+        ctx.fillStyle = frameColor;
+      }
+    } else {
+      ctx.fillStyle = frameColor;
+    }
     ctx.fillRect(ox, oy, outerW, outerH);
 
     const grad = ctx.createLinearGradient(ox, oy, ox + outerW, oy + outerH);
@@ -224,7 +238,32 @@ export async function compositeMockup({
   }
 
   // 7. Front: postern själv — RAKT, ingen skew (innehåll ska aldrig förvrängas)
-  ctx.drawImage(fg, px, py, posterW, posterH);
+  // När hängare är vald simulerar vi pappersmarginal: motivet krymps i höjd
+  // så listerna kan klämma fast pappret utan att täcka motivet.
+  const hasHanger = !!hangerColor && productType === "posters";
+  const slatHForMargin = hasHanger ? Math.max(3, (0.6 / scene.referenceWidthCm) * area.w) : 0;
+  const paperMarginY = hasHanger ? slatHForMargin * 1.15 : 0;
+
+  if (hasHanger) {
+    // Vit pappersbakgrund över hela paper-arean
+    ctx.save();
+    ctx.fillStyle = "#fafaf7";
+    ctx.fillRect(px, py, posterW, posterH);
+    ctx.restore();
+
+    const motifH = posterH - paperMarginY * 2;
+    const motifAspect = posterW / posterH;
+    let motifW = motifH * motifAspect;
+    let motifX = px + (posterW - motifW) / 2;
+    if (motifW > posterW) {
+      motifW = posterW;
+      motifX = px;
+    }
+    ctx.drawImage(fg, motifX, py + paperMarginY, motifW, motifH);
+  } else {
+    ctx.drawImage(fg, px, py, posterW, posterH);
+  }
+
 
   // 8. Diskret skugga i hörnen för att binda postern mot väggen
   if (productType !== "canvas") {
