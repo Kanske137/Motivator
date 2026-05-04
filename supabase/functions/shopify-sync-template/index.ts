@@ -392,6 +392,10 @@ async function syncProductOptions(
 
 /** Build a stable key from a variant's selectedOptions (Storlek + Ram/Djup),
  *  independent of order. */
+function normalizeOptionValue(s: string): string {
+  return s.toLowerCase().replace(/\s*cm\s*$/i, "").replace(/\s+/g, " ").trim();
+}
+
 function optionKeyFromSelected(
   selected: { name: string; value: string }[],
   variantOptionName: string,
@@ -399,7 +403,17 @@ function optionKeyFromSelected(
   const size = selected.find((s) => s.name === "Storlek")?.value;
   const variant = selected.find((s) => s.name === variantOptionName)?.value;
   if (!size || !variant) return null;
-  return `${size}|${variant}`;
+  return `${normalizeOptionValue(size)}|${normalizeOptionValue(variant)}`;
+}
+
+/** Fingerprint of an entire variant's selectedOptions, regardless of option
+ *  names — used as a defensive duplicate-detector when option-name matching
+ *  drifts between Lovable and Shopify. */
+function fullComboFingerprint(selected: { name: string; value: string }[]): string {
+  return selected
+    .map((s) => normalizeOptionValue(s.value))
+    .sort()
+    .join("|");
 }
 
 Deno.serve(async (req) => {
