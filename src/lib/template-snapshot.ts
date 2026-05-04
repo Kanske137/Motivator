@@ -737,16 +737,17 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
   }
 
   // Posterhängare — trälist topp+botten + snöre (preview/cart only).
-  // Ritas på en STÖRRE output-canvas så listerna och snöret hamnar UTANFÖR
-  // motivet (matchar editorns mockup). Motivet i `out` blittas in oförändrat.
+  // Listerna ritas OVANPÅ motivets översta och nedersta ~21 mm (matchar
+  // Gelatos faktiska produkt: 21mm trälist monterad på posterns front).
+  // Endast snöret ritas utanför, så vi padar bara uppåt för det.
   if (hangerActive && extraCm === 0) {
     const color = input.hangerColor!;
-    const slatH = Math.max(4, Math.round(0.6 * PX_PER_CM * scale));
-    const slatOverhang = Math.round(slatH * 0.25);
+    const slatH = Math.max(4, Math.round(2.1 * PX_PER_CM * scale));
+    const slatOverhang = Math.round(slatH * 0.12);
     const cordRise = Math.max(slatH * 1.6, Math.round(1.4 * PX_PER_CM * scale));
-    const padTop = Math.round(slatH + cordRise + slatH * 0.3);
-    const padBottom = Math.round(slatH + slatH * 0.3);
-    const padX = slatOverhang + Math.round(slatH * 0.15);
+    const padTop = Math.round(cordRise + slatH * 0.3);
+    const padBottom = 0;
+    const padX = slatOverhang;
 
     const finalW = w + padX * 2;
     const finalH = h + padTop + padBottom;
@@ -794,13 +795,14 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
         );
       }
     };
-    // Topp-list precis OVANFÖR motivet, botten-list precis UNDER motivet.
-    const topSlatY = motifY - slatH;
-    const botSlatY = motifY + motifH;
+    // Topp-list INNANFÖR motivets överkant, botten-list INNANFÖR underkanten.
+    const topSlatY = motifY;
+    const botSlatY = motifY + motifH - slatH;
     drawSlat(topSlatY);
     drawSlat(botSlatY);
 
-    // Snöre — triangulär båge från topp-listens överkant upp till `cordRise`.
+    // Snöre — triangulär båge från topp-listens överkant (= motivets överkant)
+    // upp till `cordRise`. Ritas i padding-zonen ovanför motivet.
     fctx.save();
     fctx.beginPath();
     const cordLeftX = motifX - slatOverhang + slatH * 0.5;
