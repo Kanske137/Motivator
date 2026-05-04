@@ -173,7 +173,7 @@ const GET_PRODUCT_BY_HANDLE = `
       handle
       title
       options { id name position values optionValues { id name } }
-      variants(first: 100) {
+      variants(first: 250) {
         nodes { id sku title selectedOptions { name value } }
       }
     }
