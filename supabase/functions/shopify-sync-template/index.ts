@@ -459,6 +459,12 @@ Deno.serve(async (req) => {
     const allSkipped = groups.flatMap((g) =>
       g.skipped.map((s) => ({ kind: g.kind, ...s })),
     );
+    for (const g of groups) {
+      console.log(
+        `[plan] ${g.kind} planned=${g.variants.length} skipped=${g.skipped.length}` +
+        (g.skipped.length ? ` (${g.skipped.map((s) => `${s.size}/${s.variant}:${s.reason}`).join(", ")})` : ""),
+      );
+    }
 
     if (totalVariants === 0) {
       return new Response(
