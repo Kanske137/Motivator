@@ -279,20 +279,30 @@ export async function compositeMockup({
     ctx.restore();
   }
 
-  // 9. Posterhängare (trälist topp+botten + snöre)
+  // 9. Posterhängare (trälist topp+botten + snöre i trekant)
   if (hangerColor && productType === "posters") {
     const slatH = Math.max(3, (0.6 / scene.referenceWidthCm) * area.w);
     const overhang = slatH * 0.25;
-    const cordRise = Math.max(slatH * 1.6, (1.4 / scene.referenceWidthCm) * area.w);
+    const cordRise = Math.max(slatH * 1.8, (1.8 / scene.referenceWidthCm) * area.w);
     const x0 = px - overhang;
     const x1 = px + posterW + overhang;
+
+    let oakPattern: CanvasPattern | null = null;
+    if (isOak(hangerColor)) {
+      try {
+        const tex = await getOakTexture();
+        oakPattern = ctx.createPattern(tex, "repeat");
+      } catch {
+        oakPattern = null;
+      }
+    }
 
     const drawSlat = (yTop: number) => {
       ctx.save();
       ctx.shadowColor = "rgba(0,0,0,0.3)";
       ctx.shadowBlur = slatH * 0.5;
       ctx.shadowOffsetY = slatH * 0.2;
-      ctx.fillStyle = hangerColor;
+      ctx.fillStyle = oakPattern ?? hangerColor;
       ctx.fillRect(x0, yTop, x1 - x0, slatH);
       ctx.restore();
       const grad = ctx.createLinearGradient(0, yTop, 0, yTop + slatH);
@@ -310,14 +320,32 @@ export async function compositeMockup({
     drawSlat(py);
     drawSlat(py + posterH - slatH);
 
+    // Snöre i trekant — två räta linjer som möts vid en topp-punkt (spiken)
+    const cordY = py + slatH * 0.5;
+    const apexX = (x0 + x1) / 2;
+    const apexY = py - cordRise;
     ctx.save();
     ctx.beginPath();
-    ctx.moveTo(x0 + slatH * 0.5, py + slatH * 0.5);
-    ctx.quadraticCurveTo((x0 + x1) / 2, py - cordRise, x1 - slatH * 0.5, py + slatH * 0.5);
+    ctx.moveTo(x0 + slatH * 0.5, cordY);
+    ctx.lineTo(apexX, apexY);
+    ctx.lineTo(x1 - slatH * 0.5, cordY);
     ctx.lineWidth = Math.max(1.5, slatH * 0.18);
     ctx.strokeStyle = "rgba(40,30,20,0.78)";
     ctx.lineCap = "round";
+    ctx.lineJoin = "round";
     ctx.stroke();
+
+    // Spik vid spetsen
+    const nailR = Math.max(1.5, slatH * 0.32);
+    ctx.beginPath();
+    ctx.arc(apexX, apexY, nailR, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(70,55,45,0.95)";
+    ctx.fill();
+    // liten highlight på spiken
+    ctx.beginPath();
+    ctx.arc(apexX - nailR * 0.3, apexY - nailR * 0.3, nailR * 0.35, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.fill();
     ctx.restore();
   }
 
