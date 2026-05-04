@@ -256,13 +256,21 @@ export async function compositeMockup({
         ctx.strokeRect(x0 + 0.5, yTop + 0.5, x1 - x0 - 1, slatH - 1);
       }
     };
-    drawSlat(py);
-    drawSlat(py + posterH - slatH);
+    // Listerna sitter UTANFÖR motivets topp/botten — så tryckytan visas helt.
+    const topSlatY = py - slatH;
+    const botSlatY = py + posterH;
+    drawSlat(topSlatY);
+    drawSlat(botSlatY);
 
     ctx.save();
     ctx.beginPath();
-    ctx.moveTo(x0 + slatH * 0.5, py + slatH * 0.5);
-    ctx.quadraticCurveTo((x0 + x1) / 2, py - cordRise, x1 - slatH * 0.5, py + slatH * 0.5);
+    ctx.moveTo(x0 + slatH * 0.5, topSlatY + slatH * 0.5);
+    ctx.quadraticCurveTo(
+      (x0 + x1) / 2,
+      topSlatY - cordRise,
+      x1 - slatH * 0.5,
+      topSlatY + slatH * 0.5,
+    );
     ctx.lineWidth = Math.max(1.5, slatH * 0.18);
     ctx.strokeStyle = "rgba(40,30,20,0.78)";
     ctx.lineCap = "round";
