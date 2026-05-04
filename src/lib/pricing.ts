@@ -12,14 +12,15 @@ export const POSTER_FRAMES = [
   "Hängare Vit",
 ] as const;
 
-// Hängare prissätts (tills vidare) som motsvarande träram med samma färg.
+// Hängare har egna priser baserat på Gelatos wall-hanging-produkter.
+// Finns inte i 13x18 (Gelato erbjuder ingen hängare i den storleken).
 export const POSTER_PRICES: Record<string, Record<string, number>> = {
-  "13x18": { Ingen: 199, Vit: 349, Svart: 349, Ek: 369, Valnöt: 369, "Hängare Ek": 369, "Hängare Valnöt": 369, "Hängare Svart": 349, "Hängare Vit": 349 },
-  "21x30": { Ingen: 239, Vit: 399, Svart: 399, Ek: 429, Valnöt: 429, "Hängare Ek": 429, "Hängare Valnöt": 429, "Hängare Svart": 399, "Hängare Vit": 399 },
-  "30x40": { Ingen: 259, Vit: 559, Svart: 559, Ek: 589, Valnöt: 589, "Hängare Ek": 589, "Hängare Valnöt": 589, "Hängare Svart": 559, "Hängare Vit": 559 },
-  "40x50": { Ingen: 289, Vit: 749, Svart: 749, Ek: 789, Valnöt: 789, "Hängare Ek": 789, "Hängare Valnöt": 789, "Hängare Svart": 749, "Hängare Vit": 749 },
-  "50x70": { Ingen: 329, Vit: 919, Svart: 919, Ek: 969, Valnöt: 969, "Hängare Ek": 969, "Hängare Valnöt": 969, "Hängare Svart": 919, "Hängare Vit": 919 },
-  "70x100": { Ingen: 429, Vit: 1249, Svart: 1249, Ek: 1299, Valnöt: 1299, "Hängare Ek": 1299, "Hängare Valnöt": 1299, "Hängare Svart": 1249, "Hängare Vit": 1249 },
+  "13x18": { Ingen: 199, Vit: 349, Svart: 349, Ek: 369, Valnöt: 369 },
+  "21x30": { Ingen: 239, Vit: 399, Svart: 399, Ek: 429, Valnöt: 429, "Hängare Vit": 339, "Hängare Svart": 339, "Hängare Ek": 349, "Hängare Valnöt": 349 },
+  "30x40": { Ingen: 259, Vit: 559, Svart: 559, Ek: 589, Valnöt: 589, "Hängare Vit": 439, "Hängare Svart": 439, "Hängare Ek": 449, "Hängare Valnöt": 449 },
+  "40x50": { Ingen: 289, Vit: 749, Svart: 749, Ek: 789, Valnöt: 789, "Hängare Vit": 489, "Hängare Svart": 489, "Hängare Ek": 499, "Hängare Valnöt": 499 },
+  "50x70": { Ingen: 329, Vit: 919, Svart: 919, Ek: 969, Valnöt: 969, "Hängare Vit": 589, "Hängare Svart": 589, "Hängare Ek": 599, "Hängare Valnöt": 599 },
+  "70x100": { Ingen: 429, Vit: 1249, Svart: 1249, Ek: 1299, Valnöt: 1299, "Hängare Vit": 729, "Hängare Svart": 729, "Hängare Ek": 749, "Hängare Valnöt": 749 },
 };
 
 export const CANVAS_SIZES = ["20x25", "20x30", "30x40", "40x50", "40x60", "50x70", "60x80", "70x100"] as const;
