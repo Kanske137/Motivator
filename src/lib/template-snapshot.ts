@@ -534,6 +534,18 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
 
+  // Hänger-padding beräknas här för att matcha det som hängar-blocket nedan
+  // använder. Resulterande padding tillämpas EFTER att motivet är ritat (se
+  // efter hängar-blocket) genom att blitta hela `out` till en större canvas
+  // och rita listerna + snöret i paddingytan. Påverkar bara cart-preview
+  // för posters med vald hängare — ramvarianter och canvas/aluminium/akryl
+  // är helt orörda.
+  const hangerActive =
+    !input.hires &&
+    !!input.hangerColor &&
+    (input.productType ?? "posters") === "posters" &&
+    (wrapCm + bleedCm) === 0;
+
   // Background — full extended area (wrap inherits bg)
   ctx.fillStyle = input.livePosterBgColor || "#ffffff";
   ctx.fillRect(0, 0, w, h);
