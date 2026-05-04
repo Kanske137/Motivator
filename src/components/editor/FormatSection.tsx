@@ -364,6 +364,8 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
               const diff = v.price - currentVariantPrice;
               const isNoFrame = v.name.toLowerCase() === "ingen";
               const hangerHex = HANGER_HEX[v.name];
+              const isDisabled = !!v.disabled;
+              const priceLabel = isDisabled ? "Ej för denna storlek" : formatDiff(diff);
               return (
                 <FrameOption
                   key={v.name}
@@ -373,14 +375,16 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
                     isCanvas
                       ? <DepthIcon depth={v.name} />
                       : hangerHex
-                        ? <HangerIcon color={hangerHex} />
+                        ? <HangerIcon color={hangerHex} name={v.name} />
                         : isNoFrame
                           ? <NoFrameIcon />
                           : undefined
                   }
                   selected={v.name === variant}
                   onClick={() => setVariant(v.name)}
-                  priceLabel={formatDiff(diff)}
+                  priceLabel={priceLabel}
+                  disabled={isDisabled}
+                  disabledReason={isDisabled ? `${v.name} finns inte i ${size} — välj en större storlek.` : undefined}
                 />
               );
             })}
