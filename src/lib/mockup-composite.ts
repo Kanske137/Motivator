@@ -232,7 +232,10 @@ export async function compositeMockup({
   if (hangerColor && productType === "posters") {
     const slatH = Math.max(3, (1.4 / scene.referenceWidthCm) * area.w);
     const overhang = slatH * 0.35;
-    const cordRise = Math.max(slatH * 1.8, (1.6 / scene.referenceWidthCm) * area.w);
+    // Snörets höjd i cm av posterns verkliga höjd → triangel håller sig
+    // tydlig även på stora postrar (annars ser den platt ut).
+    const cordRiseCm = Math.min(6, Math.max(2.5, realHcm * 0.06));
+    const cordRise = (cordRiseCm / scene.referenceWidthCm) * area.w;
     const x0 = px - overhang;
     const x1 = px + posterW + overhang;
 
@@ -262,18 +265,22 @@ export async function compositeMockup({
     drawSlat(topSlatY);
     drawSlat(botSlatY);
 
+    // Triangulärt snöre (spik), fäst på topp-listens ÖVERKANT nära ytterkanterna.
+    const slatWidth = x1 - x0;
+    const anchorInset = slatWidth * 0.06;
+    const cordLeftX = x0 + anchorInset;
+    const cordRightX = x1 - anchorInset;
+    const cordBaseY = topSlatY; // listens överkant
+    const cordPeakY = topSlatY - cordRise;
     ctx.save();
     ctx.beginPath();
-    ctx.moveTo(x0 + slatH * 0.5, topSlatY + slatH * 0.5);
-    ctx.quadraticCurveTo(
-      (x0 + x1) / 2,
-      topSlatY - cordRise,
-      x1 - slatH * 0.5,
-      topSlatY + slatH * 0.5,
-    );
-    ctx.lineWidth = Math.max(1.5, slatH * 0.18);
-    ctx.strokeStyle = "rgba(40,30,20,0.78)";
+    ctx.moveTo(cordLeftX, cordBaseY);
+    ctx.lineTo((cordLeftX + cordRightX) / 2, cordPeakY);
+    ctx.lineTo(cordRightX, cordBaseY);
+    ctx.lineWidth = Math.max(1.5, slatH * 0.22);
+    ctx.strokeStyle = "rgba(40,30,20,0.82)";
     ctx.lineCap = "round";
+    ctx.lineJoin = "round";
     ctx.stroke();
     ctx.restore();
   }
