@@ -18,6 +18,7 @@ import type { Template, TemplateLayer } from "./template-schema";
 import { getActiveLayoutBlock } from "./template-schema";
 import type { LayerValue } from "@/stores/editorStore";
 import { getActiveMarginInsetsPct, expandRectForRemovedMargin } from "./layer-utils";
+import { paintWoodGrain, woodVariantFromColor } from "./wood-texture";
 
 export interface TemplateSnapshotInput {
   template: Template;
@@ -674,12 +675,21 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
   const hasFrame = !!input.frameColor && input.frameColor.trim() !== "";
   if (!input.hires && extraCm === 0 && hasFrame && (input.frameWidthCm ?? 0) > 0) {
     const fw = Math.max(1, Math.round((input.frameWidthCm ?? 1.2) * PX_PER_CM * scale));
+    const woodVar = woodVariantFromColor(input.frameColor!);
     ctx.save();
-    ctx.fillStyle = input.frameColor!;
-    ctx.fillRect(0, 0, w, fw);
-    ctx.fillRect(0, h - fw, w, fw);
-    ctx.fillRect(0, 0, fw, h);
-    ctx.fillRect(w - fw, 0, fw, h);
+    if (woodVar) {
+      // Procedurell trä-textur per sida — ådringen följer listens långaxel.
+      paintWoodGrain(ctx, 0, 0, w, fw, woodVar, { direction: "horizontal", seed: `frame-top-${w}` });
+      paintWoodGrain(ctx, 0, h - fw, w, fw, woodVar, { direction: "horizontal", seed: `frame-bot-${w}` });
+      paintWoodGrain(ctx, 0, 0, fw, h, woodVar, { direction: "vertical", seed: `frame-left-${h}` });
+      paintWoodGrain(ctx, w - fw, 0, fw, h, woodVar, { direction: "vertical", seed: `frame-right-${h}` });
+    } else {
+      ctx.fillStyle = input.frameColor!;
+      ctx.fillRect(0, 0, w, fw);
+      ctx.fillRect(0, h - fw, w, fw);
+      ctx.fillRect(0, 0, fw, h);
+      ctx.fillRect(w - fw, 0, fw, h);
+    }
     ctx.strokeStyle = "rgba(0,0,0,0.18)";
     ctx.lineWidth = Math.max(1, Math.round(fw * 0.06));
     ctx.strokeRect(fw, fw, w - 2 * fw, h - 2 * fw);
@@ -770,36 +780,44 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
     const motifW = w;
     const motifH = h;
 
-    const drawSlat = (yTop: number) => {
+    const woodVar = woodVariantFromColor(color);
+    const drawSlat = (yTop: number, side: "top" | "bot") => {
+      const sx = motifX - slatOverhang;
+      const sw = motifW + 2 * slatOverhang;
+      // Drop-shadow under listen — separat fyllning så texturen inte suddas.
       fctx.save();
       fctx.shadowColor = "rgba(0,0,0,0.28)";
       fctx.shadowBlur = Math.max(2, slatH * 0.4);
       fctx.shadowOffsetY = Math.max(1, slatH * 0.15);
-      fctx.fillStyle = color;
-      fctx.fillRect(motifX - slatOverhang, yTop, motifW + 2 * slatOverhang, slatH);
+      fctx.fillStyle = woodVar ? "#000" : color;
+      fctx.fillRect(sx, yTop, sw, slatH);
       fctx.restore();
-      const grad = fctx.createLinearGradient(0, yTop, 0, yTop + slatH);
-      grad.addColorStop(0, "rgba(255,255,255,0.22)");
-      grad.addColorStop(0.5, "rgba(255,255,255,0)");
-      grad.addColorStop(1, "rgba(0,0,0,0.28)");
-      fctx.fillStyle = grad;
-      fctx.fillRect(motifX - slatOverhang, yTop, motifW + 2 * slatOverhang, slatH);
-      if (color.toLowerCase() === "#f5f5f2") {
-        fctx.strokeStyle = "rgba(0,0,0,0.2)";
-        fctx.lineWidth = 1;
-        fctx.strokeRect(
-          motifX - slatOverhang + 0.5,
-          yTop + 0.5,
-          motifW + 2 * slatOverhang - 1,
-          slatH - 1,
-        );
+      if (woodVar) {
+        paintWoodGrain(fctx, sx, yTop, sw, slatH, woodVar, {
+          direction: "horizontal",
+          seed: `hanger-${side}-${Math.round(sw)}`,
+        });
+      } else {
+        fctx.fillStyle = color;
+        fctx.fillRect(sx, yTop, sw, slatH);
+        const grad = fctx.createLinearGradient(0, yTop, 0, yTop + slatH);
+        grad.addColorStop(0, "rgba(255,255,255,0.22)");
+        grad.addColorStop(0.5, "rgba(255,255,255,0)");
+        grad.addColorStop(1, "rgba(0,0,0,0.28)");
+        fctx.fillStyle = grad;
+        fctx.fillRect(sx, yTop, sw, slatH);
+        if (color.toLowerCase() === "#f5f5f2") {
+          fctx.strokeStyle = "rgba(0,0,0,0.2)";
+          fctx.lineWidth = 1;
+          fctx.strokeRect(sx + 0.5, yTop + 0.5, sw - 1, slatH - 1);
+        }
       }
     };
     // Topp-list INNANFÖR motivets överkant, botten-list INNANFÖR underkanten.
     const topSlatY = motifY;
     const botSlatY = motifY + motifH - slatH;
-    drawSlat(topSlatY);
-    drawSlat(botSlatY);
+    drawSlat(topSlatY, "top");
+    drawSlat(botSlatY, "bot");
 
     // Snöre — triangulär båge från topp-listens överkant (= motivets överkant)
     // upp till `cordRise`. Ritas i padding-zonen ovanför motivet.
