@@ -99,8 +99,8 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
   const [selected, setSelected] = useState<Record<Kind, boolean>>({
     poster: true,
     canvas: true,
-    aluminum: false,
-    acrylic: false,
+    aluminum: true,
+    acrylic: true,
   });
   const [saving, setSaving] = useState(false);
 
@@ -113,7 +113,7 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
       setTitle("");
       setHandle("");
       setHandleEdited(false);
-      setSelected({ poster: true, canvas: true, aluminum: false, acrylic: false });
+      setSelected({ poster: true, canvas: true, aluminum: true, acrylic: true });
       setSaving(false);
     }
   }, [open]);
