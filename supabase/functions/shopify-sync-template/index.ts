@@ -173,7 +173,7 @@ const GET_PRODUCT_BY_HANDLE = `
       handle
       title
       options { id name position values optionValues { id name } }
-      variants(first: 100) {
+      variants(first: 250) {
         nodes { id sku title selectedOptions { name value } }
       }
     }
@@ -392,6 +392,10 @@ async function syncProductOptions(
 
 /** Build a stable key from a variant's selectedOptions (Storlek + Ram/Djup),
  *  independent of order. */
+function normalizeOptionValue(s: string): string {
+  return s.toLowerCase().replace(/\s*cm\s*$/i, "").replace(/\s+/g, " ").trim();
+}
+
 function optionKeyFromSelected(
   selected: { name: string; value: string }[],
   variantOptionName: string,
@@ -399,7 +403,17 @@ function optionKeyFromSelected(
   const size = selected.find((s) => s.name === "Storlek")?.value;
   const variant = selected.find((s) => s.name === variantOptionName)?.value;
   if (!size || !variant) return null;
-  return `${size}|${variant}`;
+  return `${normalizeOptionValue(size)}|${normalizeOptionValue(variant)}`;
+}
+
+/** Fingerprint of an entire variant's selectedOptions, regardless of option
+ *  names — used as a defensive duplicate-detector when option-name matching
+ *  drifts between Lovable and Shopify. */
+function fullComboFingerprint(selected: { name: string; value: string }[]): string {
+  return selected
+    .map((s) => normalizeOptionValue(s.value))
+    .sort()
+    .join("|");
 }
 
 Deno.serve(async (req) => {
@@ -654,20 +668,39 @@ Deno.serve(async (req) => {
         await syncProductOptions(productId, existing, group);
 
         const existingByKey = new Map<string, typeof existing.variants.nodes[number]>();
+        const existingByCombo = new Map<string, typeof existing.variants.nodes[number]>();
         for (const n of existing.variants.nodes) {
           const k = optionKeyFromSelected(n.selectedOptions, group.variantOptionName);
           if (k) existingByKey.set(k, n);
+          existingByCombo.set(fullComboFingerprint(n.selectedOptions), n);
         }
-        const desiredKeys = new Set(group.variants.map((v) => `${v.size}|${v.variant}`));
+        const desiredKeys = new Set(
+          group.variants.map((v) => `${normalizeOptionValue(v.size)}|${normalizeOptionValue(v.variant)}`),
+        );
 
         const toCreate: VariantInput[] = [];
         const toUpdate: (VariantInput & { id: string })[] = [];
+        const skippedDuplicates: string[] = [];
         for (const v of group.variants) {
-          const key = `${v.size}|${v.variant}`;
-          const ex = existingByKey.get(key);
+          const key = `${normalizeOptionValue(v.size)}|${normalizeOptionValue(v.variant)}`;
           const input = buildVariantInput(group, v);
-          if (ex) toUpdate.push({ ...input, id: ex.id });
-          else toCreate.push(input);
+          const ex = existingByKey.get(key);
+          if (ex) {
+            toUpdate.push({ ...input, id: ex.id });
+            continue;
+          }
+          // Defensive fallback: maybe option-name matching drifted. Look up by
+          // the unordered fingerprint of all option values.
+          const fp = fullComboFingerprint(
+            input.optionValues.map((o) => ({ name: o.optionName, value: o.name })),
+          );
+          const exByCombo = existingByCombo.get(fp);
+          if (exByCombo) {
+            toUpdate.push({ ...input, id: exByCombo.id });
+            skippedDuplicates.push(`${v.size}/${v.variant} (matched by combo fingerprint)`);
+            continue;
+          }
+          toCreate.push(input);
         }
         const toDelete = existing.variants.nodes
           .filter((n) => {
@@ -675,6 +708,22 @@ Deno.serve(async (req) => {
             return k !== null && !desiredKeys.has(k);
           })
           .map((n) => n.id);
+
+        console.log(
+          `[sync] ${group.kind} existing=${existing.variants.nodes.length} ` +
+            `toCreate=${toCreate.length} toUpdate=${toUpdate.length} toDelete=${toDelete.length} ` +
+            `dupRescued=${skippedDuplicates.length}`,
+        );
+        if (toCreate.length) {
+          console.log(
+            `[sync] ${group.kind} toCreate keys:`,
+            toCreate.map((i) => i.optionValues.map((o) => o.name).join("/")).join(", "),
+          );
+        }
+        if (skippedDuplicates.length) {
+          console.log(`[sync] ${group.kind} duplicate-rescued:`, skippedDuplicates.join(", "));
+        }
+
 
         if (toCreate.length) {
           const r = await shopifyAdmin<{

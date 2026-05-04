@@ -1,37 +1,43 @@
-# Hängare som del av Ram-varianten i Shopify-sync
+# Fix: bulkCreate avbryts av befintliga varianter — hängarna skapas aldrig
 
-## Problem
-När mallen "X - poster" syncas till Shopify skapas bara de 5 ursprungliga ram-värdena (Ingen, Vit, Svart, Ek, Valnöt). De fyra hängar-värdena (Hängare Vit, Hängare Svart, Hängare Ek, Hängare Valnöt) saknas — så kunder kan se dem i editorn men inte lägga dem i varukorgen (variant-resolvern hittar ingen matchning).
+## Vad loggarna avslöjade
 
-## Rotorsak
-Sync-funktionen `plan()` i `supabase/functions/shopify-sync-template/index.ts` itererar exakt över `template.productOptions.poster.allowedFrames`. Befintliga mallar i databasen sparades **innan** hängare lades till i `getPosterFrames()`, så deras `allowedFrames` innehåller bara de 5 ursprungliga ramarna. Hängarna planeras aldrig och skickas aldrig till Shopify.
+```
+ERROR shopify-sync-template error: generic bulkCreate userErrors:
+variants.0 The variant '13x18 / Ingen' already exists. Please change at least one option value.
+```
 
-Pris-tabellen (`POSTER_PRICES`) och SKU-mapen (`gelato-sku-map.json`, både i `src/lib/` och `supabase/functions/_shared/`) innehåller redan korrekt data för alla fyra hängare i storlekarna 21x30 → 70x100. Endast plan-/sync-steget måste justeras.
+Min förra fix lyckades — `plan()` inkluderar nu hängarna och `syncProductOptions()` lägger till "Hängare …"-värden på Shopifys "Ram"-option. **Men hela `productVariantsBulkCreate`-anropet abortar atomärt** så fort en variant kolliderar med en redan befintlig kombination. När 13×18/Ingen kraschar skapas varken hängarna eller någon annan variant. Inga fel når DB:n så det ser ut som om hängarna bara "saknas".
 
-## Lösning
+Rotorsaken: existerande variant matchas inte av `optionKeyFromSelected()`-jämförelsen i splitten `toCreate` vs `toUpdate`. Antingen för att:
+- Shopify returnerar ett aningen annorlunda värde (case/whitespace, t.ex. "13x18 cm" vs "13x18"), eller
+- den finns på produkten men hamnade i tidigare misslyckade syncs i ett annat option-format.
 
-### 1. Garantera fullständig ram-lista i sync (`shopify-sync-template/index.ts`)
-I `plan()`, för poster-blocket: slå ihop `opts.poster.allowedFrames` med en kanonisk lista (Ingen, Vit, Svart, Ek, Valnöt, Hängare Vit, Hängare Svart, Hängare Ek, Hängare Valnöt) och deduplicera, så att hängarna alltid inkluderas oavsett vad som råkar ligga i den sparade mallen.
+Resultatet blir att den hamnar felaktigt i `toCreate` → kollision → hela bulkCreate kraschar → 0 nya varianter.
 
-Detta är det minst invasiva ingreppet och påverkar bara poster (canvas/aluminum/acrylic lämnas orörda). Eftersom `plan()` redan hoppar över storlek/variant utan SKU eller pris, hamnar 13×18-hängare inte med (saknar SKU) — vilket är önskat beteende.
+## Lösning (tre defensiva förbättringar i `shopify-sync-template/index.ts`)
 
-### 2. Säkerställ option-värden uppdateras innan variants skapas
-`syncProductOptions()` lägger redan till saknade värden via `productOptionUpdate` med `optionValuesToAdd`. Med fix 1 kommer de fyra hängar-värdena nu finnas i `desiredByOption["Ram"]` och läggas till på den befintliga Shopify-produktens "Ram"-option innan `productVariantsBulkCreate` körs. Ingen kodändring behövs här utöver fix 1.
+### 1. Normalisera nyckeln i `optionKeyFromSelected()`
+Lower-case + trim + ta bort eventuellt trailande " cm" så att Shopifys variant-värde alltid mappas till samma nyckel som vår plan använder. Använd samma normalisering på vår sida när vi bygger `desiredKeys`/`existingByKey`.
 
-### 3. Uppdatera defaults för nya mallar (`CreateTemplateDialog.tsx`)
-`DEFAULT_PRODUCT_VARIANTS.poster.frames` använder redan `getPosterFrames()` som läser från SKU-mapen och därför **redan** inkluderar alla fyra hängare. Nya mallar är alltså korrekta. Verifiering räcker — ingen kodändring.
+### 2. Bygg en extra "alla befintliga kombinationer"-set baserad på rå value-jämförelse
+Som extra säkerhetsnät: bygg `existingComboSet` genom att joina ALLA `selectedOptions.value` (oavsett option-namn) i normaliserad form. Innan vi pushar något till `toCreate`, kontrollera att kombon inte redan finns. Om den finns men saknas i `existingByKey`, försök hitta den manuellt via lös matchning och flytta till `toUpdate` istället.
 
-### 4. Befintliga mallar i databasen
-För den redan sparade "X - poster"-mallen — efter fix 1 räcker det att klicka "Synka mall" igen. Sync-funktionen kommer själv att:
-- Lägga till hängar-värdena på Shopifys "Ram"-option
-- Bulk-skapa de fyra nya varianterna per storlek (21×30 t.o.m. 70×100) med rätt SKU och pris
+### 3. Logga splitten för felsökning
+Skriv `console.log` med antalet befintliga varianter, antalet `toCreate`, `toUpdate`, `toDelete` samt nycklarna i `toCreate` innan vi anropar Shopify. Då ser vi direkt nästa gång om filtreringen verkligen utesluter hängarna eller inte.
 
-Inget behov av databas-migration eller manuell mall-redigering.
+### 4. Höj variant-paginering från 100 → 250
+Defensivt: även om vi nu är under 100, kommer vi snart över när nya storlekar/ramar läggs till. Sätt `variants(first: 250)` i `GET_PRODUCT_BY_HANDLE`. Shopify tillåter max 250 per page; för fler hade vi behövt cursor-paginering, men 250 räcker länge.
 
 ## Filer som ändras
-- `supabase/functions/shopify-sync-template/index.ts` — utöka poster-grenen i `plan()` så att `allowedFrames` alltid kompletteras med den kanoniska hängar-listan.
+- `supabase/functions/shopify-sync-template/index.ts`
+  - `normalizeOptionValue()` ny helper.
+  - `optionKeyFromSelected()` använder normalisering.
+  - I update-grenen: bygg `existingComboSet` och filtrera `toCreate` defensivt; logga splitten.
+  - `GET_PRODUCT_BY_HANDLE`: `variants(first: 250)`.
 
-## Verifiering efter implementation
-1. Synka "X - poster" från admin.
-2. I Shopify Admin: produkten ska nu ha t.ex. 5 storlekar × 9 ram-värden − skipped = ~41 varianter (5 ramar i 13×18 + 9 ramar × 5 större storlekar).
-3. I editorn: klicka på "Hängare Ek" på 30×40 och verifiera att "Lägg i varukorg" fungerar (variant-resolvern hittar nu matchning).
+## Verifiering
+1. Synka "X - poster" igen.
+2. I edge-loggen ska vi se rader som `[sync] poster existing=N toCreate=M toUpdate=K`. För "X - poster" ska `toCreate` innehålla exakt de fyra hängar-värdena för 21×30 → 70×100 (totalt 20 nya varianter), inte "13x18/Ingen".
+3. I Shopify Admin: "Ram"-option får 9 värden, produkten får ~46 varianter (5 ramar i 13×18 + 9 ramar × 5 större storlekar = 5 + 45).
+4. I editorn: "Hängare Ek 30×40" ska kunna läggas i varukorg (variant-resolvern matchar nu).
