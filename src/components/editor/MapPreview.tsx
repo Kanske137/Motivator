@@ -636,6 +636,9 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
             <AcrylicCornerOverlay frontWcm={frontW} frontHcm={frontH} zIndex={45} />
           </div>
         )}
+        {frameColor && borderPx > 0 && woodVariantFromColor(frameColor) && (
+          <WoodFrameOverlay variant={woodVariantFromColor(frameColor)!} borderPx={borderPx} />
+        )}
         {hangerColor && (
           <HangerOverlay color={hangerColor} motifHeightCm={frontH} />
         )}
