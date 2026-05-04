@@ -7,6 +7,7 @@ import { ImageLayerView, LineLayerView, MarginLayerView } from "./layers/StaticL
 import { ShapeLayerView } from "./layers/ShapeLayerView";
 import { lineThicknessPxFromCanvas, effectiveLayerRect, clampLayerRect, getActiveMarginInsetsPct } from "@/lib/layer-utils";
 import { AcrylicCornerOverlay } from "./AcrylicCornerOverlay";
+import { woodCssBackground, woodVariantFromColor } from "@/lib/wood-texture";
 
 interface Props {
   frameColor?: string;
