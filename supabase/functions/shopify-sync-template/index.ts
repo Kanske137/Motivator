@@ -22,13 +22,15 @@ import {
 } from "../_shared/shopify-admin.ts";
 
 // Mirrors src/lib/pricing.ts — used by the live "Personlig Karta" products.
+// Speglar src/lib/pricing.ts. Hängare ingår som extra ramvärden under
+// samma "Ram"-option. 13x18 har inga hängare (Gelato saknar SKU).
 const POSTER_PRICES: Record<string, Record<string, number>> = {
   "13x18": { Ingen: 199, Vit: 349, Svart: 349, Ek: 369, "Valnöt": 369 },
-  "21x30": { Ingen: 239, Vit: 399, Svart: 399, Ek: 429, "Valnöt": 429 },
-  "30x40": { Ingen: 259, Vit: 559, Svart: 559, Ek: 589, "Valnöt": 589 },
-  "40x50": { Ingen: 289, Vit: 749, Svart: 749, Ek: 789, "Valnöt": 789 },
-  "50x70": { Ingen: 329, Vit: 919, Svart: 919, Ek: 969, "Valnöt": 969 },
-  "70x100": { Ingen: 429, Vit: 1249, Svart: 1249, Ek: 1299, "Valnöt": 1299 },
+  "21x30": { Ingen: 239, Vit: 399, Svart: 399, Ek: 429, "Valnöt": 429, "Hängare Vit": 339, "Hängare Svart": 339, "Hängare Ek": 349, "Hängare Valnöt": 349 },
+  "30x40": { Ingen: 259, Vit: 559, Svart: 559, Ek: 589, "Valnöt": 589, "Hängare Vit": 439, "Hängare Svart": 439, "Hängare Ek": 449, "Hängare Valnöt": 449 },
+  "40x50": { Ingen: 289, Vit: 749, Svart: 749, Ek: 789, "Valnöt": 789, "Hängare Vit": 489, "Hängare Svart": 489, "Hängare Ek": 499, "Hängare Valnöt": 499 },
+  "50x70": { Ingen: 329, Vit: 919, Svart: 919, Ek: 969, "Valnöt": 969, "Hängare Vit": 589, "Hängare Svart": 589, "Hängare Ek": 599, "Hängare Valnöt": 599 },
+  "70x100": { Ingen: 429, Vit: 1249, Svart: 1249, Ek: 1299, "Valnöt": 1299, "Hängare Vit": 729, "Hängare Svart": 729, "Hängare Ek": 749, "Hängare Valnöt": 749 },
 };
 
 const CANVAS_PRICES: Record<string, Record<string, number>> = {
@@ -241,7 +243,7 @@ const PRODUCT_VARIANTS_BULK_DELETE = `
 const PUBLICATIONS_QUERY = `
   query publications {
     publications(first: 50) {
-      nodes { id name catalog { ... on AppCatalog { app { handle } } } }
+      nodes { id name }
     }
   }`;
 
@@ -301,15 +303,13 @@ async function getOnlineStorePublicationId(): Promise<string | null> {
   try {
     const r = await shopifyAdmin<{
       publications: {
-        nodes: { id: string; name: string; catalog?: { app?: { handle?: string } } }[];
+        nodes: { id: string; name: string }[];
       };
     }>(PUBLICATIONS_QUERY);
-    // Prefer match by app handle (locale-independent), fall back to name regex.
-    const byHandle = r.publications.nodes.find(
-      (p) => p.catalog?.app?.handle === "online_store",
+    const byName = r.publications.nodes.find((p) =>
+      /online store|nätbutik|webbshop/i.test(p.name),
     );
-    const byName = r.publications.nodes.find((p) => /online store|nätbutik|webbshop/i.test(p.name));
-    const onlineStore = byHandle ?? byName ?? r.publications.nodes[0];
+    const onlineStore = byName ?? r.publications.nodes[0];
     cachedOnlineStorePublicationId = onlineStore?.id ?? null;
     return cachedOnlineStorePublicationId;
   } catch (e) {
@@ -459,6 +459,12 @@ Deno.serve(async (req) => {
     const allSkipped = groups.flatMap((g) =>
       g.skipped.map((s) => ({ kind: g.kind, ...s })),
     );
+    for (const g of groups) {
+      console.log(
+        `[plan] ${g.kind} planned=${g.variants.length} skipped=${g.skipped.length}` +
+        (g.skipped.length ? ` (${g.skipped.map((s) => `${s.size}/${s.variant}:${s.reason}`).join(", ")})` : ""),
+      );
+    }
 
     if (totalVariants === 0) {
       return new Response(
