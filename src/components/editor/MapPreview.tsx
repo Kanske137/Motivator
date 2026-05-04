@@ -66,14 +66,18 @@ function HangerOverlay({
   // Snörets fästpunkter på listen — nära ytterkanterna.
   const anchorXPct = 6; // % från vänsterkant av listen (matchar slatStyle left:-2%)
 
+  const woodVariant = woodVariantFromColor(color);
+  const woodStyle = woodVariant ? woodCssBackground(woodVariant, "horizontal") : null;
   const slatStyle: React.CSSProperties = {
     position: "absolute",
     left: "-2%",
     right: "-2%",
     height: `${slatPct}%`,
-    background: color,
-    backgroundImage:
-      "linear-gradient(to bottom, rgba(255,255,255,0.22), rgba(255,255,255,0) 50%, rgba(0,0,0,0.28))",
+    ...(woodStyle ?? {
+      background: color,
+      backgroundImage:
+        "linear-gradient(to bottom, rgba(255,255,255,0.22), rgba(255,255,255,0) 50%, rgba(0,0,0,0.28))",
+    }),
     boxShadow: "0 4px 8px rgba(0,0,0,0.28)",
     border: isWhite ? "1px solid rgba(0,0,0,0.18)" : undefined,
   };
