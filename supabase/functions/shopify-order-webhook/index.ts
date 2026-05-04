@@ -1,6 +1,7 @@
 // Receives Shopify orders/paid webhooks. Verifies HMAC, then asynchronously
 // generates print files and submits a Gelato order.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import GELATO_SKU_MAP_JSON from "../_shared/gelato-sku-map.json" with { type: "json" };
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
