@@ -230,8 +230,8 @@ export async function compositeMockup({
 
   // 9. Posterhängare (trälist topp+botten + snöre)
   if (hangerColor && productType === "posters") {
-    const slatH = Math.max(3, (1.4 / scene.referenceWidthCm) * area.w);
-    const overhang = slatH * 0.35;
+    const slatH = Math.max(3, (2.1 / scene.referenceWidthCm) * area.w);
+    const overhang = slatH * 0.15;
     // Snörets höjd i cm av posterns verkliga höjd → triangel håller sig
     // tydlig även på stora postrar (annars ser den platt ut).
     const cordRiseCm = Math.min(6, Math.max(2.5, realHcm * 0.06));
@@ -259,9 +259,10 @@ export async function compositeMockup({
         ctx.strokeRect(x0 + 0.5, yTop + 0.5, x1 - x0 - 1, slatH - 1);
       }
     };
-    // Listerna sitter UTANFÖR motivets topp/botten — så tryckytan visas helt.
-    const topSlatY = py - slatH;
-    const botSlatY = py + posterH;
+    // Listerna sitter OVANPÅ motivets översta/nedersta 21 mm — matchar
+    // Gelatos faktiska produkt (21mm trälist på posterns front).
+    const topSlatY = py;
+    const botSlatY = py + posterH - slatH;
     drawSlat(topSlatY);
     drawSlat(botSlatY);
 
