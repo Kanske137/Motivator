@@ -21,6 +21,8 @@ export interface LayoutDef {
 export interface SizeVariant {
   name: string; // ram-namn (Ingen/Vit/Svart/Ek/Valnöt) eller djup (2cm/4cm)
   price: number;
+  /** False = visa varianten i UI men gråa ut (saknar Gelato-SKU för storleken). */
+  available?: boolean;
 }
 
 export interface SizeDef {
@@ -171,12 +173,19 @@ export function getEffectiveSizes(
     variantNames = block.allowedFrames ?? [];
     priceTable = POSTER_PRICES;
   }
+  const isPoster = config.product_type === "posters";
   const out: SizeDef[] = [];
   for (const size of sizes) {
     const variants: SizeVariant[] = [];
     for (const name of variantNames) {
       const price = priceTable[size]?.[name];
-      if (typeof price === "number") variants.push({ name, price });
+      if (typeof price === "number") {
+        variants.push({ name, price, available: true });
+      } else if (isPoster && /^Hängare/i.test(name)) {
+        // Hängare visas alltid i UI, även för storlekar där Gelato saknar SKU
+        // (t.ex. 13×18). Markeras som otillgänglig så UI kan gråa ut.
+        variants.push({ name, price: 0, available: false });
+      }
     }
     if (variants.length > 0) out.push({ size, variants });
   }

@@ -1,4 +1,4 @@
-import { forwardRef, useMemo } from "react";
+import { forwardRef, useEffect, useMemo } from "react";
 import { useEditorStore } from "@/stores/editorStore";
 import { Label } from "@/components/ui/label";
 import {
@@ -134,6 +134,17 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
   );
 
   const currentVariantPrice = sizeDef?.variants.find((v) => v.name === variant)?.price ?? 0;
+
+  // Auto-byte: om vald variant inte längre är tillgänglig (t.ex. valde Hängare
+  // Ek på 21×30 och bytte storlek till 13×18 där hängare saknas) → välj första
+  // tillgängliga variant.
+  useEffect(() => {
+    if (!variant || visibleVariants.length === 0) return;
+    const current = visibleVariants.find((v) => v.name === variant);
+    if (current && current.available !== false) return;
+    const firstAvailable = visibleVariants.find((v) => v.available !== false);
+    if (firstAvailable) setVariant(firstAvailable.name);
+  }, [variant, visibleVariants, setVariant]);
 
   // Build a stable Produkt toggle from the template group (each kind shows up
   // at most once even if multiple configs leak in).
@@ -316,6 +327,7 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
               const diff = v.price - currentVariantPrice;
               const isNoFrame = v.name.toLowerCase() === "ingen";
               const hangerHex = HANGER_HEX[v.name];
+              const isAvailable = v.available !== false;
               return (
                 <FrameOption
                   key={v.name}
@@ -333,6 +345,8 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
                   selected={v.name === variant}
                   onClick={() => setVariant(v.name)}
                   priceLabel={formatDiff(diff)}
+                  disabled={!isAvailable}
+                  unavailableLabel={!isAvailable ? "Ej tillgänglig för denna storlek" : undefined}
                 />
               );
             })}
