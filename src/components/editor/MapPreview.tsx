@@ -82,13 +82,13 @@ function HangerOverlay({
       style={{ zIndex: 46, overflow: "visible" }}
       aria-hidden
     >
-      {/* Snöre — fäst på topp-listens ÖVERKANT, triangulär form (spik) */}
+      {/* Snöre — fäst på topp-listens ÖVERKANT (= motivets överkant), triangulär form (spik) */}
       <svg
         className="absolute"
         style={{
           left: "-2%",
           width: "104%",
-          top: `calc(-${slatPct}% - ${cordRisePct}%)`,
+          top: `-${cordRisePct}%`,
           height: `${cordRisePct}%`,
           overflow: "visible",
         }}
@@ -105,10 +105,10 @@ function HangerOverlay({
           style={{ strokeWidth: Math.max(1.5, slatPct * 1.2) }}
         />
       </svg>
-      {/* Trälist UTANFÖR motivets topp */}
-      <div style={{ ...slatStyle, top: `-${slatPct}%` }} />
-      {/* Trälist UTANFÖR motivets botten */}
-      <div style={{ ...slatStyle, bottom: `-${slatPct}%` }} />
+      {/* Trälist OVANPÅ motivets topp (täcker översta 21mm av tryckytan) */}
+      <div style={{ ...slatStyle, top: 0 }} />
+      {/* Trälist OVANPÅ motivets botten (täcker nedersta 21mm av tryckytan) */}
+      <div style={{ ...slatStyle, bottom: 0 }} />
     </div>
   );
 }
