@@ -14,6 +14,8 @@ import frameWhite from "@/assets/frames/frame-white.jpg";
 import frameOak from "@/assets/frames/frame-oak.jpg";
 import frameWalnut from "@/assets/frames/frame-walnut.jpg";
 import frameBlack from "@/assets/frames/frame-black.jpg";
+import oakTexture from "@/assets/textures/wood-oak.jpg";
+import { useEffect } from "react";
 
 interface Props {
   configs: ProductConfig[];
@@ -23,7 +25,7 @@ interface Props {
 
 const FRAME_THUMBS: Record<string, string> = {
   Vit: frameWhite,
-  Ek: frameOak,
+  Ek: oakTexture,
   Valnöt: frameWalnut,
   Svart: frameBlack,
 };
@@ -35,14 +37,32 @@ const HANGER_HEX: Record<string, string> = {
   "Hängare Vit": "#f5f5f2",
 };
 
-const HangerIcon = forwardRef<SVGSVGElement, { color: string }>(({ color }, ref) => {
+const ALL_HANGER_NAMES = ["Hängare Vit", "Hängare Svart", "Hängare Ek", "Hängare Valnöt"] as const;
+
+const HangerIcon = forwardRef<SVGSVGElement, { color: string; name?: string }>(({ color, name }, ref) => {
   const isWhite = color.toLowerCase() === "#f5f5f2";
+  const isOak = name === "Hängare Ek";
+  const slatFillId = `slat-${(name ?? color).replace(/[^a-z0-9]/gi, "")}`;
   return (
     <svg ref={ref} viewBox="0 0 40 40" className="w-full h-full" preserveAspectRatio="xMidYMid meet">
-      <path d="M 6 8 Q 20 0 34 8" fill="none" stroke="#3a2a1a" strokeWidth="1.2" strokeLinecap="round" />
-      <rect x="4" y="8" width="32" height="3.2" fill={color} stroke={isWhite ? "rgba(0,0,0,0.25)" : "none"} strokeWidth="0.5" />
-      <rect x="6" y="11.2" width="28" height="20" fill="#f3eee4" stroke="rgba(0,0,0,0.08)" strokeWidth="0.4" />
-      <rect x="4" y="31.2" width="32" height="3.2" fill={color} stroke={isWhite ? "rgba(0,0,0,0.25)" : "none"} strokeWidth="0.5" />
+      {isOak && (
+        <defs>
+          <pattern id={slatFillId} patternUnits="userSpaceOnUse" width="40" height="40">
+            <image href={oakTexture} x="0" y="0" width="40" height="40" preserveAspectRatio="xMidYMid slice" />
+          </pattern>
+        </defs>
+      )}
+      {/* snöre i trekant */}
+      <path d="M 6 9.5 L 20 2.5 L 34 9.5" fill="none" stroke="#3a2a1a" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
+      {/* spik */}
+      <circle cx="20" cy="2.5" r="1.4" fill="#46372d" />
+      <circle cx="19.5" cy="2.0" r="0.5" fill="rgba(255,255,255,0.7)" />
+      {/* topplist */}
+      <rect x="4" y="9.5" width="32" height="3.2" fill={isOak ? `url(#${slatFillId})` : color} stroke={isWhite ? "rgba(0,0,0,0.25)" : "none"} strokeWidth="0.5" />
+      {/* papper */}
+      <rect x="6" y="12.7" width="28" height="18.5" fill="#f3eee4" stroke="rgba(0,0,0,0.08)" strokeWidth="0.4" />
+      {/* bottenlist */}
+      <rect x="4" y="31.2" width="32" height="3.2" fill={isOak ? `url(#${slatFillId})` : color} stroke={isWhite ? "rgba(0,0,0,0.25)" : "none"} strokeWidth="0.5" />
     </svg>
   );
 });
