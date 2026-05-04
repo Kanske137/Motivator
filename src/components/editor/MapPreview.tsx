@@ -58,9 +58,12 @@ function HangerOverlay({
   const isWhite = color.toLowerCase() === "#f5f5f2";
   // 14 mm = 1.4 cm fysisk listhöjd. Procent av motivets höjd.
   const slatPct = Math.max(0.8, (1.4 / Math.max(motifHeightCm, 1)) * 100);
-  // Snörets båghöjd: ~3× listen, lite mer för små postrar (där listen är
-  // procentuellt stor) och avtagande för stora.
-  const cordRisePct = slatPct * 1.8;
+  // Snörets båghöjd i cm, beroende av posterstorlek (men begränsad så det
+  // varken blir för platt på stora eller för högt på små postrar).
+  const cordRiseCm = Math.min(6, Math.max(2.5, motifHeightCm * 0.06));
+  const cordRisePct = (cordRiseCm / Math.max(motifHeightCm, 1)) * 100;
+  // Snörets fästpunkter på listen — nära ytterkanterna.
+  const anchorXPct = 6; // % från vänsterkant av listen (matchar slatStyle left:-2%)
 
   const slatStyle: React.CSSProperties = {
     position: "absolute",
@@ -79,27 +82,27 @@ function HangerOverlay({
       style={{ zIndex: 46, overflow: "visible" }}
       aria-hidden
     >
-      {/* Snöre — ovanför topp-listen */}
+      {/* Snöre — fäst på topp-listens ÖVERKANT, triangulär form (spik) */}
       <svg
         className="absolute"
         style={{
-          left: 0,
-          right: 0,
+          left: "-2%",
+          width: "104%",
           top: `calc(-${slatPct}% - ${cordRisePct}%)`,
-          width: "100%",
           height: `${cordRisePct}%`,
           overflow: "visible",
         }}
-        viewBox="0 0 100 14"
+        viewBox="0 0 100 100"
         preserveAspectRatio="none"
       >
         <path
-          d="M 4 13 Q 50 -2 96 13"
+          d={`M ${anchorXPct} 100 L 50 0 L ${100 - anchorXPct} 100`}
           fill="none"
-          stroke="rgba(40,30,20,0.78)"
+          stroke="rgba(40,30,20,0.82)"
           strokeLinecap="round"
+          strokeLinejoin="round"
           vectorEffect="non-scaling-stroke"
-          style={{ strokeWidth: 2 }}
+          style={{ strokeWidth: Math.max(1.5, slatPct * 1.2) }}
         />
       </svg>
       {/* Trälist UTANFÖR motivets topp */}
