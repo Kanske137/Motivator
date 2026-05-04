@@ -675,12 +675,21 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
   const hasFrame = !!input.frameColor && input.frameColor.trim() !== "";
   if (!input.hires && extraCm === 0 && hasFrame && (input.frameWidthCm ?? 0) > 0) {
     const fw = Math.max(1, Math.round((input.frameWidthCm ?? 1.2) * PX_PER_CM * scale));
+    const woodVar = woodVariantFromColor(input.frameColor!);
     ctx.save();
-    ctx.fillStyle = input.frameColor!;
-    ctx.fillRect(0, 0, w, fw);
-    ctx.fillRect(0, h - fw, w, fw);
-    ctx.fillRect(0, 0, fw, h);
-    ctx.fillRect(w - fw, 0, fw, h);
+    if (woodVar) {
+      // Procedurell trä-textur per sida — ådringen följer listens långaxel.
+      paintWoodGrain(ctx, 0, 0, w, fw, woodVar, { direction: "horizontal", seed: `frame-top-${w}` });
+      paintWoodGrain(ctx, 0, h - fw, w, fw, woodVar, { direction: "horizontal", seed: `frame-bot-${w}` });
+      paintWoodGrain(ctx, 0, 0, fw, h, woodVar, { direction: "vertical", seed: `frame-left-${h}` });
+      paintWoodGrain(ctx, w - fw, 0, fw, h, woodVar, { direction: "vertical", seed: `frame-right-${h}` });
+    } else {
+      ctx.fillStyle = input.frameColor!;
+      ctx.fillRect(0, 0, w, fw);
+      ctx.fillRect(0, h - fw, w, fw);
+      ctx.fillRect(0, 0, fw, h);
+      ctx.fillRect(w - fw, 0, fw, h);
+    }
     ctx.strokeStyle = "rgba(0,0,0,0.18)";
     ctx.lineWidth = Math.max(1, Math.round(fw * 0.06));
     ctx.strokeRect(fw, fw, w - 2 * fw, h - 2 * fw);
