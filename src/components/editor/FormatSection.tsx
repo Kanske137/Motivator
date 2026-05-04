@@ -316,6 +316,7 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
               const diff = v.price - currentVariantPrice;
               const isNoFrame = v.name.toLowerCase() === "ingen";
               const hangerHex = HANGER_HEX[v.name];
+              const isAvailable = v.available !== false;
               return (
                 <FrameOption
                   key={v.name}
@@ -333,6 +334,8 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
                   selected={v.name === variant}
                   onClick={() => setVariant(v.name)}
                   priceLabel={formatDiff(diff)}
+                  disabled={!isAvailable}
+                  unavailableLabel={!isAvailable ? "Ej tillgänglig för denna storlek" : undefined}
                 />
               );
             })}
