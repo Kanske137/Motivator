@@ -737,47 +737,87 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
   }
 
   // Posterhängare — trälist topp+botten + snöre (preview/cart only).
-  if (!input.hires && input.hangerColor && extraCm === 0) {
-    const color = input.hangerColor;
+  // Ritas på en STÖRRE output-canvas så listerna och snöret hamnar UTANFÖR
+  // motivet (matchar editorns mockup). Motivet i `out` blittas in oförändrat.
+  if (hangerActive && extraCm === 0) {
+    const color = input.hangerColor!;
     const slatH = Math.max(4, Math.round(0.6 * PX_PER_CM * scale));
-    const slatOverhang = Math.round(slatH * 0.25); // sticker ut lite på sidorna
+    const slatOverhang = Math.round(slatH * 0.25);
     const cordRise = Math.max(slatH * 1.6, Math.round(1.4 * PX_PER_CM * scale));
-    ctx.save();
+    const padTop = Math.round(slatH + cordRise + slatH * 0.3);
+    const padBottom = Math.round(slatH + slatH * 0.3);
+    const padX = slatOverhang + Math.round(slatH * 0.15);
+
+    const finalW = w + padX * 2;
+    const finalH = h + padTop + padBottom;
+    const final = document.createElement("canvas");
+    final.width = finalW;
+    final.height = finalH;
+    const fctx = final.getContext("2d");
+    if (!fctx) throw new Error("2D ctx unavailable (hanger pad)");
+    fctx.imageSmoothingEnabled = true;
+    fctx.imageSmoothingQuality = "high";
+    // Padding-bakgrund — vit för att matcha JPEG-utgång och Shopifys cart.
+    fctx.fillStyle = "#ffffff";
+    fctx.fillRect(0, 0, finalW, finalH);
+    // Blitta motivet (oförändrat) på sin nya position.
+    fctx.drawImage(out, padX, padTop);
+
+    // Hängar-koordinater i `final` — relativt motivets topp/botten.
+    const motifX = padX;
+    const motifY = padTop;
+    const motifW = w;
+    const motifH = h;
+
     const drawSlat = (yTop: number) => {
-      // skugga
-      ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.28)";
-      ctx.shadowBlur = Math.max(2, slatH * 0.4);
-      ctx.shadowOffsetY = Math.max(1, slatH * 0.15);
-      ctx.fillStyle = color;
-      ctx.fillRect(-slatOverhang, yTop, w + 2 * slatOverhang, slatH);
-      ctx.restore();
-      // ljus topp-glans
-      const grad = ctx.createLinearGradient(0, yTop, 0, yTop + slatH);
+      fctx.save();
+      fctx.shadowColor = "rgba(0,0,0,0.28)";
+      fctx.shadowBlur = Math.max(2, slatH * 0.4);
+      fctx.shadowOffsetY = Math.max(1, slatH * 0.15);
+      fctx.fillStyle = color;
+      fctx.fillRect(motifX - slatOverhang, yTop, motifW + 2 * slatOverhang, slatH);
+      fctx.restore();
+      const grad = fctx.createLinearGradient(0, yTop, 0, yTop + slatH);
       grad.addColorStop(0, "rgba(255,255,255,0.22)");
       grad.addColorStop(0.5, "rgba(255,255,255,0)");
       grad.addColorStop(1, "rgba(0,0,0,0.28)");
-      ctx.fillStyle = grad;
-      ctx.fillRect(-slatOverhang, yTop, w + 2 * slatOverhang, slatH);
-      // mörk hairline för vit list så den syns mot vit bakgrund
+      fctx.fillStyle = grad;
+      fctx.fillRect(motifX - slatOverhang, yTop, motifW + 2 * slatOverhang, slatH);
       if (color.toLowerCase() === "#f5f5f2") {
-        ctx.strokeStyle = "rgba(0,0,0,0.2)";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(-slatOverhang + 0.5, yTop + 0.5, w + 2 * slatOverhang - 1, slatH - 1);
+        fctx.strokeStyle = "rgba(0,0,0,0.2)";
+        fctx.lineWidth = 1;
+        fctx.strokeRect(
+          motifX - slatOverhang + 0.5,
+          yTop + 0.5,
+          motifW + 2 * slatOverhang - 1,
+          slatH - 1,
+        );
       }
     };
-    drawSlat(0);
-    drawSlat(h - slatH);
+    // Topp-list precis OVANFÖR motivet, botten-list precis UNDER motivet.
+    const topSlatY = motifY - slatH;
+    const botSlatY = motifY + motifH;
+    drawSlat(topSlatY);
+    drawSlat(botSlatY);
 
-    // Snöre (båge ovanför topp-listen)
-    ctx.beginPath();
-    ctx.moveTo(-slatOverhang + slatH * 0.5, slatH * 0.5);
-    ctx.quadraticCurveTo(w / 2, -cordRise, w + slatOverhang - slatH * 0.5, slatH * 0.5);
-    ctx.lineWidth = Math.max(1.5, slatH * 0.18);
-    ctx.strokeStyle = "rgba(40,30,20,0.78)";
-    ctx.lineCap = "round";
-    ctx.stroke();
-    ctx.restore();
+    // Snöre — triangulär båge från topp-listens överkant upp till `cordRise`.
+    fctx.save();
+    fctx.beginPath();
+    const cordLeftX = motifX - slatOverhang + slatH * 0.5;
+    const cordRightX = motifX + motifW + slatOverhang - slatH * 0.5;
+    fctx.moveTo(cordLeftX, topSlatY);
+    fctx.quadraticCurveTo(motifX + motifW / 2, topSlatY - cordRise, cordRightX, topSlatY);
+    fctx.lineWidth = Math.max(1.5, slatH * 0.18);
+    fctx.strokeStyle = "rgba(40,30,20,0.78)";
+    fctx.lineCap = "round";
+    fctx.stroke();
+    fctx.restore();
+
+    const dataUrl = final.toDataURL("image/jpeg", 0.95);
+    if (!dataUrl || dataUrl.length < 1000) {
+      throw new Error("Empty template snapshot (hanger)");
+    }
+    return dataUrl;
   }
 
   const dataUrl = out.toDataURL("image/jpeg", 0.95);
