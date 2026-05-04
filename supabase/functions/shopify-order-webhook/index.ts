@@ -1,6 +1,7 @@
 // Receives Shopify orders/paid webhooks. Verifies HMAC, then asynchronously
 // generates print files and submits a Gelato order.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import GELATO_SKU_MAP_JSON from "../_shared/gelato-sku-map.json" with { type: "json" };
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,165 +11,12 @@ const corsHeaders = {
 const SHOPIFY_API_VERSION = "2025-07";
 
 // ============================================================================
-// Inline Gelato SKU map (mirror of src/lib/gelato-sku-map.json)
-// Edge functions cannot import from src/, so we embed it here. Keep in sync.
+// Gelato SKU map — single source of truth shared with shopify-sync-template.
 // ============================================================================
-const GELATO_SKU_MAP: Record<string, Record<string, { portrait: string; landscape: string }>> = {
-  posters: {
-    "13x18|Ingen": {
-      portrait: "flat_product_pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_ver",
-      landscape: "flat_product_pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_hor",
-    },
-    "13x18|Svart": {
-      portrait: "frame_and_poster_mounted_product_frs_130x180-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
-      landscape: "frame_and_poster_mounted_product_frs_130x180-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
-    },
-    "13x18|Vit": {
-      portrait: "frame_and_poster_mounted_product_frs_130x180-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
-      landscape: "frame_and_poster_mounted_product_frs_130x180-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
-    },
-    "13x18|Ek": {
-      portrait: "frame_and_poster_mounted_product_frs_130x180-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
-      landscape: "frame_and_poster_mounted_product_frs_130x180-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
-    },
-    "13x18|Valnöt": {
-      portrait: "frame_and_poster_mounted_product_frs_130x180-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
-      landscape: "frame_and_poster_mounted_product_frs_130x180-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_130x180-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
-    },
-    "21x30|Ingen": {
-      portrait: "flat_product_pf_210x300-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_ver",
-      landscape: "flat_product_pf_210x300-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_hor",
-    },
-    "21x30|Svart": {
-      portrait: "frame_and_poster_mounted_product_frs_210x297mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
-      landscape: "frame_and_poster_mounted_product_frs_210x297mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
-    },
-    "21x30|Vit": {
-      portrait: "frame_and_poster_mounted_product_frs_210x297mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
-      landscape: "frame_and_poster_mounted_product_frs_210x297mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
-    },
-    "21x30|Ek": {
-      portrait: "frame_and_poster_mounted_product_frs_210x297mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
-      landscape: "frame_and_poster_mounted_product_frs_210x297mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
-    },
-    "21x30|Valnöt": {
-      portrait: "frame_and_poster_mounted_product_frs_210x297mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
-      landscape: "frame_and_poster_mounted_product_frs_210x297mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
-    },
-    "30x40|Ingen": {
-      portrait: "flat_product_pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_ver",
-      landscape: "flat_product_pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_hor",
-    },
-    "30x40|Svart": {
-      portrait: "frame_and_poster_mounted_product_frs_300x400-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
-      landscape: "frame_and_poster_mounted_product_frs_300x400-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
-    },
-    "30x40|Vit": {
-      portrait: "frame_and_poster_mounted_product_frs_300x400-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
-      landscape: "frame_and_poster_mounted_product_frs_300x400-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
-    },
-    "30x40|Ek": {
-      portrait: "frame_and_poster_mounted_product_frs_300x400-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
-      landscape: "frame_and_poster_mounted_product_frs_300x400-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
-    },
-    "30x40|Valnöt": {
-      portrait: "frame_and_poster_mounted_product_frs_300x400-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
-      landscape: "frame_and_poster_mounted_product_frs_300x400-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
-    },
-    "40x50|Ingen": {
-      portrait: "flat_product_pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_ver",
-      landscape: "flat_product_pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_hor",
-    },
-    "40x50|Svart": {
-      portrait: "frame_and_poster_mounted_product_frs_400x500-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
-      landscape: "frame_and_poster_mounted_product_frs_400x500-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
-    },
-    "40x50|Vit": {
-      portrait: "frame_and_poster_mounted_product_frs_400x500-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
-      landscape: "frame_and_poster_mounted_product_frs_400x500-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
-    },
-    "40x50|Ek": {
-      portrait: "frame_and_poster_mounted_product_frs_400x500-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
-      landscape: "frame_and_poster_mounted_product_frs_400x500-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
-    },
-    "40x50|Valnöt": {
-      portrait: "frame_and_poster_mounted_product_frs_400x500-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
-      landscape: "frame_and_poster_mounted_product_frs_400x500-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
-    },
-    "50x70|Ingen": {
-      portrait: "flat_product_pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_ver",
-      landscape: "flat_product_pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_hor",
-    },
-    "50x70|Svart": {
-      portrait: "frame_and_poster_mounted_product_frs_500x700-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
-      landscape: "frame_and_poster_mounted_product_frs_500x700-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
-    },
-    "50x70|Vit": {
-      portrait: "frame_and_poster_mounted_product_frs_500x700-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
-      landscape: "frame_and_poster_mounted_product_frs_500x700-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
-    },
-    "50x70|Ek": {
-      portrait: "frame_and_poster_mounted_product_frs_500x700-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
-      landscape: "frame_and_poster_mounted_product_frs_500x700-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
-    },
-    "50x70|Valnöt": {
-      portrait: "frame_and_poster_mounted_product_frs_500x700-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
-      landscape: "frame_and_poster_mounted_product_frs_500x700-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
-    },
-    "70x100|Ingen": {
-      portrait: "flat_product_pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_ver",
-      landscape: "flat_product_pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_hor",
-    },
-    "70x100|Svart": {
-      portrait: "frame_and_poster_mounted_product_frs_700x1000-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
-      landscape: "frame_and_poster_mounted_product_frs_700x1000-mm_frc_black_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
-    },
-    "70x100|Vit": {
-      portrait: "frame_and_poster_mounted_product_frs_700x1000-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
-      landscape: "frame_and_poster_mounted_product_frs_700x1000-mm_frc_white_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
-    },
-    "70x100|Ek": {
-      portrait: "frame_and_poster_mounted_product_frs_700x1000-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
-      landscape: "frame_and_poster_mounted_product_frs_700x1000-mm_frc_natural-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
-    },
-    "70x100|Valnöt": {
-      portrait: "frame_and_poster_mounted_product_frs_700x1000-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
-      landscape: "frame_and_poster_mounted_product_frs_700x1000-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor",
-    },
-  },
-  aluminum: {
-    "20x30|Standard": { portrait: "metallic_200x300-mm-8x12-inch_3-mm_4-0_ver", landscape: "metallic_200x300-mm-8x12-inch_3-mm_4-0_hor" },
-    "30x40|Standard": { portrait: "metallic_300x400-mm-12x16-inch_3-mm_4-0_ver", landscape: "metallic_300x400-mm-12x16-inch_3-mm_4-0_hor" },
-    "40x50|Standard": { portrait: "metallic_400x500-mm-16x20-inch_3-mm_4-0_ver", landscape: "metallic_400x500-mm-16x20-inch_3-mm_4-0_hor" },
-    "50x70|Standard": { portrait: "metallic_500x700-mm-20x28-inch_3-mm_4-0_ver", landscape: "metallic_500x700-mm-20x28-inch_3-mm_4-0_hor" },
-    "70x100|Standard": { portrait: "metallic_700x1000-mm-28x40-inch_3-mm_4-0_ver", landscape: "metallic_700x1000-mm-28x40-inch_3-mm_4-0_hor" },
-  },
-  acrylic: {
-    "20x30|Standard": { portrait: "acrylic_200x300-mm-8x12-inch_4-mm_4-0_ver", landscape: "acrylic_200x300-mm-8x12-inch_4-mm_4-0_hor" },
-    "30x40|Standard": { portrait: "acrylic_300x400-mm-12x16-inch_4-mm_4-0_ver", landscape: "acrylic_300x400-mm-12x16-inch_4-mm_4-0_hor" },
-    "40x50|Standard": { portrait: "acrylic_400x500-mm-16x20-inch_4-mm_4-0_ver", landscape: "acrylic_400x500-mm-16x20-inch_4-mm_4-0_hor" },
-    "50x70|Standard": { portrait: "acrylic_500x700-mm-20x28-inch_4-mm_4-0_ver", landscape: "acrylic_500x700-mm-20x28-inch_4-mm_4-0_hor" },
-    "70x100|Standard": { portrait: "acrylic_700x1000-mm-28x40-inch_4-mm_4-0_ver", landscape: "acrylic_700x1000-mm-28x40-inch_4-mm_4-0_hor" },
-  },
-  canvas: {
-    "20x25|2cm": { portrait: "canvas_product_cf_200x250-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver", landscape: "canvas_product_cf_200x250-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor" },
-    "20x25|4cm": { portrait: "canvas_product_cf_200x250-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver", landscape: "canvas_product_cf_200x250-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor" },
-    "20x30|2cm": { portrait: "canvas_product_cf_200x300-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver", landscape: "canvas_product_cf_200x300-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor" },
-    "20x30|4cm": { portrait: "canvas_product_cf_200x300-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver", landscape: "canvas_product_cf_200x300-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor" },
-    "30x40|2cm": { portrait: "canvas_product_cf_300x400-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver", landscape: "canvas_product_cf_300x400-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor" },
-    "30x40|4cm": { portrait: "canvas_product_cf_300x400-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver", landscape: "canvas_product_cf_300x400-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor" },
-    "40x50|2cm": { portrait: "canvas_product_cf_400x500-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver", landscape: "canvas_product_cf_400x500-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor" },
-    "40x50|4cm": { portrait: "canvas_product_cf_400x500-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver", landscape: "canvas_product_cf_400x500-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor" },
-    "40x60|2cm": { portrait: "canvas_product_cf_400x600-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver", landscape: "canvas_product_cf_400x600-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor" },
-    "40x60|4cm": { portrait: "canvas_product_cf_400x600-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver", landscape: "canvas_product_cf_400x600-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor" },
-    "50x70|2cm": { portrait: "canvas_product_cf_500x700-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver", landscape: "canvas_product_cf_500x700-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor" },
-    "50x70|4cm": { portrait: "canvas_product_cf_500x700-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver", landscape: "canvas_product_cf_500x700-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor" },
-    "60x80|2cm": { portrait: "canvas_product_cf_600x800-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver", landscape: "canvas_product_cf_600x800-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor" },
-    "60x80|4cm": { portrait: "canvas_product_cf_600x800-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver", landscape: "canvas_product_cf_600x800-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor" },
-    "70x100|2cm": { portrait: "canvas_product_cf_700x1000-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_ver", landscape: "canvas_product_cf_700x1000-mm_cm_canvas_cfrm_wood-fsc-2-cm_cl_4-0_hor" },
-    "70x100|4cm": { portrait: "canvas_product_cf_700x1000-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_ver", landscape: "canvas_product_cf_700x1000-mm_cm_canvas_cfrm_wood-fsc-4-cm_cl_4-0_hor" },
-  },
-};
+const GELATO_SKU_MAP = GELATO_SKU_MAP_JSON as Record<
+  string,
+  Record<string, { portrait: string; landscape: string }>
+>;
 
 function productTypeFromHandle(handle: string): "posters" | "canvas" | "aluminum" | "acrylic" | null {
   const h = (handle || "").toLowerCase();
@@ -214,20 +62,24 @@ function resolveProductUid(args: {
     };
   }
 
-  // 3) Any variant for the same size
-  const sizeMatch = Object.entries(localForType).find(([k]) => k.startsWith(`${size}|`));
-  if (sizeMatch && sizeMatch[1]?.[orientation]) {
-    return {
-      productUid: sizeMatch[1][orientation],
-      source: "local-size-fallback",
-      detail: `${ptype} ${sizeMatch[0]} ${orientation} (fallback from variant="${variant}")`,
-    };
+  // 3) Size-only fallback ONLY if variant is missing entirely.
+  // If a variant was specified but didn't match exactly, we MUST fail loudly
+  // instead of silently shipping the wrong product (e.g. "Hängare Ek" → flat poster).
+  if (!variant) {
+    const sizeMatch = Object.entries(localForType).find(([k]) => k.startsWith(`${size}|`));
+    if (sizeMatch && sizeMatch[1]?.[orientation]) {
+      return {
+        productUid: sizeMatch[1][orientation],
+        source: "local-size-fallback",
+        detail: `${ptype} ${sizeMatch[0]} ${orientation} (no variant supplied)`,
+      };
+    }
   }
 
   return {
     productUid: null,
     source: "missing",
-    detail: `no SKU for ${ptype} size=${size} variant=${variant} orientation=${orientation}`,
+    detail: `no exact SKU for ${ptype} size=${size} variant=${variant ?? "(none)"} orientation=${orientation}`,
   };
 }
 
