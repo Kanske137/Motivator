@@ -1,66 +1,52 @@
-# Posterhängare — 4 nya varianter i poster-flödet
+# Posterhängare — fyra fixar
 
-## Vad som byggs
-4 nya "hängare"-varianter som beter sig som ramvarianter i poster-flödet, men ritas som **trälist topp + botten + snöre** istället för en omslutande ram. Samma storleksval som befintliga posters. Visas i editor-Preview, mockups och cart-bilder. **Aldrig** bakade i tryckfilen.
+## 1. Visa hängarval även för 13×18 (disabled)
 
-## Varianter
-- **Hängare Ek** — `#c8a371`
-- **Hängare Valnöt** — `#5a3a26`
-- **Hängare Svart** — `#1a1a1a`
-- **Hängare Vit** — `#f5f5f2`
+Idag filtrerar `gelato-catalog.ts` bort hängar-varianter för 13×18 eftersom Gelato saknar UID. Vi ska istället alltid visa de fyra hängar-rutorna i `FormatSection`, men gråa ut dem på storlekar som saknar UID och visa en kort förklaring.
 
-Pris (tills vidare): samma som motsvarande befintlig ram per storlek (Ek/Valnöt/Svart/Vit). Lätt att uppdatera senare i `pricing.ts`.
+**Var:**
+- `src/lib/gelato-catalog.ts` — sluta filtrera bort hängare för 13×18; markera dem som `available: false` istället (eller lägg till motsvarande flagga i variant-objektet).
+- `src/components/editor/FormatSection.tsx` — när variant har `available === false`:
+  - skicka `disabled` till `FrameOption`
+  - visa text "Ej tillgänglig för denna storlek" istället för pris
+- `src/components/editor/FrameOption.tsx` — ta emot `disabled`, sätt `pointer-events:none`, `opacity:0.45`, ingen ring/hover, och ingen `onClick`-utförande.
+- Om aktuell vald variant blir otillgänglig efter storleksbyte: auto-välj första tillgängliga (gör i `editorStore` eller `FormatSection` via en effect).
 
-## Tekniska ändringar
+## 2. Hängaren ska INTE täcka motivets topp/botten
 
-### 1. `src/lib/pricing.ts`
-- Utöka `POSTER_FRAMES` till `["Ingen","Vit","Svart","Ek","Valnöt","Hängare Ek","Hängare Valnöt","Hängare Svart","Hängare Vit"]`.
-- Lägg till de 4 nya nycklarna i varje rad i `POSTER_PRICES` med samma värde som motsv. ram-färg.
+Idag ligger `HangerOverlay` inuti motiv-rutan (`inset:0`) och ritar listerna med `top:0`/`bottom:0` ovanpå tryckytan → täcker motivet. Hängarens trälist ska sitta UTANFÖR posterns kant (uppe ovanför topp, nere under botten), precis som `mockup-composite.ts` gör (`overhang` utanför `posterW/H`).
 
-### 2. Variantigenkänning
-- Ny helper `isHangerVariant(name)` i `src/lib/mockup-scenes.ts`.
-- Ny helper `hangerColorFromVariant(name)` som returnerar hex för listen (samma 4 färger som ramarna).
-- `frameColorFromVariant` returnerar **null** för hängare (så ingen omslutande ram ritas).
+**Var:** `src/components/editor/MapPreview.tsx` → `HangerOverlay`
+- Behåll absolute-wrappern men skapa två separata lister positionerade `top: -slatH` och `bottom: -slatH` (utanför motivet).
+- `MapPreview` måste tillåta att overlayn ritar utanför ramen: vrappern som håller `HangerOverlay` får `overflow: visible` (idag är wrappern redan `inset:0` med `overflow: visible`, men ramens stacking + `border` kan klippa — säkerställ att hängar-elementen ligger som syskon till `frameRef`-innehållet, INTE inuti border-boxen). Enklast: rendera `HangerOverlay` utanpå border via en wrapper-div runt `frameRef` (samma w/h, men med `overflow:visible`), eller ge `frameRef` en yttre container som hänger ut.
 
-### 3. Procedural rendering — `src/lib/template-snapshot.ts`
-Efter befintligt frame-block (rad ~660), lägg till ett `hanger`-block som körs när `input.hangerColor` är satt och `input.hires === false`:
-- Topp-list: rektangel `width = posterW`, `height ≈ 0.6 cm × PX_PER_CM × scale`, placerad strax ovanför postern.
-- Botten-list: identisk, strax under postern.
-- Snöre: tunn båge (quadratic curve) från topp-listens vänsterkant till högerkant, böjd uppåt ~1.5 cm.
-- Färg från `hangerColor`. Vit list får tunn grå kontur för synlighet på vit bakgrund.
-- I print-grenen (rad ~750): tvinga `hangerColor: undefined` precis som `frameColor` — säkerställer att tryckfilen är ren.
+## 3. Hängarens tjocklek ska skalas mot storlek (live editor)
 
-### 4. Mockup-composite — `src/lib/mockup-composite.ts`
-- Ta emot `hangerColor` i input, sätt `frameWpx = 0` när hängare används (postern ska ligga direkt mot scenen utan ram-padding).
-- Efter att postern ritats (efter rad ~193), rita topp/botten-list + snöre med samma proportioner som template-snapshot.
+Gelato ger oss listbredd via UID (`229-mm`, `310-mm`, `410-mm`, `510-mm`, `710-mm`, `1010-mm`) och fast tjocklek `w14×t20-mm` (14 mm fram, 20 mm djup). I praktiken är listens fysiska höjd ~14 mm oberoende av posterstorlek — så på en 70×100 ska den se betydligt smalare ut (relativt sett) än på en 21×30.
 
-### 5. Editor-UI — `src/components/editor/FormatSection.tsx` + `FrameOption.tsx`
-- `FRAME_THUMBS`: lägg till 4 hängar-thumbnails (procedurella SVG:er inline, eller återanvänd ram-thumbnails som färgreferens).
-- Ändra label från "Ram" till "Ram / Hängare" när poster har hängar-varianter aktiva.
-- Grid: byt till `grid-cols-3` när antal varianter > 6 (annars överfullt på mobil).
+**Var:** `src/components/editor/MapPreview.tsx` → `HangerOverlay`
+- Ändra signatur: `HangerOverlay({ color, sizeCm, orientation })`.
+- Räkna ut listhöjd i procent av motivets höjd:
+  `slatPct = (1.4 / motifHeightCm) * 100` (1.4 cm = 14 mm).
+- Använd `slatPct` istället för dagens fasta `3.2%`.
+- Skala även snörets båghöjd, listens overhang och skuggor mot `slatPct` så att proportionerna stämmer.
 
-### 6. Anrops-uppdateringar
-- `MockupGallery.tsx`: läs `hangerColor = hangerColorFromVariant(variant)`, skicka med i composite-anropet.
-- `MapPreview.tsx` / `editor-snapshot.ts`: skicka `hangerColor` till `renderTemplateSnapshot` (preview/cart-pipeline). Print-pipeline rör vi inte — den passerar redan `hires: true` och nollställer overlays.
+## 4. Hängare i mockup-preview ser oproportionerligt smala ut
 
-### 7. Admin (ProductOptionsSection)
-- `allowedFrames` för poster bör nu kunna inkludera de 4 nya namnen — verifiera att admin-listan plockar upp dem från `POSTER_FRAMES` automatiskt (den läser konstanten).
+`mockup-composite.ts` använder `slatH = max(3, (0.6 / referenceWidthCm) * area.w)` → 0.6 cm är fel referens (verklig list är 1.4 cm). Det förklarar varför listerna ser för smala ut.
 
-## Vad som INTE ändras
-- `src/lib/print-pipeline.ts` och `template-snapshot` print-grenen — hängare bakas aldrig i tryckfilen.
-- Gelato SKU-map — du fyller på senare. Webhook kommer svara `sku_not_found` för hängar-ordrar tills dess (medvetet val).
-- Storleks-/orienteringslogik — oförändrad.
+**Var:** `src/lib/mockup-composite.ts`
+- Byt `0.6` → `1.4` i `slatH`-formeln.
+- Justera `cordRise` till t.ex. `max(slatH * 1.4, (1.6 / scene.referenceWidthCm) * area.w)` så bågen håller proportion.
+- Verifiera att `overhang` (just nu `slatH * 0.25`) ser bra ut visuellt — annars höj till `slatH * 0.4`.
 
-## ASCII av hur en hängare ser ut i preview
+## Test efter implementation
 
-```text
-   ╭──────────────────╮      ← snöre (tunn båge)
-   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓      ← topp-list (färgad)
-   │                  │
-   │     POSTER       │
-   │                  │
-   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓      ← botten-list (färgad)
-```
+1. Öppna live-editor 13×18 → hängar-rutorna syns men är gråa, ej klickbara, text "Ej tillgänglig för denna storlek".
+2. Välj 21×30 + Hängare Ek → listen ligger UTANFÖR motivets topp och botten, motivet syns helt.
+3. Växla 21×30 → 70×100 → listens relativa tjocklek minskar tydligt.
+4. Mockup-galleriet (vardagsrum/sovrum/kontor/vägg) → hängar-listen ser tjockare och mer trovärdig ut.
 
-## Resultat
-Kund väljer "Hängare Ek" i ram-väljaren → preview, mockups och cart-bilder visar postern med träliste-hängare i vald färg. Tryckfil = bara motivet. Pris matchar motsvarande ram tills du levererar slutgiltig prislista.
+## Out of scope
+- Inga ändringar i pricing/SKU-map (den är redan klar).
+- Inga ändringar för canvas/aluminium/akryl.
