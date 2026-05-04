@@ -1,52 +1,37 @@
-# Posterhängare — fyra fixar
+# Hängare som del av Ram-varianten i Shopify-sync
 
-## 1. Visa hängarval även för 13×18 (disabled)
+## Problem
+När mallen "X - poster" syncas till Shopify skapas bara de 5 ursprungliga ram-värdena (Ingen, Vit, Svart, Ek, Valnöt). De fyra hängar-värdena (Hängare Vit, Hängare Svart, Hängare Ek, Hängare Valnöt) saknas — så kunder kan se dem i editorn men inte lägga dem i varukorgen (variant-resolvern hittar ingen matchning).
 
-Idag filtrerar `gelato-catalog.ts` bort hängar-varianter för 13×18 eftersom Gelato saknar UID. Vi ska istället alltid visa de fyra hängar-rutorna i `FormatSection`, men gråa ut dem på storlekar som saknar UID och visa en kort förklaring.
+## Rotorsak
+Sync-funktionen `plan()` i `supabase/functions/shopify-sync-template/index.ts` itererar exakt över `template.productOptions.poster.allowedFrames`. Befintliga mallar i databasen sparades **innan** hängare lades till i `getPosterFrames()`, så deras `allowedFrames` innehåller bara de 5 ursprungliga ramarna. Hängarna planeras aldrig och skickas aldrig till Shopify.
 
-**Var:**
-- `src/lib/gelato-catalog.ts` — sluta filtrera bort hängare för 13×18; markera dem som `available: false` istället (eller lägg till motsvarande flagga i variant-objektet).
-- `src/components/editor/FormatSection.tsx` — när variant har `available === false`:
-  - skicka `disabled` till `FrameOption`
-  - visa text "Ej tillgänglig för denna storlek" istället för pris
-- `src/components/editor/FrameOption.tsx` — ta emot `disabled`, sätt `pointer-events:none`, `opacity:0.45`, ingen ring/hover, och ingen `onClick`-utförande.
-- Om aktuell vald variant blir otillgänglig efter storleksbyte: auto-välj första tillgängliga (gör i `editorStore` eller `FormatSection` via en effect).
+Pris-tabellen (`POSTER_PRICES`) och SKU-mapen (`gelato-sku-map.json`, både i `src/lib/` och `supabase/functions/_shared/`) innehåller redan korrekt data för alla fyra hängare i storlekarna 21x30 → 70x100. Endast plan-/sync-steget måste justeras.
 
-## 2. Hängaren ska INTE täcka motivets topp/botten
+## Lösning
 
-Idag ligger `HangerOverlay` inuti motiv-rutan (`inset:0`) och ritar listerna med `top:0`/`bottom:0` ovanpå tryckytan → täcker motivet. Hängarens trälist ska sitta UTANFÖR posterns kant (uppe ovanför topp, nere under botten), precis som `mockup-composite.ts` gör (`overhang` utanför `posterW/H`).
+### 1. Garantera fullständig ram-lista i sync (`shopify-sync-template/index.ts`)
+I `plan()`, för poster-blocket: slå ihop `opts.poster.allowedFrames` med en kanonisk lista (Ingen, Vit, Svart, Ek, Valnöt, Hängare Vit, Hängare Svart, Hängare Ek, Hängare Valnöt) och deduplicera, så att hängarna alltid inkluderas oavsett vad som råkar ligga i den sparade mallen.
 
-**Var:** `src/components/editor/MapPreview.tsx` → `HangerOverlay`
-- Behåll absolute-wrappern men skapa två separata lister positionerade `top: -slatH` och `bottom: -slatH` (utanför motivet).
-- `MapPreview` måste tillåta att overlayn ritar utanför ramen: vrappern som håller `HangerOverlay` får `overflow: visible` (idag är wrappern redan `inset:0` med `overflow: visible`, men ramens stacking + `border` kan klippa — säkerställ att hängar-elementen ligger som syskon till `frameRef`-innehållet, INTE inuti border-boxen). Enklast: rendera `HangerOverlay` utanpå border via en wrapper-div runt `frameRef` (samma w/h, men med `overflow:visible`), eller ge `frameRef` en yttre container som hänger ut.
+Detta är det minst invasiva ingreppet och påverkar bara poster (canvas/aluminum/acrylic lämnas orörda). Eftersom `plan()` redan hoppar över storlek/variant utan SKU eller pris, hamnar 13×18-hängare inte med (saknar SKU) — vilket är önskat beteende.
 
-## 3. Hängarens tjocklek ska skalas mot storlek (live editor)
+### 2. Säkerställ option-värden uppdateras innan variants skapas
+`syncProductOptions()` lägger redan till saknade värden via `productOptionUpdate` med `optionValuesToAdd`. Med fix 1 kommer de fyra hängar-värdena nu finnas i `desiredByOption["Ram"]` och läggas till på den befintliga Shopify-produktens "Ram"-option innan `productVariantsBulkCreate` körs. Ingen kodändring behövs här utöver fix 1.
 
-Gelato ger oss listbredd via UID (`229-mm`, `310-mm`, `410-mm`, `510-mm`, `710-mm`, `1010-mm`) och fast tjocklek `w14×t20-mm` (14 mm fram, 20 mm djup). I praktiken är listens fysiska höjd ~14 mm oberoende av posterstorlek — så på en 70×100 ska den se betydligt smalare ut (relativt sett) än på en 21×30.
+### 3. Uppdatera defaults för nya mallar (`CreateTemplateDialog.tsx`)
+`DEFAULT_PRODUCT_VARIANTS.poster.frames` använder redan `getPosterFrames()` som läser från SKU-mapen och därför **redan** inkluderar alla fyra hängare. Nya mallar är alltså korrekta. Verifiering räcker — ingen kodändring.
 
-**Var:** `src/components/editor/MapPreview.tsx` → `HangerOverlay`
-- Ändra signatur: `HangerOverlay({ color, sizeCm, orientation })`.
-- Räkna ut listhöjd i procent av motivets höjd:
-  `slatPct = (1.4 / motifHeightCm) * 100` (1.4 cm = 14 mm).
-- Använd `slatPct` istället för dagens fasta `3.2%`.
-- Skala även snörets båghöjd, listens overhang och skuggor mot `slatPct` så att proportionerna stämmer.
+### 4. Befintliga mallar i databasen
+För den redan sparade "X - poster"-mallen — efter fix 1 räcker det att klicka "Synka mall" igen. Sync-funktionen kommer själv att:
+- Lägga till hängar-värdena på Shopifys "Ram"-option
+- Bulk-skapa de fyra nya varianterna per storlek (21×30 t.o.m. 70×100) med rätt SKU och pris
 
-## 4. Hängare i mockup-preview ser oproportionerligt smala ut
+Inget behov av databas-migration eller manuell mall-redigering.
 
-`mockup-composite.ts` använder `slatH = max(3, (0.6 / referenceWidthCm) * area.w)` → 0.6 cm är fel referens (verklig list är 1.4 cm). Det förklarar varför listerna ser för smala ut.
+## Filer som ändras
+- `supabase/functions/shopify-sync-template/index.ts` — utöka poster-grenen i `plan()` så att `allowedFrames` alltid kompletteras med den kanoniska hängar-listan.
 
-**Var:** `src/lib/mockup-composite.ts`
-- Byt `0.6` → `1.4` i `slatH`-formeln.
-- Justera `cordRise` till t.ex. `max(slatH * 1.4, (1.6 / scene.referenceWidthCm) * area.w)` så bågen håller proportion.
-- Verifiera att `overhang` (just nu `slatH * 0.25`) ser bra ut visuellt — annars höj till `slatH * 0.4`.
-
-## Test efter implementation
-
-1. Öppna live-editor 13×18 → hängar-rutorna syns men är gråa, ej klickbara, text "Ej tillgänglig för denna storlek".
-2. Välj 21×30 + Hängare Ek → listen ligger UTANFÖR motivets topp och botten, motivet syns helt.
-3. Växla 21×30 → 70×100 → listens relativa tjocklek minskar tydligt.
-4. Mockup-galleriet (vardagsrum/sovrum/kontor/vägg) → hängar-listen ser tjockare och mer trovärdig ut.
-
-## Out of scope
-- Inga ändringar i pricing/SKU-map (den är redan klar).
-- Inga ändringar för canvas/aluminium/akryl.
+## Verifiering efter implementation
+1. Synka "X - poster" från admin.
+2. I Shopify Admin: produkten ska nu ha t.ex. 5 storlekar × 9 ram-värden − skipped = ~41 varianter (5 ramar i 13×18 + 9 ramar × 5 större storlekar).
+3. I editorn: klicka på "Hängare Ek" på 30×40 och verifiera att "Lägg i varukorg" fungerar (variant-resolvern hittar nu matchning).

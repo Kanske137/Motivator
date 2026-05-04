@@ -134,8 +134,22 @@ function plan(template: any): PlannedGroup[] {
   };
 
   if (opts.poster?.enabled) {
+    // Kanonisk ram-lista: säkerställer att alla hängar-värden alltid syncas
+    // till Shopify, även för äldre mallar som sparades innan hängarna lades
+    // till i defaults. plan() hoppar ändå över storlek/variant utan SKU/pris,
+    // så 13×18-hängare (saknar Gelato-SKU) filtreras bort automatiskt.
+    const CANONICAL_POSTER_FRAMES = [
+      "Ingen", "Vit", "Svart", "Ek", "Valnöt",
+      "Hängare Vit", "Hängare Svart", "Hängare Ek", "Hängare Valnöt",
+    ];
+    const savedFrames = opts.poster.allowedFrames ?? [];
+    const seen = new Set<string>();
+    const mergedFrames: string[] = [];
+    for (const f of [...savedFrames, ...CANONICAL_POSTER_FRAMES]) {
+      if (!seen.has(f)) { seen.add(f); mergedFrames.push(f); }
+    }
     groups.push(buildGroup("poster", "Poster", "Ram",
-      opts.poster.allowedSizes ?? [], opts.poster.allowedFrames ?? []));
+      opts.poster.allowedSizes ?? [], mergedFrames));
   }
   if (opts.canvas?.enabled) {
     groups.push(buildGroup("canvas", "Canvas", "Djup",
