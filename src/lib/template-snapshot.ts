@@ -18,6 +18,7 @@ import type { Template, TemplateLayer } from "./template-schema";
 import { getActiveLayoutBlock } from "./template-schema";
 import type { LayerValue } from "@/stores/editorStore";
 import { getActiveMarginInsetsPct, expandRectForRemovedMargin } from "./layer-utils";
+import { paintWoodGrain, woodVariantFromColor } from "./wood-texture";
 
 export interface TemplateSnapshotInput {
   template: Template;
