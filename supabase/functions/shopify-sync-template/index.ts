@@ -303,15 +303,13 @@ async function getOnlineStorePublicationId(): Promise<string | null> {
   try {
     const r = await shopifyAdmin<{
       publications: {
-        nodes: { id: string; name: string; catalog?: { app?: { handle?: string } } }[];
+        nodes: { id: string; name: string }[];
       };
     }>(PUBLICATIONS_QUERY);
-    // Prefer match by app handle (locale-independent), fall back to name regex.
-    const byHandle = r.publications.nodes.find(
-      (p) => p.catalog?.app?.handle === "online_store",
+    const byName = r.publications.nodes.find((p) =>
+      /online store|nätbutik|webbshop/i.test(p.name),
     );
-    const byName = r.publications.nodes.find((p) => /online store|nätbutik|webbshop/i.test(p.name));
-    const onlineStore = byHandle ?? byName ?? r.publications.nodes[0];
+    const onlineStore = byName ?? r.publications.nodes[0];
     cachedOnlineStorePublicationId = onlineStore?.id ?? null;
     return cachedOnlineStorePublicationId;
   } catch (e) {
