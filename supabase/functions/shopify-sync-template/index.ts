@@ -243,7 +243,7 @@ const PRODUCT_VARIANTS_BULK_DELETE = `
 const PUBLICATIONS_QUERY = `
   query publications {
     publications(first: 50) {
-      nodes { id name catalog { ... on AppCatalog { app { handle } } } }
+      nodes { id name }
     }
   }`;
 
