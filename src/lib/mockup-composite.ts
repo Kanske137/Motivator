@@ -1,6 +1,7 @@
 import type { MockupScene } from "./mockup-scenes";
 import { parseSizeCm } from "./mockup-scenes";
 import type { Orientation, ProductType } from "./product-config";
+import oakTextureUrl from "@/assets/textures/wood-oak.jpg";
 
 function loadImage(src: string, crossOrigin = false): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -10,6 +11,17 @@ function loadImage(src: string, crossOrigin = false): Promise<HTMLImageElement> 
     img.onerror = () => reject(new Error(`Bild kunde inte laddas: ${src}`));
     img.src = src;
   });
+}
+
+let oakTextureCache: HTMLImageElement | null = null;
+async function getOakTexture(): Promise<HTMLImageElement> {
+  if (oakTextureCache) return oakTextureCache;
+  oakTextureCache = await loadImage(oakTextureUrl, false);
+  return oakTextureCache;
+}
+
+function isOak(hex: string | null | undefined): boolean {
+  return !!hex && hex.toLowerCase() === "#c8a371";
 }
 
 interface CompositArgs {
