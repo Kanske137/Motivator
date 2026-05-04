@@ -180,6 +180,8 @@ function WoodFrameOverlay({ variant, borderPx }: { variant: "oak" | "walnut"; bo
     </div>
   );
 }
+
+function StarClipDef({ id }: { id: string }) {
   return (
     <svg width="0" height="0" className="absolute pointer-events-none">
       <defs>
