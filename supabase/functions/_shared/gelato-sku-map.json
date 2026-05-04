@@ -40,6 +40,22 @@
       "portrait": "frame_and_poster_mounted_product_frs_210x297mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
       "landscape": "frame_and_poster_mounted_product_frs_210x297mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_a4_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor"
     },
+    "21x30|Hängare Vit": {
+      "portrait": "wall_hanging_poster_229-mm_white_wood_w14xt20-mm_a4-8x12-inch_200-gsm-80lb-uncoated_4-0_ver",
+      "landscape": "wall_hanging_poster_310-mm_white_wood_w14xt20-mm_a4-8x12-inch_200-gsm-80lb-uncoated_4-0_hor"
+    },
+    "21x30|Hängare Svart": {
+      "portrait": "wall_hanging_poster_229-mm_black_wood_w14xt20-mm_a4-8x12-inch_200-gsm-80lb-uncoated_4-0_ver",
+      "landscape": "wall_hanging_poster_310-mm_black_wood_w14xt20-mm_a4-8x12-inch_200-gsm-80lb-uncoated_4-0_hor"
+    },
+    "21x30|Hängare Ek": {
+      "portrait": "wall_hanging_poster_229-mm_natural-wood_wood_w14xt20-mm_a4-8x12-inch_200-gsm-80lb-uncoated_4-0_ver",
+      "landscape": "wall_hanging_poster_310-mm_natural-wood_wood_w14xt20-mm_a4-8x12-inch_200-gsm-80lb-uncoated_4-0_hor"
+    },
+    "21x30|Hängare Valnöt": {
+      "portrait": "wall_hanging_poster_229-mm_dark-wood_wood_w14xt20-mm_a4-8x12-inch_200-gsm-80lb-uncoated_4-0_ver",
+      "landscape": "wall_hanging_poster_310-mm_dark-wood_wood_w14xt20-mm_a4-8x12-inch_200-gsm-80lb-uncoated_4-0_hor"
+    },
     "30x40|Ingen": {
       "portrait": "flat_product_pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_ver",
       "landscape": "flat_product_pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_hor"
@@ -59,6 +75,22 @@
     "30x40|Valnöt": {
       "portrait": "frame_and_poster_mounted_product_frs_300x400-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
       "landscape": "frame_and_poster_mounted_product_frs_300x400-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_300x400-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor"
+    },
+    "30x40|Hängare Vit": {
+      "portrait": "wall_hanging_poster_310-mm_white_wood_w14xt20-mm_300x400-mm-12x16-inch_200-gsm-80lb-uncoated_4-0_ver",
+      "landscape": "wall_hanging_poster_410-mm_white_wood_w14xt20-mm_300x400-mm-12x16-inch_200-gsm-80lb-uncoated_4-0_hor"
+    },
+    "30x40|Hängare Svart": {
+      "portrait": "wall_hanging_poster_310-mm_black_wood_w14xt20-mm_300x400-mm-12x16-inch_200-gsm-80lb-uncoated_4-0_ver",
+      "landscape": "wall_hanging_poster_410-mm_black_wood_w14xt20-mm_300x400-mm-12x16-inch_200-gsm-80lb-uncoated_4-0_hor"
+    },
+    "30x40|Hängare Ek": {
+      "portrait": "wall_hanging_poster_310-mm_natural-wood_wood_w14xt20-mm_300x400-mm-12x16-inch_200-gsm-80lb-uncoated_4-0_ver",
+      "landscape": "wall_hanging_poster_410-mm_natural-wood_wood_w14xt20-mm_300x400-mm-12x16-inch_200-gsm-80lb-uncoated_4-0_hor"
+    },
+    "30x40|Hängare Valnöt": {
+      "portrait": "wall_hanging_poster_310-mm_dark-wood_wood_w14xt20-mm_300x400-mm-12x16-inch_200-gsm-80lb-uncoated_4-0_ver",
+      "landscape": "wall_hanging_poster_410-mm_dark-wood_wood_w14xt20-mm_300x400-mm-12x16-inch_200-gsm-80lb-uncoated_4-0_hor"
     },
     "40x50|Ingen": {
       "portrait": "flat_product_pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_ver",
@@ -80,6 +112,22 @@
       "portrait": "frame_and_poster_mounted_product_frs_400x500-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
       "landscape": "frame_and_poster_mounted_product_frs_400x500-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_400x500-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor"
     },
+    "40x50|Hängare Vit": {
+      "portrait": "wall_hanging_poster_410-mm_white_wood_w14xt20-mm_400x500-mm-16x20-inch_200-gsm-80lb-uncoated_4-0_ver",
+      "landscape": "wall_hanging_poster_510-mm_white_wood_w14xt20-mm_400x500-mm-16x20-inch_200-gsm-80lb-uncoated_4-0_hor"
+    },
+    "40x50|Hängare Svart": {
+      "portrait": "wall_hanging_poster_410-mm_black_wood_w14xt20-mm_400x500-mm-16x20-inch_200-gsm-80lb-uncoated_4-0_ver",
+      "landscape": "wall_hanging_poster_510-mm_black_wood_w14xt20-mm_400x500-mm-16x20-inch_200-gsm-80lb-uncoated_4-0_hor"
+    },
+    "40x50|Hängare Ek": {
+      "portrait": "wall_hanging_poster_410-mm_natural-wood_wood_w14xt20-mm_400x500-mm-16x20-inch_200-gsm-80lb-uncoated_4-0_ver",
+      "landscape": "wall_hanging_poster_510-mm_natural-wood_wood_w14xt20-mm_400x500-mm-16x20-inch_200-gsm-80lb-uncoated_4-0_hor"
+    },
+    "40x50|Hängare Valnöt": {
+      "portrait": "wall_hanging_poster_410-mm_dark-wood_wood_w14xt20-mm_400x500-mm-16x20-inch_200-gsm-80lb-uncoated_4-0_ver",
+      "landscape": "wall_hanging_poster_510-mm_dark-wood_wood_w14xt20-mm_400x500-mm-16x20-inch_200-gsm-80lb-uncoated_4-0_hor"
+    },
     "50x70|Ingen": {
       "portrait": "flat_product_pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_ver",
       "landscape": "flat_product_pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_hor"
@@ -100,6 +148,22 @@
       "portrait": "frame_and_poster_mounted_product_frs_500x700-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
       "landscape": "frame_and_poster_mounted_product_frs_500x700-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_500x700-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor"
     },
+    "50x70|Hängare Vit": {
+      "portrait": "wall_hanging_poster_510-mm_white_wood_w14xt20-mm_500x700-mm-20x28-inch_200-gsm-80lb-uncoated_4-0_ver",
+      "landscape": "wall_hanging_poster_710-mm_white_wood_w14xt20-mm_500x700-mm-20x28-inch_200-gsm-80lb-uncoated_4-0_hor"
+    },
+    "50x70|Hängare Svart": {
+      "portrait": "wall_hanging_poster_510-mm_black_wood_w14xt20-mm_500x700-mm-20x28-inch_200-gsm-80lb-uncoated_4-0_ver",
+      "landscape": "wall_hanging_poster_710-mm_black_wood_w14xt20-mm_500x700-mm-20x28-inch_200-gsm-80lb-uncoated_4-0_hor"
+    },
+    "50x70|Hängare Ek": {
+      "portrait": "wall_hanging_poster_510-mm_natural-wood_wood_w14xt20-mm_500x700-mm-20x28-inch_200-gsm-80lb-uncoated_4-0_ver",
+      "landscape": "wall_hanging_poster_710-mm_natural-wood_wood_w14xt20-mm_500x700-mm-20x28-inch_200-gsm-80lb-uncoated_4-0_hor"
+    },
+    "50x70|Hängare Valnöt": {
+      "portrait": "wall_hanging_poster_510-mm_dark-wood_wood_w14xt20-mm_500x700-mm-20x28-inch_200-gsm-80lb-uncoated_4-0_ver",
+      "landscape": "wall_hanging_poster_710-mm_dark-wood_wood_w14xt20-mm_500x700-mm-20x28-inch_200-gsm-80lb-uncoated_4-0_hor"
+    },
     "70x100|Ingen": {
       "portrait": "flat_product_pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_ver",
       "landscape": "flat_product_pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_sft_none_set_none_hor"
@@ -119,6 +183,22 @@
     "70x100|Valnöt": {
       "portrait": "frame_and_poster_mounted_product_frs_700x1000-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_ver",
       "landscape": "frame_and_poster_mounted_product_frs_700x1000-mm_frc_dark-wood_frm_wood_frp_w12xt22-mm_gt_plexiglass__pf_700x1000-mm_pt_200-gsm-uncoated_cl_4-0_ct_none_prt_none_hor"
+    },
+    "70x100|Hängare Vit": {
+      "portrait": "wall_hanging_poster_710-mm_white_wood_w14xt20-mm_700x1000-mm-28x40-inch_200-gsm-80lb-uncoated_4-0_ver",
+      "landscape": "wall_hanging_poster_1010-mm_white_wood_w14xt20-mm_700x1000-mm-28x40-inch_200-gsm-80lb-uncoated_4-0_hor"
+    },
+    "70x100|Hängare Svart": {
+      "portrait": "wall_hanging_poster_710-mm_black_wood_w14xt20-mm_700x1000-mm-28x40-inch_200-gsm-80lb-uncoated_4-0_ver",
+      "landscape": "wall_hanging_poster_1010-mm_black_wood_w14xt20-mm_700x1000-mm-28x40-inch_200-gsm-80lb-uncoated_4-0_hor"
+    },
+    "70x100|Hängare Ek": {
+      "portrait": "wall_hanging_poster_710-mm_natural-wood_wood_w14xt20-mm_700x1000-mm-28x40-inch_200-gsm-80lb-uncoated_4-0_ver",
+      "landscape": "wall_hanging_poster_1010-mm_natural-wood_wood_w14xt20-mm_700x1000-mm-28x40-inch_200-gsm-80lb-uncoated_4-0_hor"
+    },
+    "70x100|Hängare Valnöt": {
+      "portrait": "wall_hanging_poster_710-mm_dark-wood_wood_w14xt20-mm_700x1000-mm-28x40-inch_200-gsm-80lb-uncoated_4-0_ver",
+      "landscape": "wall_hanging_poster_1010-mm_dark-wood_wood_w14xt20-mm_700x1000-mm-28x40-inch_200-gsm-80lb-uncoated_4-0_hor"
     }
   },
   "canvas": {
