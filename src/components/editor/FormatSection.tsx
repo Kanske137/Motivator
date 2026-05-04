@@ -1,4 +1,4 @@
-import { forwardRef, useMemo } from "react";
+import { forwardRef, useEffect, useMemo } from "react";
 import { useEditorStore } from "@/stores/editorStore";
 import { Label } from "@/components/ui/label";
 import {
@@ -11,11 +11,9 @@ import {
 import { deriveTemplateSlug, getEffectiveSizes, type ProductConfig } from "@/lib/product-config";
 import { FrameOption } from "./FrameOption";
 import frameWhite from "@/assets/frames/frame-white.jpg";
-import frameOak from "@/assets/frames/frame-oak.jpg";
 import frameWalnut from "@/assets/frames/frame-walnut.jpg";
 import frameBlack from "@/assets/frames/frame-black.jpg";
 import oakTexture from "@/assets/textures/wood-oak.jpg";
-import { useEffect } from "react";
 
 interface Props {
   configs: ProductConfig[];
