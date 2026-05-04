@@ -56,8 +56,8 @@ function HangerOverlay({
   motifHeightCm: number;
 }) {
   const isWhite = color.toLowerCase() === "#f5f5f2";
-  // 14 mm = 1.4 cm fysisk listhöjd. Procent av motivets höjd.
-  const slatPct = Math.max(0.8, (1.4 / Math.max(motifHeightCm, 1)) * 100);
+  // 21 mm = 2.1 cm fysisk listhöjd (Gelato-spec). Procent av motivets höjd.
+  const slatPct = Math.max(0.8, (2.1 / Math.max(motifHeightCm, 1)) * 100);
   // Snörets båghöjd i cm, beroende av posterstorlek (men begränsad så det
   // varken blir för platt på stora eller för högt på små postrar).
   const cordRiseCm = Math.min(6, Math.max(2.5, motifHeightCm * 0.06));

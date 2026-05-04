@@ -1,26 +1,51 @@
-Jag hittade en tydlig miss i synk-funktionen: databasen och editorn har hängarna sparade, och SKU-mappen har Gelato-SKU:er för hängare, men `shopify-sync-template` har fortfarande en lokal poster-pristabell utan hängarpriser. Därför filtreras alla hängare bort i `plan()` som `no price`, vilket matchar loggen exakt: `poster existing=30 toCreate=0 toUpdate=30`. 30 = 6 storlekar × 5 vanliga ramval, alltså inga hängare planeras alls.
 
-Plan:
+## Bakgrund
 
-1. Uppdatera poster-priserna i `supabase/functions/shopify-sync-template/index.ts`
-   - Spegla `src/lib/pricing.ts` så hängarna får sina definierade priser:
-     - 21x30: Hängare Vit/Svart 339, Ek/Valnöt 349
-     - 30x40: Hängare Vit/Svart 439, Ek/Valnöt 449
-     - 40x50: Hängare Vit/Svart 489, Ek/Valnöt 499
-     - 50x70: Hängare Vit/Svart 589, Ek/Valnöt 599
-     - 70x100: Hängare Vit/Svart 729, Ek/Valnöt 749
-   - Lämna 13x18 utan hängare, eftersom Gelato-SKU saknas där.
+Gelatos posterhängare (per [supportartikel](https://support.gelato.com/en/articles/8996216)) består av två trälister à **21 mm breda × 9 mm tjocka**, som monteras **direkt på posterns fram-/baksida** vid topp och botten. Listerna **täcker alltså 21 mm av tryckytan** — de sitter inte utanför posterns kant.
 
-2. Behåll hängare som värden under samma Shopify-option `Ram`
-   - Det ska alltså bli varianter som `30x40 / Hängare Ek`.
-   - Ingen separat `Ingen ram`-definition skapas för hängare; `Ingen` fortsätter bara vara ett vanligt ramvärde i grundflödet för poster.
+Vår nuvarande implementation ritar listerna *utanför* motivets ramar i alla tre previews, vilket inte stämmer med Gelatos faktiska preview/produkt.
 
-3. Förbättra felsökningsloggningen lite
-   - Logga `plannedVariants` och antal `skipped`, så det blir uppenbart om hängare filtreras bort igen p.g.a. pris eller SKU.
-   - Efter fixen bör nästa postersynk ungefär visa `existing=30 toCreate=20 toUpdate=30`, inte `toCreate=0`.
+Tryckfilen (`renderHiresTemplateSnapshotSafe`) sätter redan `hangerColor: undefined` (template-snapshot.ts rad 849), så **print-pipen är redan korrekt** och rörs inte.
 
-4. Rensa den separata publiceringsvarningen i samma funktion
-   - Loggarna visar också en Shopify GraphQL-varning: `Field 'app' doesn't exist on type 'AppCatalog'` i publications-queryn.
-   - Den verkar inte vara orsaken till hängarvarianterna, men den gör att publiceringssteget returnerar `false`. Jag tar bort det inkompatibla fältet och matchar Online Store via namn istället, så loggarna blir rena och produkten kan publiceras korrekt.
+## Vad som ändras
 
-Efter detta behöver du synka `vad-poster` igen. Då ska hängaralternativen skapas som riktiga Shopify-varianter med storlek, pris och Gelato-SKU.
+Tre filer, alla på samma princip: list-rektangeln flyttas från *utanför* motivet till *innanför* motivets topp- respektive botten-kant. Listhöjden räknas från Gelatos faktiska 21 mm (inte 14 mm som idag).
+
+### 1. `src/components/editor/MapPreview.tsx` — `HangerOverlay`
+
+- Ändra `slatPct`-formel: `2.1 / motifHeightCm * 100` (21 mm istället för nuvarande 14 mm).
+- Topplistens `top: -slatPct%` → `top: 0%` (sitter på motivets överkant, går nedåt).
+- Bottenlistens `bottom: -slatPct%` → `bottom: 0%` (sitter på underkant, går uppåt).
+- Bredden behålls med liten överhäng (`left: -2%`, `right: -2%`) — i verkligheten är listen lite bredare än posterns bredd så den syns från sidan; behåller den visuella karaktären.
+- Snörets fästpunkt `top` justeras eftersom topplisten nu sitter inne i motivet, inte ovanför. Snöret ska börja vid topplistens *överkant* — som nu är posterns överkant. Snöret ritas alltså utanför/ovanför motivet (oförändrat beteende).
+- z-index behålls (46) så listen ligger över text- och bildlager.
+
+### 2. `src/lib/template-snapshot.ts` — hängar-blocket (rad 742–821)
+
+- Idag: skapar en *större* canvas och blittar motivet med `padTop`/`padBottom` så listerna ritas i padding-zonen utanför motivet.
+- Nytt: behåll motivets storlek `w × h`. Lägg bara till `padTop = cordRise + slatH * 0.3` (för snöret), inget `padBottom`, och inget extra `padX` för listens överhäng (eller mycket mindre — bara för snörets ankarpunkter).
+- Listerna ritas *inuti* motivets område: `topSlatY = motifY` (precis innanför överkanten) och `botSlatY = motifY + motifH - slatH` (precis innanför underkanten).
+- `slatH` höjs till `2.1 cm * PX_PER_CM * scale` (Gelato 21 mm).
+- Snöret behåller sin position ovanför topplisten (= ovanför motivet).
+- Eftersom motivet inte längre växer i bredd kan vi förenkla `padX` till bara det som behövs för snörets ankare.
+
+### 3. `src/lib/mockup-composite.ts` — hängar-blocket (rad 231–286)
+
+- Samma flytt: `topSlatY = py` (innanför motivets topp), `botSlatY = py + posterH - slatH` (innanför botten).
+- `slatH`-formel uppdateras till `2.1 / scene.referenceWidthCm * area.w`.
+- Snöret är oförändrat (sitter ovanför topplisten = ovanför posterns visuella topp i scenen).
+
+### 4. Print-filen
+
+Inga ändringar. `renderHiresTemplateSnapshotSafe` sätter redan `hangerColor: undefined` så hängar-blocket aldrig körs vid generering av tryckfilen. Verifierat i `template-snapshot.ts` rad 843–853.
+
+## Påverkar ramar (frame)?
+
+Nej. Ram-overlayen är ett separat kodflöde (`frameColor`, `frameWidthCm`) och rör inte hängar-koden. Posters med ram (Vit/Svart/Ek/Valnöt) ser likadana ut som idag.
+
+## Test efter implementation
+
+1. Öppna editorn, välj en poster + variant "Hängare Ek". Listerna ska nu ligga *ovanpå* motivets översta och nedersta ~21 mm — du ska tydligt se att de täcker en del av kartan/texten närmast kanten.
+2. Lägg i varukorgen → cart-thumbnail ska visa samma sak (lister inne i motivet, snöret ovanför).
+3. Mockup-galleriet → hängar-postrarna i interiörscener ska också visa lister över motivets ytterkanter.
+4. Genomför testorder → Gelatos preview ska nu matcha vår preview.
