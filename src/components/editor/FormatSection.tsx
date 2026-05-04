@@ -149,9 +149,37 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
     (s) => !allowedSizes || allowedSizes.length === 0 || allowedSizes.includes(s.size),
   );
   const sizeDef = visibleSizes.find((s) => s.size === size) ?? effectiveSizes.find((s) => s.size === size);
-  const visibleVariants = (sizeDef?.variants ?? []).filter(
+  const isPoster = !isCanvas && !isAluminum && !isAcrylic;
+  const baseVisibleVariants = (sizeDef?.variants ?? []).filter(
     (v) => !allowedVariants || allowedVariants.length === 0 || allowedVariants.includes(v.name),
   );
+
+  // För poster: visa ALLA hängarvarianter alltid (även om storleken saknar
+  // pris för dem). Saknade renderas som disabled.
+  type VisibleVariant = { name: string; price: number; disabled?: boolean };
+  const visibleVariants: VisibleVariant[] = (() => {
+    if (!isPoster) return baseVisibleVariants.map((v) => ({ name: v.name, price: v.price }));
+    const out: VisibleVariant[] = baseVisibleVariants.map((v) => ({ name: v.name, price: v.price }));
+    const present = new Set(out.map((v) => v.name));
+    for (const hangerName of ALL_HANGER_NAMES) {
+      if (allowedVariants && allowedVariants.length > 0 && !allowedVariants.includes(hangerName)) continue;
+      if (!present.has(hangerName)) {
+        out.push({ name: hangerName, price: 0, disabled: true });
+      }
+    }
+    return out;
+  })();
+
+  // Auto-fallback: om vald variant är en hängare men nuvarande storlek saknar den.
+  useEffect(() => {
+    if (!variant || !sizeDef) return;
+    if (!variant.startsWith("Hängare")) return;
+    const exists = sizeDef.variants.some((v) => v.name === variant);
+    if (!exists) {
+      const fallback = sizeDef.variants.find((v) => v.name === "Ingen") ?? sizeDef.variants[0];
+      if (fallback) setVariant(fallback.name);
+    }
+  }, [variant, sizeDef, setVariant]);
 
   const currentVariantPrice = sizeDef?.variants.find((v) => v.name === variant)?.price ?? 0;
 
