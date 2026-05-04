@@ -7,7 +7,6 @@ import { ImageLayerView, LineLayerView, MarginLayerView } from "./layers/StaticL
 import { ShapeLayerView } from "./layers/ShapeLayerView";
 import { lineThicknessPxFromCanvas, effectiveLayerRect, clampLayerRect, getActiveMarginInsetsPct } from "@/lib/layer-utils";
 import { AcrylicCornerOverlay } from "./AcrylicCornerOverlay";
-import { woodCssBackground, woodVariantFromColor } from "@/lib/wood-texture";
 
 interface Props {
   frameColor?: string;
@@ -66,18 +65,14 @@ function HangerOverlay({
   // Snörets fästpunkter på listen — nära ytterkanterna.
   const anchorXPct = 6; // % från vänsterkant av listen (matchar slatStyle left:-2%)
 
-  const woodVariant = woodVariantFromColor(color);
-  const woodStyle = woodVariant ? woodCssBackground(woodVariant, "horizontal") : null;
   const slatStyle: React.CSSProperties = {
     position: "absolute",
     left: "-2%",
     right: "-2%",
     height: `${slatPct}%`,
-    ...(woodStyle ?? {
-      background: color,
-      backgroundImage:
-        "linear-gradient(to bottom, rgba(255,255,255,0.22), rgba(255,255,255,0) 50%, rgba(0,0,0,0.28))",
-    }),
+    background: color,
+    backgroundImage:
+      "linear-gradient(to bottom, rgba(255,255,255,0.22), rgba(255,255,255,0) 50%, rgba(0,0,0,0.28))",
     boxShadow: "0 4px 8px rgba(0,0,0,0.28)",
     border: isWhite ? "1px solid rgba(0,0,0,0.18)" : undefined,
   };
@@ -118,68 +113,6 @@ function HangerOverlay({
   );
 }
 
-/**
- * WoodFrameOverlay — fyra trä-listor som täcker frame-divens CSS-border-area.
- * Ådringen följer varje lists långaxel. Hörnen klipps i 45° så listerna möts.
- * Ligger ovanpå CSS-bordern (som behåller layout/utrymme) men under hängare.
- */
-function WoodFrameOverlay({ variant, borderPx }: { variant: "oak" | "walnut"; borderPx: number }) {
-  const horiz = woodCssBackground(variant, "horizontal");
-  const vert = woodCssBackground(variant, "vertical");
-  const t = `${borderPx}px`;
-  const slats: Array<{ key: string; style: React.CSSProperties }> = [
-    {
-      key: "top",
-      style: {
-        position: "absolute", top: 0, left: 0, right: 0, height: t,
-        clipPath: `polygon(0 0, 100% 0, calc(100% - ${t}) 100%, ${t} 100%)`,
-        ...horiz,
-      },
-    },
-    {
-      key: "bottom",
-      style: {
-        position: "absolute", bottom: 0, left: 0, right: 0, height: t,
-        clipPath: `polygon(${t} 0, calc(100% - ${t}) 0, 100% 100%, 0 100%)`,
-        ...horiz,
-      },
-    },
-    {
-      key: "left",
-      style: {
-        position: "absolute", top: 0, bottom: 0, left: 0, width: t,
-        clipPath: `polygon(0 0, 100% ${t}, 100% calc(100% - ${t}), 0 100%)`,
-        ...vert,
-      },
-    },
-    {
-      key: "right",
-      style: {
-        position: "absolute", top: 0, bottom: 0, right: 0, width: t,
-        clipPath: `polygon(100% 0, 100% 100%, 0 calc(100% - ${t}), 0 ${t})`,
-        ...vert,
-      },
-    },
-  ];
-  return (
-    <div
-      className="pointer-events-none absolute"
-      style={{ inset: `-${borderPx}px`, zIndex: 44 }}
-      aria-hidden
-    >
-      {slats.map((s) => <div key={s.key} style={s.style} />)}
-      {/* Inner skugga mot motivet för att skilja ram från innehåll */}
-      <div
-        style={{
-          position: "absolute",
-          inset: t,
-          boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.18)",
-          pointerEvents: "none",
-        }}
-      />
-    </div>
-  );
-}
 
 function StarClipDef({ id }: { id: string }) {
   return (
@@ -697,9 +630,6 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
           >
             <AcrylicCornerOverlay frontWcm={frontW} frontHcm={frontH} zIndex={45} />
           </div>
-        )}
-        {frameColor && borderPx > 0 && woodVariantFromColor(frameColor) && (
-          <WoodFrameOverlay variant={woodVariantFromColor(frameColor)!} borderPx={borderPx} />
         )}
         {hangerColor && (
           <HangerOverlay color={hangerColor} motifHeightCm={frontH} />
