@@ -1,0 +1,65 @@
+{
+  "common": {
+    "addToCart": "Ajouter au panier", "loading": "Chargement…", "tryAgain": "Réessayer", "remove": "Supprimer", "reset": "Réinitialiser",
+    "yes": "Oui", "no": "Non", "close": "Fermer", "previous": "Précédent", "next": "Suivant"
+  },
+  "header": { "yourChoice": "Votre choix" },
+  "cart": { "title": "Panier", "empty": "Votre panier est vide", "total": "Total", "checkout": "Passer à la caisse" },
+  "orientation": { "portrait": "Portrait", "landscape": "Paysage" },
+  "section": { "image": "Image", "transformation": "Transformation", "map": "Carte", "text": "Texte", "format": "Format" },
+  "format": {
+    "backgroundColor": "Couleur de fond", "whiteMargin": "Marge blanche",
+    "noActiveSizes": "Aucune taille active n'est encore configurée pour ce produit.",
+    "product": "Produit", "size": "Taille", "selectSize": "Choisir la taille",
+    "depth": "Profondeur", "material": "Matériau", "finish": "Finition", "frameOrHanger": "Cadre / Suspente", "orientation": "Orientation"
+  },
+  "productKind": { "poster": "Poster", "canvas": "Toile", "aluminum": "Aluminium", "acrylic": "Acrylique" },
+  "frame": {
+    "none": "Aucun", "white": "Blanc", "black": "Noir", "oak": "Chêne", "walnut": "Noyer",
+    "hangerOak": "Suspente Chêne", "hangerWalnut": "Suspente Noyer", "hangerBlack": "Suspente Noir", "hangerWhite": "Suspente Blanc",
+    "unavailable": "Indisponible", "unavailableForSize": "Indisponible pour cette taille"
+  },
+  "shape": { "none": "Aucune", "circle": "Cercle", "heart": "Cœur", "star": "Étoile", "mapShape": "Forme de la carte", "imageShape": "Forme de l'image" },
+  "map": {
+    "selectedPlace": "Lieu sélectionné", "searchAddress": "Rechercher une adresse ou une ville",
+    "searchPlaceholder": "ex. 10 rue de Rivoli, Paris",
+    "tipDrag": "Astuce : faites glisser et zoomez directement sur la carte pour ajuster.",
+    "showLabels": "Afficher les noms de zones sur la carte", "tab": "Carte {{n}}"
+  },
+  "text": { "show": "Afficher le texte", "placeholder": "Votre texte ici…", "font": "Police", "tab": "Texte {{n}}" },
+  "layer": {
+    "size": "Taille",
+    "tipMove": "Astuce : faites glisser la poignée ✥ du calque dans l'aperçu pour le déplacer.",
+    "imageTab": "Image {{n}}", "transformationTab": "Transformation {{n}}"
+  },
+  "photo": {
+    "uploadCta": "Téléverser une image", "uploadHint": "JPG, PNG, WebP · max 25 Mo",
+    "swap": "Changer l'image", "altUploaded": "Image téléversée",
+    "tipCrop": "Faites glisser l'image pour choisir le cadrage.",
+    "errorOnlyImages": "Seuls les fichiers image sont pris en charge",
+    "errorTooLarge": "Image trop volumineuse",
+    "errorTooLargeHint": "Max 25 Mo. Compressez et réessayez.",
+    "errorTooSmall": "Image trop petite pour l'impression ({{w}}×{{h}}). Au moins {{min}} px sur le côté le plus court requis."
+  },
+  "ai": {
+    "uploadFirst": "Téléversez d'abord une image pour pouvoir choisir un style IA.",
+    "uploadFirstShort": "Téléversez d'abord une image",
+    "chooseStyle": "Choisir un style", "yourTried": "Vos styles essayés",
+    "removeFromHistory": "Retirer de l'historique", "revertToOriginal": "Revenir à la photo sans style",
+    "uploadFailed": "Impossible de téléverser l'image",
+    "styleReused": "Style \"{{name}}\" réutilisé",
+    "styleApplied": "Style \"{{name}}\" appliqué",
+    "styleFailed": "Impossible d'appliquer le style",
+    "creatingImage": "Création de l'image",
+    "stagePrep": "Préparation de votre image…", "stageUpload": "Téléversement de votre image…",
+    "stageCreate": "Création de votre image…", "stageFetch": "Récupération du résultat…",
+    "noResult": "Le service n'a renvoyé aucune image", "unknownError": "Erreur inconnue"
+  },
+  "preview": { "title": "Aperçu", "enlarge": "Agrandir {{name}}", "noImage": "Aucune image", "compositeFailed": "Échec de la composition", "somethingWrong": "Une erreur s'est produite" },
+  "cartAdd": {
+    "added": "Ajouté au panier",
+    "prepareFailed": "Impossible de préparer le fichier d'impression",
+    "variantUnavailable": "Cette combinaison n'est pas encore disponible en boutique",
+    "variantUnavailableHint": "{{size}} · {{variant}} introuvable pour {{handle}}."
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "common": {
+    "addToCart": "Lisää ostoskoriin", "loading": "Ladataan…", "tryAgain": "Yritä uudelleen", "remove": "Poista", "reset": "Nollaa",
+    "yes": "Kyllä", "no": "Ei", "close": "Sulje", "previous": "Edellinen", "next": "Seuraava"
+  },
+  "header": { "yourChoice": "Sinun valintasi" },
+  "cart": { "title": "Ostoskori", "empty": "Ostoskorisi on tyhjä", "total": "Yhteensä", "checkout": "Kassalle" },
+  "orientation": { "portrait": "Pysty", "landscape": "Vaaka" },
+  "section": { "image": "Kuva", "transformation": "Muunnos", "map": "Kartta", "text": "Teksti", "format": "Muoto" },
+  "format": {
+    "backgroundColor": "Taustaväri", "whiteMargin": "Valkoinen marginaali",
+    "noActiveSizes": "Tälle tuotteelle ei ole vielä määritelty aktiivisia kokoja.",
+    "product": "Tuote", "size": "Koko", "selectSize": "Valitse koko",
+    "depth": "Syvyys", "material": "Materiaali", "finish": "Pinta", "frameOrHanger": "Kehys / Ripustin", "orientation": "Suunta"
+  },
+  "productKind": { "poster": "Juliste", "canvas": "Kangas", "aluminum": "Alumiini", "acrylic": "Akryyli" },
+  "frame": {
+    "none": "Ei mitään", "white": "Valkoinen", "black": "Musta", "oak": "Tammi", "walnut": "Pähkinäpuu",
+    "hangerOak": "Ripustin Tammi", "hangerWalnut": "Ripustin Pähkinäpuu", "hangerBlack": "Ripustin Musta", "hangerWhite": "Ripustin Valkoinen",
+    "unavailable": "Ei saatavilla", "unavailableForSize": "Ei saatavilla tälle koolle"
+  },
+  "shape": { "none": "Ei mitään", "circle": "Ympyrä", "heart": "Sydän", "star": "Tähti", "mapShape": "Kartan muoto", "imageShape": "Kuvan muoto" },
+  "map": {
+    "selectedPlace": "Valittu paikka", "searchAddress": "Hae osoite tai kaupunki",
+    "searchPlaceholder": "esim. Mannerheimintie 1, Helsinki",
+    "tipDrag": "Vinkki: vedä ja zoomaa suoraan kartassa hienosäätääksesi.",
+    "showLabels": "Näytä alueiden nimet kartalla", "tab": "Kartta {{n}}"
+  },
+  "text": { "show": "Näytä teksti", "placeholder": "Tekstisi tähän…", "font": "Fontti", "tab": "Teksti {{n}}" },
+  "layer": {
+    "size": "Koko",
+    "tipMove": "Vinkki: vedä esikatselun ✥-kahvasta liikuttaaksesi tasoa.",
+    "imageTab": "Kuva {{n}}", "transformationTab": "Muunnos {{n}}"
+  },
+  "photo": {
+    "uploadCta": "Lataa kuva", "uploadHint": "JPG, PNG, WebP · enint. 25 MB",
+    "swap": "Vaihda kuva", "altUploaded": "Ladattu kuva",
+    "tipCrop": "Vedä kuvaa valitaksesi rajauksen kehyksen sisällä.",
+    "errorOnlyImages": "Vain kuvatiedostot ovat tuettuja",
+    "errorTooLarge": "Kuva on liian suuri",
+    "errorTooLargeHint": "Enint. 25 MB. Tiivistä ja yritä uudelleen.",
+    "errorTooSmall": "Kuva on liian pieni painatukseen ({{w}}×{{h}}). Vähintään {{min}} px lyhyellä sivulla vaaditaan."
+  },
+  "ai": {
+    "uploadFirst": "Lataa kuva ensin valitaksesi AI-tyylin.",
+    "uploadFirstShort": "Lataa kuva ensin",
+    "chooseStyle": "Valitse tyyli", "yourTried": "Kokeillut tyylit",
+    "removeFromHistory": "Poista historiasta", "revertToOriginal": "Palaa kuvaan ilman tyyliä",
+    "uploadFailed": "Kuvan lataaminen epäonnistui",
+    "styleReused": "Tyyli \"{{name}}\" käytettiin uudelleen",
+    "styleApplied": "Tyyli \"{{name}}\" otettiin käyttöön",
+    "styleFailed": "Tyyliä ei voitu käyttää",
+    "creatingImage": "Luodaan kuvaa",
+    "stagePrep": "Valmistellaan kuvaasi…", "stageUpload": "Ladataan kuvaasi…",
+    "stageCreate": "Luodaan kuvaasi…", "stageFetch": "Haetaan tulosta…",
+    "noResult": "Palvelu ei palauttanut kuvaa", "unknownError": "Tuntematon virhe"
+  },
+  "preview": { "title": "Esikatselu", "enlarge": "Suurenna {{name}}", "noImage": "Ei kuvaa", "compositeFailed": "Yhdistäminen epäonnistui", "somethingWrong": "Jokin meni pieleen" },
+  "cartAdd": {
+    "added": "Lisätty ostoskoriin",
+    "prepareFailed": "Painotiedostoa ei voitu valmistella",
+    "variantUnavailable": "Tämä yhdistelmä ei ole vielä saatavilla kaupassa",
+    "variantUnavailableHint": "{{size}} · {{variant}} ei löytynyt tuotteelle {{handle}}."
+  }
+}

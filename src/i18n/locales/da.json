@@ -1,0 +1,65 @@
+{
+  "common": {
+    "addToCart": "Læg i kurv", "loading": "Indlæser…", "tryAgain": "Prøv igen", "remove": "Fjern", "reset": "Nulstil",
+    "yes": "Ja", "no": "Nej", "close": "Luk", "previous": "Forrige", "next": "Næste"
+  },
+  "header": { "yourChoice": "Dit valg" },
+  "cart": { "title": "Indkøbskurv", "empty": "Din kurv er tom", "total": "I alt", "checkout": "Til kassen" },
+  "orientation": { "portrait": "Stående", "landscape": "Liggende" },
+  "section": { "image": "Billede", "transformation": "Forvandling", "map": "Kort", "text": "Tekst", "format": "Format" },
+  "format": {
+    "backgroundColor": "Baggrundsfarve", "whiteMargin": "Hvid margen",
+    "noActiveSizes": "Dette produkt har endnu ingen aktive størrelser konfigureret.",
+    "product": "Produkt", "size": "Størrelse", "selectSize": "Vælg størrelse",
+    "depth": "Dybde", "material": "Materiale", "finish": "Finish", "frameOrHanger": "Ramme / Ophæng", "orientation": "Retning"
+  },
+  "productKind": { "poster": "Plakat", "canvas": "Lærred", "aluminum": "Aluminium", "acrylic": "Akryl" },
+  "frame": {
+    "none": "Ingen", "white": "Hvid", "black": "Sort", "oak": "Eg", "walnut": "Valnød",
+    "hangerOak": "Ophæng Eg", "hangerWalnut": "Ophæng Valnød", "hangerBlack": "Ophæng Sort", "hangerWhite": "Ophæng Hvid",
+    "unavailable": "Ikke tilgængelig", "unavailableForSize": "Ikke tilgængelig for denne størrelse"
+  },
+  "shape": { "none": "Ingen", "circle": "Cirkel", "heart": "Hjerte", "star": "Stjerne", "mapShape": "Kortets form", "imageShape": "Billedets form" },
+  "map": {
+    "selectedPlace": "Valgt sted", "searchAddress": "Søg adresse eller by",
+    "searchPlaceholder": "f.eks. Strøget 1, København",
+    "tipDrag": "Tip: træk og zoom direkte i kortet for at finjustere.",
+    "showLabels": "Vis områdenavne på kortet", "tab": "Kort {{n}}"
+  },
+  "text": { "show": "Vis tekst", "placeholder": "Din tekst her…", "font": "Skrifttype", "tab": "Tekst {{n}}" },
+  "layer": {
+    "size": "Størrelse",
+    "tipMove": "Tip: træk i ✥-håndtaget på laget i forhåndsvisningen for at flytte det.",
+    "imageTab": "Billede {{n}}", "transformationTab": "Forvandling {{n}}"
+  },
+  "photo": {
+    "uploadCta": "Upload billede", "uploadHint": "JPG, PNG, WebP · maks 25 MB",
+    "swap": "Skift billede", "altUploaded": "Uploadet billede",
+    "tipCrop": "Træk i billedet for at vælge udsnit i rammen.",
+    "errorOnlyImages": "Kun billedfiler understøttes",
+    "errorTooLarge": "Billedet er for stort",
+    "errorTooLargeHint": "Maks 25 MB. Komprimer og prøv igen.",
+    "errorTooSmall": "Billedet er for lille til tryk ({{w}}×{{h}}). Mindst {{min}} px på korteste side kræves."
+  },
+  "ai": {
+    "uploadFirst": "Upload et billede først for at kunne vælge AI-stil.",
+    "uploadFirstShort": "Upload et billede først",
+    "chooseStyle": "Vælg stil", "yourTried": "Dine prøvede stilarter",
+    "removeFromHistory": "Fjern fra historik", "revertToOriginal": "Gå tilbage til foto uden stil",
+    "uploadFailed": "Kunne ikke uploade billedet",
+    "styleReused": "Stilen \"{{name}}\" blev genbrugt",
+    "styleApplied": "Stilen \"{{name}}\" blev anvendt",
+    "styleFailed": "Kunne ikke anvende stilen",
+    "creatingImage": "Opretter billede",
+    "stagePrep": "Forbereder dit billede…", "stageUpload": "Uploader dit billede…",
+    "stageCreate": "Opretter dit billede…", "stageFetch": "Henter resultat…",
+    "noResult": "Tjenesten returnerede intet billede", "unknownError": "Ukendt fejl"
+  },
+  "preview": { "title": "Forhåndsvisning", "enlarge": "Forstør {{name}}", "noImage": "Intet billede", "compositeFailed": "Sammensætning mislykkedes", "somethingWrong": "Noget gik galt" },
+  "cartAdd": {
+    "added": "Lagt i kurv",
+    "prepareFailed": "Kunne ikke forberede trykfilen",
+    "variantUnavailable": "Denne kombination er endnu ikke tilgængelig i butikken",
+    "variantUnavailableHint": "{{size}} · {{variant}} blev ikke fundet for {{handle}}."
+  }
+}
