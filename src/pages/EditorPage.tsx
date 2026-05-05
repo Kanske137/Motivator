@@ -122,8 +122,8 @@ export default function EditorPage() {
     ? (variant?.match(/(\d+)/)?.[1] ? parseInt(variant!.match(/(\d+)/)![1], 10) : 2)
     : 0;
 
-  const orientationLabel = orientation === "portrait" ? "Stående" : "Liggande";
-  const variantLabel = config?.product_type === "canvas" ? `${variant ?? ""} djup` : `${variant ?? ""} ram`;
+  const orientationLabel = orientation === "portrait" ? t("orientation.portrait") : t("orientation.landscape");
+  const variantLabel = config?.product_type === "canvas" ? `${variant ?? ""} ${t("format.depth").toLowerCase()}` : `${variant ?? ""}`;
   const summary = [size ? `${size} cm` : null, variantLabel.trim() ? variantLabel : null, orientationLabel]
     .filter(Boolean)
     .join(" · ");
