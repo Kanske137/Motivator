@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Loader2, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useShopContextStore } from "@/stores/shopContextStore";
+import { formatPrice } from "@/lib/format-price";
 import { useEditorStore } from "@/stores/editorStore";
 import {
   loadAllConfigs,
