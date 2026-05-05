@@ -51,6 +51,8 @@ export default function EditorPage() {
 
   const { config, template, layerValues, layerTransforms, whiteMarginEnabled, setConfig, currentPrice, currentLayout, mapStyleId, mapCenter, mapZoom, text, textFont, textVisible, showLabels, mapShape, orientation, size, variant, posterBgColor, designSource, aiPrintFileUrl, aiPhotoResults, shopifyVariantId, shopifyVariantResolving, setShopifyVariantId, setShopifyVariantResolving } =
     useEditorStore();
+  const { t } = useTranslation();
+  const shopCtx = useShopContextStore();
   const addItem = useCartStore((s) => s.addItem);
   const isAdding = useCartStore((s) => s.isLoading);
   const [isPreparing, setIsPreparing] = useState(false);
