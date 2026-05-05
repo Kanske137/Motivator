@@ -2,6 +2,8 @@
 
 Följ stegen i ordning. Allt sker i din Shopify Admin — ingen Dev Dashboard, ingen CLI.
 
+> **Uppdaterar du befintligt snippet?** Steg 1 nedan innehåller nu `locale`, `currency`, `rate` och `country` i iframe-URL:en + en `pushContext()`-funktion som skickar `SHOP_CONTEXT` till editorn. Klistra över den gamla `personlig-karta-editor`-snippeten med blocket nedan så får editorn automatiskt rätt språk + valuta för varje kund.
+
 ---
 
 ## Steg 1 — Lägg till editor-snippet i temat

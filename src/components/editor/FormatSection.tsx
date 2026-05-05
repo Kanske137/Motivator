@@ -1,5 +1,8 @@
 import { forwardRef, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useEditorStore } from "@/stores/editorStore";
+import { useShopContextStore } from "@/stores/shopContextStore";
+import { formatPriceDelta } from "@/lib/format-price";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -48,11 +51,7 @@ const HangerIcon = forwardRef<SVGSVGElement, { color: string }>(({ color }, ref)
 });
 HangerIcon.displayName = "HangerIcon";
 
-function formatDiff(diff: number): string {
-  if (diff === 0) return "+0 kr";
-  if (diff > 0) return `+${diff} kr`;
-  return `−${Math.abs(diff)} kr`;
-}
+// Pris-delta formatteras nu via formatPriceDelta() i komponenten (kräver shop-context).
 
 const NoFrameIcon = forwardRef<SVGSVGElement>((_, ref) => (
   <svg ref={ref} viewBox="0 0 40 40" className="w-1/2 h-1/2" fill="none" stroke="currentColor" strokeWidth="2">
@@ -72,6 +71,9 @@ const DepthIcon = forwardRef<SVGSVGElement, { depth: string }>(({ depth }, ref) 
 DepthIcon.displayName = "DepthIcon";
 
 export function FormatSection({ configs, activeHandle, onProductChange }: Props) {
+  const { t } = useTranslation();
+  const shopCtx = useShopContextStore();
+  const formatDiff = (d: number) => formatPriceDelta(d, shopCtx);
   const { config, productOptions, template, size, variant, orientation, setSize, setVariant, setOrientation } = useEditorStore();
 
   const allowedOrientations = template?.orientations ?? ["portrait", "landscape"];
