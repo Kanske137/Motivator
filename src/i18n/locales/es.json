@@ -1,0 +1,65 @@
+{
+  "common": {
+    "addToCart": "Añadir al carrito", "loading": "Cargando…", "tryAgain": "Reintentar", "remove": "Eliminar", "reset": "Restablecer",
+    "yes": "Sí", "no": "No", "close": "Cerrar", "previous": "Anterior", "next": "Siguiente"
+  },
+  "header": { "yourChoice": "Tu selección" },
+  "cart": { "title": "Carrito", "empty": "Tu carrito está vacío", "total": "Total", "checkout": "Pagar" },
+  "orientation": { "portrait": "Vertical", "landscape": "Horizontal" },
+  "section": { "image": "Imagen", "transformation": "Transformación", "map": "Mapa", "text": "Texto", "format": "Formato" },
+  "format": {
+    "backgroundColor": "Color de fondo", "whiteMargin": "Margen blanco",
+    "noActiveSizes": "Este producto aún no tiene tamaños activos configurados.",
+    "product": "Producto", "size": "Tamaño", "selectSize": "Elegir tamaño",
+    "depth": "Profundidad", "material": "Material", "finish": "Acabado", "frameOrHanger": "Marco / Colgador", "orientation": "Orientación"
+  },
+  "productKind": { "poster": "Póster", "canvas": "Lienzo", "aluminum": "Aluminio", "acrylic": "Acrílico" },
+  "frame": {
+    "none": "Ninguno", "white": "Blanco", "black": "Negro", "oak": "Roble", "walnut": "Nogal",
+    "hangerOak": "Colgador Roble", "hangerWalnut": "Colgador Nogal", "hangerBlack": "Colgador Negro", "hangerWhite": "Colgador Blanco",
+    "unavailable": "No disponible", "unavailableForSize": "No disponible para este tamaño"
+  },
+  "shape": { "none": "Ninguna", "circle": "Círculo", "heart": "Corazón", "star": "Estrella", "mapShape": "Forma del mapa", "imageShape": "Forma de la imagen" },
+  "map": {
+    "selectedPlace": "Lugar seleccionado", "searchAddress": "Buscar dirección o ciudad",
+    "searchPlaceholder": "ej. Gran Vía 1, Madrid",
+    "tipDrag": "Consejo: arrastra y haz zoom directamente en el mapa para ajustar.",
+    "showLabels": "Mostrar nombres de áreas en el mapa", "tab": "Mapa {{n}}"
+  },
+  "text": { "show": "Mostrar texto", "placeholder": "Tu texto aquí…", "font": "Fuente", "tab": "Texto {{n}}" },
+  "layer": {
+    "size": "Tamaño",
+    "tipMove": "Consejo: arrastra el tirador ✥ de la capa en la vista previa para moverla.",
+    "imageTab": "Imagen {{n}}", "transformationTab": "Transformación {{n}}"
+  },
+  "photo": {
+    "uploadCta": "Subir imagen", "uploadHint": "JPG, PNG, WebP · máx. 25 MB",
+    "swap": "Cambiar imagen", "altUploaded": "Imagen subida",
+    "tipCrop": "Arrastra la imagen para elegir el encuadre dentro del marco.",
+    "errorOnlyImages": "Solo se admiten archivos de imagen",
+    "errorTooLarge": "La imagen es demasiado grande",
+    "errorTooLargeHint": "Máx. 25 MB. Comprime y vuelve a intentarlo.",
+    "errorTooSmall": "Imagen demasiado pequeña para imprimir ({{w}}×{{h}}). Se requieren al menos {{min}} px en el lado más corto."
+  },
+  "ai": {
+    "uploadFirst": "Sube una imagen primero para poder elegir un estilo IA.",
+    "uploadFirstShort": "Sube una imagen primero",
+    "chooseStyle": "Elegir estilo", "yourTried": "Tus estilos probados",
+    "removeFromHistory": "Quitar del historial", "revertToOriginal": "Volver a la foto sin estilo",
+    "uploadFailed": "No se pudo subir la imagen",
+    "styleReused": "Estilo \"{{name}}\" reutilizado",
+    "styleApplied": "Estilo \"{{name}}\" aplicado",
+    "styleFailed": "No se pudo aplicar el estilo",
+    "creatingImage": "Creando imagen",
+    "stagePrep": "Preparando tu imagen…", "stageUpload": "Subiendo tu imagen…",
+    "stageCreate": "Creando tu imagen…", "stageFetch": "Obteniendo resultado…",
+    "noResult": "El servicio no devolvió ninguna imagen", "unknownError": "Error desconocido"
+  },
+  "preview": { "title": "Vista previa", "enlarge": "Ampliar {{name}}", "noImage": "Sin imagen", "compositeFailed": "Falló la composición", "somethingWrong": "Algo salió mal" },
+  "cartAdd": {
+    "added": "Añadido al carrito",
+    "prepareFailed": "No se pudo preparar el archivo de impresión",
+    "variantUnavailable": "Esta combinación aún no está disponible en la tienda",
+    "variantUnavailableHint": "{{size}} · {{variant}} no encontrado para {{handle}}."
+  }
+}

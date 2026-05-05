@@ -1,0 +1,137 @@
+{
+  "common": {
+    "addToCart": "In den Warenkorb",
+    "loading": "Lädt…",
+    "tryAgain": "Erneut versuchen",
+    "remove": "Entfernen",
+    "reset": "Zurücksetzen",
+    "yes": "Ja",
+    "no": "Nein",
+    "close": "Schließen",
+    "previous": "Zurück",
+    "next": "Weiter"
+  },
+  "header": {
+    "yourChoice": "Deine Auswahl"
+  },
+  "cart": {
+    "title": "Warenkorb",
+    "empty": "Dein Warenkorb ist leer",
+    "total": "Gesamt",
+    "checkout": "Zur Kasse"
+  },
+  "orientation": {
+    "portrait": "Hochformat",
+    "landscape": "Querformat"
+  },
+  "section": {
+    "image": "Bild",
+    "transformation": "Verwandlung",
+    "map": "Karte",
+    "text": "Text",
+    "format": "Format"
+  },
+  "format": {
+    "backgroundColor": "Hintergrundfarbe",
+    "whiteMargin": "Weißer Rand",
+    "noActiveSizes": "Für dieses Produkt sind noch keine Größen aktiviert.",
+    "product": "Produkt",
+    "size": "Größe",
+    "selectSize": "Größe wählen",
+    "depth": "Tiefe",
+    "material": "Material",
+    "finish": "Finish",
+    "frameOrHanger": "Rahmen / Aufhänger",
+    "orientation": "Ausrichtung"
+  },
+  "productKind": {
+    "poster": "Poster",
+    "canvas": "Leinwand",
+    "aluminum": "Aluminium",
+    "acrylic": "Acryl"
+  },
+  "frame": {
+    "none": "Keiner",
+    "white": "Weiß",
+    "black": "Schwarz",
+    "oak": "Eiche",
+    "walnut": "Nussbaum",
+    "hangerOak": "Aufhänger Eiche",
+    "hangerWalnut": "Aufhänger Nussbaum",
+    "hangerBlack": "Aufhänger Schwarz",
+    "hangerWhite": "Aufhänger Weiß",
+    "unavailable": "Nicht verfügbar",
+    "unavailableForSize": "Für diese Größe nicht verfügbar"
+  },
+  "shape": {
+    "none": "Keine",
+    "circle": "Kreis",
+    "heart": "Herz",
+    "star": "Stern",
+    "mapShape": "Form der Karte",
+    "imageShape": "Form des Bildes"
+  },
+  "map": {
+    "selectedPlace": "Ausgewählter Ort",
+    "searchAddress": "Adresse oder Stadt suchen",
+    "searchPlaceholder": "z. B. Unter den Linden 1, Berlin",
+    "tipDrag": "Tipp: Direkt in der Karte ziehen und zoomen, um fein einzustellen.",
+    "showLabels": "Gebietsnamen auf der Karte anzeigen",
+    "tab": "Karte {{n}}"
+  },
+  "text": {
+    "show": "Text anzeigen",
+    "placeholder": "Dein Text hier…",
+    "font": "Schriftart",
+    "tab": "Text {{n}}"
+  },
+  "layer": {
+    "size": "Größe",
+    "tipMove": "Tipp: Ziehe den ✥-Griff der Ebene in der Vorschau, um sie zu verschieben.",
+    "imageTab": "Bild {{n}}",
+    "transformationTab": "Verwandlung {{n}}"
+  },
+  "photo": {
+    "uploadCta": "Bild hochladen",
+    "uploadHint": "JPG, PNG, WebP · max. 25 MB",
+    "swap": "Bild ändern",
+    "altUploaded": "Hochgeladenes Bild",
+    "tipCrop": "Ziehe das Bild, um den Ausschnitt im Rahmen zu wählen.",
+    "errorOnlyImages": "Nur Bilddateien werden unterstützt",
+    "errorTooLarge": "Das Bild ist zu groß",
+    "errorTooLargeHint": "Max. 25 MB. Komprimiere es und versuche es erneut.",
+    "errorTooSmall": "Bild zu klein für den Druck ({{w}}×{{h}}). Mindestens {{min}} px auf der kurzen Seite erforderlich."
+  },
+  "ai": {
+    "uploadFirst": "Lade zuerst ein Bild hoch, um einen AI-Stil wählen zu können.",
+    "uploadFirstShort": "Lade zuerst ein Bild hoch",
+    "chooseStyle": "Stil wählen",
+    "yourTried": "Deine getesteten Stile",
+    "removeFromHistory": "Aus dem Verlauf entfernen",
+    "revertToOriginal": "Zurück zum Foto ohne Stil",
+    "uploadFailed": "Bild konnte nicht hochgeladen werden",
+    "styleReused": "Stil \"{{name}}\" wiederverwendet",
+    "styleApplied": "Stil \"{{name}}\" angewendet",
+    "styleFailed": "Stil konnte nicht angewendet werden",
+    "creatingImage": "Bild wird erstellt",
+    "stagePrep": "Bild wird vorbereitet…",
+    "stageUpload": "Bild wird hochgeladen…",
+    "stageCreate": "Bild wird erstellt…",
+    "stageFetch": "Ergebnis wird abgerufen…",
+    "noResult": "Der Dienst hat kein Bild zurückgegeben",
+    "unknownError": "Unbekannter Fehler"
+  },
+  "preview": {
+    "title": "Vorschau",
+    "enlarge": "{{name}} vergrößern",
+    "noImage": "Kein Bild",
+    "compositeFailed": "Komposition fehlgeschlagen",
+    "somethingWrong": "Etwas ist schiefgelaufen"
+  },
+  "cartAdd": {
+    "added": "In den Warenkorb gelegt",
+    "prepareFailed": "Druckdatei konnte nicht vorbereitet werden",
+    "variantUnavailable": "Diese Kombination ist im Shop noch nicht verfügbar",
+    "variantUnavailableHint": "{{size}} · {{variant}} wurde für {{handle}} nicht gefunden."
+  }
+}

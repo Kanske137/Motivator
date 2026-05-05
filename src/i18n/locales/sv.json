@@ -1,0 +1,137 @@
+{
+  "common": {
+    "addToCart": "Lägg i varukorg",
+    "loading": "Laddar…",
+    "tryAgain": "Försök igen",
+    "remove": "Ta bort",
+    "reset": "Återställ",
+    "yes": "Ja",
+    "no": "Nej",
+    "close": "Stäng",
+    "previous": "Föregående",
+    "next": "Nästa"
+  },
+  "header": {
+    "yourChoice": "Ditt val"
+  },
+  "cart": {
+    "title": "Varukorg",
+    "empty": "Varukorgen är tom",
+    "total": "Totalt",
+    "checkout": "Till kassan"
+  },
+  "orientation": {
+    "portrait": "Stående",
+    "landscape": "Liggande"
+  },
+  "section": {
+    "image": "Bild",
+    "transformation": "Förvandling",
+    "map": "Karta",
+    "text": "Text",
+    "format": "Format"
+  },
+  "format": {
+    "backgroundColor": "Bakgrundsfärg",
+    "whiteMargin": "Vit marginal",
+    "noActiveSizes": "Den här produkten har inga aktiva storlekar konfigurerade ännu.",
+    "product": "Produkt",
+    "size": "Storlek",
+    "selectSize": "Välj storlek",
+    "depth": "Djup",
+    "material": "Material",
+    "finish": "Finish",
+    "frameOrHanger": "Ram / Hängare",
+    "orientation": "Orientering"
+  },
+  "productKind": {
+    "poster": "Poster",
+    "canvas": "Canvas",
+    "aluminum": "Aluminium",
+    "acrylic": "Akryl"
+  },
+  "frame": {
+    "none": "Ingen",
+    "white": "Vit",
+    "black": "Svart",
+    "oak": "Ek",
+    "walnut": "Valnöt",
+    "hangerOak": "Hängare Ek",
+    "hangerWalnut": "Hängare Valnöt",
+    "hangerBlack": "Hängare Svart",
+    "hangerWhite": "Hängare Vit",
+    "unavailable": "Ej tillgänglig",
+    "unavailableForSize": "Ej tillgänglig för denna storlek"
+  },
+  "shape": {
+    "none": "Ingen",
+    "circle": "Cirkel",
+    "heart": "Hjärta",
+    "star": "Stjärna",
+    "mapShape": "Kartans form",
+    "imageShape": "Bildens form"
+  },
+  "map": {
+    "selectedPlace": "Vald plats",
+    "searchAddress": "Sök adress eller stad",
+    "searchPlaceholder": "t.ex. Drottninggatan 1, Stockholm",
+    "tipDrag": "Tips: dra och zooma direkt i kartan för att finjustera.",
+    "showLabels": "Visa områdesnamn på kartan",
+    "tab": "Karta {{n}}"
+  },
+  "text": {
+    "show": "Visa text",
+    "placeholder": "Din text här…",
+    "font": "Typsnitt",
+    "tab": "Text {{n}}"
+  },
+  "layer": {
+    "size": "Storlek",
+    "tipMove": "Tips: dra ✥-handtaget på lagret i förhandsvisningen för att flytta det.",
+    "imageTab": "Bild {{n}}",
+    "transformationTab": "Förvandling {{n}}"
+  },
+  "photo": {
+    "uploadCta": "Ladda upp bild",
+    "uploadHint": "JPG, PNG, WebP · max 25 MB",
+    "swap": "Byt bild",
+    "altUploaded": "Uppladdad bild",
+    "tipCrop": "Dra i bilden för att välja utsnitt inom ramen.",
+    "errorOnlyImages": "Endast bildfiler stöds",
+    "errorTooLarge": "Bilden är för stor",
+    "errorTooLargeHint": "Max 25 MB. Komprimera och försök igen.",
+    "errorTooSmall": "Bilden är för liten för print ({{w}}×{{h}}). Minst {{min}} px på kortaste sidan krävs."
+  },
+  "ai": {
+    "uploadFirst": "Ladda upp en bild först för att kunna välja AI-stil.",
+    "uploadFirstShort": "Ladda upp en bild först",
+    "chooseStyle": "Välj stil",
+    "yourTried": "Dina provade stilar",
+    "removeFromHistory": "Ta bort från historik",
+    "revertToOriginal": "Återgå till foto utan stil",
+    "uploadFailed": "Kunde inte ladda upp bilden",
+    "styleReused": "Stil \"{{name}}\" återanvänd",
+    "styleApplied": "Stil \"{{name}}\" tillämpad",
+    "styleFailed": "Kunde inte tillämpa stilen",
+    "creatingImage": "Skapar bild",
+    "stagePrep": "Förbereder din bild…",
+    "stageUpload": "Laddar upp din bild…",
+    "stageCreate": "Skapar din bild…",
+    "stageFetch": "Hämtar resultat…",
+    "noResult": "Tjänsten returnerade ingen bild",
+    "unknownError": "Okänt fel"
+  },
+  "preview": {
+    "title": "Förhandsgranska",
+    "enlarge": "Förstora {{name}}",
+    "noImage": "Ingen bild",
+    "compositeFailed": "Composit misslyckades",
+    "somethingWrong": "Något gick fel"
+  },
+  "cartAdd": {
+    "added": "Lagt till i varukorgen",
+    "prepareFailed": "Kunde inte förbereda tryckfil",
+    "variantUnavailable": "Den här kombinationen är inte tillgänglig i butiken ännu",
+    "variantUnavailableHint": "{{size}} · {{variant}} hittades inte för {{handle}}."
+  }
+}

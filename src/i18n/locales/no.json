@@ -1,0 +1,101 @@
+{
+  "common": {
+    "addToCart": "Legg i handlekurv",
+    "loading": "Laster…",
+    "tryAgain": "Prøv igjen",
+    "remove": "Fjern",
+    "reset": "Tilbakestill",
+    "yes": "Ja",
+    "no": "Nei",
+    "close": "Lukk",
+    "previous": "Forrige",
+    "next": "Neste"
+  },
+  "header": { "yourChoice": "Ditt valg" },
+  "cart": {
+    "title": "Handlekurv",
+    "empty": "Handlekurven er tom",
+    "total": "Totalt",
+    "checkout": "Til kassen"
+  },
+  "orientation": { "portrait": "Stående", "landscape": "Liggende" },
+  "section": {
+    "image": "Bilde",
+    "transformation": "Forvandling",
+    "map": "Kart",
+    "text": "Tekst",
+    "format": "Format"
+  },
+  "format": {
+    "backgroundColor": "Bakgrunnsfarge",
+    "whiteMargin": "Hvit marg",
+    "noActiveSizes": "Dette produktet har ingen aktive størrelser konfigurert ennå.",
+    "product": "Produkt",
+    "size": "Størrelse",
+    "selectSize": "Velg størrelse",
+    "depth": "Dybde",
+    "material": "Materiale",
+    "finish": "Finish",
+    "frameOrHanger": "Ramme / Henger",
+    "orientation": "Retning"
+  },
+  "productKind": { "poster": "Poster", "canvas": "Lerret", "aluminum": "Aluminium", "acrylic": "Akryl" },
+  "frame": {
+    "none": "Ingen", "white": "Hvit", "black": "Svart", "oak": "Eik", "walnut": "Valnøtt",
+    "hangerOak": "Henger Eik", "hangerWalnut": "Henger Valnøtt", "hangerBlack": "Henger Svart", "hangerWhite": "Henger Hvit",
+    "unavailable": "Ikke tilgjengelig",
+    "unavailableForSize": "Ikke tilgjengelig for denne størrelsen"
+  },
+  "shape": { "none": "Ingen", "circle": "Sirkel", "heart": "Hjerte", "star": "Stjerne", "mapShape": "Kartets form", "imageShape": "Bildets form" },
+  "map": {
+    "selectedPlace": "Valgt sted",
+    "searchAddress": "Søk adresse eller by",
+    "searchPlaceholder": "f.eks. Karl Johans gate 1, Oslo",
+    "tipDrag": "Tips: dra og zoom rett i kartet for å finjustere.",
+    "showLabels": "Vis områdenavn på kartet",
+    "tab": "Kart {{n}}"
+  },
+  "text": { "show": "Vis tekst", "placeholder": "Din tekst her…", "font": "Skrifttype", "tab": "Tekst {{n}}" },
+  "layer": {
+    "size": "Størrelse",
+    "tipMove": "Tips: dra ✥-håndtaket på laget i forhåndsvisningen for å flytte det.",
+    "imageTab": "Bilde {{n}}", "transformationTab": "Forvandling {{n}}"
+  },
+  "photo": {
+    "uploadCta": "Last opp bilde",
+    "uploadHint": "JPG, PNG, WebP · maks 25 MB",
+    "swap": "Bytt bilde",
+    "altUploaded": "Opplastet bilde",
+    "tipCrop": "Dra i bildet for å velge utsnitt innen rammen.",
+    "errorOnlyImages": "Kun bildefiler støttes",
+    "errorTooLarge": "Bildet er for stort",
+    "errorTooLargeHint": "Maks 25 MB. Komprimer og prøv igjen.",
+    "errorTooSmall": "Bildet er for lite for trykk ({{w}}×{{h}}). Minst {{min}} px på korteste side kreves."
+  },
+  "ai": {
+    "uploadFirst": "Last opp et bilde først for å kunne velge AI-stil.",
+    "uploadFirstShort": "Last opp et bilde først",
+    "chooseStyle": "Velg stil",
+    "yourTried": "Dine prøvde stiler",
+    "removeFromHistory": "Fjern fra historikk",
+    "revertToOriginal": "Gå tilbake til foto uten stil",
+    "uploadFailed": "Kunne ikke laste opp bildet",
+    "styleReused": "Stilen \"{{name}}\" ble gjenbrukt",
+    "styleApplied": "Stilen \"{{name}}\" ble brukt",
+    "styleFailed": "Kunne ikke bruke stilen",
+    "creatingImage": "Lager bilde",
+    "stagePrep": "Forbereder bildet ditt…",
+    "stageUpload": "Laster opp bildet ditt…",
+    "stageCreate": "Lager bildet ditt…",
+    "stageFetch": "Henter resultat…",
+    "noResult": "Tjenesten returnerte ingen bilde",
+    "unknownError": "Ukjent feil"
+  },
+  "preview": { "title": "Forhåndsvisning", "enlarge": "Forstørr {{name}}", "noImage": "Ingen bilde", "compositeFailed": "Komponering mislyktes", "somethingWrong": "Noe gikk galt" },
+  "cartAdd": {
+    "added": "Lagt i handlekurv",
+    "prepareFailed": "Kunne ikke forberede trykkfilen",
+    "variantUnavailable": "Denne kombinasjonen er ikke tilgjengelig i butikken ennå",
+    "variantUnavailableHint": "{{size}} · {{variant}} ble ikke funnet for {{handle}}."
+  }
+}

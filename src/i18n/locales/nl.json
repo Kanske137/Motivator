@@ -1,0 +1,65 @@
+{
+  "common": {
+    "addToCart": "In winkelwagen", "loading": "Laden…", "tryAgain": "Opnieuw proberen", "remove": "Verwijderen", "reset": "Herstellen",
+    "yes": "Ja", "no": "Nee", "close": "Sluiten", "previous": "Vorige", "next": "Volgende"
+  },
+  "header": { "yourChoice": "Jouw keuze" },
+  "cart": { "title": "Winkelwagen", "empty": "Je winkelwagen is leeg", "total": "Totaal", "checkout": "Naar de kassa" },
+  "orientation": { "portrait": "Staand", "landscape": "Liggend" },
+  "section": { "image": "Afbeelding", "transformation": "Transformatie", "map": "Kaart", "text": "Tekst", "format": "Formaat" },
+  "format": {
+    "backgroundColor": "Achtergrondkleur", "whiteMargin": "Witte marge",
+    "noActiveSizes": "Dit product heeft nog geen actieve maten geconfigureerd.",
+    "product": "Product", "size": "Maat", "selectSize": "Kies maat",
+    "depth": "Diepte", "material": "Materiaal", "finish": "Afwerking", "frameOrHanger": "Lijst / Ophanger", "orientation": "Oriëntatie"
+  },
+  "productKind": { "poster": "Poster", "canvas": "Canvas", "aluminum": "Aluminium", "acrylic": "Acryl" },
+  "frame": {
+    "none": "Geen", "white": "Wit", "black": "Zwart", "oak": "Eiken", "walnut": "Notenhout",
+    "hangerOak": "Ophanger Eiken", "hangerWalnut": "Ophanger Notenhout", "hangerBlack": "Ophanger Zwart", "hangerWhite": "Ophanger Wit",
+    "unavailable": "Niet beschikbaar", "unavailableForSize": "Niet beschikbaar voor deze maat"
+  },
+  "shape": { "none": "Geen", "circle": "Cirkel", "heart": "Hart", "star": "Ster", "mapShape": "Vorm van de kaart", "imageShape": "Vorm van de afbeelding" },
+  "map": {
+    "selectedPlace": "Gekozen plaats", "searchAddress": "Zoek adres of stad",
+    "searchPlaceholder": "bv. Damrak 1, Amsterdam",
+    "tipDrag": "Tip: sleep en zoom direct in de kaart om fijn af te stellen.",
+    "showLabels": "Toon gebiedsnamen op de kaart", "tab": "Kaart {{n}}"
+  },
+  "text": { "show": "Tekst tonen", "placeholder": "Jouw tekst hier…", "font": "Lettertype", "tab": "Tekst {{n}}" },
+  "layer": {
+    "size": "Grootte",
+    "tipMove": "Tip: sleep aan de ✥-greep van de laag in de preview om hem te verplaatsen.",
+    "imageTab": "Afbeelding {{n}}", "transformationTab": "Transformatie {{n}}"
+  },
+  "photo": {
+    "uploadCta": "Afbeelding uploaden", "uploadHint": "JPG, PNG, WebP · max. 25 MB",
+    "swap": "Afbeelding wisselen", "altUploaded": "Geüploade afbeelding",
+    "tipCrop": "Sleep de afbeelding om de uitsnede in het kader te kiezen.",
+    "errorOnlyImages": "Alleen afbeeldingsbestanden worden ondersteund",
+    "errorTooLarge": "Afbeelding te groot",
+    "errorTooLargeHint": "Max. 25 MB. Comprimeer en probeer opnieuw.",
+    "errorTooSmall": "Afbeelding te klein voor druk ({{w}}×{{h}}). Minstens {{min}} px op de korte zijde vereist."
+  },
+  "ai": {
+    "uploadFirst": "Upload eerst een afbeelding om een AI-stijl te kunnen kiezen.",
+    "uploadFirstShort": "Upload eerst een afbeelding",
+    "chooseStyle": "Kies stijl", "yourTried": "Jouw geprobeerde stijlen",
+    "removeFromHistory": "Verwijder uit geschiedenis", "revertToOriginal": "Terug naar foto zonder stijl",
+    "uploadFailed": "Kan de afbeelding niet uploaden",
+    "styleReused": "Stijl \"{{name}}\" hergebruikt",
+    "styleApplied": "Stijl \"{{name}}\" toegepast",
+    "styleFailed": "Kan de stijl niet toepassen",
+    "creatingImage": "Afbeelding maken",
+    "stagePrep": "Je afbeelding wordt voorbereid…", "stageUpload": "Je afbeelding wordt geüpload…",
+    "stageCreate": "Je afbeelding wordt gemaakt…", "stageFetch": "Resultaat ophalen…",
+    "noResult": "De service heeft geen afbeelding teruggegeven", "unknownError": "Onbekende fout"
+  },
+  "preview": { "title": "Voorvertoning", "enlarge": "{{name}} vergroten", "noImage": "Geen afbeelding", "compositeFailed": "Compositie mislukt", "somethingWrong": "Er is iets misgegaan" },
+  "cartAdd": {
+    "added": "Toegevoegd aan winkelwagen",
+    "prepareFailed": "Kan het printbestand niet voorbereiden",
+    "variantUnavailable": "Deze combinatie is nog niet beschikbaar in de winkel",
+    "variantUnavailableHint": "{{size}} · {{variant}} niet gevonden voor {{handle}}."
+  }
+}

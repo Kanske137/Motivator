@@ -1,15 +1,21 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ShoppingCart, Minus, Plus, Trash2, ExternalLink, Loader2 } from "lucide-react";
 import { useCartStore } from "@/stores/cartStore";
+import { useShopContextStore } from "@/stores/shopContextStore";
+import { formatMoney } from "@/lib/format-price";
 
 export function CartDrawer() {
+  const { t } = useTranslation();
+  const ctx = useShopContextStore();
   const [open, setOpen] = useState(false);
   const { items, isLoading, isSyncing, updateQuantity, removeItem, getCheckoutUrl, syncCart } = useCartStore();
   const totalItems = items.reduce((s, i) => s + i.quantity, 0);
   const totalPrice = items.reduce((s, i) => s + parseFloat(i.price.amount) * i.quantity, 0);
+  const currency = items[0]?.price.currencyCode ?? ctx.currency;
 
   useEffect(() => { if (open) syncCart(); }, [open, syncCart]);
 
@@ -35,13 +41,13 @@ export function CartDrawer() {
       </SheetTrigger>
       <SheetContent className="w-full sm:max-w-md flex flex-col">
         <SheetHeader>
-          <SheetTitle>Varukorg ({totalItems})</SheetTitle>
+          <SheetTitle>{t("cart.title")} ({totalItems})</SheetTitle>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto py-4 space-y-3">
           {items.length === 0 ? (
             <div className="text-center text-muted-foreground py-12">
               <ShoppingCart className="size-10 mx-auto mb-3 opacity-50" />
-              <p>Varukorgen är tom</p>
+              <p>{t("cart.empty")}</p>
             </div>
           ) : (
             items.map((item) => {
@@ -58,7 +64,7 @@ export function CartDrawer() {
                       {a.key}: {a.value}
                     </p>
                   ))}
-                  <p className="text-sm font-semibold mt-1">{item.price.amount} {item.price.currencyCode}</p>
+                  <p className="text-sm font-semibold mt-1">{formatMoney(parseFloat(item.price.amount), item.price.currencyCode, ctx.locale)}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <Button variant="ghost" size="icon" className="size-7" onClick={() => removeItem(item.variantId)}>
@@ -82,11 +88,11 @@ export function CartDrawer() {
         {items.length > 0 && (
           <div className="border-t pt-4 space-y-3">
             <div className="flex justify-between font-semibold">
-              <span>Totalt</span>
-              <span>{totalPrice.toFixed(0)} SEK</span>
+              <span>{t("cart.total")}</span>
+              <span>{formatMoney(totalPrice, currency, ctx.locale)}</span>
             </div>
             <Button className="w-full" size="lg" onClick={checkout} disabled={isLoading || isSyncing}>
-              {isLoading || isSyncing ? <Loader2 className="size-4 animate-spin" /> : <><ExternalLink className="size-4 mr-2" />Till kassan</>}
+              {isLoading || isSyncing ? <Loader2 className="size-4 animate-spin" /> : <><ExternalLink className="size-4 mr-2" />{t("cart.checkout")}</>}
             </Button>
           </div>
         )}

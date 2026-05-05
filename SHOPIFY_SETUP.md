@@ -2,6 +2,8 @@
 
 Följ stegen i ordning. Allt sker i din Shopify Admin — ingen Dev Dashboard, ingen CLI.
 
+> **Uppdaterar du befintligt snippet?** Steg 1 nedan innehåller nu `locale`, `currency`, `rate` och `country` i iframe-URL:en + en `pushContext()`-funktion som skickar `SHOP_CONTEXT` till editorn. Klistra över den gamla `personlig-karta-editor`-snippeten med blocket nedan så får editorn automatiskt rätt språk + valuta för varje kund.
+
 ---
 
 ## Steg 1 — Lägg till editor-snippet i temat
@@ -21,7 +23,7 @@ Följ stegen i ordning. Allt sker i din Shopify Admin — ingen Dev Dashboard, i
 <div class="lovable-map-editor-wrap">
   <iframe
     id="lovable-editor-iframe-{{ product.handle }}"
-    src="https://artful-create-studio-87.lovable.app/editor?handle={{ product.handle }}"
+    src="https://artful-create-studio-87.lovable.app/editor?handle={{ product.handle }}&locale={{ request.locale.iso_code }}&currency={{ cart.currency.iso_code }}&rate={{ cart.currency.rate | default: 1 }}&country={{ localization.country.iso_code }}"
     allow="clipboard-write; geolocation"
     loading="eager"
   ></iframe>
@@ -29,6 +31,26 @@ Följ stegen i ordning. Allt sker i din Shopify Admin — ingen Dev Dashboard, i
 <script>
 (function(){
   var iframe = document.getElementById('lovable-editor-iframe-{{ product.handle }}');
+
+  // Push current shop context (locale + currency + rate) to the editor.
+  // Sent on iframe load AND whenever the customer switches market/language
+  // on the parent page (Shopify dispatches no event for this, so we re-send
+  // on every visibility change as a safety net).
+  function pushContext() {
+    if (!iframe || !iframe.contentWindow) return;
+    iframe.contentWindow.postMessage({
+      type: 'SHOP_CONTEXT',
+      locale: {{ request.locale.iso_code | json }},
+      currency: {{ cart.currency.iso_code | json }},
+      rate: {{ cart.currency.rate | default: 1 }},
+      country: {{ localization.country.iso_code | json }}
+    }, '*');
+  }
+  iframe && iframe.addEventListener('load', pushContext);
+  document.addEventListener('visibilitychange', function(){
+    if (document.visibilityState === 'visible') pushContext();
+  });
+
   window.addEventListener('message', function(e) {
     var d = e.data;
     if (!d || typeof d !== 'object') return;

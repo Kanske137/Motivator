@@ -1,0 +1,137 @@
+{
+  "common": {
+    "addToCart": "Add to cart",
+    "loading": "Loading…",
+    "tryAgain": "Try again",
+    "remove": "Remove",
+    "reset": "Reset",
+    "yes": "Yes",
+    "no": "No",
+    "close": "Close",
+    "previous": "Previous",
+    "next": "Next"
+  },
+  "header": {
+    "yourChoice": "Your choice"
+  },
+  "cart": {
+    "title": "Cart",
+    "empty": "Your cart is empty",
+    "total": "Total",
+    "checkout": "Checkout"
+  },
+  "orientation": {
+    "portrait": "Portrait",
+    "landscape": "Landscape"
+  },
+  "section": {
+    "image": "Image",
+    "transformation": "Transformation",
+    "map": "Map",
+    "text": "Text",
+    "format": "Format"
+  },
+  "format": {
+    "backgroundColor": "Background colour",
+    "whiteMargin": "White margin",
+    "noActiveSizes": "This product has no active sizes configured yet.",
+    "product": "Product",
+    "size": "Size",
+    "selectSize": "Select size",
+    "depth": "Depth",
+    "material": "Material",
+    "finish": "Finish",
+    "frameOrHanger": "Frame / Hanger",
+    "orientation": "Orientation"
+  },
+  "productKind": {
+    "poster": "Poster",
+    "canvas": "Canvas",
+    "aluminum": "Aluminium",
+    "acrylic": "Acrylic"
+  },
+  "frame": {
+    "none": "None",
+    "white": "White",
+    "black": "Black",
+    "oak": "Oak",
+    "walnut": "Walnut",
+    "hangerOak": "Hanger Oak",
+    "hangerWalnut": "Hanger Walnut",
+    "hangerBlack": "Hanger Black",
+    "hangerWhite": "Hanger White",
+    "unavailable": "Unavailable",
+    "unavailableForSize": "Not available for this size"
+  },
+  "shape": {
+    "none": "None",
+    "circle": "Circle",
+    "heart": "Heart",
+    "star": "Star",
+    "mapShape": "Map shape",
+    "imageShape": "Image shape"
+  },
+  "map": {
+    "selectedPlace": "Selected place",
+    "searchAddress": "Search address or city",
+    "searchPlaceholder": "e.g. 10 Downing Street, London",
+    "tipDrag": "Tip: drag and zoom directly in the map to fine-tune.",
+    "showLabels": "Show area names on the map",
+    "tab": "Map {{n}}"
+  },
+  "text": {
+    "show": "Show text",
+    "placeholder": "Your text here…",
+    "font": "Font",
+    "tab": "Text {{n}}"
+  },
+  "layer": {
+    "size": "Size",
+    "tipMove": "Tip: drag the ✥ handle on the layer in the preview to move it.",
+    "imageTab": "Image {{n}}",
+    "transformationTab": "Transformation {{n}}"
+  },
+  "photo": {
+    "uploadCta": "Upload image",
+    "uploadHint": "JPG, PNG, WebP · max 25 MB",
+    "swap": "Swap image",
+    "altUploaded": "Uploaded image",
+    "tipCrop": "Drag the image to choose the crop within the frame.",
+    "errorOnlyImages": "Only image files are supported",
+    "errorTooLarge": "Image too large",
+    "errorTooLargeHint": "Max 25 MB. Compress and try again.",
+    "errorTooSmall": "Image too small for print ({{w}}×{{h}}). At least {{min}} px on the shortest side required."
+  },
+  "ai": {
+    "uploadFirst": "Upload an image first to be able to pick an AI style.",
+    "uploadFirstShort": "Upload an image first",
+    "chooseStyle": "Choose style",
+    "yourTried": "Your tried styles",
+    "removeFromHistory": "Remove from history",
+    "revertToOriginal": "Revert to photo without style",
+    "uploadFailed": "Could not upload the image",
+    "styleReused": "Style \"{{name}}\" reused",
+    "styleApplied": "Style \"{{name}}\" applied",
+    "styleFailed": "Could not apply the style",
+    "creatingImage": "Creating image",
+    "stagePrep": "Preparing your image…",
+    "stageUpload": "Uploading your image…",
+    "stageCreate": "Creating your image…",
+    "stageFetch": "Fetching result…",
+    "noResult": "The service returned no image",
+    "unknownError": "Unknown error"
+  },
+  "preview": {
+    "title": "Preview",
+    "enlarge": "Enlarge {{name}}",
+    "noImage": "No image",
+    "compositeFailed": "Composite failed",
+    "somethingWrong": "Something went wrong"
+  },
+  "cartAdd": {
+    "added": "Added to cart",
+    "prepareFailed": "Could not prepare print file",
+    "variantUnavailable": "This combination is not yet available in the store",
+    "variantUnavailableHint": "{{size}} · {{variant}} not found for {{handle}}."
+  }
+}

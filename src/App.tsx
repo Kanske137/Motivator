@@ -10,11 +10,13 @@ import AdminConfigs from "./pages/AdminConfigs.tsx";
 import DesignerPage from "./pages/admin/DesignerPage.tsx";
 
 import { useCartSync } from "./hooks/useCartSync";
+import { useShopContextBootstrap } from "./hooks/useShopContextBootstrap";
 
 const queryClient = new QueryClient();
 
 const AppRoutes = () => {
   useCartSync();
+  useShopContextBootstrap();
   return (
     <Routes>
       <Route path="/" element={<AdminConfigs />} />

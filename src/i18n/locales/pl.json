@@ -1,0 +1,65 @@
+{
+  "common": {
+    "addToCart": "Dodaj do koszyka", "loading": "Ładowanie…", "tryAgain": "Spróbuj ponownie", "remove": "Usuń", "reset": "Zresetuj",
+    "yes": "Tak", "no": "Nie", "close": "Zamknij", "previous": "Poprzedni", "next": "Następny"
+  },
+  "header": { "yourChoice": "Twój wybór" },
+  "cart": { "title": "Koszyk", "empty": "Twój koszyk jest pusty", "total": "Razem", "checkout": "Do kasy" },
+  "orientation": { "portrait": "Pionowo", "landscape": "Poziomo" },
+  "section": { "image": "Obraz", "transformation": "Przemiana", "map": "Mapa", "text": "Tekst", "format": "Format" },
+  "format": {
+    "backgroundColor": "Kolor tła", "whiteMargin": "Biały margines",
+    "noActiveSizes": "Ten produkt nie ma jeszcze skonfigurowanych aktywnych rozmiarów.",
+    "product": "Produkt", "size": "Rozmiar", "selectSize": "Wybierz rozmiar",
+    "depth": "Głębokość", "material": "Materiał", "finish": "Wykończenie", "frameOrHanger": "Rama / Wieszak", "orientation": "Orientacja"
+  },
+  "productKind": { "poster": "Plakat", "canvas": "Płótno", "aluminum": "Aluminium", "acrylic": "Akryl" },
+  "frame": {
+    "none": "Brak", "white": "Biały", "black": "Czarny", "oak": "Dąb", "walnut": "Orzech",
+    "hangerOak": "Wieszak Dąb", "hangerWalnut": "Wieszak Orzech", "hangerBlack": "Wieszak Czarny", "hangerWhite": "Wieszak Biały",
+    "unavailable": "Niedostępne", "unavailableForSize": "Niedostępne dla tego rozmiaru"
+  },
+  "shape": { "none": "Brak", "circle": "Koło", "heart": "Serce", "star": "Gwiazda", "mapShape": "Kształt mapy", "imageShape": "Kształt obrazu" },
+  "map": {
+    "selectedPlace": "Wybrane miejsce", "searchAddress": "Wyszukaj adres lub miasto",
+    "searchPlaceholder": "np. Marszałkowska 1, Warszawa",
+    "tipDrag": "Wskazówka: przeciągaj i powiększaj bezpośrednio na mapie, aby dopracować.",
+    "showLabels": "Pokaż nazwy obszarów na mapie", "tab": "Mapa {{n}}"
+  },
+  "text": { "show": "Pokaż tekst", "placeholder": "Twój tekst tutaj…", "font": "Czcionka", "tab": "Tekst {{n}}" },
+  "layer": {
+    "size": "Rozmiar",
+    "tipMove": "Wskazówka: przeciągnij uchwyt ✥ warstwy w podglądzie, aby ją przesunąć.",
+    "imageTab": "Obraz {{n}}", "transformationTab": "Przemiana {{n}}"
+  },
+  "photo": {
+    "uploadCta": "Prześlij obraz", "uploadHint": "JPG, PNG, WebP · maks. 25 MB",
+    "swap": "Zmień obraz", "altUploaded": "Przesłany obraz",
+    "tipCrop": "Przeciągnij obraz, aby wybrać kadr w ramce.",
+    "errorOnlyImages": "Obsługiwane są tylko pliki obrazów",
+    "errorTooLarge": "Obraz jest zbyt duży",
+    "errorTooLargeHint": "Maks. 25 MB. Skompresuj i spróbuj ponownie.",
+    "errorTooSmall": "Obraz zbyt mały do druku ({{w}}×{{h}}). Wymagane co najmniej {{min}} px na krótszej krawędzi."
+  },
+  "ai": {
+    "uploadFirst": "Najpierw prześlij obraz, aby móc wybrać styl AI.",
+    "uploadFirstShort": "Najpierw prześlij obraz",
+    "chooseStyle": "Wybierz styl", "yourTried": "Twoje wypróbowane style",
+    "removeFromHistory": "Usuń z historii", "revertToOriginal": "Wróć do zdjęcia bez stylu",
+    "uploadFailed": "Nie udało się przesłać obrazu",
+    "styleReused": "Styl „{{name}}\" użyty ponownie",
+    "styleApplied": "Styl „{{name}}\" zastosowany",
+    "styleFailed": "Nie udało się zastosować stylu",
+    "creatingImage": "Tworzenie obrazu",
+    "stagePrep": "Przygotowywanie obrazu…", "stageUpload": "Przesyłanie obrazu…",
+    "stageCreate": "Tworzenie obrazu…", "stageFetch": "Pobieranie wyniku…",
+    "noResult": "Usługa nie zwróciła obrazu", "unknownError": "Nieznany błąd"
+  },
+  "preview": { "title": "Podgląd", "enlarge": "Powiększ {{name}}", "noImage": "Brak obrazu", "compositeFailed": "Kompozycja nie powiodła się", "somethingWrong": "Coś poszło nie tak" },
+  "cartAdd": {
+    "added": "Dodano do koszyka",
+    "prepareFailed": "Nie udało się przygotować pliku do druku",
+    "variantUnavailable": "Ta kombinacja nie jest jeszcze dostępna w sklepie",
+    "variantUnavailableHint": "{{size}} · {{variant}} nie znaleziono dla {{handle}}."
+  }
+}
