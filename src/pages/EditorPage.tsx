@@ -317,9 +317,9 @@ export default function EditorPage() {
                 <span className="flex items-center justify-between w-full">
                   <span className="flex items-center">
                     <ShoppingCart className="h-4 w-4 mr-2" />
-                    Lägg i varukorg
+                    {t("common.addToCart")}
                   </span>
-                  <span className="text-base">{currentPrice()} kr</span>
+                  <span className="text-base">{formatPrice(currentPrice(), shopCtx)}</span>
                 </span>
               )}
             </Button>
@@ -333,7 +333,7 @@ export default function EditorPage() {
       {/* Mobile sticky bottom bar */}
       <div className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t bg-background p-3 flex items-center gap-3">
         <div className="flex-1 min-w-0">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Ditt val</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("header.yourChoice")}</div>
           <div className="text-xs font-medium leading-tight truncate">{summary}</div>
         </div>
         <Button
@@ -345,8 +345,8 @@ export default function EditorPage() {
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <span className="flex items-center justify-between w-full">
-              <span>Lägg i varukorg</span>
-              <span>{currentPrice()} kr</span>
+              <span>{t("common.addToCart")}</span>
+              <span>{formatPrice(currentPrice(), shopCtx)}</span>
             </span>
           )}
         </Button>
