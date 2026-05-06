@@ -322,7 +322,7 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
       {visibleVariants.length > 1 && (
         <div className="space-y-2">
           <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-            {isCanvas ? "Djup" : isAluminum ? "Material" : isAcrylic ? "Finish" : "Ram / Hängare"}
+            {isCanvas ? t("format.depth") : isAluminum ? t("format.material") : isAcrylic ? t("format.finish") : t("format.frameOrHanger")}
           </Label>
           <div className={`grid gap-2 ${isCanvas ? "grid-cols-2" : "grid-cols-3"}`}>
             {visibleVariants.map((v) => {
