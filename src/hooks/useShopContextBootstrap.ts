@@ -5,6 +5,19 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { normalizeLocale, useShopContextStore } from "@/stores/shopContextStore";
 
+/** Härled marknadsland från valutakoden när Shopify-temat inte skickar `country`.
+ *  Storefront API kräver en CountryCode för att returnera marknadsanpassade
+ *  priser — utan detta får vi alltid SEK tillbaka. */
+function countryFromCurrency(currency: string | null | undefined): string {
+  if (!currency) return "SE";
+  const map: Record<string, string> = {
+    SEK: "SE", NOK: "NO", DKK: "DK", EUR: "DE", USD: "US", GBP: "GB",
+    CHF: "CH", PLN: "PL", CZK: "CZ", HUF: "HU", RON: "RO", BGN: "BG",
+    CAD: "CA", AUD: "AU", NZD: "NZ", JPY: "JP", ISK: "IS",
+  };
+  return map[currency.toUpperCase()] ?? "SE";
+}
+
 export function useShopContextBootstrap() {
   const setContext = useShopContextStore((s) => s.setContext);
   const { i18n } = useTranslation();
