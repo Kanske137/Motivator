@@ -312,13 +312,14 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
               const matchVariant =
                 s.variants.find((v) => v.name === variantNameForCompare) ?? s.variants[0];
               const diff = (matchVariant?.price ?? 0) - currentSizeBasePrice;
+              const live = liveDelta(size, variantNameForCompare ?? null, s.size, matchVariant?.name ?? "");
               const isCurrent = s.size === size;
               return (
                 <SelectItem key={s.size} value={s.size}>
                   <div className="flex items-center justify-between w-full gap-4">
                     <span>{s.size} cm</span>
                     {!isCurrent && (
-                      <span className="text-xs text-muted-foreground">{formatDiff(diff)}</span>
+                      <span className="text-xs text-muted-foreground">{live ?? formatDiff(diff)}</span>
                     )}
                   </div>
                 </SelectItem>
@@ -337,6 +338,7 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
           <div className={`grid gap-2 ${isCanvas ? "grid-cols-2" : "grid-cols-3"}`}>
             {visibleVariants.map((v) => {
               const diff = v.price - currentVariantPrice;
+              const live = liveDelta(size, variant, size ?? "", v.name);
               const isNoFrame = v.name.toLowerCase() === "ingen";
               const hangerHex = HANGER_HEX[v.name];
               const isAvailable = v.available !== false;
@@ -356,7 +358,7 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
                   }
                   selected={v.name === variant}
                   onClick={() => setVariant(v.name)}
-                  priceLabel={formatDiff(diff)}
+                  priceLabel={live ?? formatDiff(diff)}
                   disabled={!isAvailable}
                   unavailableLabel={!isAvailable ? t("frame.unavailableForSize") : undefined}
                 />
