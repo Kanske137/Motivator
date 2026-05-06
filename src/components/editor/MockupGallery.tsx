@@ -29,6 +29,7 @@ type GallerySlot =
   | { kind: "detail"; id: string; label: string; thumbUrl: string; fullUrl: string };
 
 export function MockupGallery() {
+  const { t } = useTranslation();
   const {
     config, template, size, variant, orientation,
     mapStyleId, mapCenter, mapZoom,
