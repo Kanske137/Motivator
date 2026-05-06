@@ -49,11 +49,14 @@ export function useShopContextBootstrap() {
     const onMessage = (e: MessageEvent) => {
       const d = e.data;
       if (!d || typeof d !== "object" || d.type !== "SHOP_CONTEXT") return;
+      const currency = typeof d.currency === "string" ? d.currency : "SEK";
       const next = {
         locale: normalizeLocale(d.locale),
-        currency: typeof d.currency === "string" ? d.currency : "SEK",
+        currency,
         rate: typeof d.rate === "number" && d.rate > 0 ? d.rate : 1,
-        country: typeof d.country === "string" ? d.country : null,
+        country: typeof d.country === "string" && d.country
+          ? d.country
+          : countryFromCurrency(currency),
       };
       setContext(next);
       void i18n.changeLanguage(next.locale);
