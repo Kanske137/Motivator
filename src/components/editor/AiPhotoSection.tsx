@@ -67,6 +67,7 @@ async function blobToDataUrl(blob: Blob): Promise<string> {
 }
 
 export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const sources = useEditorStore((s) => s.aiPhotoSources);
   const results = useEditorStore((s) => s.aiPhotoResults);
