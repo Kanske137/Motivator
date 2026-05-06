@@ -514,6 +514,7 @@ function TextLayerSection({
   value: TextLayerValue | null;
   heading: string | null;
 }) {
+  const { t } = useTranslation();
   const setLayerText = useEditorStore((s) => s.setLayerText);
   const setLayerTextFont = useEditorStore((s) => s.setLayerTextFont);
   const setLayerTextVisible = useEditorStore((s) => s.setLayerTextVisible);
