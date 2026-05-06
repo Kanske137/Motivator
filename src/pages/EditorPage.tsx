@@ -62,7 +62,7 @@ export default function EditorPage() {
   const livePrice = priceFromMap(shopifyPriceMap, size, variant);
   const displayPrice = livePrice
     ? formatMoney(livePrice.amount, livePrice.currencyCode, shopCtx.locale)
-    : displayPrice;
+    : formatPrice(currentPrice(), shopCtx);
 
   // All configs that belong to the same template (same template_slug). Passed
   // down so FormatSection can render its poster/canvas toggle without having
