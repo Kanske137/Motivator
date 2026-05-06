@@ -9,28 +9,13 @@
     "no": "No",
     "close": "Close",
     "previous": "Previous",
-    "next": "Next"
+    "next": "Next",
+    "unknownError": "Unknown error"
   },
-  "header": {
-    "yourChoice": "Your choice"
-  },
-  "cart": {
-    "title": "Cart",
-    "empty": "Your cart is empty",
-    "total": "Total",
-    "checkout": "Checkout"
-  },
-  "orientation": {
-    "portrait": "Portrait",
-    "landscape": "Landscape"
-  },
-  "section": {
-    "image": "Image",
-    "transformation": "Transformation",
-    "map": "Map",
-    "text": "Text",
-    "format": "Format"
-  },
+  "header": { "yourChoice": "Your choice" },
+  "cart": { "title": "Cart", "empty": "Your cart is empty", "total": "Total", "checkout": "Checkout" },
+  "orientation": { "portrait": "Portrait", "landscape": "Landscape" },
+  "section": { "image": "Image", "transformation": "Transformation", "map": "Map", "text": "Text", "format": "Format", "aiStyle": "AI style" },
   "format": {
     "backgroundColor": "Background colour",
     "whiteMargin": "White margin",
@@ -44,33 +29,13 @@
     "frameOrHanger": "Frame / Hanger",
     "orientation": "Orientation"
   },
-  "productKind": {
-    "poster": "Poster",
-    "canvas": "Canvas",
-    "aluminum": "Aluminium",
-    "acrylic": "Acrylic"
-  },
+  "productKind": { "poster": "Poster", "canvas": "Canvas", "aluminum": "Aluminium", "acrylic": "Acrylic" },
   "frame": {
-    "none": "None",
-    "white": "White",
-    "black": "Black",
-    "oak": "Oak",
-    "walnut": "Walnut",
-    "hangerOak": "Hanger Oak",
-    "hangerWalnut": "Hanger Walnut",
-    "hangerBlack": "Hanger Black",
-    "hangerWhite": "Hanger White",
-    "unavailable": "Unavailable",
-    "unavailableForSize": "Not available for this size"
+    "none": "None", "white": "White", "black": "Black", "oak": "Oak", "walnut": "Walnut",
+    "hangerOak": "Hanger Oak", "hangerWalnut": "Hanger Walnut", "hangerBlack": "Hanger Black", "hangerWhite": "Hanger White",
+    "unavailable": "Unavailable", "unavailableForSize": "Not available for this size"
   },
-  "shape": {
-    "none": "None",
-    "circle": "Circle",
-    "heart": "Heart",
-    "star": "Star",
-    "mapShape": "Map shape",
-    "imageShape": "Image shape"
-  },
+  "shape": { "none": "None", "circle": "Circle", "heart": "Heart", "star": "Star", "mapShape": "Map shape", "imageShape": "Image shape" },
   "map": {
     "selectedPlace": "Selected place",
     "searchAddress": "Search address or city",
@@ -79,12 +44,7 @@
     "showLabels": "Show area names on the map",
     "tab": "Map {{n}}"
   },
-  "text": {
-    "show": "Show text",
-    "placeholder": "Your text here…",
-    "font": "Font",
-    "tab": "Text {{n}}"
-  },
+  "text": { "show": "Show text", "placeholder": "Your text here…", "font": "Font", "tab": "Text {{n}}" },
   "layer": {
     "size": "Size",
     "tipMove": "Tip: drag the ✥ handle on the layer in the preview to move it.",
@@ -100,7 +60,9 @@
     "errorOnlyImages": "Only image files are supported",
     "errorTooLarge": "Image too large",
     "errorTooLargeHint": "Max 25 MB. Compress and try again.",
-    "errorTooSmall": "Image too small for print ({{w}}×{{h}}). At least {{min}} px on the shortest side required."
+    "errorTooSmall": "Image too small for print ({{w}}×{{h}}). At least {{min}} px on the shortest side required.",
+    "errorWrongType": "The image must be JPEG, PNG or WebP.",
+    "errorReadFailed": "Could not read the image."
   },
   "ai": {
     "uploadFirst": "Upload an image first to be able to pick an AI style.",
@@ -118,15 +80,34 @@
     "stageUpload": "Uploading your image…",
     "stageCreate": "Creating your image…",
     "stageFetch": "Fetching result…",
-    "noResult": "The service returned no image",
-    "unknownError": "Unknown error"
+    "noResult": "The service returned no image"
+  },
+  "aiPhoto": {
+    "yourImage": "Your image",
+    "missingReference": "Missing reference image for this subject",
+    "notConfigured": "This product is not fully configured yet. Please contact support.",
+    "create": "Create now",
+    "recreate": "Create again",
+    "creating": "Creating…",
+    "ready": "Your image is ready",
+    "failed": "Could not create the image",
+    "friendlyFailed": "We couldn't create the image. Try another photo with a clear face and good lighting.",
+    "chooseStyleOptional": "Choose style (optional)",
+    "styleHintBackgroundOnly": "The background is always removed — the style only affects the subject.",
+    "subjectHintHuman": "The image should show the face straight on, well lit.",
+    "subjectHintPet": "The image should clearly show the animal's face, preferably from the front.",
+    "subjectHintRemoveBg": "Upload an image where the subject is clearly visible — we'll remove the background for you."
   },
   "preview": {
     "title": "Preview",
     "enlarge": "Enlarge {{name}}",
     "noImage": "No image",
     "compositeFailed": "Composite failed",
-    "somethingWrong": "Something went wrong"
+    "somethingWrong": "Something went wrong",
+    "threeDLabel": "3D view",
+    "threeDBadge": "3D",
+    "dragToRotate": "drag to rotate",
+    "title3D": "3D preview"
   },
   "cartAdd": {
     "added": "Added to cart",

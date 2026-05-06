@@ -9,32 +9,17 @@
     "no": "Nein",
     "close": "Schließen",
     "previous": "Zurück",
-    "next": "Weiter"
+    "next": "Weiter",
+    "unknownError": "Unbekannter Fehler"
   },
-  "header": {
-    "yourChoice": "Deine Auswahl"
-  },
-  "cart": {
-    "title": "Warenkorb",
-    "empty": "Dein Warenkorb ist leer",
-    "total": "Gesamt",
-    "checkout": "Zur Kasse"
-  },
-  "orientation": {
-    "portrait": "Hochformat",
-    "landscape": "Querformat"
-  },
-  "section": {
-    "image": "Bild",
-    "transformation": "Verwandlung",
-    "map": "Karte",
-    "text": "Text",
-    "format": "Format"
-  },
+  "header": { "yourChoice": "Deine Auswahl" },
+  "cart": { "title": "Warenkorb", "empty": "Dein Warenkorb ist leer", "total": "Gesamt", "checkout": "Zur Kasse" },
+  "orientation": { "portrait": "Hochformat", "landscape": "Querformat" },
+  "section": { "image": "Bild", "transformation": "Verwandlung", "map": "Karte", "text": "Text", "format": "Format", "aiStyle": "KI-Stil" },
   "format": {
     "backgroundColor": "Hintergrundfarbe",
     "whiteMargin": "Weißer Rand",
-    "noActiveSizes": "Für dieses Produkt sind noch keine Größen aktiviert.",
+    "noActiveSizes": "Für dieses Produkt sind noch keine aktiven Größen konfiguriert.",
     "product": "Produkt",
     "size": "Größe",
     "selectSize": "Größe wählen",
@@ -44,69 +29,46 @@
     "frameOrHanger": "Rahmen / Aufhänger",
     "orientation": "Ausrichtung"
   },
-  "productKind": {
-    "poster": "Poster",
-    "canvas": "Leinwand",
-    "aluminum": "Aluminium",
-    "acrylic": "Acryl"
-  },
+  "productKind": { "poster": "Poster", "canvas": "Leinwand", "aluminum": "Aluminium", "acrylic": "Acryl" },
   "frame": {
-    "none": "Keiner",
-    "white": "Weiß",
-    "black": "Schwarz",
-    "oak": "Eiche",
-    "walnut": "Nussbaum",
-    "hangerOak": "Aufhänger Eiche",
-    "hangerWalnut": "Aufhänger Nussbaum",
-    "hangerBlack": "Aufhänger Schwarz",
-    "hangerWhite": "Aufhänger Weiß",
-    "unavailable": "Nicht verfügbar",
-    "unavailableForSize": "Für diese Größe nicht verfügbar"
+    "none": "Keiner", "white": "Weiß", "black": "Schwarz", "oak": "Eiche", "walnut": "Nussbaum",
+    "hangerOak": "Aufhänger Eiche", "hangerWalnut": "Aufhänger Nussbaum", "hangerBlack": "Aufhänger Schwarz", "hangerWhite": "Aufhänger Weiß",
+    "unavailable": "Nicht verfügbar", "unavailableForSize": "Für diese Größe nicht verfügbar"
   },
-  "shape": {
-    "none": "Keine",
-    "circle": "Kreis",
-    "heart": "Herz",
-    "star": "Stern",
-    "mapShape": "Form der Karte",
-    "imageShape": "Form des Bildes"
-  },
+  "shape": { "none": "Keine", "circle": "Kreis", "heart": "Herz", "star": "Stern", "mapShape": "Form der Karte", "imageShape": "Form des Bildes" },
   "map": {
-    "selectedPlace": "Ausgewählter Ort",
+    "selectedPlace": "Gewählter Ort",
     "searchAddress": "Adresse oder Stadt suchen",
-    "searchPlaceholder": "z. B. Unter den Linden 1, Berlin",
-    "tipDrag": "Tipp: Direkt in der Karte ziehen und zoomen, um fein einzustellen.",
+    "searchPlaceholder": "z.B. Unter den Linden 1, Berlin",
+    "tipDrag": "Tipp: Karte direkt ziehen und zoomen, um sie anzupassen.",
     "showLabels": "Gebietsnamen auf der Karte anzeigen",
     "tab": "Karte {{n}}"
   },
-  "text": {
-    "show": "Text anzeigen",
-    "placeholder": "Dein Text hier…",
-    "font": "Schriftart",
-    "tab": "Text {{n}}"
-  },
+  "text": { "show": "Text anzeigen", "placeholder": "Dein Text hier…", "font": "Schriftart", "tab": "Text {{n}}" },
   "layer": {
     "size": "Größe",
-    "tipMove": "Tipp: Ziehe den ✥-Griff der Ebene in der Vorschau, um sie zu verschieben.",
+    "tipMove": "Tipp: Ziehe den ✥-Griff am Layer in der Vorschau, um ihn zu verschieben.",
     "imageTab": "Bild {{n}}",
     "transformationTab": "Verwandlung {{n}}"
   },
   "photo": {
     "uploadCta": "Bild hochladen",
     "uploadHint": "JPG, PNG, WebP · max. 25 MB",
-    "swap": "Bild ändern",
+    "swap": "Bild wechseln",
     "altUploaded": "Hochgeladenes Bild",
-    "tipCrop": "Ziehe das Bild, um den Ausschnitt im Rahmen zu wählen.",
-    "errorOnlyImages": "Nur Bilddateien werden unterstützt",
-    "errorTooLarge": "Das Bild ist zu groß",
-    "errorTooLargeHint": "Max. 25 MB. Komprimiere es und versuche es erneut.",
-    "errorTooSmall": "Bild zu klein für den Druck ({{w}}×{{h}}). Mindestens {{min}} px auf der kurzen Seite erforderlich."
+    "tipCrop": "Ziehe das Bild, um den Ausschnitt zu wählen.",
+    "errorOnlyImages": "Es werden nur Bilddateien unterstützt",
+    "errorTooLarge": "Bild zu groß",
+    "errorTooLargeHint": "Max. 25 MB. Komprimiere und versuche es erneut.",
+    "errorTooSmall": "Bild zu klein für den Druck ({{w}}×{{h}}). Mindestens {{min}} px an der kürzesten Seite erforderlich.",
+    "errorWrongType": "Das Bild muss JPEG, PNG oder WebP sein.",
+    "errorReadFailed": "Bild konnte nicht gelesen werden."
   },
   "ai": {
-    "uploadFirst": "Lade zuerst ein Bild hoch, um einen AI-Stil wählen zu können.",
+    "uploadFirst": "Lade zuerst ein Bild hoch, um einen KI-Stil zu wählen.",
     "uploadFirstShort": "Lade zuerst ein Bild hoch",
     "chooseStyle": "Stil wählen",
-    "yourTried": "Deine getesteten Stile",
+    "yourTried": "Deine ausprobierten Stile",
     "removeFromHistory": "Aus dem Verlauf entfernen",
     "revertToOriginal": "Zurück zum Foto ohne Stil",
     "uploadFailed": "Bild konnte nicht hochgeladen werden",
@@ -117,21 +79,40 @@
     "stagePrep": "Bild wird vorbereitet…",
     "stageUpload": "Bild wird hochgeladen…",
     "stageCreate": "Bild wird erstellt…",
-    "stageFetch": "Ergebnis wird abgerufen…",
-    "noResult": "Der Dienst hat kein Bild zurückgegeben",
-    "unknownError": "Unbekannter Fehler"
+    "stageFetch": "Ergebnis wird geladen…",
+    "noResult": "Der Dienst hat kein Bild zurückgegeben"
+  },
+  "aiPhoto": {
+    "yourImage": "Dein Bild",
+    "missingReference": "Referenzbild für dieses Motiv fehlt",
+    "notConfigured": "Dieses Produkt ist noch nicht vollständig konfiguriert. Bitte kontaktiere den Support.",
+    "create": "Jetzt erstellen",
+    "recreate": "Erneut erstellen",
+    "creating": "Erstelle…",
+    "ready": "Bild ist fertig",
+    "failed": "Bild konnte nicht erstellt werden",
+    "friendlyFailed": "Wir konnten das Bild nicht erstellen. Versuche es mit einem Foto mit klarem Gesicht und guter Beleuchtung.",
+    "chooseStyleOptional": "Stil wählen (optional)",
+    "styleHintBackgroundOnly": "Der Hintergrund wird immer entfernt — der Stil betrifft nur das Motiv.",
+    "subjectHintHuman": "Das Bild sollte das Gesicht von vorne zeigen, gut beleuchtet.",
+    "subjectHintPet": "Das Bild sollte das Gesicht des Tieres deutlich zeigen, am besten von vorne.",
+    "subjectHintRemoveBg": "Lade ein Bild hoch, auf dem das Motiv klar sichtbar ist — wir entfernen den Hintergrund für dich."
   },
   "preview": {
     "title": "Vorschau",
     "enlarge": "{{name}} vergrößern",
     "noImage": "Kein Bild",
     "compositeFailed": "Komposition fehlgeschlagen",
-    "somethingWrong": "Etwas ist schiefgelaufen"
+    "somethingWrong": "Etwas ist schiefgelaufen",
+    "threeDLabel": "3D-Ansicht",
+    "threeDBadge": "3D",
+    "dragToRotate": "ziehen zum Drehen",
+    "title3D": "3D-Vorschau"
   },
   "cartAdd": {
-    "added": "In den Warenkorb gelegt",
+    "added": "Zum Warenkorb hinzugefügt",
     "prepareFailed": "Druckdatei konnte nicht vorbereitet werden",
     "variantUnavailable": "Diese Kombination ist im Shop noch nicht verfügbar",
-    "variantUnavailableHint": "{{size}} · {{variant}} wurde für {{handle}} nicht gefunden."
+    "variantUnavailableHint": "{{size}} · {{variant}} wurde nicht für {{handle}} gefunden."
   }
 }
