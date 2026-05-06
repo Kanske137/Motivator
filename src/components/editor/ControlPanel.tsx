@@ -583,13 +583,14 @@ function PhotoShapeSection({
   value: PhotoLayerValue | null;
   heading: string | null;
 }) {
+  const { t } = useTranslation();
   const setLayerPhotoShape = useEditorStore((s) => s.setLayerPhotoShape);
   const shape = value?.shape ?? layer.defaults.shape;
   const options = [
-    { id: "rect", label: "Ingen", Icon: Square },
-    { id: "circle", label: "Cirkel", Icon: Circle },
-    { id: "heart", label: "Hjärta", Icon: Heart },
-    { id: "star", label: "Stjärna", Icon: Star },
+    { id: "rect", label: t("shape.none"), Icon: Square },
+    { id: "circle", label: t("shape.circle"), Icon: Circle },
+    { id: "heart", label: t("shape.heart"), Icon: Heart },
+    { id: "star", label: t("shape.star"), Icon: Star },
   ] as const;
 
   return (
@@ -602,7 +603,7 @@ function PhotoShapeSection({
       {!layer.locks.shape && (
         <>
           <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-            Bildens form
+            {t("shape.imageShape")}
           </Label>
           <div className="grid grid-cols-4 gap-2">
             {options.map(({ id, label, Icon }) => {
