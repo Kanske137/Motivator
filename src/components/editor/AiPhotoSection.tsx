@@ -119,11 +119,11 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
     const f = files?.[0];
     if (!f) return;
     if (!f.type.match(/^image\//)) {
-      toast.error("Endast bildfiler stöds");
+      toast.error(t("photo.errorOnlyImages"));
       return;
     }
     if (f.size > MAX_BYTES) {
-      toast.error("Bilden är för stor", { description: "Max 25 MB." });
+      toast.error(t("photo.errorTooLarge"), { description: t("photo.errorTooLargeHint") });
       return;
     }
     const url = URL.createObjectURL(f);
