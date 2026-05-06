@@ -251,6 +251,7 @@ function MapTabs({
   layers: Array<Extract<TemplateLayer, { type: "map" }>>;
   layerValues: Record<string, unknown>;
 }) {
+  const { t } = useTranslation();
   const [activeId, setActiveId] = useState<string>(layers[0]?.id ?? "");
 
   // If layers change (added/removed), make sure activeId still exists.
