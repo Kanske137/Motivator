@@ -12,23 +12,23 @@ const ZERO_DECIMAL_CURRENCIES = new Set(["SEK", "NOK", "DKK", "ISK", "JPY", "HUF
  * Mirrors Shopify's own conversion: amount * rate, rounded to currency norms.
  */
 export function formatPrice(sekAmount: number, ctx: ShopContext): string {
-  // Säkerhetsnät: om kunden har en annan valuta än SEK men temat inte skickade
-  // en växelkurs (rate=1) skulle vi annars visa SEK-talet med fel symbol
-  // (t.ex. "199 €"). Visa då i SEK istället tills Shopify-priser hinner laddas.
-  const safeCurrency = ctx.currency !== "SEK" && (!ctx.rate || ctx.rate === 1) ? "SEK" : ctx.currency;
-  const safeLocale = safeCurrency === "SEK" ? "sv" : ctx.locale;
-  const decimals = ZERO_DECIMAL_CURRENCIES.has(safeCurrency) ? 0 : 2;
-  const converted = safeCurrency === "SEK" ? sekAmount : sekAmount * (ctx.rate || 1);
+  const currency = ctx.currency || "SEK";
+  const locale = ctx.locale || "sv";
+  const decimals = ZERO_DECIMAL_CURRENCIES.has(currency) ? 0 : 2;
+  // Konvertera SEK → kundens valuta med Shopify-rate när den finns.
+  // Om rate saknas (=1) visar vi ändå rätt valutasymbol — det är bättre att
+  // visa ett ungefärligt belopp i rätt valuta tills Storefront-priser hinner
+  // laddas, än att fastna på "kr" för alla utländska kunder.
+  const converted = currency === "SEK" ? sekAmount : sekAmount * (ctx.rate || 1);
   try {
-    return new Intl.NumberFormat(safeLocale, {
+    return new Intl.NumberFormat(locale, {
       style: "currency",
-      currency: safeCurrency,
+      currency,
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
     }).format(converted);
   } catch {
-    // Fallback if locale/currency code is unsupported by the runtime.
-    return `${converted.toFixed(decimals)} ${safeCurrency}`;
+    return `${converted.toFixed(decimals)} ${currency}`;
   }
 }
 
