@@ -30,6 +30,8 @@ function syncContextToUrl(ctx: { locale: string; currency: string; rate: number;
   if (ctx.rate && ctx.rate !== 1) url.searchParams.set("rate", String(ctx.rate));
   window.history.replaceState(window.history.state, "", url.toString());
 }
+
+export function useShopContextBootstrap() {
   const setContext = useShopContextStore((s) => s.setContext);
   const { i18n } = useTranslation();
 
