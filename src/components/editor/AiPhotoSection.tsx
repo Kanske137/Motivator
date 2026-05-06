@@ -239,7 +239,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         },
       });
       if (error) throw error;
-      setStage("Hämtar resultat…");
+      setStage(t("ai.stageFetch"));
       const payload = data as {
         printFileUrl?: string;
         error?: string;
@@ -250,12 +250,12 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         replicateOutputUrl?: string;
       };
       if (payload?.error) {
-        const friendly = payload.userMessage ?? "Vi kunde inte skapa bilden. Prova en annan bild med tydligt ansikte och bra ljus.";
-        toast.error("Kunde inte skapa bilden", { description: friendly });
+        const friendly = payload.userMessage ?? t("aiPhoto.friendlyFailed");
+        toast.error(t("aiPhoto.failed"), { description: friendly });
         return;
       }
       const printFileUrl = payload?.printFileUrl;
-      if (!printFileUrl) throw new Error("Tjänsten returnerade ingen bild");
+      if (!printFileUrl) throw new Error(t("ai.noResult"));
       console.info("[AiPhoto] face-swap result", {
         layerId: layer.id,
         printFileUrl,
@@ -265,11 +265,11 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
       });
       setAiPhotoResult(layer.id, printFileUrl);
       if (hash) addFaceSwapToCache(layer.id, hash, cacheRefSlot, printFileUrl);
-      toast.success("Bilden är klar");
+      toast.success(t("aiPhoto.ready"));
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Okänt fel";
+      const msg = e instanceof Error ? e.message : t("common.unknownError");
       console.error("[AiPhoto] swap failed", e);
-      toast.error("Kunde inte skapa bilden", { description: msg });
+      toast.error(t("aiPhoto.failed"), { description: msg });
     } finally {
       setBusy(false);
       setStage(null);
