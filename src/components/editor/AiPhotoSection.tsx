@@ -42,12 +42,7 @@ interface Props {
 const ACCEPT = "image/jpeg,image/png,image/webp,image/heic";
 const MAX_BYTES = 25 * 1024 * 1024;
 
-const SUBJECT_HINT: Record<string, string> = {
-  human: "Bilden ska visa ansiktet rakt framifrån, väl belyst.",
-  pet: "Bilden ska visa djurets ansikte tydligt, gärna framifrån.",
-  removeBackground:
-    "Ladda upp bilden där motivet syns tydligt — vi tar bort bakgrunden åt dig.",
-};
+// Subject hints moved to i18n (aiPhoto.subjectHint*).
 
 /** Cache slot used in place of the admin reference URL for removeBackground.
  *  Including the style id keeps each style pick cached separately. */
