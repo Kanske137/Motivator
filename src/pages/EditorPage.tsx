@@ -58,6 +58,11 @@ export default function EditorPage() {
   const addItem = useCartStore((s) => s.addItem);
   const isAdding = useCartStore((s) => s.isLoading);
   const [isPreparing, setIsPreparing] = useState(false);
+  const shopifyPriceMap = useShopifyPriceMap();
+  const livePrice = priceFromMap(shopifyPriceMap, size, variant);
+  const displayPrice = livePrice
+    ? formatMoney(livePrice.amount, livePrice.currencyCode, shopCtx.locale)
+    : formatPrice(currentPrice(), shopCtx);
 
   // All configs that belong to the same template (same template_slug). Passed
   // down so FormatSection can render its poster/canvas toggle without having
