@@ -234,11 +234,11 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
       {/* Vit marginal — Ja/Nej toggle, visas endast om mallen har ett margin-lager */}
       {hasMarginLayer && (
         <div className="space-y-2">
-          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Vit marginal</Label>
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("format.whiteMargin")}</Label>
           <div className="flex p-1 bg-muted rounded-full">
             {([
-              { id: true, label: "Ja" },
-              { id: false, label: "Nej" },
+              { id: true, label: t("common.yes") },
+              { id: false, label: t("common.no") },
             ] as const).map(({ id, label }) => {
               const active = whiteMarginEnabled === id;
               return (
