@@ -348,7 +348,7 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
                   onClick={() => setVariant(v.name)}
                   priceLabel={formatDiff(diff)}
                   disabled={!isAvailable}
-                  unavailableLabel={!isAvailable ? "Ej tillgänglig för denna storlek" : undefined}
+                  unavailableLabel={!isAvailable ? t("frame.unavailableForSize") : undefined}
                 />
               );
             })}
