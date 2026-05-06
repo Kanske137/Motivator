@@ -71,9 +71,9 @@ export function PhotoUploadSection() {
           )}
         >
           <Upload className="h-6 w-6 text-muted-foreground" />
-          <span className="text-sm font-medium">Ladda upp bild</span>
+          <span className="text-sm font-medium">{t("photo.uploadCta")}</span>
           <span className="text-[11px] text-muted-foreground">
-            JPG, PNG, WebP · max 25 MB
+            {t("photo.uploadHint")}
           </span>
         </button>
       ) : (
@@ -82,7 +82,7 @@ export function PhotoUploadSection() {
             {photoPreviewUrl ? (
               <img
                 src={photoPreviewUrl}
-                alt="Uppladdad bild"
+                alt={t("photo.altUploaded")}
                 className="w-full h-full object-cover"
               />
             ) : (
@@ -100,7 +100,7 @@ export function PhotoUploadSection() {
               onClick={() => inputRef.current?.click()}
             >
               <Upload className="h-3.5 w-3.5 mr-1.5" />
-              Byt bild
+              {t("photo.swap")}
             </Button>
             <Button
               type="button"
@@ -110,11 +110,11 @@ export function PhotoUploadSection() {
               className="text-destructive hover:text-destructive"
             >
               <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-              Ta bort
+              {t("common.remove")}
             </Button>
           </div>
           <p className="text-[11px] text-muted-foreground">
-            Dra i bilden för att välja utsnitt inom ramen.
+            {t("photo.tipCrop")}
           </p>
         </div>
       )}
