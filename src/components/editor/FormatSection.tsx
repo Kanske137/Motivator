@@ -158,10 +158,10 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
     acrylic: "acrylic",
   };
   const KIND_LABEL: Record<Kind, string> = {
-    poster: "Poster",
-    canvas: "Canvas",
-    aluminum: "Aluminium",
-    acrylic: "Akryl",
+    poster: t("productKind.poster"),
+    canvas: t("productKind.canvas"),
+    aluminum: t("productKind.aluminum"),
+    acrylic: t("productKind.acrylic"),
   };
   const kindToConfig = new Map<Kind, ProductConfig>();
   for (const c of sameTemplateConfigs) {
