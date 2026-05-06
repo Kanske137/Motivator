@@ -224,7 +224,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         }
       }
 
-      setStage("Skapar din bild…");
+      setStage(t("ai.stageCreate"));
       const { data, error } = await supabase.functions.invoke("replicate-face-swap", {
         body: {
           referenceImageUrl: refUrl,
