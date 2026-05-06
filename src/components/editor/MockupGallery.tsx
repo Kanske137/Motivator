@@ -128,7 +128,7 @@ export function MockupGallery() {
               });
               return { scene, url, error: undefined as string | undefined };
             } catch (e) {
-              const msg = e instanceof Error ? e.message : "Composit misslyckades";
+              const msg = e instanceof Error ? e.message : t("preview.compositeFailed");
               return { scene, url: null as string | null, error: msg };
             }
           }),
