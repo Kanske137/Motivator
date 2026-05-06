@@ -290,7 +290,7 @@ export function MockupGallery() {
 
       <Dialog open={lightboxIdx !== null} onOpenChange={(o) => !o && setLightboxIdx(null)}>
         <DialogContent className="max-w-[95vw] md:max-w-4xl p-0 bg-background border-0 overflow-hidden">
-          <DialogTitle className="sr-only">{currentSlot?.label ?? "Förhandsgranska"}</DialogTitle>
+          <DialogTitle className="sr-only">{currentSlot?.label ?? t("preview.title")}</DialogTitle>
           {currentSlot && (
             <div className="relative bg-muted">
               {currentSlot.kind === "threeD" ? (
