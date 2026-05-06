@@ -18,7 +18,18 @@ function countryFromCurrency(currency: string | null | undefined): string {
   return map[currency.toUpperCase()] ?? "SE";
 }
 
-export function useShopContextBootstrap() {
+/** Skriv tillbaka shop-kontext i URL:en (utan reload) så att allt — inklusive
+ *  tredjepartsverktyg och konsoltester som `URLSearchParams(location.search)` —
+ *  ser samma `locale/currency/country/rate` som appen använder internt. */
+function syncContextToUrl(ctx: { locale: string; currency: string; rate: number; country: string }) {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  url.searchParams.set("locale", ctx.locale);
+  url.searchParams.set("currency", ctx.currency);
+  url.searchParams.set("country", ctx.country);
+  if (ctx.rate && ctx.rate !== 1) url.searchParams.set("rate", String(ctx.rate));
+  window.history.replaceState(window.history.state, "", url.toString());
+}
   const setContext = useShopContextStore((s) => s.setContext);
   const { i18n } = useTranslation();
 
