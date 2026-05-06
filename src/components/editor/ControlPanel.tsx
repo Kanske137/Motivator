@@ -313,6 +313,7 @@ function PlaceLayerSection({
   value: MapLayerValue | null;
   heading: string | null;
 }) {
+  const { t } = useTranslation();
   const applyPlaceToLayer = useEditorStore((s) => s.applyPlaceToLayer);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<GeocodeResult[]>([]);
