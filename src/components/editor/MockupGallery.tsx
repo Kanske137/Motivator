@@ -321,7 +321,7 @@ export function MockupGallery() {
                     size="icon"
                     onClick={goPrev}
                     className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full shadow-lg bg-background/90 hover:bg-background z-10"
-                    aria-label="Föregående"
+                    aria-label={t("common.previous")}
                   >
                     <ChevronLeft className="h-5 w-5" />
                   </Button>
@@ -331,7 +331,7 @@ export function MockupGallery() {
                     size="icon"
                     onClick={goNext}
                     className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full shadow-lg bg-background/90 hover:bg-background z-10"
-                    aria-label="Nästa"
+                    aria-label={t("common.next")}
                   >
                     <ChevronRight className="h-5 w-5" />
                   </Button>
