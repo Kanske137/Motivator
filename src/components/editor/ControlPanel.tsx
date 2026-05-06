@@ -289,11 +289,14 @@ function MapTabs({
     <div className="space-y-4">
       <Tabs value={activeId} onValueChange={setActiveId}>
         <TabsList className="w-full justify-start overflow-x-auto">
-          {layers.map((l, idx) => (
-            <TabsTrigger key={l.id} value={l.id} className="text-xs">
-              {l.name || `Karta ${idx + 1}`}
-            </TabsTrigger>
-          ))}
+          {layers.map((l, idx) => {
+            const { t } = useTranslation();
+            return (
+              <TabsTrigger key={l.id} value={l.id} className="text-xs">
+                {l.name || t("map.tab", { n: idx + 1 })}
+              </TabsTrigger>
+            );
+          })}
         </TabsList>
       </Tabs>
       {renderForLayer(activeLayer)}
