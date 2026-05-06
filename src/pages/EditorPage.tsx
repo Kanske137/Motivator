@@ -4,7 +4,9 @@ import { useTranslation } from "react-i18next";
 import { Loader2, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useShopContextStore } from "@/stores/shopContextStore";
-import { formatPrice } from "@/lib/format-price";
+import { formatPrice, formatMoney } from "@/lib/format-price";
+import { useShopifyPriceMap, priceFromMap } from "@/hooks/useShopifyPriceMap";
+import { translateVariantName } from "@/lib/variant-labels";
 import { useEditorStore } from "@/stores/editorStore";
 import {
   loadAllConfigs,
