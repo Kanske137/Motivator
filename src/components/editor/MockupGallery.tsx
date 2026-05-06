@@ -175,7 +175,7 @@ export function MockupGallery() {
       list.push({
         kind: "threeD",
         id: "3d",
-        label: "3D-vy",
+        label: t("preview.threeDLabel"),
         thumbUrl: snapshotUrl,
         loading: snapshotLoading,
         error: snapshotError,
