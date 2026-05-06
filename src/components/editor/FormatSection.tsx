@@ -75,7 +75,15 @@ DepthIcon.displayName = "DepthIcon";
 export function FormatSection({ configs, activeHandle, onProductChange }: Props) {
   const { t } = useTranslation();
   const shopCtx = useShopContextStore();
-  const formatDiff = (d: number) => formatPriceDelta(d, shopCtx);
+  const priceMap = useShopifyPriceMap();
+  const formatDiff = (sekDiff: number) => formatPriceDelta(sekDiff, shopCtx);
+  /** Compute size delta in customer currency: prefer live Shopify prices when both targets exist. */
+  const liveDelta = (sizeA: string | null, variantA: string | null, sizeB: string, variantB: string): string | null => {
+    const a = priceFromMap(priceMap, sizeA, variantA);
+    const b = priceFromMap(priceMap, sizeB, variantB);
+    if (!a || !b || a.currencyCode !== b.currencyCode) return null;
+    return formatMoneyDelta(b.amount - a.amount, b.currencyCode, shopCtx.locale);
+  };
   const { config, productOptions, template, size, variant, orientation, setSize, setVariant, setOrientation } = useEditorStore();
 
   const allowedOrientations = template?.orientations ?? ["portrait", "landscape"];
