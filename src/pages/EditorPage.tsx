@@ -62,7 +62,7 @@ export default function EditorPage() {
   const livePrice = priceFromMap(shopifyPriceMap, size, variant);
   const displayPrice = livePrice
     ? formatMoney(livePrice.amount, livePrice.currencyCode, shopCtx.locale)
-    : formatPrice(currentPrice(), shopCtx);
+    : displayPrice;
 
   // All configs that belong to the same template (same template_slug). Passed
   // down so FormatSection can render its poster/canvas toggle without having
@@ -329,7 +329,7 @@ export default function EditorPage() {
                     <ShoppingCart className="h-4 w-4 mr-2" />
                     {t("common.addToCart")}
                   </span>
-                  <span className="text-base">{formatPrice(currentPrice(), shopCtx)}</span>
+                  <span className="text-base">{displayPrice}</span>
                 </span>
               )}
             </Button>
@@ -356,7 +356,7 @@ export default function EditorPage() {
           ) : (
             <span className="flex items-center justify-between w-full">
               <span>{t("common.addToCart")}</span>
-              <span>{formatPrice(currentPrice(), shopCtx)}</span>
+              <span>{displayPrice}</span>
             </span>
           )}
         </Button>
