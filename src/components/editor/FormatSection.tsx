@@ -2,7 +2,8 @@ import { forwardRef, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useEditorStore } from "@/stores/editorStore";
 import { useShopContextStore } from "@/stores/shopContextStore";
-import { formatPriceDelta } from "@/lib/format-price";
+import { formatPriceDelta, formatMoneyDelta } from "@/lib/format-price";
+import { useShopifyPriceMap, priceFromMap } from "@/hooks/useShopifyPriceMap";
 import { translateVariantName } from "@/lib/variant-labels";
 import { Label } from "@/components/ui/label";
 import {
