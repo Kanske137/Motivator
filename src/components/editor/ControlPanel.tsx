@@ -419,6 +419,7 @@ function MapStyleLayerSection({
   value: MapLayerValue | null;
   heading: string | null;
 }) {
+  const { t } = useTranslation();
   const setLayerMapStyle = useEditorStore((s) => s.setLayerMapStyle);
   const setLayerShowLabels = useEditorStore((s) => s.setLayerShowLabels);
   const setLayerMapShape = useEditorStore((s) => s.setLayerMapShape);
@@ -434,10 +435,10 @@ function MapStyleLayerSection({
   );
 
   const shapeOptions = ([
-    { id: "rect", label: "Ingen", Icon: Square },
-    { id: "circle", label: "Cirkel", Icon: Circle },
-    { id: "heart", label: "Hjärta", Icon: Heart },
-    { id: "star", label: "Stjärna", Icon: Star },
+    { id: "rect", label: t("shape.none"), Icon: Square },
+    { id: "circle", label: t("shape.circle"), Icon: Circle },
+    { id: "heart", label: t("shape.heart"), Icon: Heart },
+    { id: "star", label: t("shape.star"), Icon: Star },
   ] as const);
 
   return (
