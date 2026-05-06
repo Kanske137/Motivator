@@ -358,12 +358,12 @@ function PlaceLayerSection({
         </h4>
       )}
       <div className="space-y-1">
-        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Vald plats</Label>
+        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("map.selectedPlace")}</Label>
         <p className="text-sm font-medium font-serif-display">{placeName}</p>
       </div>
       <div className="space-y-2">
         <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-          Sök adress eller stad
+          {t("map.searchAddress")}
         </Label>
         <Popover open={results.length > 0}>
           <PopoverTrigger asChild>
@@ -372,7 +372,7 @@ function PlaceLayerSection({
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="t.ex. Drottninggatan 1, Stockholm"
+                placeholder={t("map.searchPlaceholder")}
                 className="pl-10 pr-10 h-12 rounded-full bg-background shadow-inner"
               />
               {searching && (
@@ -401,7 +401,7 @@ function PlaceLayerSection({
         </Popover>
       </div>
       <p className="text-[11px] text-muted-foreground">
-        Tips: dra och zooma direkt i kartan för att finjustera.
+        {t("map.tipDrag")}
       </p>
       <LayerTransformControls layer={layer} />
     </div>
