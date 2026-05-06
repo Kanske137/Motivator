@@ -246,7 +246,7 @@ export function MockupGallery() {
                   disabled={openableIdx < 0}
                   onClick={() => openableIdx >= 0 && setLightboxIdx(openableIdx)}
                   className="group flex-shrink-0 w-32 h-32 md:w-40 md:h-40 rounded-2xl overflow-hidden bg-card border snap-start relative disabled:cursor-default cursor-zoom-in"
-                  aria-label={`Förstora ${s.label}`}
+                  aria-label={t("preview.enlarge", { name: s.label })}
                 >
                   {isLoading ? (
                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/40 animate-pulse">
