@@ -265,7 +265,7 @@ export function MockupGallery() {
                       {s.kind === "threeD" && (
                         <span className="absolute top-1.5 left-1.5 inline-flex items-center gap-1 rounded-full bg-foreground/85 text-background text-[10px] font-semibold px-2 py-0.5 backdrop-blur-sm">
                           <Box className="h-3 w-3" />
-                          3D
+                          {t("preview.threeDBadge")}
                         </span>
                       )}
                       <span className="absolute top-1.5 right-1.5 inline-flex items-center justify-center h-6 w-6 rounded-full bg-background/85 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition">
