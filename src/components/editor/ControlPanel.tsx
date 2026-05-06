@@ -536,7 +536,7 @@ function TextLayerSection({
       )}
       {!layer.locks.visibility && (
         <div className="flex items-center justify-between">
-          <Label className="text-xs text-foreground">Visa text</Label>
+          <Label className="text-xs text-foreground">{t("text.show")}</Label>
           <Switch checked={visible} onCheckedChange={(v) => setLayerTextVisible(layer.id, v)} />
         </div>
       )}
@@ -544,7 +544,7 @@ function TextLayerSection({
         <Textarea
           value={text}
           onChange={(e) => setLayerText(layer.id, e.target.value)}
-          placeholder="Din text här…"
+          placeholder={t("text.placeholder")}
           maxLength={config.text_config.maxChars}
           rows={3}
           className="rounded-xl"
@@ -552,7 +552,7 @@ function TextLayerSection({
       )}
       {!layer.locks.font && (
         <div className="space-y-2">
-          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Typsnitt</Label>
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("text.font")}</Label>
           <div className="grid grid-cols-3 gap-2">
             {allowedFonts.map((f) => (
               <Button
