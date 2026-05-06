@@ -251,8 +251,8 @@ export default function EditorPage() {
       if (variantGid) setShopifyVariantId(variantGid);
     }
     if (!variantGid) {
-      toast.error("Den här kombinationen är inte tillgänglig i butiken ännu", {
-        description: `${size} · ${variant} hittades inte för ${config.shopify_handle}.`,
+      toast.error(t("cartAdd.variantUnavailable"), {
+        description: t("cartAdd.variantUnavailableHint", { size, variant, handle: config.shopify_handle }),
       });
       return;
     }
