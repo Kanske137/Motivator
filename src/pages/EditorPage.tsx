@@ -130,7 +130,10 @@ export default function EditorPage() {
     : 0;
 
   const orientationLabel = orientation === "portrait" ? t("orientation.portrait") : t("orientation.landscape");
-  const variantLabel = config?.product_type === "canvas" ? `${variant ?? ""} ${t("format.depth").toLowerCase()}` : `${variant ?? ""}`;
+  const translatedVariant = translateVariantName(variant, t);
+  const variantLabel = config?.product_type === "canvas"
+    ? `${translatedVariant} ${t("format.depth").toLowerCase()}`
+    : translatedVariant;
   const summary = [size ? `${size} cm` : null, variantLabel.trim() ? variantLabel : null, orientationLabel]
     .filter(Boolean)
     .join(" · ");
@@ -195,8 +198,8 @@ export default function EditorPage() {
       previewUrl = await uploadCartPreview(thumbDataUrl, designId);
     } catch (err) {
       console.error("[print-pipeline] failed", err);
-      const msg = err instanceof Error ? err.message : "Okänt fel";
-      toast.error("Kunde inte förbereda tryckfil", { description: msg });
+      const msg = err instanceof Error ? err.message : t("common.unknownError");
+      toast.error(t("cartAdd.prepareFailed"), { description: msg });
       setIsPreparing(false);
       return; // ABORT — do NOT add a broken item to the cart.
     } finally {
@@ -236,7 +239,7 @@ export default function EditorPage() {
         },
         "*"
       );
-      toast.success("Lagt till i varukorgen");
+      toast.success(t("cartAdd.added"));
       return;
     }
 
