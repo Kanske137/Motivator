@@ -1,77 +1,97 @@
 ## Mål
+1. Översätt allt som fortfarande visas på svenska (ramnamn, mockup-thumbnail-labels m.fl.).
+2. Fixa valutan så att summan stämmer exakt med Shopifys konverterade pris (just nu visas SEK-talet med fel valutasymbol = `rate` saknas/är 1).
 
-Editorn (iframe i Shopify-temat) ska automatiskt visa **samma språk och valuta** som butiken visar för kunden — utan val i appen. Stöd för sv (default), en, de + förberedd struktur för fler europeiska språk (no, da, fi, fr, es, it, nl, pl). Pris vid checkout = exakt det Shopify visar.
+---
 
-## Tema-snippet — behövs uppdatering?
+## Del 1 — Kvarvarande oöversatta texter
 
-**Ja, en liten uppdatering krävs i testbutiken** (3 rader till i befintlig snippet i `personlig-karta-editor`). Mycket lite jobb:
+Efter genomgång hittades dessa hårdkodade svenska strängar:
 
-- `src=...?handle=...` → utöka med `&locale={{ request.locale.iso_code }}&currency={{ cart.currency.iso_code }}&country={{ localization.country.iso_code }}`
-- Lägg till en liten `<script>` som vid iframe-load `postMessage`:ar `{ type: 'SHOP_CONTEXT', locale, currency, rate, country }` så att appen kan reagera även om kunden byter språk/valuta utan att ladda om.
+**A. Ramvarianter (Ingen / Vit / Svart / Ek / Valnöt / Hängare …)**
+- Datakällan (`src/lib/pricing.ts`, `product-config.ts`) MÅSTE behålla svenska nycklar — de används som ID mot Shopify-varianter, Gelato SKU-mappning och pris-tabeller. Vi översätter bara *visningen*.
+- Lägg till en `frameVariantLabel(name, t)`-helper i `src/lib/format-price.ts` (eller ny `src/lib/variant-labels.ts`) som mappar svenska variantnamn → i18n-nyckel:
+  - `Ingen` → `frame.none`
+  - `Vit` → `frame.white`, `Svart` → `frame.black`, `Ek` → `frame.oak`, `Valnöt` → `frame.walnut`
+  - `Hängare Vit/Svart/Ek/Valnöt` → `frame.hangerWhite/Black/Oak/Walnut`
+  - Canvas djup `2 cm` / `4 cm` → `format.depthValue` med `{cm}`
+- Använd helpern i:
+  - `FormatSection.tsx` (FrameOption `name` + dropdown-summary)
+  - `EditorPage.tsx` (`summary` raden + `Lagt till i varukorgen`-toast)
+  - `CartDrawer.tsx` om variantnamn visas där
+  - `FrameOption.tsx` `aria-label` / unavailableLabel ("Ej tillgänglig" → `frame.unavailable`)
 
-Resten av snippet (cart-add-flödet, resize) är oförändrat. När appen flyttas till nya temat följer samma 10-radersändring med — temat i sig spelar ingen roll, bara att snippet sitter i en `custom-liquid`-sektion som idag.
+**B. Mockup-thumbnail-labels** (`src/lib/mockup-scenes.ts`)
+- "Vardagsrum / Sovrum / Kontor / På vägg" är hårdkodade.
+- Behåll `id` som datanyckel; flytta `label` → `labelKey: "scene.livingroom"` osv. och låt `MockupGallery.tsx` köra `t(scene.labelKey)`.
 
-`SHOPIFY_SETUP.md` uppdateras med det nya snippet-innehållet.
+**C. Produktdetalj-bilder** (`src/components/editor/product-details.ts`)
+- "Pappersdetalj / Ramval / Hörndetalj / Baksida & upphängning / Kantdetalj / Montering / Skruvhörn" — samma mönster: byt `label` → `labelKey` (`detail.posterPaper` etc.) och översätt i komponenten.
 
-## Lösning
+**D. Toasts / fallback-meddelanden**
+- `EditorPage.tsx`: `"Kunde inte förbereda tryckfil"`, `"Okänt fel"`, `"Lagt till i varukorgen"`, `"Den här kombinationen är inte tillgänglig …"` → flytta till `toast.*`-nycklar.
+- `FrameOption.tsx`: `"Ej tillgänglig"` default.
 
-### A. i18n (språk)
+**E. Översättningsfiler**
+- Lägg till alla nya nycklar i alla 11 språk (`sv` är källa).
 
-- Installera `react-i18next` + `i18next`.
-- Skapa `src/i18n/index.ts` som initierar med resurser och läser locale från:
-  1. `?locale=` i URL (sätts av tema-snippet)
-  2. `postMessage` `SHOP_CONTEXT` (live-uppdatering)
-  3. `navigator.language` (fallback utanför iframe)
-  4. `sv` (slutfallback)
-- Region-mappning: `en-GB` → `en`, `de-AT` → `de` osv.
-- Resursfiler i `src/i18n/locales/`: `sv.json` (källa), `en.json`, `de.json`, `no.json`, `da.json`, `fi.json`, `fr.json`, `es.json`, `it.json`, `nl.json`, `pl.json`. Översättningar genereras initialt för en/de (manuellt kvalitetsskrivna), övriga europeiska språk får en första maskin-översättning som du kan finputsa.
-- **Alla** hårdkodade UI-strängar extraheras till nycklar (knappar, sektionsrubriker, mockup-titlar, ramnamn där det är generiska "Ingen/Vit/Svart/Ek/Valnöt/Hängare …", toasts, validering, fält-etiketter).
+---
 
-### B. Valuta & pris (Shopifys egna värden)
+## Del 2 — Korrekt valutakonvertering (matchar Shopify exakt)
 
-Eftersom du vill att slutpriset = exakt det Shopify visar/debiterar, kör vi **Shopifys egen konvertering**:
+### Problem
+Just nu visas `199 €` istället för t.ex. `17,90 €`. Det betyder att `rate` som temat skickar är `1` (eller saknas helt), så `formatPrice` bara byter symbolen utan att räkna om.
 
-- Tema-snippet skickar in `currency` (kundens valda) + `rate` (Shopifys multiplikator från SEK).
-- I appen: ny `useShopContext()`-store (Zustand) håller `{ locale, currency, rate, country }`.
-- Ny `formatPrice(sekAmount, ctx)` helper:
-  - `converted = round(sekAmount * rate)` med Shopifys avrundningsregler (heltal för SEK/NOK/DKK/JPY, 2 decimaler för EUR/USD/GBP osv.).
-  - Formatera via `Intl.NumberFormat(locale, { style: 'currency', currency })`.
-- Editorn visar då **samma belopp** som produktsidan i samma butik visar i kundens valuta. Vid checkout används Shopifys cart (vi har redan rätt valuta i `cart.cost`-svaret) → identiskt belopp betalas.
-- Cart-drawer: ta bort hårdkodad `"SEK"`/`" kr"`. Använd `currencyCode` + locale från Shopify-svaret.
+Att förlita sig på `cart.currency.rate` i Liquid är bräckligt — det fältet är inte alltid satt och avrundar inte exakt som Shopifys storefront-rendering. Den enda källan som *garanterat* ger samma siffra som kassan är **Storefront API med `@inContext(country: …)`**.
 
-### C. Bevarad referens (intern)
+### Lösning: hämta priset direkt från Shopify per produkt
 
-`pricing.ts` förblir SEK — det är källan för Gelato-marginaler och variant-mapping. Ingenting i print/order-flödet ändras.
+1. **Behåll SEK-tabellen som intern källa** för Gelato-marginaler — ingen ändring i `pricing.ts`.
+2. **Ny hook `useShopifyVariantPrice(variantGid, country)`** som anropar Storefront API:
+   ```graphql
+   query($id: ID!, $country: CountryCode!) @inContext(country: $country) {
+     node(id: $id) { ... on ProductVariant { price { amount currencyCode } } }
+   }
+   ```
+   Returnerar `{ amount, currencyCode }` i kundens valuta — exakt samma värde som Shopify visar i kassan.
+3. **Ny store-utility `useDisplayPrice()`**:
+   - Om en `shopifyPrice` finns för aktiv variant → visa den som-den-är.
+   - Annars (admin-läge, okonfigurerad variant, första laddning) → fall tillbaka på `formatPrice(sekAmount, ctx)` som idag.
+4. **För pris-deltan** ("+99 kr" mellan storlekar/ramar): hämta priser för alla synliga varianter i ett enda batch-query när storleks-/ram-väljaren öppnas, och räkna delta i kundens valuta. Cache:a per `(handle, country)` i en Zustand-map så vi inte spammar API:et.
+5. **Add-to-cart-knappens summa** + **mobile sticky-bar** + **storleks-/ram-dropdownen** i `FormatSection` läser från samma hook → garanterad konsistens med Shopify.
 
-## Filer
+### Theme-snippet
+- Behåll `country` och `locale` i query-params (de behövs för i18n och Storefront-context).
+- `currency` och `rate` blir då rena fallbacks för admin-läge — behöver inte ändras i temat.
 
-**Nya**
-- `src/i18n/index.ts`
-- `src/i18n/locales/{sv,en,de,no,da,fi,fr,es,it,nl,pl}.json`
-- `src/stores/shopContextStore.ts` — locale/currency/rate/country + postMessage-lyssnare
-- `src/lib/format-price.ts` — `formatPrice`, `formatPriceDelta` (för "+99 kr"-fallet)
-- `src/hooks/useShopContextBootstrap.ts` — läser query-param vid mount, prenumererar på `SHOP_CONTEXT`-meddelanden
+### Edge-cases
+- Om Storefront-anropet failar → fallback till SEK×1 (ctx.rate=1) + visa konsoll-varning.
+- När `country` ändras via `SHOP_CONTEXT` postMessage → invalidera price-cache och refetch.
 
-**Ändrade**
-- `src/main.tsx` — initiera i18n
-- `src/App.tsx` — montera `useShopContextBootstrap()`
-- `src/pages/EditorPage.tsx` — `t()` + `formatPrice()` istället för `{currentPrice()} kr`
-- `src/components/editor/{ControlPanel,FormatSection,FrameOption,MockupGallery,AiStyleSection,AiPhotoSection,PhotoUploadSection,Canvas3DPreview}.tsx` — alla strängar via `t()`; pris-deltan via `formatPriceDelta`
-- `src/components/CartDrawer.tsx` — `t()` + använd `currencyCode` från Shopify
-- `src/lib/photo-source.ts` + alla `toast.*("svensk text")`-anrop — via `t()`
-- `SHOPIFY_SETUP.md` — uppdaterad snippet med locale/currency/rate
+---
 
-**Inte ändras**
-- `pricing.ts`, edge functions, cart attributes, print pipeline, Gelato-flöde
+## Tekniska detaljer
 
-## Memory
+**Filer som ändras:**
+- `src/lib/variant-labels.ts` (ny)
+- `src/lib/mockup-scenes.ts` — `label` → `labelKey`
+- `src/components/editor/product-details.ts` — `label` → `labelKey`
+- `src/components/editor/MockupGallery.tsx` — `t(s.labelKey)`
+- `src/components/editor/FormatSection.tsx` — översätt variantnamn + djup
+- `src/components/editor/FrameOption.tsx` — översätt fallback-text
+- `src/pages/EditorPage.tsx` — översätt toasts + summary
+- `src/i18n/locales/*.json` (alla 11) — nya nycklar
+- `src/hooks/useShopifyDisplayPrice.ts` (ny) — Storefront-prisanrop med `@inContext(country)`
+- `src/stores/shopContextStore.ts` — liten cache-map för pris per `(variantId, country)`
+- `src/lib/format-price.ts` — `formatMoneyFromShopify({amount, currencyCode}, locale)` helper
 
-Sparar i `mem://index.md` Core-regel: *"All ny UI-text ska in via i18n-nycklar (sv som källa) i `src/i18n/locales/*.json`. Hårdkoda aldrig användarsynlig text. Priser visas alltid via `formatPrice()` med Shopify-kontext."* — så alla framtida ändringar respekterar detta automatiskt.
+**Inga ändringar i:**
+- `pricing.ts` (SEK-källan)
+- `product-config.ts` variantnamn
+- Gelato SKU-mappning
+- Theme-snippet (förutom om du redan tagit bort `rate`-fältet är det OK)
 
-## Tema-uppdatering: Ny snippet att klistra in
-
-I `SHOPIFY_SETUP.md` Steg 1 ersätts iframe + script-blocket med en variant som inkluderar locale/currency. Du gör en kopia-och-klistra i testbutiken (1 minut). När du flyttar till nya temat: samma snippet, samma `custom-liquid`-mall.
-
-## Frågor innan jag kör
-
-Inga blockerande frågor — jag har det jag behöver. Säg "kör" så implementerar jag.
+**Verifiering:**
+- Öppna editorn med `?country=DE&locale=de` → priserna i dropdownen + knappen ska matcha priset på samma produkt på `/en-de/products/...` i butiken.
+- Byt ram → delta uppdateras i EUR.
+- Switch:a tillbaka till SE → SEK med decimaler enligt SEK-konvention (heltal).

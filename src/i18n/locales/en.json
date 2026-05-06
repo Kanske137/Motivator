@@ -12,10 +12,27 @@
     "next": "Next",
     "unknownError": "Unknown error"
   },
-  "header": { "yourChoice": "Your choice" },
-  "cart": { "title": "Cart", "empty": "Your cart is empty", "total": "Total", "checkout": "Checkout" },
-  "orientation": { "portrait": "Portrait", "landscape": "Landscape" },
-  "section": { "image": "Image", "transformation": "Transformation", "map": "Map", "text": "Text", "format": "Format", "aiStyle": "AI style" },
+  "header": {
+    "yourChoice": "Your choice"
+  },
+  "cart": {
+    "title": "Cart",
+    "empty": "Your cart is empty",
+    "total": "Total",
+    "checkout": "Checkout"
+  },
+  "orientation": {
+    "portrait": "Portrait",
+    "landscape": "Landscape"
+  },
+  "section": {
+    "image": "Image",
+    "transformation": "Transformation",
+    "map": "Map",
+    "text": "Text",
+    "format": "Format",
+    "aiStyle": "AI style"
+  },
   "format": {
     "backgroundColor": "Background colour",
     "whiteMargin": "White margin",
@@ -27,15 +44,36 @@
     "material": "Material",
     "finish": "Finish",
     "frameOrHanger": "Frame / Hanger",
-    "orientation": "Orientation"
+    "orientation": "Orientation",
+    "depthValue": "{{cm}} cm"
   },
-  "productKind": { "poster": "Poster", "canvas": "Canvas", "aluminum": "Aluminium", "acrylic": "Acrylic" },
+  "productKind": {
+    "poster": "Poster",
+    "canvas": "Canvas",
+    "aluminum": "Aluminium",
+    "acrylic": "Acrylic"
+  },
   "frame": {
-    "none": "None", "white": "White", "black": "Black", "oak": "Oak", "walnut": "Walnut",
-    "hangerOak": "Hanger Oak", "hangerWalnut": "Hanger Walnut", "hangerBlack": "Hanger Black", "hangerWhite": "Hanger White",
-    "unavailable": "Unavailable", "unavailableForSize": "Not available for this size"
+    "none": "None",
+    "white": "White",
+    "black": "Black",
+    "oak": "Oak",
+    "walnut": "Walnut",
+    "hangerOak": "Hanger Oak",
+    "hangerWalnut": "Hanger Walnut",
+    "hangerBlack": "Hanger Black",
+    "hangerWhite": "Hanger White",
+    "unavailable": "Unavailable",
+    "unavailableForSize": "Not available for this size"
   },
-  "shape": { "none": "None", "circle": "Circle", "heart": "Heart", "star": "Star", "mapShape": "Map shape", "imageShape": "Image shape" },
+  "shape": {
+    "none": "None",
+    "circle": "Circle",
+    "heart": "Heart",
+    "star": "Star",
+    "mapShape": "Map shape",
+    "imageShape": "Image shape"
+  },
   "map": {
     "selectedPlace": "Selected place",
     "searchAddress": "Search address or city",
@@ -44,7 +82,12 @@
     "showLabels": "Show area names on the map",
     "tab": "Map {{n}}"
   },
-  "text": { "show": "Show text", "placeholder": "Your text here…", "font": "Font", "tab": "Text {{n}}" },
+  "text": {
+    "show": "Show text",
+    "placeholder": "Your text here…",
+    "font": "Font",
+    "tab": "Text {{n}}"
+  },
   "layer": {
     "size": "Size",
     "tipMove": "Tip: drag the ✥ handle on the layer in the preview to move it.",
@@ -114,5 +157,21 @@
     "prepareFailed": "Could not prepare print file",
     "variantUnavailable": "This combination is not yet available in the store",
     "variantUnavailableHint": "{{size}} · {{variant}} not found for {{handle}}."
+  },
+  "scene": {
+    "livingroom": "Living room",
+    "bedroom": "Bedroom",
+    "office": "Office",
+    "wall": "On wall"
+  },
+  "detail": {
+    "posterPaper": "Paper detail",
+    "posterFrames": "Frame options",
+    "canvasCorner": "Corner detail",
+    "canvasBack": "Back & hanging",
+    "aluminumEdge": "Edge detail",
+    "aluminumMount": "Mounting",
+    "acrylicStud": "Standoff",
+    "acrylicMount": "Mounting"
   }
 }

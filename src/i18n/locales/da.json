@@ -1,19 +1,177 @@
 {
-  "common": {"addToCart":"Læg i kurv","loading":"Indlæser…","tryAgain":"Prøv igen","remove":"Fjern","reset":"Nulstil","yes":"Ja","no":"Nej","close":"Luk","previous":"Forrige","next":"Næste","unknownError":"Ukendt fejl"},
-  "header": {"yourChoice":"Dit valg"},
-  "cart": {"title":"Kurv","empty":"Din kurv er tom","total":"I alt","checkout":"Til kassen"},
-  "orientation": {"portrait":"Stående","landscape":"Liggende"},
-  "section": {"image":"Billede","transformation":"Forvandling","map":"Kort","text":"Tekst","format":"Format","aiStyle":"AI-stil"},
-  "format": {"backgroundColor":"Baggrundsfarve","whiteMargin":"Hvid margen","noActiveSizes":"Dette produkt har ingen aktive størrelser konfigureret endnu.","product":"Produkt","size":"Størrelse","selectSize":"Vælg størrelse","depth":"Dybde","material":"Materiale","finish":"Finish","frameOrHanger":"Ramme / Hænger","orientation":"Orientering"},
-  "productKind": {"poster":"Plakat","canvas":"Lærred","aluminum":"Aluminium","acrylic":"Akryl"},
-  "frame": {"none":"Ingen","white":"Hvid","black":"Sort","oak":"Eg","walnut":"Valnød","hangerOak":"Hænger Eg","hangerWalnut":"Hænger Valnød","hangerBlack":"Hænger Sort","hangerWhite":"Hænger Hvid","unavailable":"Ikke tilgængelig","unavailableForSize":"Ikke tilgængelig for denne størrelse"},
-  "shape": {"none":"Ingen","circle":"Cirkel","heart":"Hjerte","star":"Stjerne","mapShape":"Kortets form","imageShape":"Billedets form"},
-  "map": {"selectedPlace":"Valgt sted","searchAddress":"Søg adresse eller by","searchPlaceholder":"f.eks. Strøget 1, København","tipDrag":"Tip: træk og zoom direkte i kortet for at finjustere.","showLabels":"Vis områdenavne på kortet","tab":"Kort {{n}}"},
-  "text": {"show":"Vis tekst","placeholder":"Din tekst her…","font":"Skrifttype","tab":"Tekst {{n}}"},
-  "layer": {"size":"Størrelse","tipMove":"Tip: træk ✥-håndtaget på laget i forhåndsvisningen for at flytte det.","imageTab":"Billede {{n}}","transformationTab":"Forvandling {{n}}"},
-  "photo": {"uploadCta":"Upload billede","uploadHint":"JPG, PNG, WebP · maks 25 MB","swap":"Skift billede","altUploaded":"Uploadet billede","tipCrop":"Træk i billedet for at vælge udsnit inden for rammen.","errorOnlyImages":"Kun billedfiler understøttes","errorTooLarge":"Billedet er for stort","errorTooLargeHint":"Maks 25 MB. Komprimér og prøv igen.","errorTooSmall":"Billedet er for lille til tryk ({{w}}×{{h}}). Mindst {{min}} px på korteste side krævet.","errorWrongType":"Billedet skal være JPEG, PNG eller WebP.","errorReadFailed":"Kunne ikke læse billedet."},
-  "ai": {"uploadFirst":"Upload et billede først for at kunne vælge AI-stil.","uploadFirstShort":"Upload et billede først","chooseStyle":"Vælg stil","yourTried":"Dine prøvede stilarter","removeFromHistory":"Fjern fra historik","revertToOriginal":"Tilbage til foto uden stil","uploadFailed":"Kunne ikke uploade billedet","styleReused":"Stil \"{{name}}\" genbrugt","styleApplied":"Stil \"{{name}}\" anvendt","styleFailed":"Kunne ikke anvende stilen","creatingImage":"Skaber billede","stagePrep":"Forbereder dit billede…","stageUpload":"Uploader dit billede…","stageCreate":"Skaber dit billede…","stageFetch":"Henter resultat…","noResult":"Tjenesten returnerede intet billede"},
-  "aiPhoto": {"yourImage":"Dit billede","missingReference":"Mangler referencebillede for dette motiv","notConfigured":"Dette produkt er endnu ikke fuldt konfigureret. Kontakt support.","create":"Skab nu","recreate":"Skab igen","creating":"Skaber…","ready":"Billedet er klar","failed":"Kunne ikke skabe billedet","friendlyFailed":"Vi kunne ikke skabe billedet. Prøv et andet foto med tydeligt ansigt og godt lys.","chooseStyleOptional":"Vælg stil (valgfri)","styleHintBackgroundOnly":"Baggrunden fjernes altid — stilen påvirker kun motivet.","subjectHintHuman":"Billedet skal vise ansigtet lige forfra, godt belyst.","subjectHintPet":"Billedet skal vise dyrets ansigt tydeligt, gerne forfra.","subjectHintRemoveBg":"Upload et billede hvor motivet er tydeligt — vi fjerner baggrunden for dig."},
-  "preview": {"title":"Forhåndsvisning","enlarge":"Forstør {{name}}","noImage":"Intet billede","compositeFailed":"Sammensætning mislykkedes","somethingWrong":"Noget gik galt","threeDLabel":"3D-visning","threeDBadge":"3D","dragToRotate":"træk for at rotere","title3D":"3D-forhåndsvisning"},
-  "cartAdd": {"added":"Tilføjet til kurven","prepareFailed":"Kunne ikke forberede trykfil","variantUnavailable":"Denne kombination er endnu ikke tilgængelig i butikken","variantUnavailableHint":"{{size}} · {{variant}} blev ikke fundet for {{handle}}."}
+  "common": {
+    "addToCart": "Læg i kurv",
+    "loading": "Indlæser…",
+    "tryAgain": "Prøv igen",
+    "remove": "Fjern",
+    "reset": "Nulstil",
+    "yes": "Ja",
+    "no": "Nej",
+    "close": "Luk",
+    "previous": "Forrige",
+    "next": "Næste",
+    "unknownError": "Ukendt fejl"
+  },
+  "header": {
+    "yourChoice": "Dit valg"
+  },
+  "cart": {
+    "title": "Kurv",
+    "empty": "Din kurv er tom",
+    "total": "I alt",
+    "checkout": "Til kassen"
+  },
+  "orientation": {
+    "portrait": "Stående",
+    "landscape": "Liggende"
+  },
+  "section": {
+    "image": "Billede",
+    "transformation": "Forvandling",
+    "map": "Kort",
+    "text": "Tekst",
+    "format": "Format",
+    "aiStyle": "AI-stil"
+  },
+  "format": {
+    "backgroundColor": "Baggrundsfarve",
+    "whiteMargin": "Hvid margen",
+    "noActiveSizes": "Dette produkt har ingen aktive størrelser konfigureret endnu.",
+    "product": "Produkt",
+    "size": "Størrelse",
+    "selectSize": "Vælg størrelse",
+    "depth": "Dybde",
+    "material": "Materiale",
+    "finish": "Finish",
+    "frameOrHanger": "Ramme / Hænger",
+    "orientation": "Orientering",
+    "depthValue": "{{cm}} cm"
+  },
+  "productKind": {
+    "poster": "Plakat",
+    "canvas": "Lærred",
+    "aluminum": "Aluminium",
+    "acrylic": "Akryl"
+  },
+  "frame": {
+    "none": "Ingen",
+    "white": "Hvid",
+    "black": "Sort",
+    "oak": "Eg",
+    "walnut": "Valnød",
+    "hangerOak": "Hænger Eg",
+    "hangerWalnut": "Hænger Valnød",
+    "hangerBlack": "Hænger Sort",
+    "hangerWhite": "Hænger Hvid",
+    "unavailable": "Ikke tilgængelig",
+    "unavailableForSize": "Ikke tilgængelig for denne størrelse"
+  },
+  "shape": {
+    "none": "Ingen",
+    "circle": "Cirkel",
+    "heart": "Hjerte",
+    "star": "Stjerne",
+    "mapShape": "Kortets form",
+    "imageShape": "Billedets form"
+  },
+  "map": {
+    "selectedPlace": "Valgt sted",
+    "searchAddress": "Søg adresse eller by",
+    "searchPlaceholder": "f.eks. Strøget 1, København",
+    "tipDrag": "Tip: træk og zoom direkte i kortet for at finjustere.",
+    "showLabels": "Vis områdenavne på kortet",
+    "tab": "Kort {{n}}"
+  },
+  "text": {
+    "show": "Vis tekst",
+    "placeholder": "Din tekst her…",
+    "font": "Skrifttype",
+    "tab": "Tekst {{n}}"
+  },
+  "layer": {
+    "size": "Størrelse",
+    "tipMove": "Tip: træk ✥-håndtaget på laget i forhåndsvisningen for at flytte det.",
+    "imageTab": "Billede {{n}}",
+    "transformationTab": "Forvandling {{n}}"
+  },
+  "photo": {
+    "uploadCta": "Upload billede",
+    "uploadHint": "JPG, PNG, WebP · maks 25 MB",
+    "swap": "Skift billede",
+    "altUploaded": "Uploadet billede",
+    "tipCrop": "Træk i billedet for at vælge udsnit inden for rammen.",
+    "errorOnlyImages": "Kun billedfiler understøttes",
+    "errorTooLarge": "Billedet er for stort",
+    "errorTooLargeHint": "Maks 25 MB. Komprimér og prøv igen.",
+    "errorTooSmall": "Billedet er for lille til tryk ({{w}}×{{h}}). Mindst {{min}} px på korteste side krævet.",
+    "errorWrongType": "Billedet skal være JPEG, PNG eller WebP.",
+    "errorReadFailed": "Kunne ikke læse billedet."
+  },
+  "ai": {
+    "uploadFirst": "Upload et billede først for at kunne vælge AI-stil.",
+    "uploadFirstShort": "Upload et billede først",
+    "chooseStyle": "Vælg stil",
+    "yourTried": "Dine prøvede stilarter",
+    "removeFromHistory": "Fjern fra historik",
+    "revertToOriginal": "Tilbage til foto uden stil",
+    "uploadFailed": "Kunne ikke uploade billedet",
+    "styleReused": "Stil \"{{name}}\" genbrugt",
+    "styleApplied": "Stil \"{{name}}\" anvendt",
+    "styleFailed": "Kunne ikke anvende stilen",
+    "creatingImage": "Skaber billede",
+    "stagePrep": "Forbereder dit billede…",
+    "stageUpload": "Uploader dit billede…",
+    "stageCreate": "Skaber dit billede…",
+    "stageFetch": "Henter resultat…",
+    "noResult": "Tjenesten returnerede intet billede"
+  },
+  "aiPhoto": {
+    "yourImage": "Dit billede",
+    "missingReference": "Mangler referencebillede for dette motiv",
+    "notConfigured": "Dette produkt er endnu ikke fuldt konfigureret. Kontakt support.",
+    "create": "Skab nu",
+    "recreate": "Skab igen",
+    "creating": "Skaber…",
+    "ready": "Billedet er klar",
+    "failed": "Kunne ikke skabe billedet",
+    "friendlyFailed": "Vi kunne ikke skabe billedet. Prøv et andet foto med tydeligt ansigt og godt lys.",
+    "chooseStyleOptional": "Vælg stil (valgfri)",
+    "styleHintBackgroundOnly": "Baggrunden fjernes altid — stilen påvirker kun motivet.",
+    "subjectHintHuman": "Billedet skal vise ansigtet lige forfra, godt belyst.",
+    "subjectHintPet": "Billedet skal vise dyrets ansigt tydeligt, gerne forfra.",
+    "subjectHintRemoveBg": "Upload et billede hvor motivet er tydeligt — vi fjerner baggrunden for dig."
+  },
+  "preview": {
+    "title": "Forhåndsvisning",
+    "enlarge": "Forstør {{name}}",
+    "noImage": "Intet billede",
+    "compositeFailed": "Sammensætning mislykkedes",
+    "somethingWrong": "Noget gik galt",
+    "threeDLabel": "3D-visning",
+    "threeDBadge": "3D",
+    "dragToRotate": "træk for at rotere",
+    "title3D": "3D-forhåndsvisning"
+  },
+  "cartAdd": {
+    "added": "Tilføjet til kurven",
+    "prepareFailed": "Kunne ikke forberede trykfil",
+    "variantUnavailable": "Denne kombination er endnu ikke tilgængelig i butikken",
+    "variantUnavailableHint": "{{size}} · {{variant}} blev ikke fundet for {{handle}}."
+  },
+  "scene": {
+    "livingroom": "Stue",
+    "bedroom": "Soveværelse",
+    "office": "Kontor",
+    "wall": "På væg"
+  },
+  "detail": {
+    "posterPaper": "Papirdetalje",
+    "posterFrames": "Rammevalg",
+    "canvasCorner": "Hjørnedetalje",
+    "canvasBack": "Bagside & ophæng",
+    "aluminumEdge": "Kantdetalje",
+    "aluminumMount": "Montering",
+    "acrylicStud": "Afstandsholder",
+    "acrylicMount": "Montering"
+  }
 }

@@ -1,19 +1,177 @@
 {
-  "common": {"addToCart":"Legg i handlekurv","loading":"Laster…","tryAgain":"Prøv igjen","remove":"Fjern","reset":"Tilbakestill","yes":"Ja","no":"Nei","close":"Lukk","previous":"Forrige","next":"Neste","unknownError":"Ukjent feil"},
-  "header": {"yourChoice":"Ditt valg"},
-  "cart": {"title":"Handlekurv","empty":"Handlekurven er tom","total":"Totalt","checkout":"Til kassen"},
-  "orientation": {"portrait":"Stående","landscape":"Liggende"},
-  "section": {"image":"Bilde","transformation":"Forvandling","map":"Kart","text":"Tekst","format":"Format","aiStyle":"AI-stil"},
-  "format": {"backgroundColor":"Bakgrunnsfarge","whiteMargin":"Hvit marg","noActiveSizes":"Dette produktet har ingen aktive størrelser konfigurert ennå.","product":"Produkt","size":"Størrelse","selectSize":"Velg størrelse","depth":"Dybde","material":"Materiale","finish":"Finish","frameOrHanger":"Ramme / Henger","orientation":"Orientering"},
-  "productKind": {"poster":"Plakat","canvas":"Lerret","aluminum":"Aluminium","acrylic":"Akryl"},
-  "frame": {"none":"Ingen","white":"Hvit","black":"Svart","oak":"Eik","walnut":"Valnøtt","hangerOak":"Henger Eik","hangerWalnut":"Henger Valnøtt","hangerBlack":"Henger Svart","hangerWhite":"Henger Hvit","unavailable":"Ikke tilgjengelig","unavailableForSize":"Ikke tilgjengelig for denne størrelsen"},
-  "shape": {"none":"Ingen","circle":"Sirkel","heart":"Hjerte","star":"Stjerne","mapShape":"Kartets form","imageShape":"Bildets form"},
-  "map": {"selectedPlace":"Valgt sted","searchAddress":"Søk adresse eller by","searchPlaceholder":"f.eks. Karl Johans gate 1, Oslo","tipDrag":"Tips: dra og zoom direkte i kartet for å justere.","showLabels":"Vis områdenavn på kartet","tab":"Kart {{n}}"},
-  "text": {"show":"Vis tekst","placeholder":"Din tekst her…","font":"Skrifttype","tab":"Tekst {{n}}"},
-  "layer": {"size":"Størrelse","tipMove":"Tips: dra ✥-håndtaket på laget i forhåndsvisningen for å flytte det.","imageTab":"Bilde {{n}}","transformationTab":"Forvandling {{n}}"},
-  "photo": {"uploadCta":"Last opp bilde","uploadHint":"JPG, PNG, WebP · maks 25 MB","swap":"Bytt bilde","altUploaded":"Opplastet bilde","tipCrop":"Dra i bildet for å velge utsnitt innenfor rammen.","errorOnlyImages":"Bare bildefiler støttes","errorTooLarge":"Bildet er for stort","errorTooLargeHint":"Maks 25 MB. Komprimer og prøv igjen.","errorTooSmall":"Bildet er for lite for trykk ({{w}}×{{h}}). Minst {{min}} px på korteste side kreves.","errorWrongType":"Bildet må være JPEG, PNG eller WebP.","errorReadFailed":"Kunne ikke lese bildet."},
-  "ai": {"uploadFirst":"Last opp et bilde først for å velge AI-stil.","uploadFirstShort":"Last opp et bilde først","chooseStyle":"Velg stil","yourTried":"Dine prøvde stiler","removeFromHistory":"Fjern fra historikk","revertToOriginal":"Gå tilbake til foto uten stil","uploadFailed":"Kunne ikke laste opp bildet","styleReused":"Stil \"{{name}}\" gjenbrukt","styleApplied":"Stil \"{{name}}\" anvendt","styleFailed":"Kunne ikke bruke stilen","creatingImage":"Lager bilde","stagePrep":"Forbereder bildet ditt…","stageUpload":"Laster opp bildet ditt…","stageCreate":"Lager bildet ditt…","stageFetch":"Henter resultat…","noResult":"Tjenesten returnerte ingen bilde"},
-  "aiPhoto": {"yourImage":"Ditt bilde","missingReference":"Mangler referansebilde for dette motivet","notConfigured":"Dette produktet er ikke fullt konfigurert ennå. Kontakt support.","create":"Lag nå","recreate":"Lag igjen","creating":"Lager…","ready":"Bildet er klart","failed":"Kunne ikke lage bildet","friendlyFailed":"Vi kunne ikke lage bildet. Prøv et annet bilde med tydelig ansikt og godt lys.","chooseStyleOptional":"Velg stil (valgfritt)","styleHintBackgroundOnly":"Bakgrunnen fjernes alltid — stilen påvirker bare motivet.","subjectHintHuman":"Bildet skal vise ansiktet rett forfra, godt belyst.","subjectHintPet":"Bildet skal vise dyrets ansikt tydelig, gjerne forfra.","subjectHintRemoveBg":"Last opp et bilde der motivet er tydelig — vi fjerner bakgrunnen for deg."},
-  "preview": {"title":"Forhåndsvis","enlarge":"Forstørr {{name}}","noImage":"Ingen bilde","compositeFailed":"Komposisjon mislyktes","somethingWrong":"Noe gikk galt","threeDLabel":"3D-visning","threeDBadge":"3D","dragToRotate":"dra for å rotere","title3D":"3D-forhåndsvisning"},
-  "cartAdd": {"added":"Lagt til i handlekurven","prepareFailed":"Kunne ikke forberede trykkfil","variantUnavailable":"Denne kombinasjonen er ikke tilgjengelig i butikken ennå","variantUnavailableHint":"{{size}} · {{variant}} ble ikke funnet for {{handle}}."}
+  "common": {
+    "addToCart": "Legg i handlekurv",
+    "loading": "Laster…",
+    "tryAgain": "Prøv igjen",
+    "remove": "Fjern",
+    "reset": "Tilbakestill",
+    "yes": "Ja",
+    "no": "Nei",
+    "close": "Lukk",
+    "previous": "Forrige",
+    "next": "Neste",
+    "unknownError": "Ukjent feil"
+  },
+  "header": {
+    "yourChoice": "Ditt valg"
+  },
+  "cart": {
+    "title": "Handlekurv",
+    "empty": "Handlekurven er tom",
+    "total": "Totalt",
+    "checkout": "Til kassen"
+  },
+  "orientation": {
+    "portrait": "Stående",
+    "landscape": "Liggende"
+  },
+  "section": {
+    "image": "Bilde",
+    "transformation": "Forvandling",
+    "map": "Kart",
+    "text": "Tekst",
+    "format": "Format",
+    "aiStyle": "AI-stil"
+  },
+  "format": {
+    "backgroundColor": "Bakgrunnsfarge",
+    "whiteMargin": "Hvit marg",
+    "noActiveSizes": "Dette produktet har ingen aktive størrelser konfigurert ennå.",
+    "product": "Produkt",
+    "size": "Størrelse",
+    "selectSize": "Velg størrelse",
+    "depth": "Dybde",
+    "material": "Materiale",
+    "finish": "Finish",
+    "frameOrHanger": "Ramme / Henger",
+    "orientation": "Orientering",
+    "depthValue": "{{cm}} cm"
+  },
+  "productKind": {
+    "poster": "Plakat",
+    "canvas": "Lerret",
+    "aluminum": "Aluminium",
+    "acrylic": "Akryl"
+  },
+  "frame": {
+    "none": "Ingen",
+    "white": "Hvit",
+    "black": "Svart",
+    "oak": "Eik",
+    "walnut": "Valnøtt",
+    "hangerOak": "Henger Eik",
+    "hangerWalnut": "Henger Valnøtt",
+    "hangerBlack": "Henger Svart",
+    "hangerWhite": "Henger Hvit",
+    "unavailable": "Ikke tilgjengelig",
+    "unavailableForSize": "Ikke tilgjengelig for denne størrelsen"
+  },
+  "shape": {
+    "none": "Ingen",
+    "circle": "Sirkel",
+    "heart": "Hjerte",
+    "star": "Stjerne",
+    "mapShape": "Kartets form",
+    "imageShape": "Bildets form"
+  },
+  "map": {
+    "selectedPlace": "Valgt sted",
+    "searchAddress": "Søk adresse eller by",
+    "searchPlaceholder": "f.eks. Karl Johans gate 1, Oslo",
+    "tipDrag": "Tips: dra og zoom direkte i kartet for å justere.",
+    "showLabels": "Vis områdenavn på kartet",
+    "tab": "Kart {{n}}"
+  },
+  "text": {
+    "show": "Vis tekst",
+    "placeholder": "Din tekst her…",
+    "font": "Skrifttype",
+    "tab": "Tekst {{n}}"
+  },
+  "layer": {
+    "size": "Størrelse",
+    "tipMove": "Tips: dra ✥-håndtaket på laget i forhåndsvisningen for å flytte det.",
+    "imageTab": "Bilde {{n}}",
+    "transformationTab": "Forvandling {{n}}"
+  },
+  "photo": {
+    "uploadCta": "Last opp bilde",
+    "uploadHint": "JPG, PNG, WebP · maks 25 MB",
+    "swap": "Bytt bilde",
+    "altUploaded": "Opplastet bilde",
+    "tipCrop": "Dra i bildet for å velge utsnitt innenfor rammen.",
+    "errorOnlyImages": "Bare bildefiler støttes",
+    "errorTooLarge": "Bildet er for stort",
+    "errorTooLargeHint": "Maks 25 MB. Komprimer og prøv igjen.",
+    "errorTooSmall": "Bildet er for lite for trykk ({{w}}×{{h}}). Minst {{min}} px på korteste side kreves.",
+    "errorWrongType": "Bildet må være JPEG, PNG eller WebP.",
+    "errorReadFailed": "Kunne ikke lese bildet."
+  },
+  "ai": {
+    "uploadFirst": "Last opp et bilde først for å velge AI-stil.",
+    "uploadFirstShort": "Last opp et bilde først",
+    "chooseStyle": "Velg stil",
+    "yourTried": "Dine prøvde stiler",
+    "removeFromHistory": "Fjern fra historikk",
+    "revertToOriginal": "Gå tilbake til foto uten stil",
+    "uploadFailed": "Kunne ikke laste opp bildet",
+    "styleReused": "Stil \"{{name}}\" gjenbrukt",
+    "styleApplied": "Stil \"{{name}}\" anvendt",
+    "styleFailed": "Kunne ikke bruke stilen",
+    "creatingImage": "Lager bilde",
+    "stagePrep": "Forbereder bildet ditt…",
+    "stageUpload": "Laster opp bildet ditt…",
+    "stageCreate": "Lager bildet ditt…",
+    "stageFetch": "Henter resultat…",
+    "noResult": "Tjenesten returnerte ingen bilde"
+  },
+  "aiPhoto": {
+    "yourImage": "Ditt bilde",
+    "missingReference": "Mangler referansebilde for dette motivet",
+    "notConfigured": "Dette produktet er ikke fullt konfigurert ennå. Kontakt support.",
+    "create": "Lag nå",
+    "recreate": "Lag igjen",
+    "creating": "Lager…",
+    "ready": "Bildet er klart",
+    "failed": "Kunne ikke lage bildet",
+    "friendlyFailed": "Vi kunne ikke lage bildet. Prøv et annet bilde med tydelig ansikt og godt lys.",
+    "chooseStyleOptional": "Velg stil (valgfritt)",
+    "styleHintBackgroundOnly": "Bakgrunnen fjernes alltid — stilen påvirker bare motivet.",
+    "subjectHintHuman": "Bildet skal vise ansiktet rett forfra, godt belyst.",
+    "subjectHintPet": "Bildet skal vise dyrets ansikt tydelig, gjerne forfra.",
+    "subjectHintRemoveBg": "Last opp et bilde der motivet er tydelig — vi fjerner bakgrunnen for deg."
+  },
+  "preview": {
+    "title": "Forhåndsvis",
+    "enlarge": "Forstørr {{name}}",
+    "noImage": "Ingen bilde",
+    "compositeFailed": "Komposisjon mislyktes",
+    "somethingWrong": "Noe gikk galt",
+    "threeDLabel": "3D-visning",
+    "threeDBadge": "3D",
+    "dragToRotate": "dra for å rotere",
+    "title3D": "3D-forhåndsvisning"
+  },
+  "cartAdd": {
+    "added": "Lagt til i handlekurven",
+    "prepareFailed": "Kunne ikke forberede trykkfil",
+    "variantUnavailable": "Denne kombinasjonen er ikke tilgjengelig i butikken ennå",
+    "variantUnavailableHint": "{{size}} · {{variant}} ble ikke funnet for {{handle}}."
+  },
+  "scene": {
+    "livingroom": "Stue",
+    "bedroom": "Soverom",
+    "office": "Kontor",
+    "wall": "På vegg"
+  },
+  "detail": {
+    "posterPaper": "Papirdetalj",
+    "posterFrames": "Rammevalg",
+    "canvasCorner": "Hjørnedetalj",
+    "canvasBack": "Bakside & oppheng",
+    "aluminumEdge": "Kantdetalj",
+    "aluminumMount": "Montering",
+    "acrylicStud": "Avstandsholder",
+    "acrylicMount": "Montering"
+  }
 }

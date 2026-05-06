@@ -18,7 +18,8 @@ import canvasSide from "@/assets/mockups/canvas-side.jpg";
  */
 export interface MockupScene {
   id: string;
-  label: string;
+  /** i18n key — translate at render time. */
+  labelKey: string;
   src: string;
   /** Tom väggyta i scenens pixelkoordinater (1024-bas). */
   area: { x: number; y: number; w: number; h: number };
@@ -33,7 +34,7 @@ export interface MockupScene {
 const POSTER_SCENES: MockupScene[] = [
   {
     id: "livingroom",
-    label: "Vardagsrum",
+    labelKey: "scene.livingroom",
     src: livingroom,
     area: { x: 180, y: 110, w: 680, h: 600 },
     referenceWidthCm: 120,
@@ -41,7 +42,7 @@ const POSTER_SCENES: MockupScene[] = [
   },
   {
     id: "bedroom",
-    label: "Sovrum",
+    labelKey: "scene.bedroom",
     src: bedroom,
     area: { x: 180, y: 80, w: 700, h: 600 },
     referenceWidthCm: 130,
@@ -49,7 +50,7 @@ const POSTER_SCENES: MockupScene[] = [
   },
   {
     id: "office",
-    label: "Kontor",
+    labelKey: "scene.office",
     src: office,
     area: { x: 140, y: 80, w: 760, h: 660 },
     referenceWidthCm: 140,
@@ -57,7 +58,7 @@ const POSTER_SCENES: MockupScene[] = [
   },
   {
     id: "wall",
-    label: "På vägg",
+    labelKey: "scene.wall",
     src: wall,
     area: { x: 120, y: 80, w: 800, h: 700 },
     referenceWidthCm: 130,

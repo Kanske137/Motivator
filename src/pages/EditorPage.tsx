@@ -4,7 +4,9 @@ import { useTranslation } from "react-i18next";
 import { Loader2, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useShopContextStore } from "@/stores/shopContextStore";
-import { formatPrice } from "@/lib/format-price";
+import { formatPrice, formatMoney } from "@/lib/format-price";
+import { useShopifyPriceMap, priceFromMap } from "@/hooks/useShopifyPriceMap";
+import { translateVariantName } from "@/lib/variant-labels";
 import { useEditorStore } from "@/stores/editorStore";
 import {
   loadAllConfigs,
@@ -56,6 +58,11 @@ export default function EditorPage() {
   const addItem = useCartStore((s) => s.addItem);
   const isAdding = useCartStore((s) => s.isLoading);
   const [isPreparing, setIsPreparing] = useState(false);
+  const shopifyPriceMap = useShopifyPriceMap();
+  const livePrice = priceFromMap(shopifyPriceMap, size, variant);
+  const displayPrice = livePrice
+    ? formatMoney(livePrice.amount, livePrice.currencyCode, shopCtx.locale)
+    : formatPrice(currentPrice(), shopCtx);
 
   // All configs that belong to the same template (same template_slug). Passed
   // down so FormatSection can render its poster/canvas toggle without having
@@ -123,7 +130,10 @@ export default function EditorPage() {
     : 0;
 
   const orientationLabel = orientation === "portrait" ? t("orientation.portrait") : t("orientation.landscape");
-  const variantLabel = config?.product_type === "canvas" ? `${variant ?? ""} ${t("format.depth").toLowerCase()}` : `${variant ?? ""}`;
+  const translatedVariant = translateVariantName(variant, t);
+  const variantLabel = config?.product_type === "canvas"
+    ? `${translatedVariant} ${t("format.depth").toLowerCase()}`
+    : translatedVariant;
   const summary = [size ? `${size} cm` : null, variantLabel.trim() ? variantLabel : null, orientationLabel]
     .filter(Boolean)
     .join(" · ");
@@ -188,8 +198,8 @@ export default function EditorPage() {
       previewUrl = await uploadCartPreview(thumbDataUrl, designId);
     } catch (err) {
       console.error("[print-pipeline] failed", err);
-      const msg = err instanceof Error ? err.message : "Okänt fel";
-      toast.error("Kunde inte förbereda tryckfil", { description: msg });
+      const msg = err instanceof Error ? err.message : t("common.unknownError");
+      toast.error(t("cartAdd.prepareFailed"), { description: msg });
       setIsPreparing(false);
       return; // ABORT — do NOT add a broken item to the cart.
     } finally {
@@ -229,7 +239,7 @@ export default function EditorPage() {
         },
         "*"
       );
-      toast.success("Lagt till i varukorgen");
+      toast.success(t("cartAdd.added"));
       return;
     }
 
@@ -241,8 +251,8 @@ export default function EditorPage() {
       if (variantGid) setShopifyVariantId(variantGid);
     }
     if (!variantGid) {
-      toast.error("Den här kombinationen är inte tillgänglig i butiken ännu", {
-        description: `${size} · ${variant} hittades inte för ${config.shopify_handle}.`,
+      toast.error(t("cartAdd.variantUnavailable"), {
+        description: t("cartAdd.variantUnavailableHint", { size, variant, handle: config.shopify_handle }),
       });
       return;
     }
@@ -319,7 +329,7 @@ export default function EditorPage() {
                     <ShoppingCart className="h-4 w-4 mr-2" />
                     {t("common.addToCart")}
                   </span>
-                  <span className="text-base">{formatPrice(currentPrice(), shopCtx)}</span>
+                  <span className="text-base">{displayPrice}</span>
                 </span>
               )}
             </Button>
@@ -346,7 +356,7 @@ export default function EditorPage() {
           ) : (
             <span className="flex items-center justify-between w-full">
               <span>{t("common.addToCart")}</span>
-              <span>{formatPrice(currentPrice(), shopCtx)}</span>
+              <span>{displayPrice}</span>
             </span>
           )}
         </Button>

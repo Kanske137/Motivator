@@ -2,7 +2,9 @@ import { forwardRef, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useEditorStore } from "@/stores/editorStore";
 import { useShopContextStore } from "@/stores/shopContextStore";
-import { formatPriceDelta } from "@/lib/format-price";
+import { formatPriceDelta, formatMoneyDelta } from "@/lib/format-price";
+import { useShopifyPriceMap, priceFromMap } from "@/hooks/useShopifyPriceMap";
+import { translateVariantName } from "@/lib/variant-labels";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -73,7 +75,15 @@ DepthIcon.displayName = "DepthIcon";
 export function FormatSection({ configs, activeHandle, onProductChange }: Props) {
   const { t } = useTranslation();
   const shopCtx = useShopContextStore();
-  const formatDiff = (d: number) => formatPriceDelta(d, shopCtx);
+  const priceMap = useShopifyPriceMap();
+  const formatDiff = (sekDiff: number) => formatPriceDelta(sekDiff, shopCtx);
+  /** Compute size delta in customer currency: prefer live Shopify prices when both targets exist. */
+  const liveDelta = (sizeA: string | null, variantA: string | null, sizeB: string, variantB: string): string | null => {
+    const a = priceFromMap(priceMap, sizeA, variantA);
+    const b = priceFromMap(priceMap, sizeB, variantB);
+    if (!a || !b || a.currencyCode !== b.currencyCode) return null;
+    return formatMoneyDelta(b.amount - a.amount, b.currencyCode, shopCtx.locale);
+  };
   const { config, productOptions, template, size, variant, orientation, setSize, setVariant, setOrientation } = useEditorStore();
 
   const allowedOrientations = template?.orientations ?? ["portrait", "landscape"];
@@ -302,13 +312,14 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
               const matchVariant =
                 s.variants.find((v) => v.name === variantNameForCompare) ?? s.variants[0];
               const diff = (matchVariant?.price ?? 0) - currentSizeBasePrice;
+              const live = liveDelta(size, variantNameForCompare ?? null, s.size, matchVariant?.name ?? "");
               const isCurrent = s.size === size;
               return (
                 <SelectItem key={s.size} value={s.size}>
                   <div className="flex items-center justify-between w-full gap-4">
                     <span>{s.size} cm</span>
                     {!isCurrent && (
-                      <span className="text-xs text-muted-foreground">{formatDiff(diff)}</span>
+                      <span className="text-xs text-muted-foreground">{live ?? formatDiff(diff)}</span>
                     )}
                   </div>
                 </SelectItem>
@@ -327,13 +338,14 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
           <div className={`grid gap-2 ${isCanvas ? "grid-cols-2" : "grid-cols-3"}`}>
             {visibleVariants.map((v) => {
               const diff = v.price - currentVariantPrice;
+              const live = liveDelta(size, variant, size ?? "", v.name);
               const isNoFrame = v.name.toLowerCase() === "ingen";
               const hangerHex = HANGER_HEX[v.name];
               const isAvailable = v.available !== false;
               return (
                 <FrameOption
                   key={v.name}
-                  name={v.name}
+                  name={translateVariantName(v.name, t)}
                   thumbnail={isCanvas || isAluminum || isAcrylic || hangerHex ? undefined : isNoFrame ? undefined : FRAME_THUMBS[v.name]}
                   svg={
                     isCanvas
@@ -346,7 +358,7 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
                   }
                   selected={v.name === variant}
                   onClick={() => setVariant(v.name)}
-                  priceLabel={formatDiff(diff)}
+                  priceLabel={live ?? formatDiff(diff)}
                   disabled={!isAvailable}
                   unavailableLabel={!isAvailable ? t("frame.unavailableForSize") : undefined}
                 />

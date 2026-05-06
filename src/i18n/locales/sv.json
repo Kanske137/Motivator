@@ -44,7 +44,8 @@
     "material": "Material",
     "finish": "Finish",
     "frameOrHanger": "Ram / Hängare",
-    "orientation": "Orientering"
+    "orientation": "Orientering",
+    "depthValue": "{{cm}} cm"
   },
   "productKind": {
     "poster": "Poster",
@@ -156,5 +157,21 @@
     "prepareFailed": "Kunde inte förbereda tryckfil",
     "variantUnavailable": "Den här kombinationen är inte tillgänglig i butiken ännu",
     "variantUnavailableHint": "{{size}} · {{variant}} hittades inte för {{handle}}."
+  },
+  "scene": {
+    "livingroom": "Vardagsrum",
+    "bedroom": "Sovrum",
+    "office": "Kontor",
+    "wall": "På vägg"
+  },
+  "detail": {
+    "posterPaper": "Pappersdetalj",
+    "posterFrames": "Ramval",
+    "canvasCorner": "Hörndetalj",
+    "canvasBack": "Baksida & upphängning",
+    "aluminumEdge": "Kantdetalj",
+    "aluminumMount": "Montering",
+    "acrylicStud": "Skruvhörn",
+    "acrylicMount": "Montering"
   }
 }

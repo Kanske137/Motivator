@@ -1,19 +1,177 @@
 {
-  "common": {"addToCart":"Ajouter au panier","loading":"Chargement…","tryAgain":"Réessayer","remove":"Supprimer","reset":"Réinitialiser","yes":"Oui","no":"Non","close":"Fermer","previous":"Précédent","next":"Suivant","unknownError":"Erreur inconnue"},
-  "header": {"yourChoice":"Votre choix"},
-  "cart": {"title":"Panier","empty":"Votre panier est vide","total":"Total","checkout":"Commander"},
-  "orientation": {"portrait":"Portrait","landscape":"Paysage"},
-  "section": {"image":"Image","transformation":"Transformation","map":"Carte","text":"Texte","format":"Format","aiStyle":"Style IA"},
-  "format": {"backgroundColor":"Couleur de fond","whiteMargin":"Marge blanche","noActiveSizes":"Ce produit n'a pas encore de tailles actives configurées.","product":"Produit","size":"Taille","selectSize":"Choisir la taille","depth":"Profondeur","material":"Matériau","finish":"Finition","frameOrHanger":"Cadre / Suspension","orientation":"Orientation"},
-  "productKind": {"poster":"Poster","canvas":"Toile","aluminum":"Aluminium","acrylic":"Acrylique"},
-  "frame": {"none":"Aucun","white":"Blanc","black":"Noir","oak":"Chêne","walnut":"Noyer","hangerOak":"Suspension Chêne","hangerWalnut":"Suspension Noyer","hangerBlack":"Suspension Noir","hangerWhite":"Suspension Blanc","unavailable":"Indisponible","unavailableForSize":"Indisponible pour cette taille"},
-  "shape": {"none":"Aucune","circle":"Cercle","heart":"Cœur","star":"Étoile","mapShape":"Forme de la carte","imageShape":"Forme de l'image"},
-  "map": {"selectedPlace":"Lieu sélectionné","searchAddress":"Rechercher une adresse ou une ville","searchPlaceholder":"ex. 1 rue de Rivoli, Paris","tipDrag":"Astuce : déplacez et zoomez directement sur la carte pour ajuster.","showLabels":"Afficher les noms des zones sur la carte","tab":"Carte {{n}}"},
-  "text": {"show":"Afficher le texte","placeholder":"Votre texte ici…","font":"Police","tab":"Texte {{n}}"},
-  "layer": {"size":"Taille","tipMove":"Astuce : faites glisser la poignée ✥ sur le calque dans l'aperçu pour le déplacer.","imageTab":"Image {{n}}","transformationTab":"Transformation {{n}}"},
-  "photo": {"uploadCta":"Télécharger une image","uploadHint":"JPG, PNG, WebP · max 25 Mo","swap":"Changer l'image","altUploaded":"Image téléchargée","tipCrop":"Faites glisser l'image pour choisir le cadrage.","errorOnlyImages":"Seuls les fichiers image sont pris en charge","errorTooLarge":"Image trop volumineuse","errorTooLargeHint":"Max 25 Mo. Compressez et réessayez.","errorTooSmall":"Image trop petite pour l'impression ({{w}}×{{h}}). Au moins {{min}} px sur le côté le plus court.","errorWrongType":"L'image doit être JPEG, PNG ou WebP.","errorReadFailed":"Impossible de lire l'image."},
-  "ai": {"uploadFirst":"Téléchargez d'abord une image pour choisir un style IA.","uploadFirstShort":"Téléchargez d'abord une image","chooseStyle":"Choisir un style","yourTried":"Vos styles essayés","removeFromHistory":"Retirer de l'historique","revertToOriginal":"Revenir à la photo sans style","uploadFailed":"Impossible de télécharger l'image","styleReused":"Style \"{{name}}\" réutilisé","styleApplied":"Style \"{{name}}\" appliqué","styleFailed":"Impossible d'appliquer le style","creatingImage":"Création de l'image","stagePrep":"Préparation de votre image…","stageUpload":"Téléchargement de votre image…","stageCreate":"Création de votre image…","stageFetch":"Récupération du résultat…","noResult":"Le service n'a renvoyé aucune image"},
-  "aiPhoto": {"yourImage":"Votre image","missingReference":"Image de référence manquante pour ce sujet","notConfigured":"Ce produit n'est pas encore entièrement configuré. Contactez le support.","create":"Créer maintenant","recreate":"Recréer","creating":"Création…","ready":"L'image est prête","failed":"Impossible de créer l'image","friendlyFailed":"Nous n'avons pas pu créer l'image. Essayez une autre photo avec un visage net et un bon éclairage.","chooseStyleOptional":"Choisir un style (optionnel)","styleHintBackgroundOnly":"L'arrière-plan est toujours supprimé — le style n'affecte que le sujet.","subjectHintHuman":"L'image doit montrer le visage de face, bien éclairé.","subjectHintPet":"L'image doit montrer clairement le visage de l'animal, de préférence de face.","subjectHintRemoveBg":"Téléchargez une image où le sujet est clairement visible — nous supprimerons l'arrière-plan."},
-  "preview": {"title":"Aperçu","enlarge":"Agrandir {{name}}","noImage":"Aucune image","compositeFailed":"Composition échouée","somethingWrong":"Quelque chose s'est mal passé","threeDLabel":"Vue 3D","threeDBadge":"3D","dragToRotate":"glisser pour pivoter","title3D":"Aperçu 3D"},
-  "cartAdd": {"added":"Ajouté au panier","prepareFailed":"Impossible de préparer le fichier d'impression","variantUnavailable":"Cette combinaison n'est pas encore disponible en boutique","variantUnavailableHint":"{{size}} · {{variant}} introuvable pour {{handle}}."}
+  "common": {
+    "addToCart": "Ajouter au panier",
+    "loading": "Chargement…",
+    "tryAgain": "Réessayer",
+    "remove": "Supprimer",
+    "reset": "Réinitialiser",
+    "yes": "Oui",
+    "no": "Non",
+    "close": "Fermer",
+    "previous": "Précédent",
+    "next": "Suivant",
+    "unknownError": "Erreur inconnue"
+  },
+  "header": {
+    "yourChoice": "Votre choix"
+  },
+  "cart": {
+    "title": "Panier",
+    "empty": "Votre panier est vide",
+    "total": "Total",
+    "checkout": "Commander"
+  },
+  "orientation": {
+    "portrait": "Portrait",
+    "landscape": "Paysage"
+  },
+  "section": {
+    "image": "Image",
+    "transformation": "Transformation",
+    "map": "Carte",
+    "text": "Texte",
+    "format": "Format",
+    "aiStyle": "Style IA"
+  },
+  "format": {
+    "backgroundColor": "Couleur de fond",
+    "whiteMargin": "Marge blanche",
+    "noActiveSizes": "Ce produit n'a pas encore de tailles actives configurées.",
+    "product": "Produit",
+    "size": "Taille",
+    "selectSize": "Choisir la taille",
+    "depth": "Profondeur",
+    "material": "Matériau",
+    "finish": "Finition",
+    "frameOrHanger": "Cadre / Suspension",
+    "orientation": "Orientation",
+    "depthValue": "{{cm}} cm"
+  },
+  "productKind": {
+    "poster": "Poster",
+    "canvas": "Toile",
+    "aluminum": "Aluminium",
+    "acrylic": "Acrylique"
+  },
+  "frame": {
+    "none": "Aucun",
+    "white": "Blanc",
+    "black": "Noir",
+    "oak": "Chêne",
+    "walnut": "Noyer",
+    "hangerOak": "Suspension Chêne",
+    "hangerWalnut": "Suspension Noyer",
+    "hangerBlack": "Suspension Noir",
+    "hangerWhite": "Suspension Blanc",
+    "unavailable": "Indisponible",
+    "unavailableForSize": "Indisponible pour cette taille"
+  },
+  "shape": {
+    "none": "Aucune",
+    "circle": "Cercle",
+    "heart": "Cœur",
+    "star": "Étoile",
+    "mapShape": "Forme de la carte",
+    "imageShape": "Forme de l'image"
+  },
+  "map": {
+    "selectedPlace": "Lieu sélectionné",
+    "searchAddress": "Rechercher une adresse ou une ville",
+    "searchPlaceholder": "ex. 1 rue de Rivoli, Paris",
+    "tipDrag": "Astuce : déplacez et zoomez directement sur la carte pour ajuster.",
+    "showLabels": "Afficher les noms des zones sur la carte",
+    "tab": "Carte {{n}}"
+  },
+  "text": {
+    "show": "Afficher le texte",
+    "placeholder": "Votre texte ici…",
+    "font": "Police",
+    "tab": "Texte {{n}}"
+  },
+  "layer": {
+    "size": "Taille",
+    "tipMove": "Astuce : faites glisser la poignée ✥ sur le calque dans l'aperçu pour le déplacer.",
+    "imageTab": "Image {{n}}",
+    "transformationTab": "Transformation {{n}}"
+  },
+  "photo": {
+    "uploadCta": "Télécharger une image",
+    "uploadHint": "JPG, PNG, WebP · max 25 Mo",
+    "swap": "Changer l'image",
+    "altUploaded": "Image téléchargée",
+    "tipCrop": "Faites glisser l'image pour choisir le cadrage.",
+    "errorOnlyImages": "Seuls les fichiers image sont pris en charge",
+    "errorTooLarge": "Image trop volumineuse",
+    "errorTooLargeHint": "Max 25 Mo. Compressez et réessayez.",
+    "errorTooSmall": "Image trop petite pour l'impression ({{w}}×{{h}}). Au moins {{min}} px sur le côté le plus court.",
+    "errorWrongType": "L'image doit être JPEG, PNG ou WebP.",
+    "errorReadFailed": "Impossible de lire l'image."
+  },
+  "ai": {
+    "uploadFirst": "Téléchargez d'abord une image pour choisir un style IA.",
+    "uploadFirstShort": "Téléchargez d'abord une image",
+    "chooseStyle": "Choisir un style",
+    "yourTried": "Vos styles essayés",
+    "removeFromHistory": "Retirer de l'historique",
+    "revertToOriginal": "Revenir à la photo sans style",
+    "uploadFailed": "Impossible de télécharger l'image",
+    "styleReused": "Style \"{{name}}\" réutilisé",
+    "styleApplied": "Style \"{{name}}\" appliqué",
+    "styleFailed": "Impossible d'appliquer le style",
+    "creatingImage": "Création de l'image",
+    "stagePrep": "Préparation de votre image…",
+    "stageUpload": "Téléchargement de votre image…",
+    "stageCreate": "Création de votre image…",
+    "stageFetch": "Récupération du résultat…",
+    "noResult": "Le service n'a renvoyé aucune image"
+  },
+  "aiPhoto": {
+    "yourImage": "Votre image",
+    "missingReference": "Image de référence manquante pour ce sujet",
+    "notConfigured": "Ce produit n'est pas encore entièrement configuré. Contactez le support.",
+    "create": "Créer maintenant",
+    "recreate": "Recréer",
+    "creating": "Création…",
+    "ready": "L'image est prête",
+    "failed": "Impossible de créer l'image",
+    "friendlyFailed": "Nous n'avons pas pu créer l'image. Essayez une autre photo avec un visage net et un bon éclairage.",
+    "chooseStyleOptional": "Choisir un style (optionnel)",
+    "styleHintBackgroundOnly": "L'arrière-plan est toujours supprimé — le style n'affecte que le sujet.",
+    "subjectHintHuman": "L'image doit montrer le visage de face, bien éclairé.",
+    "subjectHintPet": "L'image doit montrer clairement le visage de l'animal, de préférence de face.",
+    "subjectHintRemoveBg": "Téléchargez une image où le sujet est clairement visible — nous supprimerons l'arrière-plan."
+  },
+  "preview": {
+    "title": "Aperçu",
+    "enlarge": "Agrandir {{name}}",
+    "noImage": "Aucune image",
+    "compositeFailed": "Composition échouée",
+    "somethingWrong": "Quelque chose s'est mal passé",
+    "threeDLabel": "Vue 3D",
+    "threeDBadge": "3D",
+    "dragToRotate": "glisser pour pivoter",
+    "title3D": "Aperçu 3D"
+  },
+  "cartAdd": {
+    "added": "Ajouté au panier",
+    "prepareFailed": "Impossible de préparer le fichier d'impression",
+    "variantUnavailable": "Cette combinaison n'est pas encore disponible en boutique",
+    "variantUnavailableHint": "{{size}} · {{variant}} introuvable pour {{handle}}."
+  },
+  "scene": {
+    "livingroom": "Salon",
+    "bedroom": "Chambre",
+    "office": "Bureau",
+    "wall": "Au mur"
+  },
+  "detail": {
+    "posterPaper": "Détail papier",
+    "posterFrames": "Options de cadre",
+    "canvasCorner": "Détail du coin",
+    "canvasBack": "Dos & accrochage",
+    "aluminumEdge": "Détail du bord",
+    "aluminumMount": "Montage",
+    "acrylicStud": "Entretoise",
+    "acrylicMount": "Montage"
+  }
 }

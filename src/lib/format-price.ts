@@ -58,3 +58,15 @@ export function formatMoney(amount: number, currency: string, locale: string): s
     return `${amount.toFixed(decimals)} ${currency}`;
   }
 }
+
+/**
+ * Format a delta between two amounts already in the same currency
+ * (e.g. both from Shopify). Sign-prefixed.
+ */
+export function formatMoneyDelta(diff: number, currency: string, locale: string): string {
+  if (Math.abs(diff) < 0.005) {
+    return `+${formatMoney(0, currency, locale)}`;
+  }
+  const abs = formatMoney(Math.abs(diff), currency, locale);
+  return diff > 0 ? `+${abs}` : `−${abs}`;
+}

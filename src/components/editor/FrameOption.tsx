@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
 
@@ -23,13 +24,15 @@ export function FrameOption({
   disabled = false,
   unavailableLabel,
 }: Props) {
+  const { t } = useTranslation();
+  const fallbackUnavailable = t("frame.unavailable");
   return (
     <button
       type="button"
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
       aria-disabled={disabled}
-      title={disabled ? unavailableLabel ?? "Ej tillgänglig" : undefined}
+      title={disabled ? unavailableLabel ?? fallbackUnavailable : undefined}
       className={cn(
         "group relative flex flex-col items-center gap-1.5 rounded-2xl p-1.5 transition",
         disabled
@@ -56,7 +59,7 @@ export function FrameOption({
       <span className="text-xs font-medium leading-tight">{name}</span>
       {disabled ? (
         <span className="text-[9px] leading-tight text-muted-foreground text-center px-0.5">
-          {unavailableLabel ?? "Ej tillgänglig"}
+          {unavailableLabel ?? fallbackUnavailable}
         </span>
       ) : (
         <span

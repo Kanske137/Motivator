@@ -187,7 +187,7 @@ export function MockupGallery() {
       list.push({
         kind: "mockup",
         id: s.scene.id,
-        label: s.scene.label,
+        label: t(s.scene.labelKey),
         thumbUrl: s.url,
         fullUrl: s.url,
         loading: s.loading,
@@ -200,7 +200,7 @@ export function MockupGallery() {
       list.push({
         kind: "detail",
         id: d.id,
-        label: d.label,
+        label: t(d.labelKey),
         thumbUrl: d.src,
         fullUrl: d.src,
       });
