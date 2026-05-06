@@ -230,7 +230,7 @@ export function MockupGallery() {
       <div className="border-t bg-[hsl(var(--paper))]">
         <div className="px-4 py-3">
           <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-3">
-            Förhandsgranska
+            {t("preview.title")}
           </h3>
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
             {allSlots.map((s, i) => {
