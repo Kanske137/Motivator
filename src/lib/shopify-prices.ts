@@ -68,8 +68,14 @@ async function fetchVariants(handle: string, country: string): Promise<VariantNo
         console.warn("[shopify-prices] proxy error", error.message);
         return null;
       }
-      const variants =
-        (data as any)?.data?.productByHandle?.variants?.edges?.map((e: any) => e.node) ?? [];
+      const product = (data as any)?.data?.productByHandle;
+      if (!product) {
+        console.info(
+          `[shopify-prices] no Shopify product for handle="${handle}" (country=${country}). ` +
+          `Live prices will fall back to internal SEK pricing.`,
+        );
+      }
+      const variants = product?.variants?.edges?.map((e: any) => e.node) ?? [];
       cache.set(k, { ts: Date.now(), variants });
       return variants as VariantNode[];
     } catch (e) {
