@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useEditorStore } from "@/stores/editorStore";
 import { useShopContextStore } from "@/stores/shopContextStore";
+import { getEffectiveSizes } from "@/lib/product-config";
 import {
   getShopifyPrices,
   type ShopifyMoney,
@@ -17,16 +18,20 @@ export function useShopifyPriceMap() {
   const [map, setMap] = useState<Map<string, ShopifyMoney>>(new Map());
 
   // Build the (size,variant) combos to fetch from current product/template.
+  // Använd getEffectiveSizes så att admin-byggda mallar (där config.sizes är
+  // tom och storlekarna kommer från productOptions × pricing.ts) också får
+  // riktiga Shopify-priser och därmed rätt valutasymbol.
   const combos = useMemo(() => {
     if (!config) return [] as Array<{ size: string; variant: string }>;
+    const sizes = getEffectiveSizes(config, productOptions);
     const out: Array<{ size: string; variant: string }> = [];
-    for (const s of config.sizes ?? []) {
+    for (const s of sizes) {
       for (const v of s.variants ?? []) {
         out.push({ size: s.size, variant: v.name });
       }
     }
     return out;
-  }, [config]);
+  }, [config, productOptions]);
 
   useEffect(() => {
     if (!config || combos.length === 0) {
