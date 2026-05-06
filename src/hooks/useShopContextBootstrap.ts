@@ -18,6 +18,19 @@ function countryFromCurrency(currency: string | null | undefined): string {
   return map[currency.toUpperCase()] ?? "SE";
 }
 
+/** Skriv tillbaka shop-kontext i URL:en (utan reload) så att allt — inklusive
+ *  tredjepartsverktyg och konsoltester som `URLSearchParams(location.search)` —
+ *  ser samma `locale/currency/country/rate` som appen använder internt. */
+function syncContextToUrl(ctx: { locale: string; currency: string; rate: number; country: string }) {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  url.searchParams.set("locale", ctx.locale);
+  url.searchParams.set("currency", ctx.currency);
+  url.searchParams.set("country", ctx.country);
+  if (ctx.rate && ctx.rate !== 1) url.searchParams.set("rate", String(ctx.rate));
+  window.history.replaceState(window.history.state, "", url.toString());
+}
+
 export function useShopContextBootstrap() {
   const setContext = useShopContextStore((s) => s.setContext);
   const { i18n } = useTranslation();
@@ -37,13 +50,20 @@ export function useShopContextBootstrap() {
     const initialCurrency = queryCurrency || "SEK";
     const initialRate = Number.isFinite(queryRate) && queryRate > 0 ? queryRate : 1;
 
+    const initialCountry = queryCountry || countryFromCurrency(initialCurrency);
     setContext({
       locale: initialLocale,
       currency: initialCurrency,
       rate: initialRate,
-      country: queryCountry || countryFromCurrency(initialCurrency),
+      country: initialCountry,
     });
     void i18n.changeLanguage(initialLocale);
+    syncContextToUrl({
+      locale: initialLocale,
+      currency: initialCurrency,
+      rate: initialRate,
+      country: initialCountry,
+    });
 
     // 2) Live updates from the parent theme.
     const onMessage = (e: MessageEvent) => {
@@ -60,6 +80,7 @@ export function useShopContextBootstrap() {
       };
       setContext(next);
       void i18n.changeLanguage(next.locale);
+      syncContextToUrl(next);
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
