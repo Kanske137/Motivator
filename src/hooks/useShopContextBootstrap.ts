@@ -5,6 +5,19 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { normalizeLocale, useShopContextStore } from "@/stores/shopContextStore";
 
+/** Härled marknadsland från valutakoden när Shopify-temat inte skickar `country`.
+ *  Storefront API kräver en CountryCode för att returnera marknadsanpassade
+ *  priser — utan detta får vi alltid SEK tillbaka. */
+function countryFromCurrency(currency: string | null | undefined): string {
+  if (!currency) return "SE";
+  const map: Record<string, string> = {
+    SEK: "SE", NOK: "NO", DKK: "DK", EUR: "DE", USD: "US", GBP: "GB",
+    CHF: "CH", PLN: "PL", CZK: "CZ", HUF: "HU", RON: "RO", BGN: "BG",
+    CAD: "CA", AUD: "AU", NZD: "NZ", JPY: "JP", ISK: "IS",
+  };
+  return map[currency.toUpperCase()] ?? "SE";
+}
+
 export function useShopContextBootstrap() {
   const setContext = useShopContextStore((s) => s.setContext);
   const { i18n } = useTranslation();
@@ -28,7 +41,7 @@ export function useShopContextBootstrap() {
       locale: initialLocale,
       currency: initialCurrency,
       rate: initialRate,
-      country: queryCountry || "SE",
+      country: queryCountry || countryFromCurrency(initialCurrency),
     });
     void i18n.changeLanguage(initialLocale);
 
@@ -36,11 +49,14 @@ export function useShopContextBootstrap() {
     const onMessage = (e: MessageEvent) => {
       const d = e.data;
       if (!d || typeof d !== "object" || d.type !== "SHOP_CONTEXT") return;
+      const currency = typeof d.currency === "string" ? d.currency : "SEK";
       const next = {
         locale: normalizeLocale(d.locale),
-        currency: typeof d.currency === "string" ? d.currency : "SEK",
+        currency,
         rate: typeof d.rate === "number" && d.rate > 0 ? d.rate : 1,
-        country: typeof d.country === "string" ? d.country : null,
+        country: typeof d.country === "string" && d.country
+          ? d.country
+          : countryFromCurrency(currency),
       };
       setContext(next);
       void i18n.changeLanguage(next.locale);
