@@ -271,7 +271,7 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
           actually has both a poster + canvas variant available. */}
       {toggleEntries.length > 1 && (
         <div className="space-y-2">
-          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Produkt</Label>
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("format.product")}</Label>
           <div className="flex p-1 bg-muted rounded-full">
             {toggleEntries.map((e) => (
               <button
