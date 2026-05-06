@@ -158,10 +158,10 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
     acrylic: "acrylic",
   };
   const KIND_LABEL: Record<Kind, string> = {
-    poster: "Poster",
-    canvas: "Canvas",
-    aluminum: "Aluminium",
-    acrylic: "Akryl",
+    poster: t("productKind.poster"),
+    canvas: t("productKind.canvas"),
+    aluminum: t("productKind.aluminum"),
+    acrylic: t("productKind.acrylic"),
   };
   const kindToConfig = new Map<Kind, ProductConfig>();
   for (const c of sameTemplateConfigs) {
@@ -202,7 +202,7 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
     <div className="space-y-5">
       {/* Bakgrundsfärg — högst upp, alltid synlig */}
       <div className="space-y-2">
-        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Bakgrundsfärg</Label>
+        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("format.backgroundColor")}</Label>
         <div className="flex flex-wrap gap-2 items-center">
           {BG_SWATCHES.map((c) => {
             const selected = posterBgColor.toLowerCase() === c.toLowerCase();
@@ -234,11 +234,11 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
       {/* Vit marginal — Ja/Nej toggle, visas endast om mallen har ett margin-lager */}
       {hasMarginLayer && (
         <div className="space-y-2">
-          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Vit marginal</Label>
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("format.whiteMargin")}</Label>
           <div className="flex p-1 bg-muted rounded-full">
             {([
-              { id: true, label: "Ja" },
-              { id: false, label: "Nej" },
+              { id: true, label: t("common.yes") },
+              { id: false, label: t("common.no") },
             ] as const).map(({ id, label }) => {
               const active = whiteMarginEnabled === id;
               return (
@@ -263,7 +263,7 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
       {/* Tomt-tillstånd: ingen storlek aktiverad i admin för den här produkttypen. */}
       {visibleSizes.length === 0 && (
         <div className="rounded-2xl border border-dashed bg-muted/40 p-4 text-sm text-muted-foreground">
-          Den här produkten har inga aktiva storlekar konfigurerade ännu.
+          {t("format.noActiveSizes")}
         </div>
       )}
 
@@ -271,7 +271,7 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
           actually has both a poster + canvas variant available. */}
       {toggleEntries.length > 1 && (
         <div className="space-y-2">
-          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Produkt</Label>
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("format.product")}</Label>
           <div className="flex p-1 bg-muted rounded-full">
             {toggleEntries.map((e) => (
               <button
@@ -292,10 +292,10 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
 
       {/* Storlek dropdown */}
       <div className="space-y-2">
-        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Storlek</Label>
+        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("format.size")}</Label>
         <Select value={size ?? undefined} onValueChange={setSize}>
           <SelectTrigger className="h-12 rounded-full px-5 text-base">
-            <SelectValue placeholder="Välj storlek" />
+            <SelectValue placeholder={t("format.selectSize")} />
           </SelectTrigger>
           <SelectContent className="rounded-2xl">
             {visibleSizes.map((s) => {
@@ -322,7 +322,7 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
       {visibleVariants.length > 1 && (
         <div className="space-y-2">
           <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-            {isCanvas ? "Djup" : isAluminum ? "Material" : isAcrylic ? "Finish" : "Ram / Hängare"}
+            {isCanvas ? t("format.depth") : isAluminum ? t("format.material") : isAcrylic ? t("format.finish") : t("format.frameOrHanger")}
           </Label>
           <div className={`grid gap-2 ${isCanvas ? "grid-cols-2" : "grid-cols-3"}`}>
             {visibleVariants.map((v) => {
@@ -348,7 +348,7 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
                   onClick={() => setVariant(v.name)}
                   priceLabel={formatDiff(diff)}
                   disabled={!isAvailable}
-                  unavailableLabel={!isAvailable ? "Ej tillgänglig för denna storlek" : undefined}
+                  unavailableLabel={!isAvailable ? t("frame.unavailableForSize") : undefined}
                 />
               );
             })}
@@ -359,11 +359,11 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
       {/* Orientering — segmented pill (hidden when only one orientation is allowed) */}
       {allowedOrientations.length > 1 && (
         <div className="space-y-2">
-          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Orientering</Label>
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("format.orientation")}</Label>
           <div className="flex p-1 bg-muted rounded-full">
             {([
-              { id: "portrait", label: "Stående" },
-              { id: "landscape", label: "Liggande" },
+              { id: "portrait", label: t("orientation.portrait") },
+              { id: "landscape", label: t("orientation.landscape") },
             ] as const)
               .filter(({ id }) => allowedOrientations.includes(id))
               .map(({ id, label }) => {

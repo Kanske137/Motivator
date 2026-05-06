@@ -251,6 +251,7 @@ function MapTabs({
   layers: Array<Extract<TemplateLayer, { type: "map" }>>;
   layerValues: Record<string, unknown>;
 }) {
+  const { t } = useTranslation();
   const [activeId, setActiveId] = useState<string>(layers[0]?.id ?? "");
 
   // If layers change (added/removed), make sure activeId still exists.
@@ -291,7 +292,7 @@ function MapTabs({
         <TabsList className="w-full justify-start overflow-x-auto">
           {layers.map((l, idx) => (
             <TabsTrigger key={l.id} value={l.id} className="text-xs">
-              {l.name || `Karta ${idx + 1}`}
+              {l.name || t("map.tab", { n: idx + 1 })}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -312,6 +313,7 @@ function PlaceLayerSection({
   value: MapLayerValue | null;
   heading: string | null;
 }) {
+  const { t } = useTranslation();
   const applyPlaceToLayer = useEditorStore((s) => s.applyPlaceToLayer);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<GeocodeResult[]>([]);
@@ -356,12 +358,12 @@ function PlaceLayerSection({
         </h4>
       )}
       <div className="space-y-1">
-        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Vald plats</Label>
+        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("map.selectedPlace")}</Label>
         <p className="text-sm font-medium font-serif-display">{placeName}</p>
       </div>
       <div className="space-y-2">
         <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-          Sök adress eller stad
+          {t("map.searchAddress")}
         </Label>
         <Popover open={results.length > 0}>
           <PopoverTrigger asChild>
@@ -370,7 +372,7 @@ function PlaceLayerSection({
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="t.ex. Drottninggatan 1, Stockholm"
+                placeholder={t("map.searchPlaceholder")}
                 className="pl-10 pr-10 h-12 rounded-full bg-background shadow-inner"
               />
               {searching && (
@@ -399,7 +401,7 @@ function PlaceLayerSection({
         </Popover>
       </div>
       <p className="text-[11px] text-muted-foreground">
-        Tips: dra och zooma direkt i kartan för att finjustera.
+        {t("map.tipDrag")}
       </p>
       <LayerTransformControls layer={layer} />
     </div>
@@ -417,6 +419,7 @@ function MapStyleLayerSection({
   value: MapLayerValue | null;
   heading: string | null;
 }) {
+  const { t } = useTranslation();
   const setLayerMapStyle = useEditorStore((s) => s.setLayerMapStyle);
   const setLayerShowLabels = useEditorStore((s) => s.setLayerShowLabels);
   const setLayerMapShape = useEditorStore((s) => s.setLayerMapShape);
@@ -432,10 +435,10 @@ function MapStyleLayerSection({
   );
 
   const shapeOptions = ([
-    { id: "rect", label: "Ingen", Icon: Square },
-    { id: "circle", label: "Cirkel", Icon: Circle },
-    { id: "heart", label: "Hjärta", Icon: Heart },
-    { id: "star", label: "Stjärna", Icon: Star },
+    { id: "rect", label: t("shape.none"), Icon: Square },
+    { id: "circle", label: t("shape.circle"), Icon: Circle },
+    { id: "heart", label: t("shape.heart"), Icon: Heart },
+    { id: "star", label: t("shape.star"), Icon: Star },
   ] as const);
 
   return (
@@ -466,13 +469,13 @@ function MapStyleLayerSection({
       )}
       {!layer.locks.style && (
         <div className="flex items-center justify-between pt-2">
-          <Label className="text-xs text-foreground">Visa områdesnamn på kartan</Label>
+          <Label className="text-xs text-foreground">{t("map.showLabels")}</Label>
           <Switch checked={showLabels} onCheckedChange={(v) => setLayerShowLabels(layer.id, v)} />
         </div>
       )}
       {!layer.locks.shape && (
         <div className="space-y-2 pt-1">
-          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Kartans form</Label>
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("shape.mapShape")}</Label>
           <div className="grid grid-cols-3 gap-2">
             {shapeOptions.map(({ id, label, Icon }) => {
               const selected = shape === id;
@@ -511,6 +514,7 @@ function TextLayerSection({
   value: TextLayerValue | null;
   heading: string | null;
 }) {
+  const { t } = useTranslation();
   const setLayerText = useEditorStore((s) => s.setLayerText);
   const setLayerTextFont = useEditorStore((s) => s.setLayerTextFont);
   const setLayerTextVisible = useEditorStore((s) => s.setLayerTextVisible);
@@ -532,7 +536,7 @@ function TextLayerSection({
       )}
       {!layer.locks.visibility && (
         <div className="flex items-center justify-between">
-          <Label className="text-xs text-foreground">Visa text</Label>
+          <Label className="text-xs text-foreground">{t("text.show")}</Label>
           <Switch checked={visible} onCheckedChange={(v) => setLayerTextVisible(layer.id, v)} />
         </div>
       )}
@@ -540,7 +544,7 @@ function TextLayerSection({
         <Textarea
           value={text}
           onChange={(e) => setLayerText(layer.id, e.target.value)}
-          placeholder="Din text här…"
+          placeholder={t("text.placeholder")}
           maxLength={config.text_config.maxChars}
           rows={3}
           className="rounded-xl"
@@ -548,7 +552,7 @@ function TextLayerSection({
       )}
       {!layer.locks.font && (
         <div className="space-y-2">
-          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Typsnitt</Label>
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("text.font")}</Label>
           <div className="grid grid-cols-3 gap-2">
             {allowedFonts.map((f) => (
               <Button
@@ -579,13 +583,14 @@ function PhotoShapeSection({
   value: PhotoLayerValue | null;
   heading: string | null;
 }) {
+  const { t } = useTranslation();
   const setLayerPhotoShape = useEditorStore((s) => s.setLayerPhotoShape);
   const shape = value?.shape ?? layer.defaults.shape;
   const options = [
-    { id: "rect", label: "Ingen", Icon: Square },
-    { id: "circle", label: "Cirkel", Icon: Circle },
-    { id: "heart", label: "Hjärta", Icon: Heart },
-    { id: "star", label: "Stjärna", Icon: Star },
+    { id: "rect", label: t("shape.none"), Icon: Square },
+    { id: "circle", label: t("shape.circle"), Icon: Circle },
+    { id: "heart", label: t("shape.heart"), Icon: Heart },
+    { id: "star", label: t("shape.star"), Icon: Star },
   ] as const;
 
   return (
@@ -598,7 +603,7 @@ function PhotoShapeSection({
       {!layer.locks.shape && (
         <>
           <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-            Bildens form
+            {t("shape.imageShape")}
           </Label>
           <div className="grid grid-cols-4 gap-2">
             {options.map(({ id, label, Icon }) => {

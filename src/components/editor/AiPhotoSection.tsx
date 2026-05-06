@@ -15,6 +15,7 @@
 // "no-ref::style:<id>" string for removeBackground so each style picks
 // caches separately.
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, Sparkles, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -41,12 +42,7 @@ interface Props {
 const ACCEPT = "image/jpeg,image/png,image/webp,image/heic";
 const MAX_BYTES = 25 * 1024 * 1024;
 
-const SUBJECT_HINT: Record<string, string> = {
-  human: "Bilden ska visa ansiktet rakt framifrån, väl belyst.",
-  pet: "Bilden ska visa djurets ansikte tydligt, gärna framifrån.",
-  removeBackground:
-    "Ladda upp bilden där motivet syns tydligt — vi tar bort bakgrunden åt dig.",
-};
+// Subject hints moved to i18n (aiPhoto.subjectHint*).
 
 /** Cache slot used in place of the admin reference URL for removeBackground.
  *  Including the style id keeps each style pick cached separately. */
@@ -71,6 +67,7 @@ async function blobToDataUrl(blob: Blob): Promise<string> {
 }
 
 export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const sources = useEditorStore((s) => s.aiPhotoSources);
   const results = useEditorStore((s) => s.aiPhotoResults);
@@ -122,11 +119,11 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
     const f = files?.[0];
     if (!f) return;
     if (!f.type.match(/^image\//)) {
-      toast.error("Endast bildfiler stöds");
+      toast.error(t("photo.errorOnlyImages"));
       return;
     }
     if (f.size > MAX_BYTES) {
-      toast.error("Bilden är för stor", { description: "Max 25 MB." });
+      toast.error(t("photo.errorTooLarge"), { description: t("photo.errorTooLargeHint") });
       return;
     }
     const url = URL.createObjectURL(f);
@@ -164,15 +161,15 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
   const runSwap = async (opts: { force?: boolean } = {}) => {
     // human/pet need a reference image; removeBackground does NOT.
     if (!isRemoveBg && !refUrl) {
-      toast.error("Saknar referensbild för det här motivet");
+      toast.error(t("aiPhoto.missingReference"));
       return;
     }
     if (!source?.file) {
-      toast.error("Ladda upp en bild först");
+      toast.error(t("ai.uploadFirstShort"));
       return;
     }
     setBusy(true);
-    setStage("Förbereder din bild…");
+    setStage(t("ai.stagePrep"));
     try {
       const hash = await ensureHash();
       const cacheRefSlot = refSlotFor(subjectKind, refUrl, selectedStyleId);
@@ -181,11 +178,11 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         const cached = getCachedFaceSwap(layer.id, hash, cacheRefSlot);
         if (cached) {
           setAiPhotoResult(layer.id, cached);
-          toast.success("Bilden är klar");
+          toast.success(t("aiPhoto.ready"));
           return;
         }
       }
-      setStage("Laddar upp din bild…");
+      setStage(t("ai.stageUpload"));
       const faceImageUrl = await ensureUploadedUrl();
       if (!faceImageUrl) return;
       const designId = `swap-${(crypto as { randomUUID?: () => string }).randomUUID?.() ?? Date.now()}`;
@@ -227,7 +224,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         }
       }
 
-      setStage("Skapar din bild…");
+      setStage(t("ai.stageCreate"));
       const { data, error } = await supabase.functions.invoke("replicate-face-swap", {
         body: {
           referenceImageUrl: refUrl,
@@ -242,7 +239,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         },
       });
       if (error) throw error;
-      setStage("Hämtar resultat…");
+      setStage(t("ai.stageFetch"));
       const payload = data as {
         printFileUrl?: string;
         error?: string;
@@ -253,12 +250,12 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         replicateOutputUrl?: string;
       };
       if (payload?.error) {
-        const friendly = payload.userMessage ?? "Vi kunde inte skapa bilden. Prova en annan bild med tydligt ansikte och bra ljus.";
-        toast.error("Kunde inte skapa bilden", { description: friendly });
+        const friendly = payload.userMessage ?? t("aiPhoto.friendlyFailed");
+        toast.error(t("aiPhoto.failed"), { description: friendly });
         return;
       }
       const printFileUrl = payload?.printFileUrl;
-      if (!printFileUrl) throw new Error("Tjänsten returnerade ingen bild");
+      if (!printFileUrl) throw new Error(t("ai.noResult"));
       console.info("[AiPhoto] face-swap result", {
         layerId: layer.id,
         printFileUrl,
@@ -268,11 +265,11 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
       });
       setAiPhotoResult(layer.id, printFileUrl);
       if (hash) addFaceSwapToCache(layer.id, hash, cacheRefSlot, printFileUrl);
-      toast.success("Bilden är klar");
+      toast.success(t("aiPhoto.ready"));
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Okänt fel";
+      const msg = e instanceof Error ? e.message : t("common.unknownError");
       console.error("[AiPhoto] swap failed", e);
-      toast.error("Kunde inte skapa bilden", { description: msg });
+      toast.error(t("aiPhoto.failed"), { description: msg });
     } finally {
       setBusy(false);
       setStage(null);
@@ -293,13 +290,13 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
 
       {!isRemoveBg && !refUrl && (
         <p className="text-xs text-destructive">
-          Den här produkten är inte fullt konfigurerad än. Kontakta support.
+          {t("aiPhoto.notConfigured")}
         </p>
       )}
 
       <div className="space-y-2">
         <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-          Din bild
+          {t("aiPhoto.yourImage")}
         </Label>
         {!source ? (
           <button
@@ -310,15 +307,19 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
             )}
           >
             <Upload className="h-5 w-5 text-muted-foreground" />
-            <span className="text-sm font-medium">Ladda upp bild</span>
+            <span className="text-sm font-medium">{t("photo.uploadCta")}</span>
             <span className="text-[10px] text-muted-foreground px-3 text-center">
-              {SUBJECT_HINT[subjectKind] ?? SUBJECT_HINT.human}
+              {subjectKind === "pet"
+                ? t("aiPhoto.subjectHintPet")
+                : subjectKind === "removeBackground"
+                  ? t("aiPhoto.subjectHintRemoveBg")
+                  : t("aiPhoto.subjectHintHuman")}
             </span>
           </button>
         ) : (
           <div className="space-y-2">
             <div className="relative rounded-xl overflow-hidden border bg-muted aspect-square w-24">
-              <img src={source.previewUrl} alt="Din bild" className="w-full h-full object-cover" />
+              <img src={source.previewUrl} alt={t("aiPhoto.yourImage")} className="w-full h-full object-cover" />
             </div>
             <div className="flex gap-2">
               <Button
@@ -329,7 +330,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
                 className="flex-1"
               >
                 <Upload className="h-3.5 w-3.5 mr-1.5" />
-                Byt bild
+                {t("photo.swap")}
               </Button>
               <Button
                 type="button"
@@ -356,7 +357,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
       {isRemoveBg && visibleStyles.length > 0 && (
         <div className="space-y-2">
           <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-            Välj stil (valfritt)
+            {t("aiPhoto.chooseStyleOptional")}
           </Label>
           <div className="grid grid-cols-3 gap-2">
             {visibleStyles.map((p) => {
@@ -386,7 +387,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
             })}
           </div>
           <p className="text-[10px] text-muted-foreground">
-            Bakgrunden tas alltid bort — stilen påverkar bara själva motivet.
+            {t("aiPhoto.styleHintBackgroundOnly")}
           </p>
         </div>
       )}
@@ -400,12 +401,12 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         {busy ? (
           <>
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            Skapar…
+            {t("aiPhoto.creating")}
           </>
         ) : (
           <>
             <Sparkles className="h-4 w-4 mr-2" />
-            {result ? "Skapa igen" : "Skapa nu"}
+            {result ? t("aiPhoto.recreate") : t("aiPhoto.create")}
           </>
         )}
       </Button>
@@ -413,7 +414,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
       <AiProgress
         active={busy}
         expectedSeconds={expectedSeconds}
-        label="Skapar bild"
+        label={t("ai.creatingImage")}
         stage={stage}
       />
     </div>

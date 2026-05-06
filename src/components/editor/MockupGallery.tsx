@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useEditorStore } from "@/stores/editorStore";
 import { Loader2, AlertCircle, ChevronLeft, ChevronRight, Maximize2, Box } from "lucide-react";
 import { getScenesFor, frameColorFromVariant, hangerColorFromVariant, type MockupScene } from "@/lib/mockup-scenes";
@@ -28,6 +29,7 @@ type GallerySlot =
   | { kind: "detail"; id: string; label: string; thumbUrl: string; fullUrl: string };
 
 export function MockupGallery() {
+  const { t } = useTranslation();
   const {
     config, template, size, variant, orientation,
     mapStyleId, mapCenter, mapZoom,
@@ -126,7 +128,7 @@ export function MockupGallery() {
               });
               return { scene, url, error: undefined as string | undefined };
             } catch (e) {
-              const msg = e instanceof Error ? e.message : "Composit misslyckades";
+              const msg = e instanceof Error ? e.message : t("preview.compositeFailed");
               return { scene, url: null as string | null, error: msg };
             }
           }),
@@ -144,7 +146,7 @@ export function MockupGallery() {
       } catch (e) {
         if (myReq !== reqIdRef.current) return;
         console.error("[MockupGallery] failed", e);
-        const msg = e instanceof Error ? e.message : "Något gick fel";
+        const msg = e instanceof Error ? e.message : t("preview.somethingWrong");
         setSnapshotError(msg);
         setSnapshotLoading(false);
         setSlots(scenes.map((s) => ({ scene: s, url: null, loading: false, error: msg })));
@@ -173,7 +175,7 @@ export function MockupGallery() {
       list.push({
         kind: "threeD",
         id: "3d",
-        label: "3D-vy",
+        label: t("preview.threeDLabel"),
         thumbUrl: snapshotUrl,
         loading: snapshotLoading,
         error: snapshotError,
@@ -205,7 +207,7 @@ export function MockupGallery() {
     }
 
     return list;
-  }, [config, isCanvas, slots, snapshotUrl, snapshotLoading, snapshotError]);
+  }, [config, isCanvas, slots, snapshotUrl, snapshotLoading, snapshotError, t]);
 
   if (!config) return null;
 
@@ -228,7 +230,7 @@ export function MockupGallery() {
       <div className="border-t bg-[hsl(var(--paper))]">
         <div className="px-4 py-3">
           <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-3">
-            Förhandsgranska
+            {t("preview.title")}
           </h3>
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
             {allSlots.map((s, i) => {
@@ -244,7 +246,7 @@ export function MockupGallery() {
                   disabled={openableIdx < 0}
                   onClick={() => openableIdx >= 0 && setLightboxIdx(openableIdx)}
                   className="group flex-shrink-0 w-32 h-32 md:w-40 md:h-40 rounded-2xl overflow-hidden bg-card border snap-start relative disabled:cursor-default cursor-zoom-in"
-                  aria-label={`Förstora ${s.label}`}
+                  aria-label={t("preview.enlarge", { name: s.label })}
                 >
                   {isLoading ? (
                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/40 animate-pulse">
@@ -263,7 +265,7 @@ export function MockupGallery() {
                       {s.kind === "threeD" && (
                         <span className="absolute top-1.5 left-1.5 inline-flex items-center gap-1 rounded-full bg-foreground/85 text-background text-[10px] font-semibold px-2 py-0.5 backdrop-blur-sm">
                           <Box className="h-3 w-3" />
-                          3D
+                          {t("preview.threeDBadge")}
                         </span>
                       )}
                       <span className="absolute top-1.5 right-1.5 inline-flex items-center justify-center h-6 w-6 rounded-full bg-background/85 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition">
@@ -273,7 +275,7 @@ export function MockupGallery() {
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center bg-destructive/5 text-destructive text-[10px] p-2 text-center gap-1">
                       <AlertCircle className="h-4 w-4" />
-                      <span className="line-clamp-3">{error ?? "Ingen bild"}</span>
+                      <span className="line-clamp-3">{error ?? t("preview.noImage")}</span>
                     </div>
                   )}
                   <div className="absolute bottom-0 inset-x-0 bg-background/85 backdrop-blur-sm text-[11px] py-1 text-center font-medium pointer-events-none">
@@ -288,7 +290,7 @@ export function MockupGallery() {
 
       <Dialog open={lightboxIdx !== null} onOpenChange={(o) => !o && setLightboxIdx(null)}>
         <DialogContent className="max-w-[95vw] md:max-w-4xl p-0 bg-background border-0 overflow-hidden">
-          <DialogTitle className="sr-only">{currentSlot?.label ?? "Förhandsgranska"}</DialogTitle>
+          <DialogTitle className="sr-only">{currentSlot?.label ?? t("preview.title")}</DialogTitle>
           {currentSlot && (
             <div className="relative bg-muted">
               {currentSlot.kind === "threeD" ? (
@@ -319,7 +321,7 @@ export function MockupGallery() {
                     size="icon"
                     onClick={goPrev}
                     className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full shadow-lg bg-background/90 hover:bg-background z-10"
-                    aria-label="Föregående"
+                    aria-label={t("common.previous")}
                   >
                     <ChevronLeft className="h-5 w-5" />
                   </Button>
@@ -329,7 +331,7 @@ export function MockupGallery() {
                     size="icon"
                     onClick={goNext}
                     className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full shadow-lg bg-background/90 hover:bg-background z-10"
-                    aria-label="Nästa"
+                    aria-label={t("common.next")}
                   >
                     <ChevronRight className="h-5 w-5" />
                   </Button>
