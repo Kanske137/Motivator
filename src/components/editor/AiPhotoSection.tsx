@@ -290,13 +290,13 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
 
       {!isRemoveBg && !refUrl && (
         <p className="text-xs text-destructive">
-          Den här produkten är inte fullt konfigurerad än. Kontakta support.
+          {t("aiPhoto.notConfigured")}
         </p>
       )}
 
       <div className="space-y-2">
         <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-          Din bild
+          {t("aiPhoto.yourImage")}
         </Label>
         {!source ? (
           <button
@@ -307,15 +307,19 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
             )}
           >
             <Upload className="h-5 w-5 text-muted-foreground" />
-            <span className="text-sm font-medium">Ladda upp bild</span>
+            <span className="text-sm font-medium">{t("photo.uploadCta")}</span>
             <span className="text-[10px] text-muted-foreground px-3 text-center">
-              {SUBJECT_HINT[subjectKind] ?? SUBJECT_HINT.human}
+              {subjectKind === "pet"
+                ? t("aiPhoto.subjectHintPet")
+                : subjectKind === "removeBackground"
+                  ? t("aiPhoto.subjectHintRemoveBg")
+                  : t("aiPhoto.subjectHintHuman")}
             </span>
           </button>
         ) : (
           <div className="space-y-2">
             <div className="relative rounded-xl overflow-hidden border bg-muted aspect-square w-24">
-              <img src={source.previewUrl} alt="Din bild" className="w-full h-full object-cover" />
+              <img src={source.previewUrl} alt={t("aiPhoto.yourImage")} className="w-full h-full object-cover" />
             </div>
             <div className="flex gap-2">
               <Button
@@ -326,7 +330,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
                 className="flex-1"
               >
                 <Upload className="h-3.5 w-3.5 mr-1.5" />
-                Byt bild
+                {t("photo.swap")}
               </Button>
               <Button
                 type="button"
@@ -353,7 +357,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
       {isRemoveBg && visibleStyles.length > 0 && (
         <div className="space-y-2">
           <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-            Välj stil (valfritt)
+            {t("aiPhoto.chooseStyleOptional")}
           </Label>
           <div className="grid grid-cols-3 gap-2">
             {visibleStyles.map((p) => {
@@ -383,7 +387,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
             })}
           </div>
           <p className="text-[10px] text-muted-foreground">
-            Bakgrunden tas alltid bort — stilen påverkar bara själva motivet.
+            {t("aiPhoto.styleHintBackgroundOnly")}
           </p>
         </div>
       )}
@@ -397,12 +401,12 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         {busy ? (
           <>
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            Skapar…
+            {t("aiPhoto.creating")}
           </>
         ) : (
           <>
             <Sparkles className="h-4 w-4 mr-2" />
-            {result ? "Skapa igen" : "Skapa nu"}
+            {result ? t("aiPhoto.recreate") : t("aiPhoto.create")}
           </>
         )}
       </Button>
@@ -410,7 +414,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
       <AiProgress
         active={busy}
         expectedSeconds={expectedSeconds}
-        label="Skapar bild"
+        label={t("ai.creatingImage")}
         stage={stage}
       />
     </div>
