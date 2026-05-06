@@ -41,7 +41,7 @@ export function useShopContextBootstrap() {
       locale: initialLocale,
       currency: initialCurrency,
       rate: initialRate,
-      country: queryCountry || "SE",
+      country: queryCountry || countryFromCurrency(initialCurrency),
     });
     void i18n.changeLanguage(initialLocale);
 
