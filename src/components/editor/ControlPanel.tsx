@@ -33,6 +33,7 @@ import type { TemplateLayer } from "@/lib/template-schema";
  *  Shown in the customer editor for any layer where `locks.size === false`.
  *  Scale percentage is RELATIVE to the layer's template default size. */
 function LayerSizeSlider({ layer }: { layer: TemplateLayer }) {
+  const { t } = useTranslation();
   const layerTransforms = useEditorStore((s) => s.layerTransforms);
   const setLayerTransform = useEditorStore((s) => s.setLayerTransform);
   const resetLayerTransform = useEditorStore((s) => s.resetLayerTransform);
@@ -44,7 +45,6 @@ function LayerSizeSlider({ layer }: { layer: TemplateLayer }) {
     const factor = val / 100;
     const newW = Math.max(1, Math.min(100, layer.wPct * factor));
     const newH = Math.max(1, Math.min(100, layer.hPct * factor));
-    // Keep the layer centered around its previous center
     const cx = eff.xPct + eff.wPct / 2;
     const cy = eff.yPct + eff.hPct / 2;
     const clamped = clampLayerRect({
@@ -60,7 +60,7 @@ function LayerSizeSlider({ layer }: { layer: TemplateLayer }) {
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-          Storlek <span className="ml-1 text-foreground/60 normal-case">{scale}%</span>
+          {t("layer.size")} <span className="ml-1 text-foreground/60 normal-case">{scale}%</span>
         </Label>
         <Button
           type="button"
@@ -69,7 +69,7 @@ function LayerSizeSlider({ layer }: { layer: TemplateLayer }) {
           className="h-7 px-2 text-[10px]"
           onClick={() => resetLayerTransform(layer.id)}
         >
-          <RotateCcw className="h-3 w-3 mr-1" /> Återställ
+          <RotateCcw className="h-3 w-3 mr-1" /> {t("common.reset")}
         </Button>
       </div>
       <Slider
@@ -86,6 +86,7 @@ function LayerSizeSlider({ layer }: { layer: TemplateLayer }) {
 /** Aggregated transform controls for a layer (size slider when unlocked + a
  *  reminder that the user can drag the layer when move is unlocked). */
 function LayerTransformControls({ layer }: { layer: TemplateLayer }) {
+  const { t } = useTranslation();
   const showSize = !layer.locks.size;
   const showMove = !layer.locks.move;
   if (!showSize && !showMove) return null;
@@ -94,7 +95,7 @@ function LayerTransformControls({ layer }: { layer: TemplateLayer }) {
       {showSize && <LayerSizeSlider layer={layer} />}
       {showMove && (
         <p className="text-[11px] text-muted-foreground">
-          Tips: dra ✥-handtaget på lagret i förhandsvisningen för att flytta det.
+          {t("layer.tipMove")}
         </p>
       )}
     </div>
