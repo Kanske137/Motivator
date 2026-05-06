@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useEditorStore } from "@/stores/editorStore";
 import { useShopContextStore } from "@/stores/shopContextStore";
 import { formatPriceDelta } from "@/lib/format-price";
+import { translateVariantName } from "@/lib/variant-labels";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -333,7 +334,7 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
               return (
                 <FrameOption
                   key={v.name}
-                  name={v.name}
+                  name={translateVariantName(v.name, t)}
                   thumbnail={isCanvas || isAluminum || isAcrylic || hangerHex ? undefined : isNoFrame ? undefined : FRAME_THUMBS[v.name]}
                   svg={
                     isCanvas
