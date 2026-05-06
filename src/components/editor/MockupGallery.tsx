@@ -146,7 +146,7 @@ export function MockupGallery() {
       } catch (e) {
         if (myReq !== reqIdRef.current) return;
         console.error("[MockupGallery] failed", e);
-        const msg = e instanceof Error ? e.message : "Något gick fel";
+        const msg = e instanceof Error ? e.message : t("preview.somethingWrong");
         setSnapshotError(msg);
         setSnapshotLoading(false);
         setSlots(scenes.map((s) => ({ scene: s, url: null, loading: false, error: msg })));
