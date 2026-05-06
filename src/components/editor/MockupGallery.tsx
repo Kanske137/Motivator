@@ -207,7 +207,7 @@ export function MockupGallery() {
     }
 
     return list;
-  }, [config, isCanvas, slots, snapshotUrl, snapshotLoading, snapshotError]);
+  }, [config, isCanvas, slots, snapshotUrl, snapshotLoading, snapshotError, t]);
 
   if (!config) return null;
 
