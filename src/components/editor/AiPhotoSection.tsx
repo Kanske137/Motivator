@@ -15,6 +15,7 @@
 // "no-ref::style:<id>" string for removeBackground so each style picks
 // caches separately.
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, Sparkles, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
