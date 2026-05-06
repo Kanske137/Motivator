@@ -161,15 +161,15 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
   const runSwap = async (opts: { force?: boolean } = {}) => {
     // human/pet need a reference image; removeBackground does NOT.
     if (!isRemoveBg && !refUrl) {
-      toast.error("Saknar referensbild för det här motivet");
+      toast.error(t("aiPhoto.missingReference"));
       return;
     }
     if (!source?.file) {
-      toast.error("Ladda upp en bild först");
+      toast.error(t("ai.uploadFirstShort"));
       return;
     }
     setBusy(true);
-    setStage("Förbereder din bild…");
+    setStage(t("ai.stagePrep"));
     try {
       const hash = await ensureHash();
       const cacheRefSlot = refSlotFor(subjectKind, refUrl, selectedStyleId);
