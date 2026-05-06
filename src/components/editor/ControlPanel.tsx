@@ -469,13 +469,13 @@ function MapStyleLayerSection({
       )}
       {!layer.locks.style && (
         <div className="flex items-center justify-between pt-2">
-          <Label className="text-xs text-foreground">Visa områdesnamn på kartan</Label>
+          <Label className="text-xs text-foreground">{t("map.showLabels")}</Label>
           <Switch checked={showLabels} onCheckedChange={(v) => setLayerShowLabels(layer.id, v)} />
         </div>
       )}
       {!layer.locks.shape && (
         <div className="space-y-2 pt-1">
-          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Kartans form</Label>
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("shape.mapShape")}</Label>
           <div className="grid grid-cols-3 gap-2">
             {shapeOptions.map(({ id, label, Icon }) => {
               const selected = shape === id;
