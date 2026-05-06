@@ -275,7 +275,7 @@ export function MockupGallery() {
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center bg-destructive/5 text-destructive text-[10px] p-2 text-center gap-1">
                       <AlertCircle className="h-4 w-4" />
-                      <span className="line-clamp-3">{error ?? "Ingen bild"}</span>
+                      <span className="line-clamp-3">{error ?? t("preview.noImage")}</span>
                     </div>
                   )}
                   <div className="absolute bottom-0 inset-x-0 bg-background/85 backdrop-blur-sm text-[11px] py-1 text-center font-medium pointer-events-none">
