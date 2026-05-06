@@ -9,7 +9,8 @@
     "no": "Nej",
     "close": "Stäng",
     "previous": "Föregående",
-    "next": "Nästa"
+    "next": "Nästa",
+    "unknownError": "Okänt fel"
   },
   "header": {
     "yourChoice": "Ditt val"
@@ -29,7 +30,8 @@
     "transformation": "Förvandling",
     "map": "Karta",
     "text": "Text",
-    "format": "Format"
+    "format": "Format",
+    "aiStyle": "AI-stil"
   },
   "format": {
     "backgroundColor": "Bakgrundsfärg",
@@ -100,7 +102,9 @@
     "errorOnlyImages": "Endast bildfiler stöds",
     "errorTooLarge": "Bilden är för stor",
     "errorTooLargeHint": "Max 25 MB. Komprimera och försök igen.",
-    "errorTooSmall": "Bilden är för liten för print ({{w}}×{{h}}). Minst {{min}} px på kortaste sidan krävs."
+    "errorTooSmall": "Bilden är för liten för print ({{w}}×{{h}}). Minst {{min}} px på kortaste sidan krävs.",
+    "errorWrongType": "Bilden måste vara JPEG, PNG eller WebP.",
+    "errorReadFailed": "Kunde inte läsa bilden."
   },
   "ai": {
     "uploadFirst": "Ladda upp en bild först för att kunna välja AI-stil.",
@@ -118,15 +122,34 @@
     "stageUpload": "Laddar upp din bild…",
     "stageCreate": "Skapar din bild…",
     "stageFetch": "Hämtar resultat…",
-    "noResult": "Tjänsten returnerade ingen bild",
-    "unknownError": "Okänt fel"
+    "noResult": "Tjänsten returnerade ingen bild"
+  },
+  "aiPhoto": {
+    "yourImage": "Din bild",
+    "missingReference": "Saknar referensbild för det här motivet",
+    "notConfigured": "Den här produkten är inte fullt konfigurerad än. Kontakta support.",
+    "create": "Skapa nu",
+    "recreate": "Skapa igen",
+    "creating": "Skapar…",
+    "ready": "Bilden är klar",
+    "failed": "Kunde inte skapa bilden",
+    "friendlyFailed": "Vi kunde inte skapa bilden. Prova en annan bild med tydligt ansikte och bra ljus.",
+    "chooseStyleOptional": "Välj stil (valfritt)",
+    "styleHintBackgroundOnly": "Bakgrunden tas alltid bort — stilen påverkar bara själva motivet.",
+    "subjectHintHuman": "Bilden ska visa ansiktet rakt framifrån, väl belyst.",
+    "subjectHintPet": "Bilden ska visa djurets ansikte tydligt, gärna framifrån.",
+    "subjectHintRemoveBg": "Ladda upp bilden där motivet syns tydligt — vi tar bort bakgrunden åt dig."
   },
   "preview": {
     "title": "Förhandsgranska",
     "enlarge": "Förstora {{name}}",
     "noImage": "Ingen bild",
     "compositeFailed": "Composit misslyckades",
-    "somethingWrong": "Något gick fel"
+    "somethingWrong": "Något gick fel",
+    "threeDLabel": "3D-vy",
+    "threeDBadge": "3D",
+    "dragToRotate": "dra för att rotera",
+    "title3D": "3D-förhandsvisning"
   },
   "cartAdd": {
     "added": "Lagt till i varukorgen",

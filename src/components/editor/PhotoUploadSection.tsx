@@ -3,6 +3,7 @@
 // lazily to the cart-previews bucket on first AI request — kept here as a
 // preview-only File until then.
 import { useCallback, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Upload, Image as ImageIcon, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEditorStore } from "@/stores/editorStore";
@@ -13,6 +14,7 @@ const ACCEPT = "image/jpeg,image/png,image/webp,image/heic";
 const MAX_BYTES = 25 * 1024 * 1024; // 25 MB
 
 export function PhotoUploadSection() {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const photoFile = useEditorStore((s) => s.photoFile);
   const photoPreviewUrl = useEditorStore((s) => s.photoPreviewUrl);
@@ -24,12 +26,12 @@ export function PhotoUploadSection() {
       const f = files?.[0];
       if (!f) return;
       if (!f.type.match(/^image\//)) {
-        toast.error("Endast bildfiler stöds");
+        toast.error(t("photo.errorOnlyImages"));
         return;
       }
       if (f.size > MAX_BYTES) {
-        toast.error("Bilden är för stor", {
-          description: "Max 25 MB. Komprimera och försök igen.",
+        toast.error(t("photo.errorTooLarge"), {
+          description: t("photo.errorTooLargeHint"),
         });
         return;
       }
@@ -69,9 +71,9 @@ export function PhotoUploadSection() {
           )}
         >
           <Upload className="h-6 w-6 text-muted-foreground" />
-          <span className="text-sm font-medium">Ladda upp bild</span>
+          <span className="text-sm font-medium">{t("photo.uploadCta")}</span>
           <span className="text-[11px] text-muted-foreground">
-            JPG, PNG, WebP · max 25 MB
+            {t("photo.uploadHint")}
           </span>
         </button>
       ) : (
@@ -80,7 +82,7 @@ export function PhotoUploadSection() {
             {photoPreviewUrl ? (
               <img
                 src={photoPreviewUrl}
-                alt="Uppladdad bild"
+                alt={t("photo.altUploaded")}
                 className="w-full h-full object-cover"
               />
             ) : (
@@ -98,7 +100,7 @@ export function PhotoUploadSection() {
               onClick={() => inputRef.current?.click()}
             >
               <Upload className="h-3.5 w-3.5 mr-1.5" />
-              Byt bild
+              {t("photo.swap")}
             </Button>
             <Button
               type="button"
@@ -108,11 +110,11 @@ export function PhotoUploadSection() {
               className="text-destructive hover:text-destructive"
             >
               <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-              Ta bort
+              {t("common.remove")}
             </Button>
           </div>
           <p className="text-[11px] text-muted-foreground">
-            Dra i bilden för att välja utsnitt inom ramen.
+            {t("photo.tipCrop")}
           </p>
         </div>
       )}

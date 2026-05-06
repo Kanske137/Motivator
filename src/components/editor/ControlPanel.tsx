@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Accordion,
   AccordionContent,
@@ -32,6 +33,7 @@ import type { TemplateLayer } from "@/lib/template-schema";
  *  Shown in the customer editor for any layer where `locks.size === false`.
  *  Scale percentage is RELATIVE to the layer's template default size. */
 function LayerSizeSlider({ layer }: { layer: TemplateLayer }) {
+  const { t } = useTranslation();
   const layerTransforms = useEditorStore((s) => s.layerTransforms);
   const setLayerTransform = useEditorStore((s) => s.setLayerTransform);
   const resetLayerTransform = useEditorStore((s) => s.resetLayerTransform);
@@ -43,7 +45,6 @@ function LayerSizeSlider({ layer }: { layer: TemplateLayer }) {
     const factor = val / 100;
     const newW = Math.max(1, Math.min(100, layer.wPct * factor));
     const newH = Math.max(1, Math.min(100, layer.hPct * factor));
-    // Keep the layer centered around its previous center
     const cx = eff.xPct + eff.wPct / 2;
     const cy = eff.yPct + eff.hPct / 2;
     const clamped = clampLayerRect({
@@ -59,7 +60,7 @@ function LayerSizeSlider({ layer }: { layer: TemplateLayer }) {
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-          Storlek <span className="ml-1 text-foreground/60 normal-case">{scale}%</span>
+          {t("layer.size")} <span className="ml-1 text-foreground/60 normal-case">{scale}%</span>
         </Label>
         <Button
           type="button"
@@ -68,7 +69,7 @@ function LayerSizeSlider({ layer }: { layer: TemplateLayer }) {
           className="h-7 px-2 text-[10px]"
           onClick={() => resetLayerTransform(layer.id)}
         >
-          <RotateCcw className="h-3 w-3 mr-1" /> Återställ
+          <RotateCcw className="h-3 w-3 mr-1" /> {t("common.reset")}
         </Button>
       </div>
       <Slider
@@ -85,6 +86,7 @@ function LayerSizeSlider({ layer }: { layer: TemplateLayer }) {
 /** Aggregated transform controls for a layer (size slider when unlocked + a
  *  reminder that the user can drag the layer when move is unlocked). */
 function LayerTransformControls({ layer }: { layer: TemplateLayer }) {
+  const { t } = useTranslation();
   const showSize = !layer.locks.size;
   const showMove = !layer.locks.move;
   if (!showSize && !showMove) return null;
@@ -93,7 +95,7 @@ function LayerTransformControls({ layer }: { layer: TemplateLayer }) {
       {showSize && <LayerSizeSlider layer={layer} />}
       {showMove && (
         <p className="text-[11px] text-muted-foreground">
-          Tips: dra ✥-handtaget på lagret i förhandsvisningen för att flytta det.
+          {t("layer.tipMove")}
         </p>
       )}
     </div>
@@ -111,6 +113,7 @@ const cardClass =
 
 
 export function ControlPanel({ configs, activeHandle, onProductChange }: Props) {
+  const { t } = useTranslation();
   const config = useEditorStore((s) => s.config);
   const template = useEditorStore((s) => s.template);
   const productOptions = useEditorStore((s) => s.productOptions);
@@ -128,7 +131,6 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
     (l): l is Extract<TemplateLayer, { type: "aiPhoto" }> => l.type === "aiPhoto",
   );
 
-  // Hide map layers fully locked (no editable surface)
   const editableMaps = mapLayers.filter(
     (l) => !l.locks.position || !l.locks.style || !l.locks.shape || !l.locks.visibility || !l.locks.size || !l.locks.move,
   );
@@ -136,8 +138,6 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
     (l) => !l.locks.content || !l.locks.font || !l.locks.visibility || !l.locks.size || !l.locks.move,
   );
 
-  // Image section visible only when the template has at least one dedicated
-  // photo layer. AI presets nest inside the image section once a photo is up.
   const showImageSection = photoLayers.length > 0;
   const aiStyles = productOptions?.aiStyles ?? [];
   const showAiInsideImage = !!photoFile && aiStyles.length > 0;
@@ -148,7 +148,7 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
       {showImageSection && (
         <AccordionItem value="bild" className={cn(cardClass, "border-b-0")}>
           <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
-            Bild
+            {t("section.image")}
           </AccordionTrigger>
           <AccordionContent className="pt-1 pb-4">
             <PhotoUploadSection />
@@ -161,7 +161,7 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
                       key={l.id}
                       layer={l}
                       value={(layerValues[l.id] as PhotoLayerValue | undefined) ?? null}
-                      heading={arr.length > 1 ? l.name || `Bild ${idx + 1}` : null}
+                      heading={arr.length > 1 ? l.name || t("layer.imageTab", { n: idx + 1 }) : null}
                     />
                   ))}
               </div>
@@ -169,7 +169,7 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
             {showAiInsideImage && (
               <div className="mt-4 pt-4 border-t space-y-2">
                 <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                  AI-stil
+                  {t("section.aiStyle")}
                 </Label>
                 <AiStyleSection presets={aiStyles} />
               </div>
@@ -181,14 +181,14 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
       {showAiPhotoSection && (
         <AccordionItem value="forvandling" className={cn(cardClass, "border-b-0")}>
           <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
-            Förvandling
+            {t("section.transformation")}
           </AccordionTrigger>
           <AccordionContent className="pt-1 pb-4 space-y-5">
             {aiPhotoLayers.map((l, idx, arr) => (
               <div key={l.id} className="space-y-3">
                 <AiPhotoSection
                   layer={l}
-                  heading={arr.length > 1 ? l.name || `Förvandling ${idx + 1}` : null}
+                  heading={arr.length > 1 ? l.name || t("layer.transformationTab", { n: idx + 1 }) : null}
                   aiStylePresets={aiStyles}
                 />
                 <LayerTransformControls layer={l} />
@@ -201,7 +201,7 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
       {editableMaps.length > 0 && (
         <AccordionItem value="karta" className={cn(cardClass, "border-b-0")}>
           <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
-            Karta
+            {t("section.map")}
           </AccordionTrigger>
           <AccordionContent className="pt-1 pb-4 overflow-visible">
             <MapTabs config={config} layers={editableMaps} layerValues={layerValues} />
@@ -212,7 +212,7 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
       {editableTexts.length > 0 && (
         <AccordionItem value="text" className={cn(cardClass, "border-b-0")}>
           <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
-            Text
+            {t("section.text")}
           </AccordionTrigger>
           <AccordionContent className="pt-1 pb-4 space-y-6">
             {editableTexts.map((l, idx) => (
@@ -221,7 +221,7 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
                 config={config}
                 layer={l}
                 value={(layerValues[l.id] as TextLayerValue | undefined) ?? null}
-                heading={editableTexts.length > 1 ? `${l.name || `Text ${idx + 1}`}` : null}
+                heading={editableTexts.length > 1 ? `${l.name || t("text.tab", { n: idx + 1 })}` : null}
               />
             ))}
           </AccordionContent>
@@ -230,7 +230,7 @@ export function ControlPanel({ configs, activeHandle, onProductChange }: Props) 
 
       <AccordionItem value="format" className={cn(cardClass, "border-b-0")}>
         <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
-          Format
+          {t("section.format")}
         </AccordionTrigger>
         <AccordionContent className="pt-1 pb-4">
           <FormatSection configs={configs} activeHandle={activeHandle} onProductChange={onProductChange} />
