@@ -292,10 +292,10 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
 
       {/* Storlek dropdown */}
       <div className="space-y-2">
-        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Storlek</Label>
+        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("format.size")}</Label>
         <Select value={size ?? undefined} onValueChange={setSize}>
           <SelectTrigger className="h-12 rounded-full px-5 text-base">
-            <SelectValue placeholder="Välj storlek" />
+            <SelectValue placeholder={t("format.selectSize")} />
           </SelectTrigger>
           <SelectContent className="rounded-2xl">
             {visibleSizes.map((s) => {
