@@ -178,7 +178,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         const cached = getCachedFaceSwap(layer.id, hash, cacheRefSlot);
         if (cached) {
           setAiPhotoResult(layer.id, cached);
-          toast.success("Bilden är klar");
+          toast.success(t("aiPhoto.ready"));
           return;
         }
       }
