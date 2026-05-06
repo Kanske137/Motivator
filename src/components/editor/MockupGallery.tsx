@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useEditorStore } from "@/stores/editorStore";
 import { Loader2, AlertCircle, ChevronLeft, ChevronRight, Maximize2, Box } from "lucide-react";
 import { getScenesFor, frameColorFromVariant, hangerColorFromVariant, type MockupScene } from "@/lib/mockup-scenes";
