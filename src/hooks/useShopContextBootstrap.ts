@@ -37,13 +37,20 @@ export function useShopContextBootstrap() {
     const initialCurrency = queryCurrency || "SEK";
     const initialRate = Number.isFinite(queryRate) && queryRate > 0 ? queryRate : 1;
 
+    const initialCountry = queryCountry || countryFromCurrency(initialCurrency);
     setContext({
       locale: initialLocale,
       currency: initialCurrency,
       rate: initialRate,
-      country: queryCountry || countryFromCurrency(initialCurrency),
+      country: initialCountry,
     });
     void i18n.changeLanguage(initialLocale);
+    syncContextToUrl({
+      locale: initialLocale,
+      currency: initialCurrency,
+      rate: initialRate,
+      country: initialCountry,
+    });
 
     // 2) Live updates from the parent theme.
     const onMessage = (e: MessageEvent) => {
@@ -60,6 +67,7 @@ export function useShopContextBootstrap() {
       };
       setContext(next);
       void i18n.changeLanguage(next.locale);
+      syncContextToUrl(next);
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);

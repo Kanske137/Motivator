@@ -118,7 +118,13 @@ export default function EditorPage() {
     // Clear the resolved variant immediately — prevents an in-flight resolve
     // from a previous handle being used in add-to-cart while we switch.
     setShopifyVariantId(null);
-    setParams({ handle: newHandle, type: nextType }, { replace: true });
+    // Bevara shop-kontext (locale/currency/country/rate) som temat skickade
+    // i iframe-URL:en — annars försvinner de vid produktbyte och prislogiken
+    // tappar marknadsland.
+    const nextParams = new URLSearchParams(window.location.search);
+    nextParams.set("handle", newHandle);
+    nextParams.set("type", nextType);
+    setParams(nextParams, { replace: true });
     setConfig(next);
   };
 
