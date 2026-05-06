@@ -202,7 +202,7 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
     <div className="space-y-5">
       {/* Bakgrundsfärg — högst upp, alltid synlig */}
       <div className="space-y-2">
-        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Bakgrundsfärg</Label>
+        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("format.backgroundColor")}</Label>
         <div className="flex flex-wrap gap-2 items-center">
           {BG_SWATCHES.map((c) => {
             const selected = posterBgColor.toLowerCase() === c.toLowerCase();
