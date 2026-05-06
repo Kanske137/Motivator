@@ -263,7 +263,7 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
       {/* Tomt-tillstånd: ingen storlek aktiverad i admin för den här produkttypen. */}
       {visibleSizes.length === 0 && (
         <div className="rounded-2xl border border-dashed bg-muted/40 p-4 text-sm text-muted-foreground">
-          Den här produkten har inga aktiva storlekar konfigurerade ännu.
+          {t("format.noActiveSizes")}
         </div>
       )}
 
