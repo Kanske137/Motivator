@@ -359,11 +359,11 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
       {/* Orientering — segmented pill (hidden when only one orientation is allowed) */}
       {allowedOrientations.length > 1 && (
         <div className="space-y-2">
-          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Orientering</Label>
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("format.orientation")}</Label>
           <div className="flex p-1 bg-muted rounded-full">
             {([
-              { id: "portrait", label: "Stående" },
-              { id: "landscape", label: "Liggande" },
+              { id: "portrait", label: t("orientation.portrait") },
+              { id: "landscape", label: t("orientation.landscape") },
             ] as const)
               .filter(({ id }) => allowedOrientations.includes(id))
               .map(({ id, label }) => {
