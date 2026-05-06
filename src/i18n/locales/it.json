@@ -1,19 +1,177 @@
 {
-  "common": {"addToCart":"Aggiungi al carrello","loading":"Caricamento…","tryAgain":"Riprova","remove":"Rimuovi","reset":"Ripristina","yes":"Sì","no":"No","close":"Chiudi","previous":"Precedente","next":"Successivo","unknownError":"Errore sconosciuto"},
-  "header": {"yourChoice":"La tua scelta"},
-  "cart": {"title":"Carrello","empty":"Il tuo carrello è vuoto","total":"Totale","checkout":"Cassa"},
-  "orientation": {"portrait":"Verticale","landscape":"Orizzontale"},
-  "section": {"image":"Immagine","transformation":"Trasformazione","map":"Mappa","text":"Testo","format":"Formato","aiStyle":"Stile IA"},
-  "format": {"backgroundColor":"Colore di sfondo","whiteMargin":"Margine bianco","noActiveSizes":"Questo prodotto non ha ancora dimensioni attive configurate.","product":"Prodotto","size":"Dimensione","selectSize":"Seleziona dimensione","depth":"Profondità","material":"Materiale","finish":"Finitura","frameOrHanger":"Cornice / Appendino","orientation":"Orientamento"},
-  "productKind": {"poster":"Poster","canvas":"Tela","aluminum":"Alluminio","acrylic":"Acrilico"},
-  "frame": {"none":"Nessuna","white":"Bianco","black":"Nero","oak":"Quercia","walnut":"Noce","hangerOak":"Appendino Quercia","hangerWalnut":"Appendino Noce","hangerBlack":"Appendino Nero","hangerWhite":"Appendino Bianco","unavailable":"Non disponibile","unavailableForSize":"Non disponibile per questa dimensione"},
-  "shape": {"none":"Nessuna","circle":"Cerchio","heart":"Cuore","star":"Stella","mapShape":"Forma della mappa","imageShape":"Forma dell'immagine"},
-  "map": {"selectedPlace":"Luogo selezionato","searchAddress":"Cerca indirizzo o città","searchPlaceholder":"es. Via Roma 1, Milano","tipDrag":"Suggerimento: trascina e zooma direttamente sulla mappa per regolare.","showLabels":"Mostra nomi delle aree sulla mappa","tab":"Mappa {{n}}"},
-  "text": {"show":"Mostra testo","placeholder":"Il tuo testo qui…","font":"Carattere","tab":"Testo {{n}}"},
-  "layer": {"size":"Dimensione","tipMove":"Suggerimento: trascina la maniglia ✥ sul livello nell'anteprima per spostarlo.","imageTab":"Immagine {{n}}","transformationTab":"Trasformazione {{n}}"},
-  "photo": {"uploadCta":"Carica immagine","uploadHint":"JPG, PNG, WebP · max 25 MB","swap":"Cambia immagine","altUploaded":"Immagine caricata","tipCrop":"Trascina l'immagine per scegliere il ritaglio entro la cornice.","errorOnlyImages":"Sono supportati solo file immagine","errorTooLarge":"Immagine troppo grande","errorTooLargeHint":"Max 25 MB. Comprimi e riprova.","errorTooSmall":"Immagine troppo piccola per la stampa ({{w}}×{{h}}). Almeno {{min}} px sul lato più corto.","errorWrongType":"L'immagine deve essere JPEG, PNG o WebP.","errorReadFailed":"Impossibile leggere l'immagine."},
-  "ai": {"uploadFirst":"Carica prima un'immagine per scegliere uno stile IA.","uploadFirstShort":"Carica prima un'immagine","chooseStyle":"Scegli stile","yourTried":"I tuoi stili provati","removeFromHistory":"Rimuovi dalla cronologia","revertToOriginal":"Torna alla foto senza stile","uploadFailed":"Impossibile caricare l'immagine","styleReused":"Stile \"{{name}}\" riutilizzato","styleApplied":"Stile \"{{name}}\" applicato","styleFailed":"Impossibile applicare lo stile","creatingImage":"Creazione immagine","stagePrep":"Preparazione della tua immagine…","stageUpload":"Caricamento della tua immagine…","stageCreate":"Creazione della tua immagine…","stageFetch":"Recupero risultato…","noResult":"Il servizio non ha restituito nessuna immagine"},
-  "aiPhoto": {"yourImage":"La tua immagine","missingReference":"Manca l'immagine di riferimento per questo soggetto","notConfigured":"Questo prodotto non è ancora completamente configurato. Contatta il supporto.","create":"Crea ora","recreate":"Ricrea","creating":"Creazione…","ready":"L'immagine è pronta","failed":"Impossibile creare l'immagine","friendlyFailed":"Non siamo riusciti a creare l'immagine. Prova un'altra foto con viso chiaro e buona illuminazione.","chooseStyleOptional":"Scegli stile (opzionale)","styleHintBackgroundOnly":"Lo sfondo viene sempre rimosso — lo stile influenza solo il soggetto.","subjectHintHuman":"L'immagine deve mostrare il viso di fronte, ben illuminato.","subjectHintPet":"L'immagine deve mostrare chiaramente il viso dell'animale, preferibilmente di fronte.","subjectHintRemoveBg":"Carica un'immagine dove il soggetto è chiaramente visibile — rimuoviamo lo sfondo per te."},
-  "preview": {"title":"Anteprima","enlarge":"Ingrandisci {{name}}","noImage":"Nessuna immagine","compositeFailed":"Composizione fallita","somethingWrong":"Qualcosa è andato storto","threeDLabel":"Vista 3D","threeDBadge":"3D","dragToRotate":"trascina per ruotare","title3D":"Anteprima 3D"},
-  "cartAdd": {"added":"Aggiunto al carrello","prepareFailed":"Impossibile preparare il file di stampa","variantUnavailable":"Questa combinazione non è ancora disponibile in negozio","variantUnavailableHint":"{{size}} · {{variant}} non trovato per {{handle}}."}
+  "common": {
+    "addToCart": "Aggiungi al carrello",
+    "loading": "Caricamento…",
+    "tryAgain": "Riprova",
+    "remove": "Rimuovi",
+    "reset": "Ripristina",
+    "yes": "Sì",
+    "no": "No",
+    "close": "Chiudi",
+    "previous": "Precedente",
+    "next": "Successivo",
+    "unknownError": "Errore sconosciuto"
+  },
+  "header": {
+    "yourChoice": "La tua scelta"
+  },
+  "cart": {
+    "title": "Carrello",
+    "empty": "Il tuo carrello è vuoto",
+    "total": "Totale",
+    "checkout": "Cassa"
+  },
+  "orientation": {
+    "portrait": "Verticale",
+    "landscape": "Orizzontale"
+  },
+  "section": {
+    "image": "Immagine",
+    "transformation": "Trasformazione",
+    "map": "Mappa",
+    "text": "Testo",
+    "format": "Formato",
+    "aiStyle": "Stile IA"
+  },
+  "format": {
+    "backgroundColor": "Colore di sfondo",
+    "whiteMargin": "Margine bianco",
+    "noActiveSizes": "Questo prodotto non ha ancora dimensioni attive configurate.",
+    "product": "Prodotto",
+    "size": "Dimensione",
+    "selectSize": "Seleziona dimensione",
+    "depth": "Profondità",
+    "material": "Materiale",
+    "finish": "Finitura",
+    "frameOrHanger": "Cornice / Appendino",
+    "orientation": "Orientamento",
+    "depthValue": "{{cm}} cm"
+  },
+  "productKind": {
+    "poster": "Poster",
+    "canvas": "Tela",
+    "aluminum": "Alluminio",
+    "acrylic": "Acrilico"
+  },
+  "frame": {
+    "none": "Nessuna",
+    "white": "Bianco",
+    "black": "Nero",
+    "oak": "Quercia",
+    "walnut": "Noce",
+    "hangerOak": "Appendino Quercia",
+    "hangerWalnut": "Appendino Noce",
+    "hangerBlack": "Appendino Nero",
+    "hangerWhite": "Appendino Bianco",
+    "unavailable": "Non disponibile",
+    "unavailableForSize": "Non disponibile per questa dimensione"
+  },
+  "shape": {
+    "none": "Nessuna",
+    "circle": "Cerchio",
+    "heart": "Cuore",
+    "star": "Stella",
+    "mapShape": "Forma della mappa",
+    "imageShape": "Forma dell'immagine"
+  },
+  "map": {
+    "selectedPlace": "Luogo selezionato",
+    "searchAddress": "Cerca indirizzo o città",
+    "searchPlaceholder": "es. Via Roma 1, Milano",
+    "tipDrag": "Suggerimento: trascina e zooma direttamente sulla mappa per regolare.",
+    "showLabels": "Mostra nomi delle aree sulla mappa",
+    "tab": "Mappa {{n}}"
+  },
+  "text": {
+    "show": "Mostra testo",
+    "placeholder": "Il tuo testo qui…",
+    "font": "Carattere",
+    "tab": "Testo {{n}}"
+  },
+  "layer": {
+    "size": "Dimensione",
+    "tipMove": "Suggerimento: trascina la maniglia ✥ sul livello nell'anteprima per spostarlo.",
+    "imageTab": "Immagine {{n}}",
+    "transformationTab": "Trasformazione {{n}}"
+  },
+  "photo": {
+    "uploadCta": "Carica immagine",
+    "uploadHint": "JPG, PNG, WebP · max 25 MB",
+    "swap": "Cambia immagine",
+    "altUploaded": "Immagine caricata",
+    "tipCrop": "Trascina l'immagine per scegliere il ritaglio entro la cornice.",
+    "errorOnlyImages": "Sono supportati solo file immagine",
+    "errorTooLarge": "Immagine troppo grande",
+    "errorTooLargeHint": "Max 25 MB. Comprimi e riprova.",
+    "errorTooSmall": "Immagine troppo piccola per la stampa ({{w}}×{{h}}). Almeno {{min}} px sul lato più corto.",
+    "errorWrongType": "L'immagine deve essere JPEG, PNG o WebP.",
+    "errorReadFailed": "Impossibile leggere l'immagine."
+  },
+  "ai": {
+    "uploadFirst": "Carica prima un'immagine per scegliere uno stile IA.",
+    "uploadFirstShort": "Carica prima un'immagine",
+    "chooseStyle": "Scegli stile",
+    "yourTried": "I tuoi stili provati",
+    "removeFromHistory": "Rimuovi dalla cronologia",
+    "revertToOriginal": "Torna alla foto senza stile",
+    "uploadFailed": "Impossibile caricare l'immagine",
+    "styleReused": "Stile \"{{name}}\" riutilizzato",
+    "styleApplied": "Stile \"{{name}}\" applicato",
+    "styleFailed": "Impossibile applicare lo stile",
+    "creatingImage": "Creazione immagine",
+    "stagePrep": "Preparazione della tua immagine…",
+    "stageUpload": "Caricamento della tua immagine…",
+    "stageCreate": "Creazione della tua immagine…",
+    "stageFetch": "Recupero risultato…",
+    "noResult": "Il servizio non ha restituito nessuna immagine"
+  },
+  "aiPhoto": {
+    "yourImage": "La tua immagine",
+    "missingReference": "Manca l'immagine di riferimento per questo soggetto",
+    "notConfigured": "Questo prodotto non è ancora completamente configurato. Contatta il supporto.",
+    "create": "Crea ora",
+    "recreate": "Ricrea",
+    "creating": "Creazione…",
+    "ready": "L'immagine è pronta",
+    "failed": "Impossibile creare l'immagine",
+    "friendlyFailed": "Non siamo riusciti a creare l'immagine. Prova un'altra foto con viso chiaro e buona illuminazione.",
+    "chooseStyleOptional": "Scegli stile (opzionale)",
+    "styleHintBackgroundOnly": "Lo sfondo viene sempre rimosso — lo stile influenza solo il soggetto.",
+    "subjectHintHuman": "L'immagine deve mostrare il viso di fronte, ben illuminato.",
+    "subjectHintPet": "L'immagine deve mostrare chiaramente il viso dell'animale, preferibilmente di fronte.",
+    "subjectHintRemoveBg": "Carica un'immagine dove il soggetto è chiaramente visibile — rimuoviamo lo sfondo per te."
+  },
+  "preview": {
+    "title": "Anteprima",
+    "enlarge": "Ingrandisci {{name}}",
+    "noImage": "Nessuna immagine",
+    "compositeFailed": "Composizione fallita",
+    "somethingWrong": "Qualcosa è andato storto",
+    "threeDLabel": "Vista 3D",
+    "threeDBadge": "3D",
+    "dragToRotate": "trascina per ruotare",
+    "title3D": "Anteprima 3D"
+  },
+  "cartAdd": {
+    "added": "Aggiunto al carrello",
+    "prepareFailed": "Impossibile preparare il file di stampa",
+    "variantUnavailable": "Questa combinazione non è ancora disponibile in negozio",
+    "variantUnavailableHint": "{{size}} · {{variant}} non trovato per {{handle}}."
+  },
+  "scene": {
+    "livingroom": "Soggiorno",
+    "bedroom": "Camera da letto",
+    "office": "Ufficio",
+    "wall": "A parete"
+  },
+  "detail": {
+    "posterPaper": "Dettaglio carta",
+    "posterFrames": "Opzioni cornice",
+    "canvasCorner": "Dettaglio angolo",
+    "canvasBack": "Retro e aggancio",
+    "aluminumEdge": "Dettaglio bordo",
+    "aluminumMount": "Montaggio",
+    "acrylicStud": "Distanziale",
+    "acrylicMount": "Montaggio"
+  }
 }
