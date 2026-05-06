@@ -3,6 +3,7 @@
 // lazily to the cart-previews bucket on first AI request — kept here as a
 // preview-only File until then.
 import { useCallback, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Upload, Image as ImageIcon, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEditorStore } from "@/stores/editorStore";
@@ -13,6 +14,7 @@ const ACCEPT = "image/jpeg,image/png,image/webp,image/heic";
 const MAX_BYTES = 25 * 1024 * 1024; // 25 MB
 
 export function PhotoUploadSection() {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const photoFile = useEditorStore((s) => s.photoFile);
   const photoPreviewUrl = useEditorStore((s) => s.photoPreviewUrl);
@@ -24,12 +26,12 @@ export function PhotoUploadSection() {
       const f = files?.[0];
       if (!f) return;
       if (!f.type.match(/^image\//)) {
-        toast.error("Endast bildfiler stöds");
+        toast.error(t("photo.errorOnlyImages"));
         return;
       }
       if (f.size > MAX_BYTES) {
-        toast.error("Bilden är för stor", {
-          description: "Max 25 MB. Komprimera och försök igen.",
+        toast.error(t("photo.errorTooLarge"), {
+          description: t("photo.errorTooLargeHint"),
         });
         return;
       }
