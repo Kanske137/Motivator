@@ -75,3 +75,25 @@ export function formatMoneyDelta(diff: number, currency: string, locale: string)
   const abs = formatMoney(Math.abs(diff), currency, locale);
   return diff > 0 ? `+${abs}` : `−${abs}`;
 }
+
+/**
+ * Format a SEK amount using a derived FX (currency + rate) sourced from a
+ * real Shopify price. Use this in fallbacks when a specific (size,variant)
+ * price wasn't returned by Shopify but we still want the customer to see a
+ * correct amount in their market currency.
+ */
+export function formatMoneyFromSEK(
+  sekAmount: number,
+  fx: { currencyCode: string; rate: number },
+  locale: string,
+): string {
+  return formatMoney(sekAmount * fx.rate, fx.currencyCode, locale);
+}
+
+export function formatMoneyDeltaFromSEK(
+  sekDiff: number,
+  fx: { currencyCode: string; rate: number },
+  locale: string,
+): string {
+  return formatMoneyDelta(sekDiff * fx.rate, fx.currencyCode, locale);
+}

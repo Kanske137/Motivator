@@ -1,122 +1,78 @@
+## Problemet
 
-# Fix: tom produktsida i Concept-temat
+Valutatecken visas korrekt (t.ex. "€") men beloppet är fel — det är SEK-summan med eurotecken (t.ex. "199 €" istället för "~17 €").
 
-## Vad som händer
-`personlig-karta.json` använder sektionstypen `custom-liquid`. Concept-temat innehåller troligen ingen `sections/custom-liquid.liquid` (premium-teman utelämnar den ofta). När en JSON-template refererar en sektionstyp som inte finns i temat renderar Shopify den som tom — vilket exakt matchar symptomet (header + footer OK, mitten tom).
+### Rotorsak
+Editorn räknar pris i två steg:
 
-Fix: skapa en egen section-fil och referera den i template:n. Snippet:en kan då slopas — vi flyttar in innehållet direkt i sektionen.
+1. **Källa A — Shopify Storefront `@inContext(country)`** (via `useShopifyPriceMap` → `getShopifyPrices`): returnerar redan rätt valuta + rätt belopp för marknaden. När detta lyckas visas "displayPrice" korrekt.
+2. **Fallback B — intern SEK × rate** (via `formatPrice(sekAmount, shopCtx)`): används när A inte hittar någon variant. Den använder `ctx.rate` som kommer från `cart.currency.rate` i Liquid-snippeten.
 
-## Steg du gör i Shopify Admin
+Två saker gör att vi hamnar i Fallback B med fel siffra:
 
-### 1. Skapa ny section i Concept-temat
-**Online Store → Themes → Concept → Edit code → Sections → Add a new section**
-- Namn: `personlig-karta-editor`
-- Klistra in koden i nästa avsnitt och spara.
+- **`cart.currency.rate` i Concept-temat returnerar `1`** för många kunder (Shopify Markets sätter inte alltid en FX-rate i Liquid när marknaden använder "currency conversion" via Markets Pro / inte är fullt aktiverad). → URL-paramen `rate=1` → SEK-beloppet visas oförändrat med fel valutasymbol.
+- **Storefront `productByHandle` matchar inte alltid varianten.** Vår `findVariant` jämför `selectedOptions.value` (t.ex. "21x30 cm" / "Vit") mot mallens combos. Om Shopify-storleken är skriven annorlunda ("21×30 cm" med riktigt multiplikationstecken, eller "Hängare i ek" mot "Ek") så returnerar den `null` → vi faller till B → fel siffra.
 
-### 2. Section-kod (`sections/personlig-karta-editor.liquid`)
+Vi måste alltså både (a) säkerställa att Källa A nästan alltid lyckas, och (b) göra Fallback B robust när A misslyckas.
+
+---
+
+## Plan
+
+### 1. Diagnos först (1 min)
+Lägg till tillfällig konsol-logg i `src/lib/shopify-prices.ts` (`fetchVariants`) som loggar `handle`, `country`, returnerade `selectedOptions`-värden, och i `findVariant` när matchning misslyckas. Be användaren öppna editor-iframen i butiken (DE-marknad), kopiera DevTools-loggen → vi vet då exakt vilka strängar Shopify levererar.
+
+### 2. Gör variant-matchning toleransare i `src/lib/shopify-prices.ts`
+Uppdatera `normalize()` så den även:
+- Ersätter `×` (U+00D7), `x`, `X` → `x`.
+- Tar bort diakritiska tecken (`å→a`, `ä→a`, `ö→o`, etc.) via `.normalize("NFD").replace(/\p{Diacritic}/gu, "")`.
+- Tar bort vanliga prefix som "Hängare i ", "Ram i ", "Ramad ".
+
+Detta gör att "Hängare i ek" matchar "Ek", "21×30 cm" matchar "21x30cm", osv.
+
+### 3. Bygg en FX-bro när Storefront-pris saknas
+Lägg till en ny hjälpfunktion i `src/lib/shopify-prices.ts`:
+
+```
+getMarketCurrency(handle, country) → { currencyCode, anyAmountSEK, anyAmountMarket } | null
+```
+
+Den läser **vilken som helst** variant från `productByHandle @inContext(country)` och returnerar förhållandet mellan dess SEK-pris (vi vet vårt interna SEK från `pricing.ts`) och dess marknadspris. Det ger oss en **härledd FX-rate** som garanterat speglar Shopifys egen kurs för marknaden, oavsett vad temat skickade i `cart.currency.rate`.
+
+I `useShopifyPriceMap` exponera även denna härledda rate. I `EditorPage`/`FormatSection`:
+
+- Om `livePrice` finns → använd den (oförändrat).
+- Annars: `formatMoney(sekAmount * derivedRate, derivedCurrency, locale)` istället för `formatPrice(sekAmount, shopCtx)`.
+
+Detta löser fallet där varianten inte matchas exakt men vi ändå behöver visa rätt belopp i rätt valuta.
+
+### 4. Förbättra theme-snippeten i `SHOPIFY_SETUP.md`
+Byt URL-rate-källa från `cart.currency.rate` till en mer pålitlig kombination, och skicka även den i `SHOP_CONTEXT`-postMessage:
 
 ```liquid
-<style>
-  .lovable-map-editor-wrap { width:100%; max-width:100%; margin:0; padding:0; display:block; }
-  .lovable-map-editor-wrap iframe { width:100%; min-height:100vh; border:0; display:block; background:#fff; }
-</style>
-
-<div class="lovable-map-editor-wrap">
-  <iframe
-    id="lovable-editor-iframe-{{ product.handle }}"
-    src="https://artful-create-studio-87.lovable.app/editor?handle={{ product.handle }}&locale={{ request.locale.iso_code }}&currency={{ cart.currency.iso_code }}&rate={{ cart.currency.rate | default: 1 }}&country={{ localization.country.iso_code }}"
-    allow="clipboard-write; geolocation"
-    loading="eager"
-  ></iframe>
-</div>
-
-<script>
-(function(){
-  var iframe = document.getElementById('lovable-editor-iframe-{{ product.handle }}');
-  function pushContext(){
-    if(!iframe||!iframe.contentWindow) return;
-    iframe.contentWindow.postMessage({
-      type:'SHOP_CONTEXT',
-      locale: {{ request.locale.iso_code | json }},
-      currency: {{ cart.currency.iso_code | json }},
-      rate: {{ cart.currency.rate | default: 1 }},
-      country: {{ localization.country.iso_code | json }}
-    },'*');
-  }
-  iframe && iframe.addEventListener('load', pushContext);
-  document.addEventListener('visibilitychange', function(){
-    if(document.visibilityState==='visible') pushContext();
-  });
-
-  window.addEventListener('message', function(e){
-    var d = e.data; if(!d || typeof d!=='object') return;
-    if(d.type==='EDITOR_RESIZE' && typeof d.height==='number' && iframe){
-      iframe.style.height = Math.max(600,d.height)+'px'; return;
-    }
-    if(d.type!=='ADD_TO_CART') return;
-    if(d.handle && d.handle!=='{{ product.handle }}') return;
-    fetch('/products/{{ product.handle }}.js').then(function(r){return r.json();})
-      .then(function(p){
-        var match = p.variants.find(function(v){
-          var o=(v.options||[]).map(function(x){return String(x).toLowerCase();});
-          return o.indexOf(String(d.size).toLowerCase())>-1 && o.indexOf(String(d.variant).toLowerCase())>-1;
-        }) || p.variants[0];
-        var props={};
-        Object.keys(d.properties||{}).forEach(function(k){props[k]=d.properties[k];});
-        return fetch('/cart/add.js',{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({id:match.id, quantity:d.quantity||1, properties:props})
-        });
-      })
-      .then(function(r){return r.json();})
-      .then(function(){window.location.href='/cart';})
-      .catch(function(err){console.error('add to cart failed',err);});
-  });
-})();
-</script>
-
-{% schema %}
-{
-  "name": "Personlig Karta Editor",
-  "settings": [],
-  "presets": [{ "name": "Personlig Karta Editor" }]
-}
-{% endschema %}
+&rate={{ shop.currency | default: 'SEK' }}...
 ```
 
-`{% schema %}`-blocket är obligatoriskt — utan det renderar Shopify ingenting.
+I praktiken: använd `localization.country.currency.iso_code` istället för `cart.currency.iso_code` (det är marknadsvalutan, inte cart-valutan), och skicka även `shop_currency={{ shop.currency }}` så vi i editorn vet att vår SEK-bas matchar shop-basen.
 
-### 3. Uppdatera template:n
-**Templates → `personlig-karta.json`** — ersätt allt med:
+Notera: detta är bara en backup — den riktiga fixen är steg 2+3 ovan, eftersom användaren aldrig får röra Liquid igen om vi själva härleder FX i editorn.
 
-```json
-{
-  "sections": {
-    "editor": {
-      "type": "personlig-karta-editor"
-    }
-  },
-  "order": ["editor"]
-}
-```
+### 5. Test-checklista
+1. Öppna `personlig-karta-poster` i butiken som **DE-kund** (EUR). Pris ska visa t.ex. "17,99 €" — inte "199 €".
+2. Byt storlek/ram → delta-priserna i `FormatSection` ska också vara i EUR med rätt belopp.
+3. Lägg i varukorg → CartDrawer visar samma EUR-summa (den läser cart-cost från Shopify, alltid korrekt).
+4. Som **SE-kund** (SEK) → priser som tidigare, oförändrat.
+5. Logga DevTools-konsolen efter steg 1 — `[shopify-prices] derived rate=…` ska finnas och inte vara `1`.
 
-(`type` matchar nu vår section-fil istället för `custom-liquid`.)
+---
 
-### 4. Behåll eller ta bort gamla snippet
-`snippets/personlig-karta-editor.liquid` används inte längre — kan ligga kvar eller raderas.
+## Filer som ändras
 
-### 5. Hard reload produktsidan
-Cmd/Ctrl + Shift + R.
+- `src/lib/shopify-prices.ts` — bättre `normalize()`, ny `getDerivedFx()`-hjälp, debug-loggning.
+- `src/hooks/useShopifyPriceMap.ts` — exponera `derivedFx` (currency + rate) bredvid pris-mappen.
+- `src/pages/EditorPage.tsx` — använd `derivedFx` för fallback-priset.
+- `src/components/editor/FormatSection.tsx` — använd `derivedFx` för delta-prisformat när Shopify-pris saknas.
+- `src/lib/format-price.ts` — liten ny `formatMoneyFromSEK(sekAmount, derivedFx, locale)`-helper.
+- `SHOPIFY_SETUP.md` — uppdatera snippeten att använda `localization.country.currency.iso_code` och skicka `shop_currency`.
 
-## Varför detta löser det
-- Garanterad section-typ — vi äger filen själva.
-- `{% schema %}` säkerställer att Shopify registrerar den som en giltig sektion.
-- Inga `display:none`-regler längre — concept-temat har redan inget extra produktinnehåll i en custom template, så vi behöver bara visa iframen.
-
-## Diagnos om det fortfarande är tomt
-View source på produktsidan och sök efter `lovable-editor-iframe`:
-- **Finns inte** → section-filen renderas inte (felstavat namn i template, schema-fel, eller temat behöver väljas om för produkten).
-- **Finns** → iframe är där men gömd; öppna DevTools, kolla om `<iframe>` har `display:none` eller `height:0` ärvt från ett tema-wrap.
-
-I så fall skicka en skärmdump av view-source-utdraget runt iframen så kan jag rikta CSS:en exakt.
+Inga DB-ändringar, inga edge function-ändringar.

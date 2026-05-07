@@ -90,7 +90,20 @@ async function fetchVariants(handle: string, country: string): Promise<VariantNo
 }
 
 function normalize(s: string) {
-  return s.toLowerCase().replace(/\s*cm\s*$/i, "").replace(/\s+/g, "").trim();
+  return s
+    .toLowerCase()
+    // Strip diacritics so "valnöt" matches "valnot", "hängare" matches "hangare".
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    // Drop common variant-name prefixes the merchant might add in Shopify.
+    .replace(/^h(a|ä)ngare\s+(i\s+)?/i, "")
+    .replace(/^ram\s+(i\s+)?/i, "")
+    .replace(/^ramad\s+/i, "")
+    // Unify "x", "X" and the real multiplication sign "×" so size strings match.
+    .replace(/[×x]/g, "x")
+    .replace(/\s*cm\s*$/i, "")
+    .replace(/\s+/g, "")
+    .trim();
 }
 
 function findVariant(

@@ -24,7 +24,7 @@ Följ stegen i ordning. Allt sker i din Shopify Admin — ingen Dev Dashboard, i
 <div class="lovable-map-editor-wrap">
   <iframe
     id="lovable-editor-iframe-{{ product.handle }}"
-    src="https://artful-create-studio-87.lovable.app/editor?handle={{ product.handle }}&locale={{ request.locale.iso_code }}&currency={{ cart.currency.iso_code }}&rate={{ cart.currency.rate | default: 1 }}&country={{ localization.country.iso_code }}"
+    src="https://artful-create-studio-87.lovable.app/editor?handle={{ product.handle }}&locale={{ request.locale.iso_code }}&currency={{ localization.country.currency.iso_code | default: cart.currency.iso_code }}&rate={{ cart.currency.rate | default: 1 }}&country={{ localization.country.iso_code }}"
     allow="clipboard-write; geolocation"
     loading="eager"
   ></iframe>
@@ -38,7 +38,7 @@ Följ stegen i ordning. Allt sker i din Shopify Admin — ingen Dev Dashboard, i
     iframe.contentWindow.postMessage({
       type:'SHOP_CONTEXT',
       locale: {{ request.locale.iso_code | json }},
-      currency: {{ cart.currency.iso_code | json }},
+      currency: {{ localization.country.currency.iso_code | default: cart.currency.iso_code | json }},
       rate: {{ cart.currency.rate | default: 1 }},
       country: {{ localization.country.iso_code | json }}
     },'*');
