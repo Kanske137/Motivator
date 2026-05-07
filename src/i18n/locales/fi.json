@@ -173,5 +173,18 @@
     "aluminumMount": "Kiinnitys",
     "acrylicStud": "Etäisyyspidike",
     "acrylicMount": "Kiinnitys"
+  },
+  "adminDelete": {
+    "button": "Poista malli",
+    "title": "Poistetaanko malli pysyvästi?",
+    "warning": "Tämä poistaa mallin Lovablesta ja Shopify-tuotteen. Tätä ei voi peruuttaa.",
+    "target": "Malli: {{title}} ({{handle}})",
+    "confirmHint": "Vahvista kirjoittamalla POISTA",
+    "placeholder": "POISTA",
+    "confirm": "Poista pysyvästi",
+    "cancel": "Peruuta",
+    "success": "Malli ja Shopify-tuote poistettu",
+    "successWithErrors": "Malli poistettu, mutta Shopify-poistossa oli virheitä",
+    "error": "Mallin poisto epäonnistui"
   }
 }

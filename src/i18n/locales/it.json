@@ -173,5 +173,18 @@
     "aluminumMount": "Montaggio",
     "acrylicStud": "Distanziale",
     "acrylicMount": "Montaggio"
+  },
+  "adminDelete": {
+    "button": "Elimina modello",
+    "title": "Eliminare il modello definitivamente?",
+    "warning": "Questo elimina il modello in Lovable e il prodotto in Shopify. Operazione irreversibile.",
+    "target": "Modello: {{title}} ({{handle}})",
+    "confirmHint": "Digita ELIMINA per confermare",
+    "placeholder": "ELIMINA",
+    "confirm": "Elimina definitivamente",
+    "cancel": "Annulla",
+    "success": "Modello e prodotto Shopify eliminati",
+    "successWithErrors": "Modello eliminato, ma l'eliminazione su Shopify ha avuto errori",
+    "error": "Impossibile eliminare il modello"
   }
 }

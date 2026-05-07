@@ -173,5 +173,18 @@
     "aluminumMount": "Montage",
     "acrylicStud": "Afstandhouder",
     "acrylicMount": "Montage"
+  },
+  "adminDelete": {
+    "button": "Sjabloon verwijderen",
+    "title": "Sjabloon permanent verwijderen?",
+    "warning": "Dit verwijdert het sjabloon in Lovable en het product in Shopify. Dit kan niet ongedaan worden gemaakt.",
+    "target": "Sjabloon: {{title}} ({{handle}})",
+    "confirmHint": "Typ VERWIJDER om te bevestigen",
+    "placeholder": "VERWIJDER",
+    "confirm": "Permanent verwijderen",
+    "cancel": "Annuleren",
+    "success": "Sjabloon en Shopify-product verwijderd",
+    "successWithErrors": "Sjabloon verwijderd, maar Shopify-verwijdering had fouten",
+    "error": "Kan het sjabloon niet verwijderen"
   }
 }

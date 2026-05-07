@@ -173,5 +173,18 @@
     "aluminumMount": "Montering",
     "acrylicStud": "Afstandsholder",
     "acrylicMount": "Montering"
+  },
+  "adminDelete": {
+    "button": "Slet skabelon",
+    "title": "Slet skabelon permanent?",
+    "warning": "Dette sletter skabelonen i Lovable og fjerner produktet fra Shopify. Det kan ikke fortrydes.",
+    "target": "Skabelon: {{title}} ({{handle}})",
+    "confirmHint": "Skriv SLET for at bekræfte",
+    "placeholder": "SLET",
+    "confirm": "Slet permanent",
+    "cancel": "Annuller",
+    "success": "Skabelonen og Shopify-produktet er slettet",
+    "successWithErrors": "Skabelonen er slettet, men Shopify-sletning havde fejl",
+    "error": "Kunne ikke slette skabelonen"
   }
 }

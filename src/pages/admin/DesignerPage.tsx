@@ -41,6 +41,7 @@ import ShopifyPublishingSection from "@/components/admin/ShopifyPublishingSectio
 import LayerCanvas from "@/components/admin/LayerCanvas";
 import LayerList, { toggleAllLocks } from "@/components/admin/LayerList";
 import LayerInspector from "@/components/admin/LayerInspector";
+import DeleteTemplateDialog from "@/components/admin/DeleteTemplateDialog";
 
 export default function DesignerPage() {
   const { handle } = useParams<{ handle: string }>();
@@ -475,6 +476,11 @@ export default function DesignerPage() {
               <Send className="h-4 w-4 mr-2" />
               Publicera
             </Button>
+            <DeleteTemplateDialog
+              productConfigId={config.id}
+              shopifyHandle={config.shopify_handle}
+              title={config.title}
+            />
           </div>
         </div>
       </header>

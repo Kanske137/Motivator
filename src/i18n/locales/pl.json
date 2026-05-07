@@ -173,5 +173,18 @@
     "aluminumMount": "Montaż",
     "acrylicStud": "Dystans",
     "acrylicMount": "Montaż"
+  },
+  "adminDelete": {
+    "button": "Usuń szablon",
+    "title": "Usunąć szablon na stałe?",
+    "warning": "To usunie szablon w Lovable oraz produkt w Shopify. Tej operacji nie można cofnąć.",
+    "target": "Szablon: {{title}} ({{handle}})",
+    "confirmHint": "Wpisz USUŃ aby potwierdzić",
+    "placeholder": "USUŃ",
+    "confirm": "Usuń na stałe",
+    "cancel": "Anuluj",
+    "success": "Szablon i produkt Shopify usunięte",
+    "successWithErrors": "Szablon usunięty, ale usunięcie w Shopify miało błędy",
+    "error": "Nie można usunąć szablonu"
   }
 }
