@@ -552,14 +552,18 @@ Deno.serve(async (req) => {
       }>(GET_PRODUCT_BY_HANDLE, { handle: handleForKind })).productByHandle;
 
       let productId: string;
-      let mode: "create" | "update";
+      let mode: "create" | "update" = "update";
       let variantsCreated = 0;
       let variantsUpdated = 0;
       let variantsDeleted = 0;
       const skippedFields: { field: string; reason: string }[] = [];
 
+      let effectiveExisting = existing;
+
       if (!existing) {
-        // CREATE — write everything from config.
+        // CREATE — write product shell with options. Shopify auto-creates one
+        // variant per option combination; we then refetch and fall through to
+        // the update branch so price/SKU/etc. get set via bulkUpdate.
         const created = await shopifyAdmin<{
           productCreate: { product: { id: string }; userErrors: { message: string }[] };
         }>(PRODUCT_CREATE, {
@@ -591,27 +595,23 @@ Deno.serve(async (req) => {
               .join("; ")}`,
           );
         }
-        productId = created.productCreate.product.id;
         mode = "create";
 
-        const inputs = group.variants.map((v) => buildVariantInput(group, v));
-        const bulk = await shopifyAdmin<{
-          productVariantsBulkCreate: {
-            productVariants: { id: string }[];
-            userErrors: { message: string; field?: string[] }[];
+        // Refetch to get option IDs + auto-created variant IDs.
+        const refetched = (await shopifyAdmin<{
+          productByHandle: null | {
+            id: string;
+            options: { id: string; name: string; values: string[] }[];
+            variants: { nodes: { id: string; sku: string; selectedOptions: { name: string; value: string }[] }[] };
           };
-        }>(PRODUCT_VARIANTS_BULK_CREATE, { productId, variants: inputs });
-        if (bulk.productVariantsBulkCreate.userErrors.length) {
-          throw new Error(
-            `bulkCreate userErrors: ${bulk.productVariantsBulkCreate.userErrors
-              .map((e) => `${(e.field ?? []).join(".")} ${e.message}`)
-              .join("; ")}`,
-          );
-        }
-        variantsCreated = bulk.productVariantsBulkCreate.productVariants.length;
-      } else {
+        }>(GET_PRODUCT_BY_HANDLE, { handle: handleForKind })).productByHandle;
+        if (!refetched) throw new Error("productCreate succeeded but refetch returned null");
+        effectiveExisting = refetched;
+      }
+
+      {
+        const existing = effectiveExisting!;
         productId = existing.id;
-        mode = "update";
 
         // Diff-protect text fields. Pull current Shopify state and compare to
         // last_synced_payload; if Shopify diverged, the merchant edited the
