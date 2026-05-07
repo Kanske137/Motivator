@@ -38,7 +38,7 @@ Följ stegen i ordning. Allt sker i din Shopify Admin — ingen Dev Dashboard, i
     iframe.contentWindow.postMessage({
       type:'SHOP_CONTEXT',
       locale: {{ request.locale.iso_code | json }},
-      currency: {{ cart.currency.iso_code | json }},
+      currency: {{ localization.country.currency.iso_code | default: cart.currency.iso_code | json }},
       rate: {{ cart.currency.rate | default: 1 }},
       country: {{ localization.country.iso_code | json }}
     },'*');
