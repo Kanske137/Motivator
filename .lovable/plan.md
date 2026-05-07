@@ -1,29 +1,31 @@
-## Varför bara "personlig-karta" fungerar
+Riktigt fel: Storefront API ser bara produkter som är publicerade till rätt sales channels. Vår sync-funktion misslyckas tyst eftersom Shopify-appen saknar `read_publications`/`write_publications` — edge-loggen visar `Access denied for publications field`. Det betyder att inga nya produkter publiceras vare sig till Online Store eller till storefront-tokenets egen kanal, oavsett om du sätter dem ACTIVE manuellt. Den enda fungerande mallen ("personlig-karta") råkar vara publicerad sedan tidigare.
 
-Tre orsaker samverkar — alla i appkoden, inget i temat:
+## Vad jag ändrar
 
-### 1. Pris-kartan hoppar över nya admin-mallar
-`useShopifyPriceMap()` bygger sina (storlek, variant)-kombinationer från `config.sizes`. Nya admin-byggda mallar (X-poster, testglas, testalu, akryl m.fl.) har tom `sizes` — storlekarna kommer från `productOptions` × prislistor via `getEffectiveSizes()`. Resultat: `combos = []`, vi frågar aldrig Shopify och `priceFromMap` returnerar alltid `null`. Endast "personlig-karta" har den gamla `sizes`-arrayen ifylld → därför är det den enda som visar Shopify-priset/valutan.
+1. Lägg till saknade Shopify-scopes
+   - `SHOPIFY_APP_SCOPES` utökas med `read_publications,write_publications`.
+   - `shopify-oauth-install`/`-callback` läser scopes från env, så install-URL byggs med rätt rättigheter automatiskt.
+   - Admin-sidan får en tydlig prompt: "Installera om Shopify-app för att uppdatera rättigheter" om scopes-listan saknar publications.
 
-### 2. Fallback-formatteraren tvingar SEK-symbol
-När live-priset saknas faller vi tillbaka på `formatPrice(currentPrice(), shopCtx)`. Den har en "säkerhetsnät"-rad som tvingar valutan till SEK när `rate=1`, även om kunden har EUR/USD. Det är därför valutasymbolen inte ändras längre — fallbacken är aktiv för alla mallar utom "personlig-karta".
+2. Publicera till ALLA tillgängliga sales channels
+   - `shopify-sync-template` uppdateras: efter `publications`-query publiceras produkten via `publishablePublish` till varje publication (Online Store + storefront-appens egen kanal + ev. headless), inte bara den första matchande.
+   - Returneras vilka publications som lyckats per produkt, så UI kan visa det.
 
-### 3. Handle-mismatch ger tyst fallback
-Om en mall i admin har ett `shopify_handle` som inte finns som produkt i Shopify (eller har andra variant-/storleksnamn) returnerar Storefront API tom data utan fel. Vi måste logga detta tydligt så vi ser exakt vilka mallar som saknar Shopify-koppling.
+3. Visa publish-status i admin
+   - Sync-resultatet i AdminConfigs visar vilka kanaler varje mall är publicerad till.
+   - Om publicering misslyckas (saknad scope, app inte ominstallerad) visas ett tydligt felmeddelande istället för "Synkad".
 
----
+4. Backfill för existerande produkter
+   - Lägg en knapp "Publicera om alla i Shopify" som loopar alla `product_configs` och kör enbart publicerings-steget — så att nya och äldre mallar kommer in i storefront-tokenets publication utan att hela synken körs om.
 
-## Åtgärd
+5. Verifiera
+   - Efter ominstallation körs syncen för en testprodukt (t.ex. `x-poster`).
+   - Storefront-anrop `productByHandle("x-poster")` ska returnera produkten (kontrolleras via edge-fn).
+   - I editorn visas riktiga Shopify-priser och variant-ID upplöses för x-poster, testglas etc.
 
-1. **`src/hooks/useShopifyPriceMap.ts`** — bygg `combos` från `getEffectiveSizes(config, productOptions)` istället för `config.sizes`. Då fungerar Shopify-priser för alla mall-typer (poster/canvas/aluminium/akryl/glas).
+## Tekniska detaljer (för referens)
 
-2. **`src/lib/format-price.ts`** — ta bort tvångskonverteringen till SEK när `rate=1`. Visa istället beloppet i kundens valuta med rätt symbol; konvertering hanteras av Shopify-priserna när de finns.
-
-3. **`src/lib/shopify-prices.ts`** — lägg till en `console.info` när `productByHandle` returnerar `null` (handle saknas i Shopify) och när varianter inte matchas på (size, variant), så vi snabbt kan se varför en specifik mall inte får live-pris.
-
-4. **Verifiering**
-   - Öppna en av de "trasiga" mallarna i editorn → bekräfta i konsolen att vi nu fetchar priser och att rätt valutasymbol visas.
-   - Kontrollera att "personlig-karta" fortfarande visar identiska priser med kassan.
-   - Om någon mall fortfarande saknar pris → loggen säger om handle eller variantnamn är boven, och då vet vi vilken admin-konfig som behöver synkas till Shopify.
-
-Inga ändringar i temat, databasen eller `pricing.ts`.
+- Custom apps med Storefront-token i Shopify har en egen Publication. En produkt blir bara synlig via Storefront API om den publicerats till den. ACTIVE-status räcker inte.
+- `publications`-query kräver `read_publications`. `publishablePublish` kräver `write_publications`. Båda saknas idag.
+- Efter scopeändring måste du ominstallera appen en gång — flödet finns redan i AdminConfigs ("Installera om").
+- `SHOPIFY_STOREFRONT_ACCESS_TOKEN` ändras inte; det är samma token, men den får tillgång till de produkter som publiceras till dess kanal.
