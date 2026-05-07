@@ -786,11 +786,15 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Publish to configured sales channels (currently: online_store).
+      // Publish to ALL Shopify publications (Online Store + Storefront/Headless
+      // app channel + any extras). Required so Storefront API can read the
+      // product — `status: ACTIVE` alone does NOT make it visible.
       const wantsOnlineStore = (cfgMeta.sales_channels ?? ["online_store"]).includes(
         "online_store",
       );
-      const published = wantsOnlineStore ? await publishToOnlineStore(productId) : false;
+      const publishResult = wantsOnlineStore
+        ? await publishToAllChannels(productId)
+        : { published: [], failed: [] };
 
       // Snapshot what we just sent — this is what next sync will compare against.
       nextSyncedPayload[group.kind] = {
@@ -812,7 +816,9 @@ Deno.serve(async (req) => {
         variantsCreated,
         variantsUpdated,
         variantsDeleted,
-        publishedToOnlineStore: published,
+        publishedToOnlineStore: publishResult.published.length > 0,
+        publishedTo: publishResult.published,
+        publishFailed: publishResult.failed,
         skipped: group.skipped,
         skippedFields,
       });
