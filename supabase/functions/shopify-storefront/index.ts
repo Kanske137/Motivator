@@ -22,7 +22,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    const r = await fetch(`https://${DOMAIN}/api/${SHOPIFY_API_VERSION}/graphql.json`, {
+    const url = `https://${DOMAIN}/api/${SHOPIFY_API_VERSION}/graphql.json`;
+    const r = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -31,8 +32,13 @@ Deno.serve(async (req) => {
       body: JSON.stringify({ query, variables: variables || {} }),
     });
 
-    const data = await r.json();
-    return new Response(JSON.stringify(data), {
+    const text = await r.text();
+    if (r.status !== 200) {
+      console.warn(
+        `[shopify-storefront] upstream ${r.status} domain=${DOMAIN} tokenLen=${TOKEN.length} body=${text.slice(0,200)}`,
+      );
+    }
+    return new Response(text, {
       status: r.status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
