@@ -173,5 +173,18 @@
     "aluminumMount": "Montage",
     "acrylicStud": "Entretoise",
     "acrylicMount": "Montage"
+  },
+  "adminDelete": {
+    "button": "Supprimer le modèle",
+    "title": "Supprimer le modèle définitivement ?",
+    "warning": "Cela supprime le modèle dans Lovable et le produit dans Shopify. Action irréversible.",
+    "target": "Modèle : {{title}} ({{handle}})",
+    "confirmHint": "Tapez SUPPRIMER pour confirmer",
+    "placeholder": "SUPPRIMER",
+    "confirm": "Supprimer définitivement",
+    "cancel": "Annuler",
+    "success": "Modèle et produit Shopify supprimés",
+    "successWithErrors": "Modèle supprimé, mais la suppression Shopify a échoué partiellement",
+    "error": "Impossible de supprimer le modèle"
   }
 }

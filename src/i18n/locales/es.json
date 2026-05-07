@@ -173,5 +173,18 @@
     "aluminumMount": "Montaje",
     "acrylicStud": "Separador",
     "acrylicMount": "Montaje"
+  },
+  "adminDelete": {
+    "button": "Eliminar plantilla",
+    "title": "¿Eliminar la plantilla permanentemente?",
+    "warning": "Esto elimina la plantilla en Lovable y el producto en Shopify. No se puede deshacer.",
+    "target": "Plantilla: {{title}} ({{handle}})",
+    "confirmHint": "Escribe ELIMINAR para confirmar",
+    "placeholder": "ELIMINAR",
+    "confirm": "Eliminar permanentemente",
+    "cancel": "Cancelar",
+    "success": "Plantilla y producto de Shopify eliminados",
+    "successWithErrors": "Plantilla eliminada, pero la eliminación en Shopify tuvo errores",
+    "error": "No se pudo eliminar la plantilla"
   }
 }

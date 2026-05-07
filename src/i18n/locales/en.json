@@ -173,5 +173,18 @@
     "aluminumMount": "Mounting",
     "acrylicStud": "Standoff",
     "acrylicMount": "Mounting"
+  },
+  "adminDelete": {
+    "button": "Delete template",
+    "title": "Delete template permanently?",
+    "warning": "This deletes the template in Lovable and removes the product from Shopify. This cannot be undone.",
+    "target": "Template: {{title}} ({{handle}})",
+    "confirmHint": "Type DELETE to confirm",
+    "placeholder": "DELETE",
+    "confirm": "Delete permanently",
+    "cancel": "Cancel",
+    "success": "Template and Shopify product deleted",
+    "successWithErrors": "Template deleted, but Shopify deletion had errors",
+    "error": "Could not delete template"
   }
 }

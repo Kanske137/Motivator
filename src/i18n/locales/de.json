@@ -173,5 +173,18 @@
     "aluminumMount": "Montage",
     "acrylicStud": "Abstandshalter",
     "acrylicMount": "Montage"
+  },
+  "adminDelete": {
+    "button": "Vorlage löschen",
+    "title": "Vorlage endgültig löschen?",
+    "warning": "Dies löscht die Vorlage in Lovable und entfernt das Produkt aus Shopify. Dies kann nicht rückgängig gemacht werden.",
+    "target": "Vorlage: {{title}} ({{handle}})",
+    "confirmHint": "LÖSCHEN eingeben zum Bestätigen",
+    "placeholder": "LÖSCHEN",
+    "confirm": "Endgültig löschen",
+    "cancel": "Abbrechen",
+    "success": "Vorlage und Shopify-Produkt gelöscht",
+    "successWithErrors": "Vorlage gelöscht, aber Shopify-Löschung hatte Fehler",
+    "error": "Vorlage konnte nicht gelöscht werden"
   }
 }

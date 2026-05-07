@@ -173,5 +173,18 @@
     "aluminumMount": "Montering",
     "acrylicStud": "Avstandsholder",
     "acrylicMount": "Montering"
+  },
+  "adminDelete": {
+    "button": "Slett mal",
+    "title": "Slett mal permanent?",
+    "warning": "Dette sletter malen i Lovable og fjerner produktet fra Shopify. Dette kan ikke angres.",
+    "target": "Mal: {{title}} ({{handle}})",
+    "confirmHint": "Skriv SLETT for å bekrefte",
+    "placeholder": "SLETT",
+    "confirm": "Slett permanent",
+    "cancel": "Avbryt",
+    "success": "Malen og Shopify-produktet er slettet",
+    "successWithErrors": "Malen er slettet, men Shopify-slettingen hadde feil",
+    "error": "Kunne ikke slette malen"
   }
 }
