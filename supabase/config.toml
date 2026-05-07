@@ -3,3 +3,7 @@ project_id = "ptzmnusfgdwcqpjpbyco"
 # Shopify OAuth callback — Shopify cannot send a Lovable JWT.
 [functions.shopify-oauth-callback]
 verify_jwt = false
+
+# Storefront-proxy anropas från editor-iframe utan användarsession.
+[functions.shopify-storefront]
+verify_jwt = false
