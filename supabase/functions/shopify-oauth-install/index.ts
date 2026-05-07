@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const shopRaw = body.shop ?? url.searchParams.get("shop")
       ?? Deno.env.get("SHOPIFY_STORE_PERMANENT_DOMAIN")
-      ?? "canvas-poster-creator-2wh5d.myshopify.com";
+      ?? "wdxugd-yq.myshopify.com";
 
     const shop = normalizeShop(shopRaw);
     const redirectUri = getCallbackUrl();

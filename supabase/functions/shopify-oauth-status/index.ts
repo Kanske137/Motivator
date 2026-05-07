@@ -6,7 +6,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 function getShop(): string {
   const d = Deno.env.get("SHOPIFY_STORE_PERMANENT_DOMAIN")
     ?? Deno.env.get("SHOPIFY_STORE_DOMAIN")
-    ?? "canvas-poster-creator-2wh5d.myshopify.com";
+    ?? "wdxugd-yq.myshopify.com";
   return d.replace(/^https?:\/\//, "").replace(/\/$/, "");
 }
 
