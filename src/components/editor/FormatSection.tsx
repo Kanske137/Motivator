@@ -75,8 +75,11 @@ DepthIcon.displayName = "DepthIcon";
 export function FormatSection({ configs, activeHandle, onProductChange }: Props) {
   const { t } = useTranslation();
   const shopCtx = useShopContextStore();
-  const priceMap = useShopifyPriceMap();
-  const formatDiff = (sekDiff: number) => formatPriceDelta(sekDiff, shopCtx);
+  const { map: priceMap, derivedFx } = useShopifyPriceMap();
+  const formatDiff = (sekDiff: number) =>
+    derivedFx
+      ? formatMoneyDeltaFromSEK(sekDiff, derivedFx, shopCtx.locale)
+      : formatPriceDelta(sekDiff, shopCtx);
   /** Compute size delta in customer currency: prefer live Shopify prices when both targets exist. */
   const liveDelta = (sizeA: string | null, variantA: string | null, sizeB: string, variantB: string): string | null => {
     const a = priceFromMap(priceMap, sizeA, variantA);
