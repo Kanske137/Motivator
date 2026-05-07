@@ -6,20 +6,21 @@ Följ stegen i ordning. Allt sker i din Shopify Admin — ingen Dev Dashboard, i
 
 ---
 
-## Steg 1 — Lägg till editor-snippet i temat
+## Steg 1 — Skapa editor-section i temat
+
+> **OBS:** Vi använder en dedikerad section istället för `custom-liquid`, eftersom premiumteman (t.ex. Concept) ofta saknar `sections/custom-liquid.liquid` och då renderas ingenting.
 
 1. **Online Store → Themes** → klicka **⋯** på ditt aktiva tema → **Edit code**
-2. I vänsterspalten: **Snippets** → **Add a new snippet**
+2. **Sections → Add a new section**
 3. Namn: `personlig-karta-editor` → **Done**
 4. Klistra in följande kod (ersätt allt befintligt innehåll), spara:
 
 ```liquid
-{%- comment -%} Personlig Karta editor — Lovable {%- endcomment -%}
 <style>
-  .shopify-section-main-product, .product, .product__info-wrapper, .product__media-wrapper { display: none !important; }
-  .lovable-map-editor-wrap { width:100%; max-width:100%; margin:0; padding:0; }
+  .lovable-map-editor-wrap { width:100%; max-width:100%; margin:0; padding:0; display:block; }
   .lovable-map-editor-wrap iframe { width:100%; min-height:100vh; border:0; display:block; background:#fff; }
 </style>
+
 <div class="lovable-map-editor-wrap">
   <iframe
     id="lovable-editor-iframe-{{ product.handle }}"
@@ -28,91 +29,82 @@ Följ stegen i ordning. Allt sker i din Shopify Admin — ingen Dev Dashboard, i
     loading="eager"
   ></iframe>
 </div>
+
 <script>
 (function(){
   var iframe = document.getElementById('lovable-editor-iframe-{{ product.handle }}');
-
-  // Push current shop context (locale + currency + rate) to the editor.
-  // Sent on iframe load AND whenever the customer switches market/language
-  // on the parent page (Shopify dispatches no event for this, so we re-send
-  // on every visibility change as a safety net).
-  function pushContext() {
-    if (!iframe || !iframe.contentWindow) return;
+  function pushContext(){
+    if(!iframe || !iframe.contentWindow) return;
     iframe.contentWindow.postMessage({
-      type: 'SHOP_CONTEXT',
+      type:'SHOP_CONTEXT',
       locale: {{ request.locale.iso_code | json }},
       currency: {{ cart.currency.iso_code | json }},
       rate: {{ cart.currency.rate | default: 1 }},
       country: {{ localization.country.iso_code | json }}
-    }, '*');
+    },'*');
   }
   iframe && iframe.addEventListener('load', pushContext);
   document.addEventListener('visibilitychange', function(){
-    if (document.visibilityState === 'visible') pushContext();
+    if(document.visibilityState==='visible') pushContext();
   });
 
-  window.addEventListener('message', function(e) {
-    var d = e.data;
-    if (!d || typeof d !== 'object') return;
-
-    if (d.type === 'EDITOR_RESIZE' && typeof d.height === 'number' && iframe) {
-      iframe.style.height = Math.max(600, d.height) + 'px';
-      return;
+  window.addEventListener('message', function(e){
+    var d = e.data; if(!d || typeof d!=='object') return;
+    if(d.type==='EDITOR_RESIZE' && typeof d.height==='number' && iframe){
+      iframe.style.height = Math.max(600,d.height)+'px'; return;
     }
-
-    if (d.type !== 'ADD_TO_CART') return;
-    if (d.handle && d.handle !== '{{ product.handle }}') return;
-
-    fetch('/products/{{ product.handle }}.js')
-      .then(function(r){ return r.json(); })
-      .then(function(product){
-        var match = product.variants.find(function(v){
-          var opts = (v.options || []).map(function(o){ return String(o).toLowerCase(); });
-          return opts.indexOf(String(d.size).toLowerCase()) > -1 &&
-                 opts.indexOf(String(d.variant).toLowerCase()) > -1;
-        }) || product.variants[0];
-        var props = {};
-        Object.keys(d.properties || {}).forEach(function(k){ props[k] = d.properties[k]; });
-        return fetch('/cart/add.js', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: match.id, quantity: d.quantity || 1, properties: props })
+    if(d.type!=='ADD_TO_CART') return;
+    if(d.handle && d.handle!=='{{ product.handle }}') return;
+    fetch('/products/{{ product.handle }}.js').then(function(r){return r.json();})
+      .then(function(p){
+        var match = p.variants.find(function(v){
+          var o=(v.options||[]).map(function(x){return String(x).toLowerCase();});
+          return o.indexOf(String(d.size).toLowerCase())>-1 && o.indexOf(String(d.variant).toLowerCase())>-1;
+        }) || p.variants[0];
+        var props={};
+        Object.keys(d.properties||{}).forEach(function(k){props[k]=d.properties[k];});
+        return fetch('/cart/add.js',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({id:match.id, quantity:d.quantity||1, properties:props})
         });
       })
-      .then(function(r){ return r.json(); })
-      .then(function(){ window.location.href = '/cart'; })
+      .then(function(r){return r.json();})
+      .then(function(){ window.location.href='/cart'; })
       .catch(function(err){ console.error('add to cart failed', err); });
   });
 })();
 </script>
+
+{% schema %}
+{
+  "name": "Personlig Karta Editor",
+  "settings": [],
+  "presets": [{ "name": "Personlig Karta Editor" }]
+}
+{% endschema %}
 ```
+
+`{% schema %}`-blocket är obligatoriskt — utan det renderar Shopify ingenting.
 
 ---
 
 ## Steg 2 — Skapa product-template
 
-1. I vänsterspalten: **Templates** → **Add a new template**
-2. Välj:
-   - **For**: `product`
-   - **Type**: `JSON`
-   - **Name**: `personlig-karta`
-3. Klicka **Create template**
-4. Ersätt allt innehåll med följande, spara:
+1. **Templates → Add a new template**
+2. Välj **For**: `product`, **Type**: `JSON`, **Name**: `personlig-karta`
+3. Ersätt innehållet med:
 
 ```json
 {
   "sections": {
-    "personlig-karta-editor": {
-      "type": "custom-liquid",
-      "settings": {
-        "custom_liquid": "{% render 'personlig-karta-editor' %}"
-      }
+    "editor": {
+      "type": "personlig-karta-editor"
     }
   },
-  "order": ["personlig-karta-editor"]
+  "order": ["editor"]
 }
 ```
-
 ---
 
 ## Steg 3 — Tilldela template till produkterna

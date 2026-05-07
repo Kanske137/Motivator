@@ -1,78 +1,122 @@
 
-# Migration: testbutik → live-butik (`wdxugd-yq.myshopify.com`)
+# Fix: tom produktsida i Concept-temat
 
-Allt ska bytas rakt över. Test-butiken kan avregistreras efteråt.
+## Vad som händer
+`personlig-karta.json` använder sektionstypen `custom-liquid`. Concept-temat innehåller troligen ingen `sections/custom-liquid.liquid` (premium-teman utelämnar den ofta). När en JSON-template refererar en sektionstyp som inte finns i temat renderar Shopify den som tom — vilket exakt matchar symptomet (header + footer OK, mitten tom).
 
-## Vad som måste ändras
+Fix: skapa en egen section-fil och referera den i template:n. Snippet:en kan då slopas — vi flyttar in innehållet direkt i sektionen.
 
-### A. I koden (jag gör)
-Den hårdkodade test-domänen finns på fyra ställen. Vi byter alla till live-butiken (eller läser från env), så att inget av misstag kan tala med fel butik:
+## Steg du gör i Shopify Admin
 
-1. `supabase/functions/_shared/shopify-admin.ts` — fallback-domän
-2. `supabase/functions/shopify-oauth-install/index.ts` — fallback-domän
-3. `supabase/functions/shopify-oauth-status/index.ts` — fallback-domän
-4. `supabase/functions/shopify-order-webhook/index.ts` — fallback-domän
-5. `supabase/functions/shopify-storefront/index.ts` — `DOMAIN` är hårdkodad, byt till `wdxugd-yq.myshopify.com`
-6. `SHOPIFY_SETUP.md` — uppdatera test-URL i dokumentationen
+### 1. Skapa ny section i Concept-temat
+**Online Store → Themes → Concept → Edit code → Sections → Add a new section**
+- Namn: `personlig-karta-editor`
+- Klistra in koden i nästa avsnitt och spara.
 
-Inga UI-ändringar, ingen affärslogik rörs.
+### 2. Section-kod (`sections/personlig-karta-editor.liquid`)
 
-### B. I Shopify (du gör — jag guidar)
+```liquid
+<style>
+  .lovable-map-editor-wrap { width:100%; max-width:100%; margin:0; padding:0; display:block; }
+  .lovable-map-editor-wrap iframe { width:100%; min-height:100vh; border:0; display:block; background:#fff; }
+</style>
 
-**B1. Skapa ny Custom App i live-butiken**
-- Settings → Apps and sales channels → Develop apps → **Create an app** ("Lovable Editor" eller likn.)
-- Configuration → **Admin API access scopes**: bocka i  
-  `write_products, write_inventory, write_orders, write_themes, read_publications, write_publications`
-- Configuration → **Storefront API access scopes**: bocka i alla `unauthenticated_read_*` (produkter, varianter, checkouts).
-- API credentials → **Install app** → kopiera:
-  - Admin API access token (`shpat_…`)
-  - Storefront API access token
-  - API key (= Client ID)
-  - API secret key (= Client Secret)
+<div class="lovable-map-editor-wrap">
+  <iframe
+    id="lovable-editor-iframe-{{ product.handle }}"
+    src="https://artful-create-studio-87.lovable.app/editor?handle={{ product.handle }}&locale={{ request.locale.iso_code }}&currency={{ cart.currency.iso_code }}&rate={{ cart.currency.rate | default: 1 }}&country={{ localization.country.iso_code }}"
+    allow="clipboard-write; geolocation"
+    loading="eager"
+  ></iframe>
+</div>
 
-**B2. Themet — kör Steg 1, 2, 3 i `SHOPIFY_SETUP.md` på live-butikens tema**  
-(snippet `personlig-karta-editor`, JSON-template `personlig-karta`, tilldela template till produkterna `personlig-karta-poster` och `personlig-karta-canvas`).
+<script>
+(function(){
+  var iframe = document.getElementById('lovable-editor-iframe-{{ product.handle }}');
+  function pushContext(){
+    if(!iframe||!iframe.contentWindow) return;
+    iframe.contentWindow.postMessage({
+      type:'SHOP_CONTEXT',
+      locale: {{ request.locale.iso_code | json }},
+      currency: {{ cart.currency.iso_code | json }},
+      rate: {{ cart.currency.rate | default: 1 }},
+      country: {{ localization.country.iso_code | json }}
+    },'*');
+  }
+  iframe && iframe.addEventListener('load', pushContext);
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState==='visible') pushContext();
+  });
 
-OBS: editor-iframens URL i snippet (`artful-create-studio-87.lovable.app/editor?…`) är samma — den behöver inte ändras.
+  window.addEventListener('message', function(e){
+    var d = e.data; if(!d || typeof d!=='object') return;
+    if(d.type==='EDITOR_RESIZE' && typeof d.height==='number' && iframe){
+      iframe.style.height = Math.max(600,d.height)+'px'; return;
+    }
+    if(d.type!=='ADD_TO_CART') return;
+    if(d.handle && d.handle!=='{{ product.handle }}') return;
+    fetch('/products/{{ product.handle }}.js').then(function(r){return r.json();})
+      .then(function(p){
+        var match = p.variants.find(function(v){
+          var o=(v.options||[]).map(function(x){return String(x).toLowerCase();});
+          return o.indexOf(String(d.size).toLowerCase())>-1 && o.indexOf(String(d.variant).toLowerCase())>-1;
+        }) || p.variants[0];
+        var props={};
+        Object.keys(d.properties||{}).forEach(function(k){props[k]=d.properties[k];});
+        return fetch('/cart/add.js',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({id:match.id, quantity:d.quantity||1, properties:props})
+        });
+      })
+      .then(function(r){return r.json();})
+      .then(function(){window.location.href='/cart';})
+      .catch(function(err){console.error('add to cart failed',err);});
+  });
+})();
+</script>
 
-**B3. Webhook**
-- Settings → Notifications → Webhooks → **Create webhook**
-- Event: `Order payment`, Format: JSON
-- URL: `https://ptzmnusfgdwcqpjpbyco.supabase.co/functions/v1/shopify-order-webhook`
-- Spara → **kopiera den nya signing secret** (börjar med några tecken, visas högst upp).
+{% schema %}
+{
+  "name": "Personlig Karta Editor",
+  "settings": [],
+  "presets": [{ "name": "Personlig Karta Editor" }]
+}
+{% endschema %}
+```
 
-**B4. Cart-thumbnail snippet (Steg 6) på nya temat** om det inte redan är gjort där.
+`{% schema %}`-blocket är obligatoriskt — utan det renderar Shopify ingenting.
 
-### C. Secrets som ska bytas (du klistrar in, jag triggar dialogerna)
+### 3. Uppdatera template:n
+**Templates → `personlig-karta.json`** — ersätt allt med:
 
-| Secret | Nytt värde |
-|---|---|
-| `SHOPIFY_STORE_PERMANENT_DOMAIN` *(ny — lägg till)* | `wdxugd-yq.myshopify.com` |
-| `SHOPIFY_ACCESS_TOKEN` | Admin API-token från B1 (`shpat_…`) |
-| `SHOPIFY_STOREFRONT_ACCESS_TOKEN` | Storefront-token från B1 |
-| `SHOPIFY_APP_CLIENT_ID` | API key från B1 |
-| `SHOPIFY_APP_CLIENT_SECRET` | API secret key från B1 |
-| `SHOPIFY_WEBHOOK_SECRET` | Signing secret från B3 |
-| `SHOPIFY_APP_SCOPES` | Behålls: `write_products,write_inventory,write_orders,write_themes,read_publications,write_publications` |
+```json
+{
+  "sections": {
+    "editor": {
+      "type": "personlig-karta-editor"
+    }
+  },
+  "order": ["editor"]
+}
+```
 
-`SHOPIFY_ONLINE_ACCESS_TOKEN:user:…` (gammal Lovable-Shopify-koppling till testbutiken) — lämnas, den används bara som fallback om DB-installationen saknas. Kan raderas senare när allt verifierats.
+(`type` matchar nu vår section-fil istället för `custom-liquid`.)
 
-### D. Databas-städning (efter att allt fungerar)
-Tabellen `shopify_app_installations` innehåller raden för testbutiken. Vi behöver inte ta bort den — koden slår upp på `shop_domain` och hittar bara live-butikens rad framöver. Kan rensas senare.
+### 4. Behåll eller ta bort gamla snippet
+`snippets/personlig-karta-editor.liquid` används inte längre — kan ligga kvar eller raderas.
 
-### E. Verifiering (jag kör)
-1. Deploya edge functions med nya domänen.
-2. Anropa `shopify-oauth-status` → ska visa `installed:false` för nya butiken (tills B1 install är gjord — eller `true` direkt om vi använder Admin token från Custom App, då hoppar vi över appens egen OAuth-install).
-3. Trigga `shopify-sync-template` på en testmall → kontrollera att produkten/varianterna skapas i nya butiken.
-4. Öppna en produktsida i nya butiken → editorn laddar → "Lägg i varukorg" → checkout (Bogus Gateway) → kontrollera `gelato_orders`.
+### 5. Hard reload produktsidan
+Cmd/Ctrl + Shift + R.
 
-## Viktigt att veta
-- **Custom App ≠ Dev Dashboard OAuth-app.** Eftersom Admin token från Custom App ges direkt vid install behöver vi inte köra `shopify-oauth-install`-flödet alls för live-butiken. Vi sparar bara token i `SHOPIFY_ACCESS_TOKEN` så plockar `shopify-admin.ts` upp den via legacy-fallbacken.
-- **Storefront-token är butiksspecifik.** Den från test-butiken slutar fungera så fort vi byter `DOMAIN` i `shopify-storefront`.
-- **Mappningar (Gelato SKU, templates i Supabase)** påverkas inte — de är butiksoberoende.
+## Varför detta löser det
+- Garanterad section-typ — vi äger filen själva.
+- `{% schema %}` säkerställer att Shopify registrerar den som en giltig sektion.
+- Inga `display:none`-regler längre — concept-temat har redan inget extra produktinnehåll i en custom template, så vi behöver bara visa iframen.
 
-## Ordning vi kör i
-1. Du gör **B1** och skickar mig de fyra värdena.
-2. Jag uppdaterar koden (A) och triggar secret-dialoger för **C**.
-3. Du gör **B2 + B3 + B4** i nya temat och skickar webhook secret.
-4. Jag deployar + verifierar (E).
+## Diagnos om det fortfarande är tomt
+View source på produktsidan och sök efter `lovable-editor-iframe`:
+- **Finns inte** → section-filen renderas inte (felstavat namn i template, schema-fel, eller temat behöver väljas om för produkten).
+- **Finns** → iframe är där men gömd; öppna DevTools, kolla om `<iframe>` har `display:none` eller `height:0` ärvt från ett tema-wrap.
+
+I så fall skicka en skärmdump av view-source-utdraget runt iframen så kan jag rikta CSS:en exakt.
