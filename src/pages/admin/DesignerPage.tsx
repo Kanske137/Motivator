@@ -476,6 +476,11 @@ export default function DesignerPage() {
               <Send className="h-4 w-4 mr-2" />
               Publicera
             </Button>
+            <DeleteTemplateDialog
+              productConfigId={config.id}
+              shopifyHandle={config.shopify_handle}
+              title={config.title}
+            />
           </div>
         </div>
       </header>
