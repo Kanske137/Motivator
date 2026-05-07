@@ -142,7 +142,7 @@ För **varje** produkt (`personlig-karta-poster` och `personlig-karta-canvas`):
 
 ## Steg 5 — Test
 
-1. Öppna `https://canvas-poster-creator-2wh5d.myshopify.com/products/personlig-karta-poster` → editorn ska rendera utan Shopify-prischrome runt om
+1. Öppna `https://wdxugd-yq.myshopify.com/products/personlig-karta-poster` → editorn ska rendera utan Shopify-prischrome runt om
 2. Skapa en design → "Lägg i varukorg" → checka ut via **Bogus Gateway** (Settings → Payments → test mode)
 3. Säg "test order skickad" — jag kollar `gelato_orders`-tabellen och bekräftar att Gelato fick ordern
 

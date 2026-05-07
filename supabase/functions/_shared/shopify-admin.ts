@@ -36,7 +36,7 @@ function makeAuthError(
 export function getShopifyDomain(): string {
   const domain = Deno.env.get("SHOPIFY_STORE_PERMANENT_DOMAIN")
     ?? Deno.env.get("SHOPIFY_STORE_DOMAIN")
-    ?? "canvas-poster-creator-2wh5d.myshopify.com";
+    ?? "wdxugd-yq.myshopify.com";
   return domain.replace(/^https?:\/\//, "").replace(/\/$/, "");
 }
 
