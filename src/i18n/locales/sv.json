@@ -173,5 +173,18 @@
     "aluminumMount": "Montering",
     "acrylicStud": "Skruvhörn",
     "acrylicMount": "Montering"
+  },
+  "adminDelete": {
+    "button": "Radera mall",
+    "title": "Radera mall permanent?",
+    "warning": "Detta raderar mallen i Lovable och tar bort produkten från Shopify. Det går inte att ångra.",
+    "target": "Mall: {{title}} ({{handle}})",
+    "confirmHint": "Skriv RADERA för att bekräfta",
+    "placeholder": "RADERA",
+    "confirm": "Radera permanent",
+    "cancel": "Avbryt",
+    "success": "Mallen och Shopify-produkten är raderade",
+    "successWithErrors": "Mallen är raderad, men Shopify-radering hade fel",
+    "error": "Kunde inte radera mallen"
   }
 }
