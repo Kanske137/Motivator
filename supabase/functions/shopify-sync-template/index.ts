@@ -552,7 +552,7 @@ Deno.serve(async (req) => {
       }>(GET_PRODUCT_BY_HANDLE, { handle: handleForKind })).productByHandle;
 
       let productId: string;
-      let mode: "create" | "update";
+      let mode: "create" | "update" = "update";
       let variantsCreated = 0;
       let variantsUpdated = 0;
       let variantsDeleted = 0;
@@ -595,10 +595,9 @@ Deno.serve(async (req) => {
               .join("; ")}`,
           );
         }
-        productId = created.productCreate.product.id;
         mode = "create";
 
-        // Refetch so we have option IDs + auto-created variant IDs.
+        // Refetch to get option IDs + auto-created variant IDs.
         const refetched = (await shopifyAdmin<{
           productByHandle: null | {
             id: string;
@@ -613,8 +612,6 @@ Deno.serve(async (req) => {
       {
         const existing = effectiveExisting!;
         productId = existing.id;
-        if (mode! === undefined as unknown as "create") mode = "update";
-        mode = mode ?? "update";
 
         // Diff-protect text fields. Pull current Shopify state and compare to
         // last_synced_payload; if Shopify diverged, the merchant edited the
