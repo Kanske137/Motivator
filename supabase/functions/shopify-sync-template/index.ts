@@ -296,44 +296,59 @@ function buildVariantInput(
   };
 }
 
-let cachedOnlineStorePublicationId: string | null = null;
+let cachedPublications: { id: string; name: string }[] | null = null;
 
-async function getOnlineStorePublicationId(): Promise<string | null> {
-  if (cachedOnlineStorePublicationId) return cachedOnlineStorePublicationId;
+async function getAllPublications(): Promise<{ id: string; name: string }[]> {
+  if (cachedPublications) return cachedPublications;
   try {
     const r = await shopifyAdmin<{
-      publications: {
-        nodes: { id: string; name: string }[];
-      };
+      publications: { nodes: { id: string; name: string }[] };
     }>(PUBLICATIONS_QUERY);
-    const byName = r.publications.nodes.find((p) =>
-      /online store|nätbutik|webbshop/i.test(p.name),
+    cachedPublications = r.publications.nodes ?? [];
+    console.log(
+      `[publications] found ${cachedPublications.length}: ${cachedPublications.map((p) => p.name).join(", ")}`,
     );
-    const onlineStore = byName ?? r.publications.nodes[0];
-    cachedOnlineStorePublicationId = onlineStore?.id ?? null;
-    return cachedOnlineStorePublicationId;
+    return cachedPublications;
   } catch (e) {
     console.warn("publications query failed", e);
-    return null;
+    cachedPublications = [];
+    return [];
   }
 }
 
-async function publishToOnlineStore(productId: string): Promise<boolean> {
-  const pubId = await getOnlineStorePublicationId();
-  if (!pubId) return false;
-  try {
-    const r = await shopifyAdmin<{
-      publishablePublish: { userErrors: { message: string }[] };
-    }>(PUBLISHABLE_PUBLISH, { id: productId, input: [{ publicationId: pubId }] });
-    if (r.publishablePublish.userErrors.length) {
-      console.warn("publishablePublish errors", r.publishablePublish.userErrors);
-      return false;
+/**
+ * Publishes the product to ALL available publications (Online Store +
+ * Headless/Storefront app channel + any extra sales channels). The
+ * Storefront API token is bound to its own publication, so a product is
+ * only readable via Storefront if it's published there — `status: ACTIVE`
+ * alone is NOT enough. The previous implementation only published to the
+ * first/Online-Store publication, which is why every template except the
+ * legacy "personlig-karta" returned null from Storefront.
+ */
+async function publishToAllChannels(
+  productId: string,
+): Promise<{ published: string[]; failed: string[] }> {
+  const pubs = await getAllPublications();
+  if (!pubs.length) return { published: [], failed: [] };
+  const published: string[] = [];
+  const failed: string[] = [];
+  for (const p of pubs) {
+    try {
+      const r = await shopifyAdmin<{
+        publishablePublish: { userErrors: { message: string }[] };
+      }>(PUBLISHABLE_PUBLISH, { id: productId, input: [{ publicationId: p.id }] });
+      if (r.publishablePublish.userErrors.length) {
+        console.warn(`publishablePublish errors for ${p.name}:`, r.publishablePublish.userErrors);
+        failed.push(p.name);
+      } else {
+        published.push(p.name);
+      }
+    } catch (e) {
+      console.warn(`publishablePublish failed for ${p.name}`, e);
+      failed.push(p.name);
     }
-    return true;
-  } catch (e) {
-    console.warn("publishablePublish failed", e);
-    return false;
   }
+  return { published, failed };
 }
 
 /** Sync existing product's options so all desired sizes/frames exist as
@@ -771,11 +786,15 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Publish to configured sales channels (currently: online_store).
+      // Publish to ALL Shopify publications (Online Store + Storefront/Headless
+      // app channel + any extras). Required so Storefront API can read the
+      // product — `status: ACTIVE` alone does NOT make it visible.
       const wantsOnlineStore = (cfgMeta.sales_channels ?? ["online_store"]).includes(
         "online_store",
       );
-      const published = wantsOnlineStore ? await publishToOnlineStore(productId) : false;
+      const publishResult = wantsOnlineStore
+        ? await publishToAllChannels(productId)
+        : { published: [], failed: [] };
 
       // Snapshot what we just sent — this is what next sync will compare against.
       nextSyncedPayload[group.kind] = {
@@ -797,7 +816,9 @@ Deno.serve(async (req) => {
         variantsCreated,
         variantsUpdated,
         variantsDeleted,
-        publishedToOnlineStore: published,
+        publishedToOnlineStore: publishResult.published.length > 0,
+        publishedTo: publishResult.published,
+        publishFailed: publishResult.failed,
         skipped: group.skipped,
         skippedFields,
       });
