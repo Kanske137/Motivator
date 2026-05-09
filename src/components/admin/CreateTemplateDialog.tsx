@@ -33,12 +33,12 @@ type Kind = "poster" | "canvas" | "aluminum" | "acrylic";
 
 const KIND_META: Record<
   Kind,
-  { label: string; productType: ProductType; suffix: string; titleSuffix: string }
+  { i18nKey: string; productType: ProductType; suffix: string }
 > = {
-  poster:   { label: "Poster",    productType: "posters",  suffix: "-poster",   titleSuffix: " - Poster" },
-  canvas:   { label: "Canvas",    productType: "canvas",   suffix: "-canvas",   titleSuffix: " - Canvas" },
-  aluminum: { label: "Aluminium", productType: "aluminum", suffix: "-aluminum", titleSuffix: " - Aluminium" },
-  acrylic:  { label: "Akryl",     productType: "acrylic",  suffix: "-acrylic",  titleSuffix: " - Akryl" },
+  poster:   { i18nKey: "productKind.poster",   productType: "posters",  suffix: "-poster" },
+  canvas:   { i18nKey: "productKind.canvas",   productType: "canvas",   suffix: "-canvas" },
+  aluminum: { i18nKey: "productKind.aluminum", productType: "aluminum", suffix: "-aluminum" },
+  acrylic:  { i18nKey: "productKind.acrylic",  productType: "acrylic",  suffix: "-acrylic" },
 };
 
 function slugify(s: string): string {
