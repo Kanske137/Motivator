@@ -435,8 +435,57 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     const orientation = state.orientation;
     const isFirstLoad = state.config === null;
-    const layerValues = hydrateLayerValues(template, orientation, config.product_type);
+    const prevTemplate = state.template;
+    const prevProductType = state.config?.product_type;
+    const layoutBlockChanged =
+      !!prevTemplate &&
+      getActiveLayoutBlock(prevTemplate, prevProductType) !==
+        getActiveLayoutBlock(template, config.product_type);
+
+    const freshLayerValues = hydrateLayerValues(template, orientation, config.product_type);
     const layout = getActiveLayoutBlock(template, config.product_type)[orientation];
+
+    let nextLayerValues = freshLayerValues;
+    let nextLayerTransforms: Record<string, { xPct?: number; yPct?: number; wPct?: number; hPct?: number }> = {};
+    let nextAiPhotoResults = state.aiPhotoResults;
+    let nextAiPhotoSources = state.aiPhotoSources;
+
+    if (!isFirstLoad && layoutBlockChanged) {
+      const idMap = buildLayerIdMap(prevTemplate, prevProductType, template, config.product_type);
+      // Carry over per-layer values (photo shape/offset, text content, map state, …)
+      const merged: Record<string, LayerValue> = { ...freshLayerValues };
+      for (const [oldId, oldVal] of Object.entries(state.layerValues)) {
+        const newId = idMap[oldId] ?? oldId;
+        if (merged[newId] && merged[newId].kind === oldVal.kind) {
+          merged[newId] = oldVal;
+        }
+      }
+      nextLayerValues = merged;
+      // Carry over layer transforms (custom rect)
+      const remappedTransforms: typeof nextLayerTransforms = {};
+      for (const [oldId, val] of Object.entries(state.layerTransforms)) {
+        const newId = idMap[oldId] ?? oldId;
+        remappedTransforms[newId] = val;
+      }
+      nextLayerTransforms = remappedTransforms;
+      // Carry over AI photo results + sources (keyed by aiPhoto layer ID)
+      const remappedAiResults: Record<string, string> = {};
+      for (const [oldId, val] of Object.entries(state.aiPhotoResults)) {
+        const newId = idMap[oldId] ?? oldId;
+        remappedAiResults[newId] = val;
+      }
+      nextAiPhotoResults = remappedAiResults;
+      const remappedAiSources: Record<string, AiPhotoSource> = {};
+      for (const [oldId, val] of Object.entries(state.aiPhotoSources)) {
+        const newId = idMap[oldId] ?? oldId;
+        remappedAiSources[newId] = val;
+      }
+      nextAiPhotoSources = remappedAiSources;
+    } else if (!isFirstLoad) {
+      // Same layout block (e.g. poster ↔ aluminum) → keep existing per-layer state untouched.
+      nextLayerValues = { ...freshLayerValues, ...state.layerValues };
+      nextLayerTransforms = state.layerTransforms;
+    }
 
     const next = {
       config,
@@ -444,14 +493,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       productOptions,
       size: nextSize,
       variant: nextVariant,
-      layerValues,
-      layerTransforms: {} as Record<string, { xPct?: number; yPct?: number; wPct?: number; hPct?: number }>,
+      layerValues: nextLayerValues,
+      layerTransforms: nextLayerTransforms,
+      aiPhotoResults: nextAiPhotoResults,
+      aiPhotoSources: nextAiPhotoSources,
       whiteMarginEnabled: true,
       ...(isFirstLoad && layout?.background?.color
         ? { posterBgColor: layout.background.color }
         : {}),
     };
-    set({ ...next, ...mirrorLegacy({ template, orientation, layerValues, config }) });
+    set({ ...next, ...mirrorLegacy({ template, orientation, layerValues: nextLayerValues, config }) });
   },
 
   setPosterBgColor: (posterBgColor) => set({ posterBgColor }),
