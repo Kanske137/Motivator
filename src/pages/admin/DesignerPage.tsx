@@ -181,7 +181,15 @@ export default function DesignerPage() {
   }, [handle]);
 
   // For canvas products we edit `canvasLayout` (separate from poster).
-  const isCanvasProduct = config?.product_type === "canvas";
+  // Konsoliderade mallar väljer via `designMode`-toggle istället för product_type.
+  const isConsolidated = !!config?.is_consolidated;
+  const enabledTypes = config?.enabled_product_types ?? [];
+  const consolidatedHasCanvas = isConsolidated && enabledTypes.includes("canvas");
+  const consolidatedHasNonCanvas = isConsolidated && enabledTypes.some((t) => t !== "canvas");
+  const showDesignModeToggle = consolidatedHasCanvas && consolidatedHasNonCanvas;
+  const isCanvasProduct = isConsolidated
+    ? designMode === "canvas"
+    : config?.product_type === "canvas";
   const layoutBlock = template
     ? (isCanvasProduct && template.canvasLayout) || template.defaultLayout
     : null;
