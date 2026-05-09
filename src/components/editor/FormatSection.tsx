@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { deriveTemplateSlug, getEffectiveSizes, type ProductConfig } from "@/lib/product-config";
+import { deriveTemplateSlug, getEffectiveSizes, type ProductConfig, type ProductType } from "@/lib/product-config";
 import { FrameOption } from "./FrameOption";
 import frameWhite from "@/assets/frames/frame-white.jpg";
 import frameOak from "@/assets/frames/frame-oak.jpg";
@@ -23,7 +23,8 @@ import frameBlack from "@/assets/frames/frame-black.jpg";
 interface Props {
   configs: ProductConfig[];
   activeHandle: string;
-  onProductChange: (handle: string) => void;
+  activeProductType: ProductType;
+  onProductChange: (handle: string, productType: ProductType) => void;
 }
 
 const FRAME_THUMBS: Record<string, string> = {
