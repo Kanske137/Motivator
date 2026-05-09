@@ -257,7 +257,7 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
                     checked={selected[k]}
                     onCheckedChange={(c) => toggleKind(k, c === true)}
                   />
-                  <span className="text-sm font-medium">{KIND_META[k].label}</span>
+                  <span className="text-sm font-medium">{t(KIND_META[k].i18nKey)}</span>
                 </label>
               ))}
             </div>
