@@ -524,6 +524,14 @@ export default function DesignerPage() {
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
+              {showDesignModeToggle && (
+                <Tabs value={designMode} onValueChange={(v) => { setDesignMode(v as "standard" | "canvas"); setSelectedId(null); }}>
+                  <TabsList>
+                    <TabsTrigger value="standard">Standard</TabsTrigger>
+                    <TabsTrigger value="canvas">Canvas</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              )}
               <div className="flex items-center gap-3 px-2 border-l border-r h-9">
                 <Label className="flex items-center gap-1.5 text-xs cursor-pointer">
                   <Switch
