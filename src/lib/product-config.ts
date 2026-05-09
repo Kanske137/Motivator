@@ -149,6 +149,27 @@ export async function loadAllConfigs(): Promise<ProductConfig[]> {
     console.error("loadAllConfigs error", error);
     return [];
   }
+  // Expandera konsoliderade rader till virtuella per-produkttyp-configs så att
+  // FormatSection / EditorPage kan filtrera per `template_slug` precis som
+  // tidigare. Den underliggande raden bevaras med samma id.
+  const out: ProductConfig[] = [];
+  for (const row of (data ?? []) as unknown as ProductConfig[]) {
+    out.push(...expandConsolidatedConfig(row));
+  }
+  return out;
+}
+
+/** Ladda RAW-rader (utan att expandera konsoliderade). Används av admin/
+ *  designer-sidor som behöver läsa själva DB-raden inkl. is_consolidated. */
+export async function loadAllConfigsRaw(): Promise<ProductConfig[]> {
+  const { data, error } = await supabase
+    .from("product_configs")
+    .select("*")
+    .order("created_at");
+  if (error) {
+    console.error("loadAllConfigsRaw error", error);
+    return [];
+  }
   return (data ?? []) as unknown as ProductConfig[];
 }
 
