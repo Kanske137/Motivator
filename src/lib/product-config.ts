@@ -110,8 +110,17 @@ export function resolveConfigForHandle(
   handleOrSlug: string,
   preferredType?: ProductType,
 ): ProductConfig | null {
+  // Vid konsoliderade mallar finns flera virtuella configs med samma handle —
+  // matcha först på handle + preferredType, annars första handle-träffen.
+  if (preferredType) {
+    const directTyped = configs.find(
+      (c) => c.shopify_handle === handleOrSlug && c.product_type === preferredType,
+    );
+    if (directTyped) return directTyped;
+  }
   const direct = configs.find((c) => c.shopify_handle === handleOrSlug);
-  if (direct) return direct;
+  if (direct && !preferredType) return direct;
+  if (direct && configs.filter((c) => c.shopify_handle === handleOrSlug).length === 1) return direct;
   const slug = deriveTemplateSlug(handleOrSlug);
   const matches = configs.filter(
     (c) => (c.template_slug ?? deriveTemplateSlug(c.shopify_handle)) === slug,
