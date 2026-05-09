@@ -224,6 +224,7 @@ export default function EditorPage() {
       _bg_color: posterBgColor,
       _orientation: orientation,
       _product_handle: config.shopify_handle,
+      _product_type: config.product_type,
       _design_id: designId,
       _map_shape: mapShape,
       _show_labels: showLabels ? "true" : "false",
