@@ -94,6 +94,7 @@ function buildSeedTemplate(kind: Kind): Template {
 
 export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [title, setTitle] = useState("");
   const [handle, setHandle] = useState("");
   const [handleEdited, setHandleEdited] = useState(false);
