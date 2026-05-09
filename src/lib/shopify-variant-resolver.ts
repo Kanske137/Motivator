@@ -40,49 +40,67 @@ const PRODUCT_VARIANTS_QUERY = /* GraphQL */ `
 const cache = new Map<string, { id: string | null; ts: number }>();
 const TTL_MS = 5 * 60 * 1000;
 
-function cacheKey(handle: string, size: string, variant: string) {
-  return `${handle}|${size}|${variant}`;
+/** Maps internal product types to the Swedish "Produkttyp"-värde som
+ *  konsoliderade Shopify-produkter använder. */
+const PRODUCT_TYPE_LABEL: Record<string, string> = {
+  posters: "Poster",
+  poster: "Poster",
+  canvas: "Canvas",
+  aluminum: "Metallposter",
+  acrylic: "Plexiglas",
+};
+
+function cacheKey(handle: string, size: string, variant: string, productType?: string) {
+  return `${handle}|${size}|${variant}|${productType ?? ""}`;
 }
 
-/** Invalidate the resolver cache — call after a template sync so newly
- *  created variants become visible without a hard reload. */
 export function clearVariantResolverCache() {
   cache.clear();
 }
 
+const normalize = (s: string) =>
+  s.toLowerCase().replace(/\s*cm\s*$/i, "").replace(/\s+/g, "").trim();
+
 /**
- * Find a variant whose selectedOptions match BOTH size and variant value
- * (variant = frame name for posters / depth for canvas). Matching is case-
- * insensitive and tolerates whitespace + the trailing " cm" Shopify often
- * uses (e.g. "30x40" vs "30x40 cm").
+ * Match a variant whose selectedOptions contain BOTH size and variant
+ * (frame/depth/finish), and — if productType supplied — also the
+ * "Produkttyp" option (Poster/Canvas/Metallposter/Plexiglas).
  */
 function findMatchingVariant(
   variants: VariantNode[],
   size: string,
   variant: string,
+  productTypeLabel: string | null,
 ): string | null {
-  const normalize = (s: string) =>
-    s.toLowerCase().replace(/\s*cm\s*$/i, "").replace(/\s+/g, "").trim();
-
   const sizeN = normalize(size);
   const variantN = normalize(variant);
+  const typeN = productTypeLabel ? normalize(productTypeLabel) : null;
 
   for (const v of variants) {
     const opts = v.selectedOptions ?? [];
     const sizeMatch = opts.some((o) => normalize(o.value) === sizeN);
     const variantMatch = opts.some((o) => normalize(o.value) === variantN);
-    if (sizeMatch && variantMatch) return v.id;
+    if (!sizeMatch || !variantMatch) continue;
+    if (typeN) {
+      const typeMatch = opts.some((o) => normalize(o.value) === typeN);
+      if (!typeMatch) continue;
+    }
+    return v.id;
   }
   return null;
 }
 
-/** Resolve a real Shopify variant ID. Returns null if not found / unavailable. */
+/** Resolve a real Shopify variant ID. Returns null if not found / unavailable.
+ *  `productType` (intern slug: posters/canvas/aluminum/acrylic) bör skickas för
+ *  konsoliderade produkter så vi matchar rätt Produkttyp-axel. */
 export async function resolveShopifyVariantId(
   handle: string,
   size: string,
   variant: string,
+  productType?: string,
 ): Promise<string | null> {
-  const key = cacheKey(handle, size, variant);
+  const productTypeLabel = productType ? PRODUCT_TYPE_LABEL[productType] ?? null : null;
+  const key = cacheKey(handle, size, variant, productType);
   const cached = cache.get(key);
   if (cached && Date.now() - cached.ts < TTL_MS) return cached.id;
 
@@ -106,7 +124,11 @@ export async function resolveShopifyVariantId(
       return null;
     }
 
-    const id = findMatchingVariant(variants, size, variant);
+    let id = findMatchingVariant(variants, size, variant, productTypeLabel);
+    // Fallback: legacy 2-option product utan Produkttyp-axel.
+    if (!id && productTypeLabel) {
+      id = findMatchingVariant(variants, size, variant, null);
+    }
     cache.set(key, { id, ts: Date.now() });
     return id;
   } catch (e) {

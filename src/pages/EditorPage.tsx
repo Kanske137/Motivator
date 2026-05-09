@@ -85,7 +85,7 @@ export default function EditorPage() {
     }
     let cancelled = false;
     setShopifyVariantResolving(true);
-    resolveShopifyVariantId(config.shopify_handle, size, variant)
+    resolveShopifyVariantId(config.shopify_handle, size, variant, config.product_type)
       .then((id) => {
         if (cancelled) return;
         setShopifyVariantId(id);
@@ -224,6 +224,7 @@ export default function EditorPage() {
       _bg_color: posterBgColor,
       _orientation: orientation,
       _product_handle: config.shopify_handle,
+      _product_type: config.product_type,
       _design_id: designId,
       _map_shape: mapShape,
       _show_labels: showLabels ? "true" : "false",
@@ -255,7 +256,7 @@ export default function EditorPage() {
     // (race when user clicks before the effect resolves).
     let variantGid = shopifyVariantId;
     if (!variantGid) {
-      variantGid = await resolveShopifyVariantId(config.shopify_handle, size, variant);
+      variantGid = await resolveShopifyVariantId(config.shopify_handle, size, variant, config.product_type);
       if (variantGid) setShopifyVariantId(variantGid);
     }
     if (!variantGid) {

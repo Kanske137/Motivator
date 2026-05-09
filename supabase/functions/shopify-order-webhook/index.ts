@@ -18,7 +18,19 @@ const GELATO_SKU_MAP = GELATO_SKU_MAP_JSON as Record<
   Record<string, { portrait: string; landscape: string }>
 >;
 
-function productTypeFromHandle(handle: string): "posters" | "canvas" | "aluminum" | "acrylic" | null {
+type ProductType = "posters" | "canvas" | "aluminum" | "acrylic";
+
+function normalizeProductType(raw: string | null | undefined): ProductType | null {
+  if (!raw) return null;
+  const v = raw.toLowerCase().trim();
+  if (v === "poster" || v === "posters") return "posters";
+  if (v === "canvas") return "canvas";
+  if (v === "aluminum" || v === "aluminium" || v === "metallic" || v === "metallposter") return "aluminum";
+  if (v === "acrylic" || v === "akryl" || v === "plexiglas") return "acrylic";
+  return null;
+}
+
+function productTypeFromHandle(handle: string): ProductType | null {
   const h = (handle || "").toLowerCase();
   if (h.endsWith("-acrylic") || h.includes("acrylic") || h.includes("akryl")) return "acrylic";
   if (h.endsWith("-aluminum") || h.includes("aluminum") || h.includes("aluminium") || h.includes("metallic")) return "aluminum";
@@ -38,16 +50,23 @@ function resolveProductUid(args: {
   size: string;
   variant?: string | null;
   orientation: "portrait" | "landscape";
+  productType?: ProductType | null;
   dbMap?: Record<string, Record<string, string>> | null;
 }): ResolveResult {
-  const { handle, size, variant, orientation, dbMap } = args;
+  const { handle, size, variant, orientation, productType, dbMap } = args;
 
-  // 1) DB-mapping (per-handle override)
-  if (variant && dbMap?.[size]?.[variant]) {
-    return { productUid: dbMap[size][variant], source: "db", detail: `${size}|${variant}` };
+  // 1) DB-mapping (per-handle override). Konsoliderade mallar har nycklar som
+  //    "<type>|<size>|<variant>" — prova den först, annars legacy "size|variant".
+  if (variant && dbMap) {
+    if (productType && dbMap[`${productType}|${size}`]?.[variant]) {
+      return { productUid: dbMap[`${productType}|${size}`][variant], source: "db", detail: `${productType}|${size}|${variant}` };
+    }
+    if (dbMap[size]?.[variant]) {
+      return { productUid: dbMap[size][variant], source: "db", detail: `${size}|${variant}` };
+    }
   }
 
-  const ptype = productTypeFromHandle(handle);
+  const ptype = productType ?? productTypeFromHandle(handle);
   if (!ptype) {
     return { productUid: null, source: "missing", detail: `unknown product type for handle="${handle}"` };
   }
@@ -150,6 +169,11 @@ async function processOrder(supabase: any, order: any) {
     const handle = getProp(props, "_product_handle") ?? li.product_handle ?? "";
     const clientPrintFileUrl = getProp(props, "_print_file_url");
     const designSource = getProp(props, "_design_source") ?? "map";
+    // Konsoliderade produkter skickar _product_type explicit. Fallback för
+    // gamla beställningar: utled från handle-suffix.
+    const productType =
+      normalizeProductType(getProp(props, "_product_type"))
+      ?? productTypeFromHandle(handle);
 
     if (!size) continue; // not an editor item
 
@@ -175,6 +199,7 @@ async function processOrder(supabase: any, order: any) {
       size: size!,
       variant,
       orientation,
+      productType,
       dbMap: cfg?.gelato_sku_map ?? null,
     });
 

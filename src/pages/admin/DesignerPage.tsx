@@ -52,6 +52,9 @@ export default function DesignerPage() {
   const [template, setTemplate] = useState<Template | null>(null);
   const [orientation, setOrientation] = useState<Orientation>("portrait");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Designyta-läge: 'standard' = poster/metall/plexi-layout, 'canvas' = canvas-wrap.
+  // Endast meningsfullt för konsoliderade mallar med både canvas och annan typ.
+  const [designMode, setDesignMode] = useState<"standard" | "canvas">("standard");
 
   // Session-only undo stack: snapshots of `template` before each mutation.
   // Cleared on page reload (intentional — user explicitly asked).
@@ -178,7 +181,15 @@ export default function DesignerPage() {
   }, [handle]);
 
   // For canvas products we edit `canvasLayout` (separate from poster).
-  const isCanvasProduct = config?.product_type === "canvas";
+  // Konsoliderade mallar väljer via `designMode`-toggle istället för product_type.
+  const isConsolidated = !!config?.is_consolidated;
+  const enabledTypes = config?.enabled_product_types ?? [];
+  const consolidatedHasCanvas = isConsolidated && enabledTypes.includes("canvas");
+  const consolidatedHasNonCanvas = isConsolidated && enabledTypes.some((t) => t !== "canvas");
+  const showDesignModeToggle = consolidatedHasCanvas && consolidatedHasNonCanvas;
+  const isCanvasProduct = isConsolidated
+    ? designMode === "canvas"
+    : config?.product_type === "canvas";
   const layoutBlock = template
     ? (isCanvasProduct && template.canvasLayout) || template.defaultLayout
     : null;
@@ -513,6 +524,14 @@ export default function DesignerPage() {
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
+              {showDesignModeToggle && (
+                <Tabs value={designMode} onValueChange={(v) => { setDesignMode(v as "standard" | "canvas"); setSelectedId(null); }}>
+                  <TabsList>
+                    <TabsTrigger value="standard">Standard</TabsTrigger>
+                    <TabsTrigger value="canvas">Canvas</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              )}
               <div className="flex items-center gap-3 px-2 border-l border-r h-9">
                 <Label className="flex items-center gap-1.5 text-xs cursor-pointer">
                   <Switch

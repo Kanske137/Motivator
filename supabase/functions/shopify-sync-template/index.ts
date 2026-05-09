@@ -101,14 +101,39 @@ interface PlannedVariant {
   variant: string;
   sku: string;
   price: number;
+  /** Konsoliderad: visar Produkttyp-värdet ("Poster", "Canvas", ...). */
+  productTypeLabel?: string;
+}
+
+interface OptionAxis {
+  name: string;
+  values: string[];
 }
 
 interface PlannedGroup {
-  kind: Kind;
+  kind: Kind | "multi";
   productType: string;
-  variantOptionName: string; // "Ram" / "Djup" / "Material" / "Finish"
+  variantOptionName: string; // "Ram" / "Djup" / "Material" / "Finish" / "Utförande"
+  /** Alla axlar i ordning (2 för legacy, 3 för konsoliderad). */
+  optionAxes: OptionAxis[];
+  /** True = konsoliderad multi-typ-produkt med Produkttyp-axel. */
+  isConsolidated?: boolean;
   variants: PlannedVariant[];
   skipped: { size: string; variant: string; reason: string }[];
+}
+
+const CANONICAL_POSTER_FRAMES = [
+  "Ingen", "Vit", "Svart", "Ek", "Valnöt",
+  "Hängare Vit", "Hängare Svart", "Hängare Ek", "Hängare Valnöt",
+];
+
+function mergedPosterFrames(saved: string[] | undefined): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const f of [...(saved ?? []), ...CANONICAL_POSTER_FRAMES]) {
+    if (!seen.has(f)) { seen.add(f); out.push(f); }
+  }
+  return out;
 }
 
 function plan(template: any): PlannedGroup[] {
@@ -122,7 +147,17 @@ function plan(template: any): PlannedGroup[] {
     sizes: string[],
     variants: string[],
   ): PlannedGroup => {
-    const g: PlannedGroup = { kind, productType, variantOptionName, variants: [], skipped: [] };
+    const g: PlannedGroup = {
+      kind,
+      productType,
+      variantOptionName,
+      optionAxes: [
+        { name: "Storlek", values: sizes },
+        { name: variantOptionName, values: variants },
+      ],
+      variants: [],
+      skipped: [],
+    };
     for (const size of sizes) {
       for (const v of variants) {
         const sku = getUid(kind, size, v);
@@ -138,20 +173,9 @@ function plan(template: any): PlannedGroup[] {
   if (opts.poster?.enabled) {
     // Kanonisk ram-lista: säkerställer att alla hängar-värden alltid syncas
     // till Shopify, även för äldre mallar som sparades innan hängarna lades
-    // till i defaults. plan() hoppar ändå över storlek/variant utan SKU/pris,
-    // så 13×18-hängare (saknar Gelato-SKU) filtreras bort automatiskt.
-    const CANONICAL_POSTER_FRAMES = [
-      "Ingen", "Vit", "Svart", "Ek", "Valnöt",
-      "Hängare Vit", "Hängare Svart", "Hängare Ek", "Hängare Valnöt",
-    ];
-    const savedFrames = opts.poster.allowedFrames ?? [];
-    const seen = new Set<string>();
-    const mergedFrames: string[] = [];
-    for (const f of [...savedFrames, ...CANONICAL_POSTER_FRAMES]) {
-      if (!seen.has(f)) { seen.add(f); mergedFrames.push(f); }
-    }
+    // till i defaults. plan() hoppar ändå över storlek/variant utan SKU/pris.
     groups.push(buildGroup("poster", "Poster", "Ram",
-      opts.poster.allowedSizes ?? [], mergedFrames));
+      opts.poster.allowedSizes ?? [], mergedPosterFrames(opts.poster.allowedFrames)));
   }
   if (opts.canvas?.enabled) {
     groups.push(buildGroup("canvas", "Canvas", "Djup",
@@ -166,6 +190,73 @@ function plan(template: any): PlannedGroup[] {
       opts.acrylic.allowedSizes ?? [], opts.acrylic.allowedFinishes ?? []));
   }
   return groups;
+}
+
+const PRODUCT_TYPE_LABELS: Record<Kind, string> = {
+  poster: "Poster",
+  canvas: "Canvas",
+  aluminum: "Metallposter",
+  acrylic: "Plexiglas",
+};
+
+const PRODUCT_TYPE_FROM_INTERNAL: Record<string, Kind> = {
+  posters: "poster",
+  poster: "poster",
+  canvas: "canvas",
+  aluminum: "aluminum",
+  acrylic: "acrylic",
+};
+
+/** Konsoliderad: bygg EN PlannedGroup med 3 axlar (Produkttyp/Storlek/Utförande). */
+function planConsolidated(template: any, enabledTypes: string[]): PlannedGroup {
+  const opts = template?.productOptions ?? {};
+  const variants: PlannedVariant[] = [];
+  const skipped: PlannedGroup["skipped"] = [];
+  const productTypeValues: string[] = [];
+  const sizesUnion = new Set<string>();
+  const variantsUnion = new Set<string>();
+
+  const planFor = (kind: Kind): { sizes: string[]; names: string[] } | null => {
+    if (kind === "poster" && opts.poster?.enabled) return { sizes: opts.poster.allowedSizes ?? [], names: mergedPosterFrames(opts.poster.allowedFrames) };
+    if (kind === "canvas" && opts.canvas?.enabled) return { sizes: opts.canvas.allowedSizes ?? [], names: opts.canvas.allowedDepths ?? [] };
+    if (kind === "aluminum" && opts.aluminum?.enabled) return { sizes: opts.aluminum.allowedSizes ?? [], names: opts.aluminum.allowedMaterials ?? [] };
+    if (kind === "acrylic" && opts.acrylic?.enabled) return { sizes: opts.acrylic.allowedSizes ?? [], names: opts.acrylic.allowedFinishes ?? [] };
+    return null;
+  };
+
+  for (const t of enabledTypes) {
+    const kind = PRODUCT_TYPE_FROM_INTERNAL[t];
+    if (!kind) continue;
+    const block = planFor(kind);
+    if (!block) continue;
+    const label = PRODUCT_TYPE_LABELS[kind];
+    if (!productTypeValues.includes(label)) productTypeValues.push(label);
+    for (const size of block.sizes) {
+      sizesUnion.add(size);
+      for (const v of block.names) {
+        const sku = getUid(kind, size, v);
+        const price = getPrice(kind, size, v);
+        if (!sku) { skipped.push({ size: `${label}/${size}`, variant: v, reason: "no Gelato SKU" }); continue; }
+        if (!price) { skipped.push({ size: `${label}/${size}`, variant: v, reason: "no price" }); continue; }
+        variantsUnion.add(v);
+        variants.push({ size, variant: v, sku, price, productTypeLabel: label });
+      }
+    }
+  }
+
+  return {
+    kind: "multi",
+    productType: "Personlig poster",
+    variantOptionName: "Utförande",
+    optionAxes: [
+      { name: "Produkttyp", values: productTypeValues },
+      { name: "Storlek", values: [...sizesUnion] },
+      { name: "Utförande", values: [...variantsUnion] },
+    ],
+    isConsolidated: true,
+    variants,
+    skipped,
+  };
 }
 
 const GET_PRODUCT_BY_HANDLE = `
@@ -283,12 +374,15 @@ function buildVariantInput(
   group: PlannedGroup,
   v: PlannedVariant,
 ): VariantInput {
+  const optionValues: { optionName: string; name: string }[] = [];
+  if (group.isConsolidated && v.productTypeLabel) {
+    optionValues.push({ optionName: "Produkttyp", name: v.productTypeLabel });
+  }
+  optionValues.push({ optionName: "Storlek", name: v.size });
+  optionValues.push({ optionName: group.variantOptionName, name: v.variant });
   // Shopify Admin API 2025-07: sku/barcode/tracked all live inside inventoryItem.
   return {
-    optionValues: [
-      { optionName: "Storlek", name: v.size },
-      { optionName: group.variantOptionName, name: v.variant },
-    ],
+    optionValues,
     price: v.price.toFixed(2),
     inventoryItem: {
       sku: v.sku,
@@ -369,12 +463,16 @@ async function syncProductOptions(
   },
   group: PlannedGroup,
 ) {
-  const desiredByOption: Record<string, string[]> = {
-    Storlek: [...new Set(group.variants.map((v) => v.size))],
-    [group.variantOptionName]: [
-      ...new Set(group.variants.map((v) => v.variant)),
-    ],
-  };
+  const desiredByOption: Record<string, string[]> = {};
+  for (const axis of group.optionAxes) {
+    if (axis.name === "Storlek") {
+      desiredByOption["Storlek"] = [...new Set(group.variants.map((v) => v.size))];
+    } else if (axis.name === "Produkttyp") {
+      desiredByOption["Produkttyp"] = [...new Set(group.variants.map((v) => v.productTypeLabel ?? "").filter(Boolean))];
+    } else {
+      desiredByOption[axis.name] = [...new Set(group.variants.map((v) => v.variant))];
+    }
+  }
 
   for (const optionName of Object.keys(desiredByOption)) {
     const existingOpt = existing.options.find((o) => o.name === optionName);
@@ -416,10 +514,16 @@ function normalizeOptionValue(s: string): string {
 function optionKeyFromSelected(
   selected: { name: string; value: string }[],
   variantOptionName: string,
+  isConsolidated = false,
 ): string | null {
   const size = selected.find((s) => s.name === "Storlek")?.value;
   const variant = selected.find((s) => s.name === variantOptionName)?.value;
   if (!size || !variant) return null;
+  if (isConsolidated) {
+    const ptype = selected.find((s) => s.name === "Produkttyp")?.value;
+    if (!ptype) return null;
+    return `${normalizeOptionValue(ptype)}|${normalizeOptionValue(size)}|${normalizeOptionValue(variant)}`;
+  }
   return `${normalizeOptionValue(size)}|${normalizeOptionValue(variant)}`;
 }
 
@@ -455,7 +559,7 @@ Deno.serve(async (req) => {
     const { data: cfg, error } = await supabase
       .from("product_configs")
       .select(
-        "id,title,shopify_handle,template_slug,template,tags,category_gid,status,sales_channels,description_html,seo_title,seo_description",
+        "id,title,shopify_handle,template_slug,template,tags,category_gid,status,sales_channels,description_html,seo_title,seo_description,is_consolidated,enabled_product_types",
       )
       .eq("shopify_handle", body.handle)
       .maybeSingle();
@@ -471,7 +575,11 @@ Deno.serve(async (req) => {
       (cfg as { template_slug?: string }).template_slug ??
       cfg.shopify_handle.replace(/-(poster|posters|canvas|aluminum|acrylic)$/i, "");
 
-    const groups = plan(cfg.template);
+    const isConsolidated = !!(cfg as { is_consolidated?: boolean }).is_consolidated;
+    const enabledTypes = ((cfg as { enabled_product_types?: string[] }).enabled_product_types ?? []);
+    const groups: PlannedGroup[] = isConsolidated
+      ? [planConsolidated(cfg.template, enabledTypes)]
+      : plan(cfg.template);
     const totalVariants = groups.reduce((n, g) => n + g.variants.length, 0);
     const allSkipped = groups.flatMap((g) =>
       g.skipped.map((s) => ({ kind: g.kind, ...s })),
@@ -522,23 +630,28 @@ Deno.serve(async (req) => {
 
     for (const group of groups) {
       const baseHandleHasNoSuffix = !/-(poster|posters|canvas|aluminum|acrylic)$/i.test(cfg.shopify_handle);
-      const handleForKind = groups.length === 1 && baseHandleHasNoSuffix
+      // Konsoliderad: ALLTID base-handle och base-titel (mallnamn).
+      const handleForKind = group.isConsolidated
         ? cfg.shopify_handle
-        : `${templateSlug}-${group.kind}`;
-      const titleForKind =
-        groups.length === 1 ? cfg.title : `${cfg.title} – ${group.productType}`;
+        : (groups.length === 1 && baseHandleHasNoSuffix
+          ? cfg.shopify_handle
+          : `${templateSlug}-${group.kind}`);
+      const titleForKind = group.isConsolidated
+        ? cfg.title
+        : (groups.length === 1 ? cfg.title : `${cfg.title} – ${group.productType}`);
 
       // Effective metadata (config values + sensible defaults).
       const tags = [
         ...new Set([
           templateSlug,
-          group.kind,
+          group.isConsolidated ? "multi" : group.kind,
           "personalized",
           "print-on-demand",
           ...(cfgMeta.tags ?? []),
         ]),
       ];
-      const categoryGid = cfgMeta.category_gid ?? DEFAULT_CATEGORY_GID[group.kind];
+      const categoryGid = cfgMeta.category_gid
+        ?? (group.isConsolidated ? DEFAULT_CATEGORY_GID.poster : DEFAULT_CATEGORY_GID[group.kind as Kind]);
       const status = (cfgMeta.status ?? "DRAFT").toUpperCase();
       const descriptionHtml =
         cfgMeta.description_html ?? "<p>Personlig design — skapas i editorn.</p>";
@@ -578,16 +691,10 @@ Deno.serve(async (req) => {
             descriptionHtml,
             category: categoryGid,
             seo: { title: seoTitle, description: seoDescription },
-            productOptions: [
-              {
-                name: "Storlek",
-                values: [...new Set(group.variants.map((v) => v.size))].map((name) => ({ name })),
-              },
-              {
-                name: group.variantOptionName,
-                values: [...new Set(group.variants.map((v) => v.variant))].map((name) => ({ name })),
-              },
-            ],
+            productOptions: group.optionAxes.map((axis) => ({
+              name: axis.name,
+              values: axis.values.map((name) => ({ name })),
+            })),
           },
         });
         if (created.productCreate.userErrors.length) {
@@ -693,19 +800,21 @@ Deno.serve(async (req) => {
         const existingByKey = new Map<string, typeof existing.variants.nodes[number]>();
         const existingByCombo = new Map<string, typeof existing.variants.nodes[number]>();
         for (const n of existing.variants.nodes) {
-          const k = optionKeyFromSelected(n.selectedOptions, group.variantOptionName);
+          const k = optionKeyFromSelected(n.selectedOptions, group.variantOptionName, group.isConsolidated);
           if (k) existingByKey.set(k, n);
           existingByCombo.set(fullComboFingerprint(n.selectedOptions), n);
         }
-        const desiredKeys = new Set(
-          group.variants.map((v) => `${normalizeOptionValue(v.size)}|${normalizeOptionValue(v.variant)}`),
-        );
+        const desiredKey = (v: PlannedVariant) =>
+          group.isConsolidated && v.productTypeLabel
+            ? `${normalizeOptionValue(v.productTypeLabel)}|${normalizeOptionValue(v.size)}|${normalizeOptionValue(v.variant)}`
+            : `${normalizeOptionValue(v.size)}|${normalizeOptionValue(v.variant)}`;
+        const desiredKeys = new Set(group.variants.map(desiredKey));
 
         const toCreate: VariantInput[] = [];
         const toUpdate: (VariantInput & { id: string })[] = [];
         const skippedDuplicates: string[] = [];
         for (const v of group.variants) {
-          const key = `${normalizeOptionValue(v.size)}|${normalizeOptionValue(v.variant)}`;
+          const key = desiredKey(v);
           const input = buildVariantInput(group, v);
           const ex = existingByKey.get(key);
           if (ex) {
@@ -727,7 +836,7 @@ Deno.serve(async (req) => {
         }
         const toDelete = existing.variants.nodes
           .filter((n) => {
-            const k = optionKeyFromSelected(n.selectedOptions, group.variantOptionName);
+            const k = optionKeyFromSelected(n.selectedOptions, group.variantOptionName, group.isConsolidated);
             return k !== null && !desiredKeys.has(k);
           })
           .map((n) => n.id);
