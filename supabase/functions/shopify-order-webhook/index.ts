@@ -169,6 +169,11 @@ async function processOrder(supabase: any, order: any) {
     const handle = getProp(props, "_product_handle") ?? li.product_handle ?? "";
     const clientPrintFileUrl = getProp(props, "_print_file_url");
     const designSource = getProp(props, "_design_source") ?? "map";
+    // Konsoliderade produkter skickar _product_type explicit. Fallback för
+    // gamla beställningar: utled från handle-suffix.
+    const productType =
+      normalizeProductType(getProp(props, "_product_type"))
+      ?? productTypeFromHandle(handle);
 
     if (!size) continue; // not an editor item
 
@@ -194,6 +199,7 @@ async function processOrder(supabase: any, order: any) {
       size: size!,
       variant,
       orientation,
+      productType,
       dbMap: cfg?.gelato_sku_map ?? null,
     });
 
