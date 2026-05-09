@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { deriveTemplateSlug, getEffectiveSizes, type ProductConfig } from "@/lib/product-config";
+import { deriveTemplateSlug, getEffectiveSizes, type ProductConfig, type ProductType } from "@/lib/product-config";
 import { FrameOption } from "./FrameOption";
 import frameWhite from "@/assets/frames/frame-white.jpg";
 import frameOak from "@/assets/frames/frame-oak.jpg";
@@ -23,7 +23,8 @@ import frameBlack from "@/assets/frames/frame-black.jpg";
 interface Props {
   configs: ProductConfig[];
   activeHandle: string;
-  onProductChange: (handle: string) => void;
+  activeProductType: ProductType;
+  onProductChange: (handle: string, productType: ProductType) => void;
 }
 
 const FRAME_THUMBS: Record<string, string> = {
@@ -72,7 +73,7 @@ const DepthIcon = forwardRef<SVGSVGElement, { depth: string }>(({ depth }, ref) 
 });
 DepthIcon.displayName = "DepthIcon";
 
-export function FormatSection({ configs, activeHandle, onProductChange }: Props) {
+export function FormatSection({ configs, activeHandle, activeProductType, onProductChange }: Props) {
   const { t } = useTranslation();
   const shopCtx = useShopContextStore();
   const { map: priceMap, derivedFx } = useShopifyPriceMap();
@@ -182,7 +183,7 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
     if (k && !kindToConfig.has(k)) kindToConfig.set(k, c);
   }
 
-  const toggleEntries: { kind: Kind; label: string; handle: string; active: boolean }[] = [];
+  const toggleEntries: { kind: Kind; label: string; handle: string; productType: ProductType; active: boolean }[] = [];
   for (const k of ["poster", "canvas", "aluminum", "acrylic"] as Kind[]) {
     const c = kindToConfig.get(k);
     if (!c) continue;
@@ -190,7 +191,8 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
       kind: k,
       label: KIND_LABEL[k],
       handle: c.shopify_handle,
-      active: c.shopify_handle === activeHandle,
+      productType: c.product_type,
+      active: c.product_type === activeProductType,
     });
   }
 
@@ -289,7 +291,7 @@ export function FormatSection({ configs, activeHandle, onProductChange }: Props)
             {toggleEntries.map((e) => (
               <button
                 key={e.kind}
-                onClick={() => onProductChange(e.handle)}
+                onClick={() => onProductChange(e.handle, e.productType)}
                 className={`flex-1 h-10 rounded-full text-sm font-medium transition ${
                   e.active
                     ? "bg-primary text-primary-foreground shadow-sm"
