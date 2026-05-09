@@ -52,6 +52,9 @@ export default function DesignerPage() {
   const [template, setTemplate] = useState<Template | null>(null);
   const [orientation, setOrientation] = useState<Orientation>("portrait");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Designyta-läge: 'standard' = poster/metall/plexi-layout, 'canvas' = canvas-wrap.
+  // Endast meningsfullt för konsoliderade mallar med både canvas och annan typ.
+  const [designMode, setDesignMode] = useState<"standard" | "canvas">("standard");
 
   // Session-only undo stack: snapshots of `template` before each mutation.
   // Cleared on page reload (intentional — user explicitly asked).
