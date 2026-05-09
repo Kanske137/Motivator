@@ -1,41 +1,41 @@
-## Mål
-Lägg till en "Radera mall"-funktion på respektive mallsida (`/admin/designer/:id`) som:
-1. Visar en bekräftelsedialog där användaren måste skriva exakt `RADERA` för att aktivera knappen.
-2. Tar bort produkten i den kopplade Shopify-butiken.
-3. Raderar mallen lokalt (`product_configs` + `shopify_sync_state`).
-4. Skickar tillbaka användaren till admin-listan.
+# 3 justeringar i admin / sync
 
-## Ändringar
+## 1. Falsk varning "saknar Gelato-SKU" på postermallar
 
-**1. Ny edge-funktion `shopify-delete-template`**
-- Tar `{ product_config_id }` i body.
-- Hämtar `shopify_sync_state.shopify_product_id` för mallen.
-- Hämtar shop-domän + Admin-token från `shopify_app_installations` (samma mönster som `shopify-sync-template`).
-- Anropar Shopify Admin GraphQL `productDelete` om ett `shopify_product_id` finns. Saknas det, hoppa Shopify-steget men fortsätt.
-- Behöver ny migration för att tillåta `DELETE` på `product_configs` och `shopify_sync_state` (idag blockerat av RLS) — körs som service role från edge-funktionen så det räcker att lägga till en `DELETE`-policy eller använda service role-klienten direkt (jag väljer service role för att undvika öppen DELETE-policy).
-- Returnerar `{ ok, shopifyDeleted, configDeleted }`.
+I `src/components/admin/ProductOptionsSection.tsx` (rad 157–189) listas alla `size × variant`-kombinationer där `hasGelatoSku()` returnerar false. Hängare finns i Gelato för `21x30`, `30x40`, `40x50`, `50x70`, `70x100` — men inte för `13x18`. Eftersom `getEffectiveSizes()` ändå tar med Hängare-varianter på `13x18` (som "ej tillgänglig"-greyed-out i kundvyn) flaggas de felaktigt här som "saknar SKU".
 
-**2. UI på `src/pages/admin/DesignerPage.tsx`**
-- Ny "Radera mall"-knapp (destructive variant) i header/footer-området bredvid Spara/Publicera.
-- Öppnar `AlertDialog` med:
-  - Tydlig varning på svenska: "Detta raderar mallen och tar bort produkten från Shopify. Det går inte att ångra."
-  - Visar `title` och `shopify_handle` så man ser vad som raderas.
-  - Inputfält där användaren måste skriva `RADERA` (case-sensitive). Bekräfta-knappen är `disabled` tills texten matchar exakt.
-- Vid bekräftelse: anropar nya edge-funktionen, visar `sonner` toast (success/error), navigerar till `/admin` (eller motsvarande mall-listsida) vid lyckad radering.
-- All ny text går via `useTranslation()` + nycklar i `src/i18n/locales/sv.json` och översätts till `en/de/no/da/fi/fr/es/it/nl/pl` enligt projektregeln.
+**Fix:** I `missingSkus`-uträkningen, hoppa över kombinationer som vi medvetet visar som otillgängliga — dvs. poster + variantnamn som matchar `^Hängare/i` på storlekar där Gelato saknar SKU. Dessa är inte ett synk-problem; sync hoppar redan över dem korrekt och kunden ser dem som greyed-out. Banner ska bara visas för faktiska, oväntade luckor (t.ex. om admin lägger till en helt ny storlek).
 
-**3. i18n-nycklar (svenska källa)**
-- `admin.delete.button` "Radera mall"
-- `admin.delete.title` "Radera mall permanent?"
-- `admin.delete.warning` "Detta raderar mallen i Lovable och tar bort produkten från Shopify. Det går inte att ångra."
-- `admin.delete.confirmHint` "Skriv RADERA för att bekräfta"
-- `admin.delete.confirm` "Radera permanent"
-- `admin.delete.cancel` "Avbryt"
-- `admin.delete.success` "Mallen och Shopify-produkten är raderade"
-- `admin.delete.error` "Kunde inte radera mallen"
+## 2. Namnbyte: Aluminium → Metallposter, Akryl → Plexiglas
+
+Interna ID:n (`aluminum`, `acrylic`, filsuffix `-aluminum`/`-acrylic`, Gelato-SKU-nycklar, pricing-tabeller) **behålls oförändrade** — endast visningsnamn ändras.
+
+**Filer:**
+- `src/i18n/locales/sv.json` — `productKind.aluminum` = "Metallposter", `productKind.acrylic` = "Plexiglas"
+- Översätt till alla 10 övriga locales (`en/de/no/da/fi/fr/es/it/nl/pl`):
+  - Metallposter → en: "Metal poster", de: "Metallposter", no/da: "Metallplakat"/"Metalplakat", fi: "Metallijuliste", fr: "Poster métal", es: "Póster metálico", it: "Poster in metallo", nl: "Metalen poster", pl: "Plakat metalowy"
+  - Plexiglas → en: "Plexiglass", de: "Plexiglas", no/da: "Plexiglass"/"Plexiglas", fi: "Pleksilasi", fr: "Plexiglas", es: "Metacrilato", it: "Plexiglas", nl: "Plexiglas", pl: "Pleksi"
+- `src/components/admin/CreateTemplateDialog.tsx` (rad 39–40): byt hårdkodade `label`/`titleSuffix` "Aluminium"/"Akryl" till `t("productKind.aluminum")` / `t("productKind.acrylic")` (titleSuffix = " - " + översatt namn).
+- `src/components/admin/ProductOptionsSection.tsx` (rad 274, 302): byt `<Label>Aluminium</Label>` / `<Label>Akryl</Label>` mot t-nycklar.
+- Kommentarer i koden lämnas (utvecklarspråk).
+
+## 3. Shopify-produktkategori hamnar på fågelmat
+
+`supabase/functions/shopify-sync-template/index.ts` rad 273–278 sätter:
+```
+poster/aluminum/acrylic: gid://shopify/TaxonomyCategory/ap-2-1-3
+canvas:                  gid://shopify/TaxonomyCategory/ap-2-1-1
+```
+Prefixet `ap-` tillhör **Animals & Pet Supplies** i Shopifys Standard Product Taxonomy — därför hamnar produkterna under fågelmat / fågelbursartiklar. Korrekt gren är **Home & Garden > Decor > Artwork**, prefix `ho-`.
+
+**Fix:** Byt `DEFAULT_CATEGORY_GID` till rätt taxonomi-GID:er:
+- Posters → `gid://shopify/TaxonomyCategory/ho-1-2-2-13` ("Posters")
+- Canvas / Metallposter / Plexiglas (alla väggkonst) → `gid://shopify/TaxonomyCategory/ho-1-2-2` ("Artwork") eller specifik underkategori "Decorative Paintings" (`ho-1-2-2-4`).
+
+Innan migrering verifierar jag exakta GID via Shopify-taxonomins offentliga JSON (`https://shopify.github.io/product-taxonomy/`) så vi sätter rätt id för varje kind. Befintliga produkter som redan synkats måste resyncas en gång (admin-knappen "Synka mall" räcker) för att kategorin ska uppdateras.
 
 ## Tekniska detaljer
-- Edge-funktion deployas med default `verify_jwt = false`; i koden valideras inget JWT eftersom admin-sidan idag är öppen (samma säkerhetsmodell som befintlig `shopify-sync-template`).
-- Shopify Admin GraphQL-versionen följer befintlig konvention i `shopify-sync-template`.
-- Tomma cachar (`clearVariantResolverCache`, prislistecache) töms efter lyckad radering så UI inte håller kvar gammal variant.
-- Inga schemändringar krävs om vi använder service role-klient i edge-funktionen för DELETE.
+- Inga DB-migreringar, inga schemaändringar.
+- Edge-funktion uppdateras + auto-deployas.
+- Inga ändringar i Gelato-SKU-mappar eller pricing.
+- Inga UI-strängar utöver i18n; banner-strängen i ProductOptionsSection är redan på svenska och flyttar inte till i18n här (separat städ-jobb).
