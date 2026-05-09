@@ -183,7 +183,7 @@ export function FormatSection({ configs, activeHandle, activeProductType, onProd
     if (k && !kindToConfig.has(k)) kindToConfig.set(k, c);
   }
 
-  const toggleEntries: { kind: Kind; label: string; handle: string; active: boolean }[] = [];
+  const toggleEntries: { kind: Kind; label: string; handle: string; productType: ProductType; active: boolean }[] = [];
   for (const k of ["poster", "canvas", "aluminum", "acrylic"] as Kind[]) {
     const c = kindToConfig.get(k);
     if (!c) continue;
@@ -191,7 +191,8 @@ export function FormatSection({ configs, activeHandle, activeProductType, onProd
       kind: k,
       label: KIND_LABEL[k],
       handle: c.shopify_handle,
-      active: c.shopify_handle === activeHandle,
+      productType: c.product_type,
+      active: c.product_type === activeProductType,
     });
   }
 
