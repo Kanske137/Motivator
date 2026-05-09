@@ -316,6 +316,7 @@ export default function EditorPage() {
             <ControlPanel
               configs={configs}
               activeHandle={config.shopify_handle}
+              activeProductType={config.product_type}
               onProductChange={onProductChange}
             />
           </div>
