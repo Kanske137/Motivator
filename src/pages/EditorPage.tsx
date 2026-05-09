@@ -113,19 +113,19 @@ export default function EditorPage() {
     })();
   }, [handleParam, typeParam, setConfig]);
 
-  const onProductChange = (newHandle: string) => {
-    const next = configs.find((c) => c.shopify_handle === newHandle);
+  const onProductChange = (newHandle: string, newType?: import("@/lib/product-config").ProductType) => {
+    // Konsoliderad mall: alla virtuella configs delar samma handle, så vi
+    // måste matcha även på product_type. Falla tillbaka till äldre beteende
+    // (matcha bara på handle) för icke-konsoliderade mallar.
+    const next = newType
+      ? configs.find((c) => c.shopify_handle === newHandle && c.product_type === newType)
+      : configs.find((c) => c.shopify_handle === newHandle);
     if (!next) return;
-    const nextType: "poster" | "canvas" = next.product_type === "canvas" ? "canvas" : "poster";
-    // Clear the resolved variant immediately — prevents an in-flight resolve
-    // from a previous handle being used in add-to-cart while we switch.
+    const nextTypeParam: string = next.product_type === "posters" ? "poster" : next.product_type;
     setShopifyVariantId(null);
-    // Bevara shop-kontext (locale/currency/country/rate) som temat skickade
-    // i iframe-URL:en — annars försvinner de vid produktbyte och prislogiken
-    // tappar marknadsland.
     const nextParams = new URLSearchParams(window.location.search);
     nextParams.set("handle", newHandle);
-    nextParams.set("type", nextType);
+    nextParams.set("type", nextTypeParam);
     setParams(nextParams, { replace: true });
     setConfig(next);
   };
