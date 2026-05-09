@@ -800,19 +800,21 @@ Deno.serve(async (req) => {
         const existingByKey = new Map<string, typeof existing.variants.nodes[number]>();
         const existingByCombo = new Map<string, typeof existing.variants.nodes[number]>();
         for (const n of existing.variants.nodes) {
-          const k = optionKeyFromSelected(n.selectedOptions, group.variantOptionName);
+          const k = optionKeyFromSelected(n.selectedOptions, group.variantOptionName, group.isConsolidated);
           if (k) existingByKey.set(k, n);
           existingByCombo.set(fullComboFingerprint(n.selectedOptions), n);
         }
-        const desiredKeys = new Set(
-          group.variants.map((v) => `${normalizeOptionValue(v.size)}|${normalizeOptionValue(v.variant)}`),
-        );
+        const desiredKey = (v: PlannedVariant) =>
+          group.isConsolidated && v.productTypeLabel
+            ? `${normalizeOptionValue(v.productTypeLabel)}|${normalizeOptionValue(v.size)}|${normalizeOptionValue(v.variant)}`
+            : `${normalizeOptionValue(v.size)}|${normalizeOptionValue(v.variant)}`;
+        const desiredKeys = new Set(group.variants.map(desiredKey));
 
         const toCreate: VariantInput[] = [];
         const toUpdate: (VariantInput & { id: string })[] = [];
         const skippedDuplicates: string[] = [];
         for (const v of group.variants) {
-          const key = `${normalizeOptionValue(v.size)}|${normalizeOptionValue(v.variant)}`;
+          const key = desiredKey(v);
           const input = buildVariantInput(group, v);
           const ex = existingByKey.get(key);
           if (ex) {
@@ -834,7 +836,7 @@ Deno.serve(async (req) => {
         }
         const toDelete = existing.variants.nodes
           .filter((n) => {
-            const k = optionKeyFromSelected(n.selectedOptions, group.variantOptionName);
+            const k = optionKeyFromSelected(n.selectedOptions, group.variantOptionName, group.isConsolidated);
             return k !== null && !desiredKeys.has(k);
           })
           .map((n) => n.id);
