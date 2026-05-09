@@ -256,7 +256,7 @@ export default function EditorPage() {
     // (race when user clicks before the effect resolves).
     let variantGid = shopifyVariantId;
     if (!variantGid) {
-      variantGid = await resolveShopifyVariantId(config.shopify_handle, size, variant);
+      variantGid = await resolveShopifyVariantId(config.shopify_handle, size, variant, config.product_type);
       if (variantGid) setShopifyVariantId(variantGid);
     }
     if (!variantGid) {
