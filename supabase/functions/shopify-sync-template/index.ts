@@ -691,16 +691,10 @@ Deno.serve(async (req) => {
             descriptionHtml,
             category: categoryGid,
             seo: { title: seoTitle, description: seoDescription },
-            productOptions: [
-              {
-                name: "Storlek",
-                values: [...new Set(group.variants.map((v) => v.size))].map((name) => ({ name })),
-              },
-              {
-                name: group.variantOptionName,
-                values: [...new Set(group.variants.map((v) => v.variant))].map((name) => ({ name })),
-              },
-            ],
+            productOptions: group.optionAxes.map((axis) => ({
+              name: axis.name,
+              values: axis.values.map((name) => ({ name })),
+            })),
           },
         });
         if (created.productCreate.userErrors.length) {
