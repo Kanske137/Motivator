@@ -1,42 +1,47 @@
-## Roten till problemet
+## Två buggar bakom symptomen
 
-`expandConsolidatedConfig` skapar 4 virtuella `ProductConfig` med **samma** `shopify_handle` (skillnaden är bara `product_type`). Format-togglen i `src/components/editor/FormatSection.tsx` använder dock `shopify_handle` som diskriminator:
+### 1. `normalizeType` känner inte igen `aluminum`/`acrylic`
 
 ```ts
-active: c.shopify_handle === activeHandle   // sant för ALLA fyra
-onClick={() => onProductChange(e.handle)}   // skickar samma handle → noop
+function normalizeType(raw) {
+  if (v === "poster" || v === "posters") return "posters";
+  if (v === "canvas") return "canvas";
+  return undefined;   // ← aluminum/acrylic faller hit
+}
 ```
 
-Resultat: alla fyra knappar markeras aktiva och ingen växling sker.
+När du klickar Metallposter sätts `?type=aluminum`, men `typeParam` blir `undefined`. `resolveConfigForHandle` saknar då preferens och returnerar default (poster-varianten först → "förblir på posterdelen").
+
+### 2. `useEffect` kör om hela laddningen vid varje typbyte
+
+```ts
+useEffect(() => {
+  setLoading(true);
+  const all = await loadAllConfigs();   // onödig DB-fetch
+  setConfigs(all);
+  ...
+}, [handleParam, typeParam, setConfig]);
+```
+
+`onProductChange` uppdaterar `?type=` → effekten triggar → `setLoading(true)` → spinner + omladdning av alla configs från Supabase. Det är därför editorn "laddas om" varje typbyte. Konfigerna finns redan i state — det räcker att resolva på plats.
 
 ## Fix
 
-Diskriminera på `product_type` istället för `handle`. Hela editor-flödet redan vet om typen via `config.product_type` och URL-parametern `?type=`.
+### `src/pages/EditorPage.tsx`
 
-### Filer
+**A.** Utöka `normalizeType` till att returnera `"aluminum"` och `"acrylic"`.
 
-**`src/components/editor/FormatSection.tsx`**
-- Ny prop: `activeProductType: ProductType` (ersätter `activeHandle` för aktiv-markering).
-- Ny prop: `onProductChange: (handle: string, productType: ProductType) => void`.
-- Bygg `toggleEntries` med `productType` som nyckel; sätt `active: c.product_type === activeProductType`.
-- Skicka `(c.shopify_handle, c.product_type)` i onClick.
+**B.** Dela upp ladd-effekten i två:
+- En första-laddning (kör bara när `configs.length === 0`) som hämtar alla configs en gång och sätter initial `config`.
+- En lättviktig effekt som lyssnar på `[handleParam, typeParam, configs]` och anropar `setConfig(resolveConfigForHandle(configs, handleParam, typeParam))` — utan `setLoading(true)`, utan ny DB-fetch.
 
-**`src/components/editor/ControlPanel.tsx`**
-- Vidarebefordra de nya prop-typerna oförändrat.
-
-**`src/pages/EditorPage.tsx`**
-- `onProductChange(newHandle, newType)` ska:
-  - Hitta nästa virtuella config: `configs.find(c => c.shopify_handle === newHandle && c.product_type === newType)`.
-  - Sätta URL-param `type=<newType>` (mappa `posters→poster`, `aluminum→aluminum`, `acrylic→acrylic`, `canvas→canvas` enligt befintlig konvention för `?type=`).
-  - `setConfig(next)` så `EditorStore.product_type` byts → variant/storlek/layout-källor reagerar som idag.
-- Skicka `activeProductType={config.product_type}` till `<ControlPanel>`.
+Då blir typbyte instant: URL uppdateras, ny config sätts från befintlig state-array, FormatSection re-renderar med rätt `activeProductType` direkt.
 
 ### Vad som inte ändras
-- `expandConsolidatedConfig` och `loadAllConfigs` — fortsätter ge 4 virtuella configs (krävs för att FormatSection ska kunna lista alla typer).
-- `resolveShopifyVariantId` — tar redan `productType` som tredje axel.
-- Add-to-cart, sizes, variants, prismotor — oförändrade.
+- `onProductChange`-signatur, FormatSection-toggle, variantresolver — allt fortsätter fungera.
+- Initial laddning + spinner-beteende vid första sidladdning.
 
 ### Verifiering
-1. Öppna `/editor?handle=skapa-fordonsposter` → endast en typ markerad.
-2. Klick på "Canvas" → URL får `?type=canvas`, layout/varianter byter, endast Canvas markerad.
-3. Lägg i varukorg → rätt Shopify-variant matchar (Produkttyp + Storlek + Utförande).
+1. Öppna editorn på Poster → klick Metallposter: ingen spinner, byte sker direkt, Metallposter blir aktiv knapp.
+2. Klick tillbaka till Poster: ingen omladdning.
+3. Hard reload med `?handle=...&type=acrylic`: laddar Plexiglas direkt.

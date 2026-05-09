@@ -41,6 +41,8 @@ function normalizeType(raw: string | null): ProductType | undefined {
   const v = raw.toLowerCase();
   if (v === "poster" || v === "posters") return "posters";
   if (v === "canvas") return "canvas";
+  if (v === "aluminum" || v === "metallic") return "aluminum";
+  if (v === "acrylic" || v === "akryl") return "acrylic";
   return undefined;
 }
 
@@ -98,20 +100,23 @@ export default function EditorPage() {
     };
   }, [config, size, variant, setShopifyVariantId, setShopifyVariantResolving]);
 
+  // Initial laddning: hämta alla configs en gång.
   useEffect(() => {
     (async () => {
       setLoading(true);
       const all = await loadAllConfigs();
       setConfigs(all);
-      // Resolve via handle OR template_slug, with optional ?type= preference.
-      // This makes both legacy direct-handle links AND new "open template"
-      // links work, including links from Shopify product pages where the
-      // handle has a -poster/-canvas suffix.
-      const active = resolveConfigForHandle(all, handleParam, typeParam) ?? all[0];
-      if (active) setConfig(active);
       setLoading(false);
     })();
-  }, [handleParam, typeParam, setConfig]);
+  }, []);
+
+  // Resolva aktiv config från redan laddade configs när URL-params ändras.
+  // Detta undviker omladdning/spinner vid produkttyp-byte i konsoliderade mallar.
+  useEffect(() => {
+    if (configs.length === 0) return;
+    const active = resolveConfigForHandle(configs, handleParam, typeParam) ?? configs[0];
+    if (active) setConfig(active);
+  }, [configs, handleParam, typeParam, setConfig]);
 
   const onProductChange = (newHandle: string, newType?: import("@/lib/product-config").ProductType) => {
     // Konsoliderad mall: alla virtuella configs delar samma handle, så vi
