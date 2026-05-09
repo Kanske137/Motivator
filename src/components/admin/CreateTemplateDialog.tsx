@@ -146,7 +146,7 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
       kind,
       handle: `${templateSlug}${KIND_META[kind].suffix}`,
       productType: KIND_META[kind].productType,
-      titleSuffix: onlyOne ? "" : KIND_META[kind].titleSuffix,
+      titleSuffix: onlyOne ? "" : ` - ${t(KIND_META[kind].i18nKey)}`,
     }));
 
     const baseTextConfig = {
