@@ -95,8 +95,9 @@ function normalize(s: string) {
     // Strip diacritics so "valnöt" matches "valnot", "hängare" matches "hangare".
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    // Drop common variant-name prefixes the merchant might add in Shopify.
-    .replace(/^h(a|ä)ngare\s+(i\s+)?/i, "")
+    // Drop common ram-prefix the merchant might add in Shopify, but NEVER
+    // strip "Hängare" — hängar-varianterna har egna priser i Shopify och måste
+    // matchas distinkt från ram-varianterna med samma färg (Ek/Valnöt/...).
     .replace(/^ram\s+(i\s+)?/i, "")
     .replace(/^ramad\s+/i, "")
     // Unify "x", "X" and the real multiplication sign "×" so size strings match.
