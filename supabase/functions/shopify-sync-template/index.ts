@@ -374,12 +374,15 @@ function buildVariantInput(
   group: PlannedGroup,
   v: PlannedVariant,
 ): VariantInput {
+  const optionValues: { optionName: string; name: string }[] = [];
+  if (group.isConsolidated && v.productTypeLabel) {
+    optionValues.push({ optionName: "Produkttyp", name: v.productTypeLabel });
+  }
+  optionValues.push({ optionName: "Storlek", name: v.size });
+  optionValues.push({ optionName: group.variantOptionName, name: v.variant });
   // Shopify Admin API 2025-07: sku/barcode/tracked all live inside inventoryItem.
   return {
-    optionValues: [
-      { optionName: "Storlek", name: v.size },
-      { optionName: group.variantOptionName, name: v.variant },
-    ],
+    optionValues,
     price: v.price.toFixed(2),
     inventoryItem: {
       sku: v.sku,
