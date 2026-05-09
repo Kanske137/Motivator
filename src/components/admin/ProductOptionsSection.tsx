@@ -277,7 +277,7 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
         {config.product_type === "aluminum" && (
           <div className="space-y-3 rounded-md border p-4">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">Aluminium</Label>
+              <Label className="text-sm font-medium">{t("productKind.aluminum")}</Label>
               <Switch
                 checked={value.aluminum?.enabled ?? false}
                 onCheckedChange={(c) => toggleEnabled("aluminum", c)}
