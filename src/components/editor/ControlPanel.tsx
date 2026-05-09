@@ -234,7 +234,7 @@ export function ControlPanel({ configs, activeHandle, activeProductType, onProdu
           {t("section.format")}
         </AccordionTrigger>
         <AccordionContent className="pt-1 pb-4">
-          <FormatSection configs={configs} activeHandle={activeHandle} onProductChange={onProductChange} />
+          <FormatSection configs={configs} activeHandle={activeHandle} activeProductType={activeProductType} onProductChange={onProductChange} />
         </AccordionContent>
       </AccordionItem>
     </Accordion>
