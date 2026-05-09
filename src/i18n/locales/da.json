@@ -50,8 +50,8 @@
   "productKind": {
     "poster": "Plakat",
     "canvas": "Lærred",
-    "aluminum": "Aluminium",
-    "acrylic": "Akryl"
+    "aluminum": "Metalplakat",
+    "acrylic": "Plexiglas"
   },
   "frame": {
     "none": "Ingen",

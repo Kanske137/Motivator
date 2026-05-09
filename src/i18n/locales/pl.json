@@ -50,8 +50,8 @@
   "productKind": {
     "poster": "Plakat",
     "canvas": "Płótno",
-    "aluminum": "Aluminium",
-    "acrylic": "Akryl"
+    "aluminum": "Plakat metalowy",
+    "acrylic": "Pleksi"
   },
   "frame": {
     "none": "Brak",

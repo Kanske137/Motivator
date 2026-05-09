@@ -50,8 +50,8 @@
   "productKind": {
     "poster": "Póster",
     "canvas": "Lienzo",
-    "aluminum": "Aluminio",
-    "acrylic": "Acrílico"
+    "aluminum": "Póster metálico",
+    "acrylic": "Metacrilato"
   },
   "frame": {
     "none": "Ninguno",
