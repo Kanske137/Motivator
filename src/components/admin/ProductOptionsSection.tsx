@@ -7,6 +7,7 @@
 // This way the admin can enable e.g. canvas on a poster-only legacy config and
 // still see canvas-shaped sizes/depths instead of poster frames.
 import { useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Info, Plus, Trash2, Upload, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
