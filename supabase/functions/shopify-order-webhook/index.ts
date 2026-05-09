@@ -18,7 +18,19 @@ const GELATO_SKU_MAP = GELATO_SKU_MAP_JSON as Record<
   Record<string, { portrait: string; landscape: string }>
 >;
 
-function productTypeFromHandle(handle: string): "posters" | "canvas" | "aluminum" | "acrylic" | null {
+type ProductType = "posters" | "canvas" | "aluminum" | "acrylic";
+
+function normalizeProductType(raw: string | null | undefined): ProductType | null {
+  if (!raw) return null;
+  const v = raw.toLowerCase().trim();
+  if (v === "poster" || v === "posters") return "posters";
+  if (v === "canvas") return "canvas";
+  if (v === "aluminum" || v === "aluminium" || v === "metallic" || v === "metallposter") return "aluminum";
+  if (v === "acrylic" || v === "akryl" || v === "plexiglas") return "acrylic";
+  return null;
+}
+
+function productTypeFromHandle(handle: string): ProductType | null {
   const h = (handle || "").toLowerCase();
   if (h.endsWith("-acrylic") || h.includes("acrylic") || h.includes("akryl")) return "acrylic";
   if (h.endsWith("-aluminum") || h.includes("aluminum") || h.includes("aluminium") || h.includes("metallic")) return "aluminum";
