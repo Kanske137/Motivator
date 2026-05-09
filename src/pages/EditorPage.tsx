@@ -85,7 +85,7 @@ export default function EditorPage() {
     }
     let cancelled = false;
     setShopifyVariantResolving(true);
-    resolveShopifyVariantId(config.shopify_handle, size, variant)
+    resolveShopifyVariantId(config.shopify_handle, size, variant, config.product_type)
       .then((id) => {
         if (cancelled) return;
         setShopifyVariantId(id);
