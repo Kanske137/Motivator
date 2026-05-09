@@ -463,12 +463,16 @@ async function syncProductOptions(
   },
   group: PlannedGroup,
 ) {
-  const desiredByOption: Record<string, string[]> = {
-    Storlek: [...new Set(group.variants.map((v) => v.size))],
-    [group.variantOptionName]: [
-      ...new Set(group.variants.map((v) => v.variant)),
-    ],
-  };
+  const desiredByOption: Record<string, string[]> = {};
+  for (const axis of group.optionAxes) {
+    if (axis.name === "Storlek") {
+      desiredByOption["Storlek"] = [...new Set(group.variants.map((v) => v.size))];
+    } else if (axis.name === "Produkttyp") {
+      desiredByOption["Produkttyp"] = [...new Set(group.variants.map((v) => v.productTypeLabel ?? "").filter(Boolean))];
+    } else {
+      desiredByOption[axis.name] = [...new Set(group.variants.map((v) => v.variant))];
+    }
+  }
 
   for (const optionName of Object.keys(desiredByOption)) {
     const existingOpt = existing.options.find((o) => o.name === optionName);
