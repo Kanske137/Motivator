@@ -50,16 +50,23 @@ function resolveProductUid(args: {
   size: string;
   variant?: string | null;
   orientation: "portrait" | "landscape";
+  productType?: ProductType | null;
   dbMap?: Record<string, Record<string, string>> | null;
 }): ResolveResult {
-  const { handle, size, variant, orientation, dbMap } = args;
+  const { handle, size, variant, orientation, productType, dbMap } = args;
 
-  // 1) DB-mapping (per-handle override)
-  if (variant && dbMap?.[size]?.[variant]) {
-    return { productUid: dbMap[size][variant], source: "db", detail: `${size}|${variant}` };
+  // 1) DB-mapping (per-handle override). Konsoliderade mallar har nycklar som
+  //    "<type>|<size>|<variant>" — prova den först, annars legacy "size|variant".
+  if (variant && dbMap) {
+    if (productType && dbMap[`${productType}|${size}`]?.[variant]) {
+      return { productUid: dbMap[`${productType}|${size}`][variant], source: "db", detail: `${productType}|${size}|${variant}` };
+    }
+    if (dbMap[size]?.[variant]) {
+      return { productUid: dbMap[size][variant], source: "db", detail: `${size}|${variant}` };
+    }
   }
 
-  const ptype = productTypeFromHandle(handle);
+  const ptype = productType ?? productTypeFromHandle(handle);
   if (!ptype) {
     return { productUid: null, source: "missing", detail: `unknown product type for handle="${handle}"` };
   }
