@@ -101,14 +101,39 @@ interface PlannedVariant {
   variant: string;
   sku: string;
   price: number;
+  /** Konsoliderad: visar Produkttyp-värdet ("Poster", "Canvas", ...). */
+  productTypeLabel?: string;
+}
+
+interface OptionAxis {
+  name: string;
+  values: string[];
 }
 
 interface PlannedGroup {
-  kind: Kind;
+  kind: Kind | "multi";
   productType: string;
-  variantOptionName: string; // "Ram" / "Djup" / "Material" / "Finish"
+  variantOptionName: string; // "Ram" / "Djup" / "Material" / "Finish" / "Utförande"
+  /** Alla axlar i ordning (2 för legacy, 3 för konsoliderad). */
+  optionAxes: OptionAxis[];
+  /** True = konsoliderad multi-typ-produkt med Produkttyp-axel. */
+  isConsolidated?: boolean;
   variants: PlannedVariant[];
   skipped: { size: string; variant: string; reason: string }[];
+}
+
+const CANONICAL_POSTER_FRAMES = [
+  "Ingen", "Vit", "Svart", "Ek", "Valnöt",
+  "Hängare Vit", "Hängare Svart", "Hängare Ek", "Hängare Valnöt",
+];
+
+function mergedPosterFrames(saved: string[] | undefined): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const f of [...(saved ?? []), ...CANONICAL_POSTER_FRAMES]) {
+    if (!seen.has(f)) { seen.add(f); out.push(f); }
+  }
+  return out;
 }
 
 function plan(template: any): PlannedGroup[] {
@@ -122,7 +147,17 @@ function plan(template: any): PlannedGroup[] {
     sizes: string[],
     variants: string[],
   ): PlannedGroup => {
-    const g: PlannedGroup = { kind, productType, variantOptionName, variants: [], skipped: [] };
+    const g: PlannedGroup = {
+      kind,
+      productType,
+      variantOptionName,
+      optionAxes: [
+        { name: "Storlek", values: sizes },
+        { name: variantOptionName, values: variants },
+      ],
+      variants: [],
+      skipped: [],
+    };
     for (const size of sizes) {
       for (const v of variants) {
         const sku = getUid(kind, size, v);
@@ -138,20 +173,9 @@ function plan(template: any): PlannedGroup[] {
   if (opts.poster?.enabled) {
     // Kanonisk ram-lista: säkerställer att alla hängar-värden alltid syncas
     // till Shopify, även för äldre mallar som sparades innan hängarna lades
-    // till i defaults. plan() hoppar ändå över storlek/variant utan SKU/pris,
-    // så 13×18-hängare (saknar Gelato-SKU) filtreras bort automatiskt.
-    const CANONICAL_POSTER_FRAMES = [
-      "Ingen", "Vit", "Svart", "Ek", "Valnöt",
-      "Hängare Vit", "Hängare Svart", "Hängare Ek", "Hängare Valnöt",
-    ];
-    const savedFrames = opts.poster.allowedFrames ?? [];
-    const seen = new Set<string>();
-    const mergedFrames: string[] = [];
-    for (const f of [...savedFrames, ...CANONICAL_POSTER_FRAMES]) {
-      if (!seen.has(f)) { seen.add(f); mergedFrames.push(f); }
-    }
+    // till i defaults. plan() hoppar ändå över storlek/variant utan SKU/pris.
     groups.push(buildGroup("poster", "Poster", "Ram",
-      opts.poster.allowedSizes ?? [], mergedFrames));
+      opts.poster.allowedSizes ?? [], mergedPosterFrames(opts.poster.allowedFrames)));
   }
   if (opts.canvas?.enabled) {
     groups.push(buildGroup("canvas", "Canvas", "Djup",
@@ -166,6 +190,73 @@ function plan(template: any): PlannedGroup[] {
       opts.acrylic.allowedSizes ?? [], opts.acrylic.allowedFinishes ?? []));
   }
   return groups;
+}
+
+const PRODUCT_TYPE_LABELS: Record<Kind, string> = {
+  poster: "Poster",
+  canvas: "Canvas",
+  aluminum: "Metallposter",
+  acrylic: "Plexiglas",
+};
+
+const PRODUCT_TYPE_FROM_INTERNAL: Record<string, Kind> = {
+  posters: "poster",
+  poster: "poster",
+  canvas: "canvas",
+  aluminum: "aluminum",
+  acrylic: "acrylic",
+};
+
+/** Konsoliderad: bygg EN PlannedGroup med 3 axlar (Produkttyp/Storlek/Utförande). */
+function planConsolidated(template: any, enabledTypes: string[]): PlannedGroup {
+  const opts = template?.productOptions ?? {};
+  const variants: PlannedVariant[] = [];
+  const skipped: PlannedGroup["skipped"] = [];
+  const productTypeValues: string[] = [];
+  const sizesUnion = new Set<string>();
+  const variantsUnion = new Set<string>();
+
+  const planFor = (kind: Kind): { sizes: string[]; names: string[] } | null => {
+    if (kind === "poster" && opts.poster?.enabled) return { sizes: opts.poster.allowedSizes ?? [], names: mergedPosterFrames(opts.poster.allowedFrames) };
+    if (kind === "canvas" && opts.canvas?.enabled) return { sizes: opts.canvas.allowedSizes ?? [], names: opts.canvas.allowedDepths ?? [] };
+    if (kind === "aluminum" && opts.aluminum?.enabled) return { sizes: opts.aluminum.allowedSizes ?? [], names: opts.aluminum.allowedMaterials ?? [] };
+    if (kind === "acrylic" && opts.acrylic?.enabled) return { sizes: opts.acrylic.allowedSizes ?? [], names: opts.acrylic.allowedFinishes ?? [] };
+    return null;
+  };
+
+  for (const t of enabledTypes) {
+    const kind = PRODUCT_TYPE_FROM_INTERNAL[t];
+    if (!kind) continue;
+    const block = planFor(kind);
+    if (!block) continue;
+    const label = PRODUCT_TYPE_LABELS[kind];
+    if (!productTypeValues.includes(label)) productTypeValues.push(label);
+    for (const size of block.sizes) {
+      sizesUnion.add(size);
+      for (const v of block.names) {
+        const sku = getUid(kind, size, v);
+        const price = getPrice(kind, size, v);
+        if (!sku) { skipped.push({ size: `${label}/${size}`, variant: v, reason: "no Gelato SKU" }); continue; }
+        if (!price) { skipped.push({ size: `${label}/${size}`, variant: v, reason: "no price" }); continue; }
+        variantsUnion.add(v);
+        variants.push({ size, variant: v, sku, price, productTypeLabel: label });
+      }
+    }
+  }
+
+  return {
+    kind: "multi",
+    productType: "Personlig poster",
+    variantOptionName: "Utförande",
+    optionAxes: [
+      { name: "Produkttyp", values: productTypeValues },
+      { name: "Storlek", values: [...sizesUnion] },
+      { name: "Utförande", values: [...variantsUnion] },
+    ],
+    isConsolidated: true,
+    variants,
+    skipped,
+  };
 }
 
 const GET_PRODUCT_BY_HANDLE = `
