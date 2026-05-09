@@ -47,6 +47,7 @@ interface Props {
 type Kind = "poster" | "canvas" | "aluminum" | "acrylic";
 
 export default function ProductOptionsSection({ config, value, onChange }: Props) {
+  const { t } = useTranslation();
   // Variant names from config (used so Gelato-mapped variants always appear)
   const configVariantNames = useMemo(
     () => Array.from(new Set(config.sizes.flatMap((s) => s.variants.map((v) => v.name)))),
