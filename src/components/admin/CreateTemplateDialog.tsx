@@ -234,7 +234,7 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
           <div className="space-y-2">
             <Label>Produkttyper</Label>
             <p className="text-xs text-muted-foreground">
-              En separat Shopify-produkt skapas per vald typ. Alla delar samma mall (bilder, kartor, text).
+              En Shopify-produkt skapas där produkttyperna blir varianter (Produkttyp/Storlek/Utförande).
             </p>
             <div className="grid grid-cols-2 gap-2">
               {(Object.keys(KIND_META) as Kind[]).map((k) => (
