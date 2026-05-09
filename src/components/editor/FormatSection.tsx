@@ -73,7 +73,7 @@ const DepthIcon = forwardRef<SVGSVGElement, { depth: string }>(({ depth }, ref) 
 });
 DepthIcon.displayName = "DepthIcon";
 
-export function FormatSection({ configs, activeHandle, onProductChange }: Props) {
+export function FormatSection({ configs, activeHandle, activeProductType, onProductChange }: Props) {
   const { t } = useTranslation();
   const shopCtx = useShopContextStore();
   const { map: priceMap, derivedFx } = useShopifyPriceMap();
