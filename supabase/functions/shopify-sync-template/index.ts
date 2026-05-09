@@ -559,7 +559,7 @@ Deno.serve(async (req) => {
     const { data: cfg, error } = await supabase
       .from("product_configs")
       .select(
-        "id,title,shopify_handle,template_slug,template,tags,category_gid,status,sales_channels,description_html,seo_title,seo_description",
+        "id,title,shopify_handle,template_slug,template,tags,category_gid,status,sales_channels,description_html,seo_title,seo_description,is_consolidated,enabled_product_types",
       )
       .eq("shopify_handle", body.handle)
       .maybeSingle();
@@ -575,7 +575,11 @@ Deno.serve(async (req) => {
       (cfg as { template_slug?: string }).template_slug ??
       cfg.shopify_handle.replace(/-(poster|posters|canvas|aluminum|acrylic)$/i, "");
 
-    const groups = plan(cfg.template);
+    const isConsolidated = !!(cfg as { is_consolidated?: boolean }).is_consolidated;
+    const enabledTypes = ((cfg as { enabled_product_types?: string[] }).enabled_product_types ?? []);
+    const groups: PlannedGroup[] = isConsolidated
+      ? [planConsolidated(cfg.template, enabledTypes)]
+      : plan(cfg.template);
     const totalVariants = groups.reduce((n, g) => n + g.variants.length, 0);
     const allSkipped = groups.flatMap((g) =>
       g.skipped.map((s) => ({ kind: g.kind, ...s })),
