@@ -296,6 +296,41 @@ function hydrateLayerValues(
   return out;
 }
 
+/**
+ * Build a mapping from previous layer IDs to next layer IDs by pairing layers
+ * of the same `type` index-by-index within each orientation. Used when the
+ * active layout block changes (poster ↔ canvas) so per-layer state survives.
+ */
+function buildLayerIdMap(
+  prevTemplate: Template | null,
+  prevProductType: string | null | undefined,
+  nextTemplate: Template,
+  nextProductType: string | null | undefined,
+): Record<string, string> {
+  const map: Record<string, string> = {};
+  if (!prevTemplate) return map;
+  const prevBlock = getActiveLayoutBlock(prevTemplate, prevProductType);
+  const nextBlock = getActiveLayoutBlock(nextTemplate, nextProductType);
+  for (const orientation of ["portrait", "landscape"] as const) {
+    const prevLayers = prevBlock[orientation]?.layers ?? [];
+    const nextLayers = nextBlock[orientation]?.layers ?? [];
+    const grouped: Record<string, TemplateLayer[]> = {};
+    for (const l of nextLayers) {
+      (grouped[l.type] ||= []).push(l);
+    }
+    const cursors: Record<string, number> = {};
+    for (const prev of prevLayers) {
+      const idx = cursors[prev.type] ?? 0;
+      const next = grouped[prev.type]?.[idx];
+      if (next && prev.id !== next.id) {
+        map[prev.id] = next.id;
+      }
+      cursors[prev.type] = idx + 1;
+    }
+  }
+  return map;
+}
+
 /** Recompute legacy "first map / first text" mirrors from layerValues. */
 function mirrorLegacy(
   state: Pick<EditorState, "template" | "orientation" | "layerValues" | "config">,
