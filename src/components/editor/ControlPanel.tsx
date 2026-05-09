@@ -17,7 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useEditorStore, type MapLayerValue, type TextLayerValue, type PhotoLayerValue, type PhotoShape } from "@/stores/editorStore";
 import { FONT_FAMILIES } from "@/lib/font-catalog";
 import { geocode, type GeocodeResult } from "@/lib/mapbox";
-import { type ProductConfig } from "@/lib/product-config";
+import { type ProductConfig, type ProductType } from "@/lib/product-config";
 import { getEnabledMapStyleIds, mapStyleLabel, mapStylePreviewBg } from "@/lib/map-style-catalog";
 import { FormatSection } from "./FormatSection";
 import { PhotoUploadSection } from "./PhotoUploadSection";
