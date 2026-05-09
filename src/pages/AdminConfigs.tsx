@@ -38,7 +38,7 @@ export default function AdminConfigs() {
 
   useEffect(() => {
     (async () => {
-      const all = await loadAllConfigs();
+      const all = await loadAllConfigsRaw();
       const enriched = all.map((c) => {
         const raw = (c as unknown as { template?: unknown }).template;
         const { template } = resolveTemplate(c, raw);
