@@ -41,6 +41,8 @@ function normalizeType(raw: string | null): ProductType | undefined {
   const v = raw.toLowerCase();
   if (v === "poster" || v === "posters") return "posters";
   if (v === "canvas") return "canvas";
+  if (v === "aluminum" || v === "metallic") return "aluminum";
+  if (v === "acrylic" || v === "akryl") return "acrylic";
   return undefined;
 }
 
