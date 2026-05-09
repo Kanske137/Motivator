@@ -52,27 +52,30 @@ function slugify(s: string): string {
     .replace(/-+/gu, "-");
 }
 
-function buildSeedTemplate(kind: Kind): Template {
+function buildSeedTemplate(kinds: Kind[]): Template {
   const productOptions: Template["productOptions"] = {};
-  if (kind === "poster") {
+  if (kinds.includes("poster")) {
     productOptions.poster = {
       enabled: true,
       allowedSizes: [...DEFAULT_PRODUCT_VARIANTS.poster.sizes],
       allowedFrames: [...DEFAULT_PRODUCT_VARIANTS.poster.frames],
     };
-  } else if (kind === "canvas") {
+  }
+  if (kinds.includes("canvas")) {
     productOptions.canvas = {
       enabled: true,
       allowedSizes: [...DEFAULT_PRODUCT_VARIANTS.canvas.sizes],
       allowedDepths: [...DEFAULT_PRODUCT_VARIANTS.canvas.depths],
     };
-  } else if (kind === "aluminum") {
+  }
+  if (kinds.includes("aluminum")) {
     productOptions.aluminum = {
       enabled: true,
       allowedSizes: [...DEFAULT_PRODUCT_VARIANTS.aluminum.sizes],
       allowedMaterials: [...DEFAULT_PRODUCT_VARIANTS.aluminum.materials],
     };
-  } else {
+  }
+  if (kinds.includes("acrylic")) {
     productOptions.acrylic = {
       enabled: true,
       allowedSizes: [...DEFAULT_PRODUCT_VARIANTS.acrylic.sizes],
@@ -136,19 +139,13 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
     }
     setSaving(true);
 
-    // template_slug groups variants under one template.
+    // Konsoliderad mall: en rad i product_configs, en produkt i Shopify.
+    // Handle = template_slug = ren slug utan -poster/-canvas-suffix.
     const trimmedHandle = handle.trim();
     const templateSlug = trimmedHandle.replace(/-(poster|posters|canvas|aluminum|acrylic)$/i, "");
-    const onlyOne = kinds.length === 1;
+    const enabledProductTypes = kinds.map((k) => KIND_META[k].productType);
 
-    type Row = { kind: Kind; handle: string; productType: ProductType; titleSuffix: string };
-    const rows: Row[] = kinds.map((kind) => ({
-      kind,
-      handle: `${templateSlug}${KIND_META[kind].suffix}`,
-      productType: KIND_META[kind].productType,
-      titleSuffix: onlyOne ? "" : ` - ${t(KIND_META[kind].i18nKey)}`,
-    }));
-
+    const tpl = buildSeedTemplate(kinds);
     const baseTextConfig = {
       fonts: ["Inter", "Playfair Display"],
       maxChars: 24,
@@ -156,54 +153,46 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
     } as unknown as never;
     const baseStyles = ["light-v11", "dark-v11", "outdoors-v12", "satellite-v9"] as unknown as never;
 
-    for (const r of rows) {
-      const tpl = buildSeedTemplate(r.kind);
-      const { error } = await supabase.from("product_configs").insert({
-        title: title.trim() + r.titleSuffix,
-        shopify_handle: r.handle,
-        template_slug: templateSlug,
-        product_type: r.productType,
-        template: tpl as unknown as never,
-        layouts: {} as unknown as never,
-        map_styles: baseStyles,
-        text_config: baseTextConfig,
-        sizes: [] as unknown as never,
-        gelato_sku_map: {} as unknown as never,
-      });
-      if (error) {
-        setSaving(false);
-        toast.error("Kunde inte skapa", { description: error.message });
-        return;
-      }
+    const { error } = await supabase.from("product_configs").insert({
+      title: title.trim(),
+      shopify_handle: templateSlug,
+      template_slug: templateSlug,
+      product_type: "multi" as unknown as never,
+      is_consolidated: true,
+      enabled_product_types: enabledProductTypes as unknown as never,
+      template: tpl as unknown as never,
+      layouts: {} as unknown as never,
+      map_styles: baseStyles,
+      text_config: baseTextConfig,
+      sizes: [] as unknown as never,
+      gelato_sku_map: {} as unknown as never,
+    });
+    if (error) {
+      setSaving(false);
+      toast.error("Kunde inte skapa", { description: error.message });
+      return;
     }
 
-    // Sync each new row to Shopify (best-effort).
-    let syncFailures = 0;
-    for (const r of rows) {
-      const { data: syncData, error: syncErr } = await supabase.functions.invoke(
-        "shopify-sync-template",
-        { body: { handle: r.handle } },
-      );
-      if (syncErr || !syncData?.ok) syncFailures += 1;
-    }
+    // Synka till Shopify (best-effort).
+    const { data: syncData, error: syncErr } = await supabase.functions.invoke(
+      "shopify-sync-template",
+      { body: { handle: templateSlug } },
+    );
     setSaving(false);
-    if (syncFailures > 0) {
-      toast.warning(
-        `Mall(ar) skapade — Shopify-synk misslyckades för ${syncFailures}/${rows.length}`,
-        { description: "Återanslut Shopify-integrationen i Lovable och kör Synka igen." },
-      );
+    if (syncErr || !syncData?.ok) {
+      toast.warning("Mall skapad — Shopify-synk misslyckades", {
+        description:
+          syncErr?.message ??
+          syncData?.error ??
+          "Återanslut Shopify-integrationen i Lovable och kör Synka igen.",
+      });
     } else {
       toast.success("Mall skapad och synkad till Shopify", {
-        description: `${rows.length} produkt(er) uppdaterade`,
+        description: `${kinds.length} produkttyp(er) som varianter`,
       });
     }
     onOpenChange(false);
-    // Open poster row first, else canvas, else first row.
-    const openHandle =
-      rows.find((r) => r.kind === "poster")?.handle ??
-      rows.find((r) => r.kind === "canvas")?.handle ??
-      rows[0].handle;
-    navigate(`/admin/designer/${openHandle}`);
+    navigate(`/admin/designer/${templateSlug}`);
   }
 
   return (
@@ -245,7 +234,7 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
           <div className="space-y-2">
             <Label>Produkttyper</Label>
             <p className="text-xs text-muted-foreground">
-              En separat Shopify-produkt skapas per vald typ. Alla delar samma mall (bilder, kartor, text).
+              En Shopify-produkt skapas där produkttyperna blir varianter (Produkttyp/Storlek/Utförande).
             </p>
             <div className="grid grid-cols-2 gap-2">
               {(Object.keys(KIND_META) as Kind[]).map((k) => (

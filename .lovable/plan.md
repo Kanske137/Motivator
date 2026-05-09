@@ -1,41 +1,93 @@
-# 3 justeringar i admin / sync
+# Konsoliderad produkt-per-mall (Shopify)
 
-## 1. Falsk varning "saknar Gelato-SKU" på postermallar
+## Mål
+En **Shopify-produkt per mall** istället för upp till 4 separata. All produkttyp-/storleks-/ramval blir varianter på samma produkt. Endast **nya** mallar använder det nya flödet — befintliga mallar och deras Shopify-produkter rörs inte.
 
-I `src/components/admin/ProductOptionsSection.tsx` (rad 157–189) listas alla `size × variant`-kombinationer där `hasGelatoSku()` returnerar false. Hängare finns i Gelato för `21x30`, `30x40`, `40x50`, `50x70`, `70x100` — men inte för `13x18`. Eftersom `getEffectiveSizes()` ändå tar med Hängare-varianter på `13x18` (som "ej tillgänglig"-greyed-out i kundvyn) flaggas de felaktigt här som "saknar SKU".
+## Shopify-modellen
 
-**Fix:** I `missingSkus`-uträkningen, hoppa över kombinationer som vi medvetet visar som otillgängliga — dvs. poster + variantnamn som matchar `^Hängare/i` på storlekar där Gelato saknar SKU. Dessa är inte ett synk-problem; sync hoppar redan över dem korrekt och kunden ser dem som greyed-out. Banner ska bara visas för faktiska, oväntade luckor (t.ex. om admin lägger till en helt ny storlek).
+Varje konsoliderad produkt får exakt 3 options:
 
-## 2. Namnbyte: Aluminium → Metallposter, Akryl → Plexiglas
+| # | Namn | Värden |
+|---|------|--------|
+| 1 | Produkttyp | Poster, Canvas, Metallposter, Plexiglas (endast aktiverade) |
+| 2 | Storlek | Alla aktiva storlekar (union över aktiverade produkttyper) |
+| 3 | Utförande | Ram (Vit/Ek/Valnöt/Svart/Ingen) + Hängare (Ek/Valnöt/Svart/Vit) + Djup (2 cm/4 cm) + "Standard" |
 
-Interna ID:n (`aluminum`, `acrylic`, filsuffix `-aluminum`/`-acrylic`, Gelato-SKU-nycklar, pricing-tabeller) **behålls oförändrade** — endast visningsnamn ändras.
+**Viktigt:** vi genererar bara **giltiga** kombinationer per produkttyp — Shopify kräver inte hela kartesiska produkten:
 
-**Filer:**
-- `src/i18n/locales/sv.json` — `productKind.aluminum` = "Metallposter", `productKind.acrylic` = "Plexiglas"
-- Översätt till alla 10 övriga locales (`en/de/no/da/fi/fr/es/it/nl/pl`):
-  - Metallposter → en: "Metal poster", de: "Metallposter", no/da: "Metallplakat"/"Metalplakat", fi: "Metallijuliste", fr: "Poster métal", es: "Póster metálico", it: "Poster in metallo", nl: "Metalen poster", pl: "Plakat metalowy"
-  - Plexiglas → en: "Plexiglass", de: "Plexiglas", no/da: "Plexiglass"/"Plexiglas", fi: "Pleksilasi", fr: "Plexiglas", es: "Metacrilato", it: "Plexiglas", nl: "Plexiglas", pl: "Pleksi"
-- `src/components/admin/CreateTemplateDialog.tsx` (rad 39–40): byt hårdkodade `label`/`titleSuffix` "Aluminium"/"Akryl" till `t("productKind.aluminum")` / `t("productKind.acrylic")` (titleSuffix = " - " + översatt namn).
-- `src/components/admin/ProductOptionsSection.tsx` (rad 274, 302): byt `<Label>Aluminium</Label>` / `<Label>Akryl</Label>` mot t-nycklar.
-- Kommentarer i koden lämnas (utvecklarspråk).
+- Poster → endast ram-/hängar-utföranden, alla aktiva poster-storlekar
+- Canvas → endast djup-utföranden (2 cm/4 cm), alla aktiva canvas-storlekar
+- Metallposter / Plexiglas → endast utförande "Standard", respektive storleksset
 
-## 3. Shopify-produktkategori hamnar på fågelmat
+Det håller varianträkningen långt under 100 (typiskt ~40–60).
 
-`supabase/functions/shopify-sync-template/index.ts` rad 273–278 sätter:
+**Titel & handle:** endast mallnamnet (`Stjärnhimmel` → handle `stjarnhimmel`). Inget `-poster` / `-canvas`-suffix.
+
+## Datamodell (Supabase)
+
+Idag ligger en rad i `product_configs` per (mall × produkttyp). Vi inför ett **mall-läge**:
+
+- Ny kolumn `product_configs.is_consolidated boolean default false`
+- Ny kolumn `product_configs.enabled_product_types text[] default '{}'` (vilka produkttyper mallen säljer)
+- För konsoliderade mallar: **en enda rad** per mall. `product_type` blir `'multi'` (befintliga `'posters'|'canvas'|'aluminum'|'acrylic'`-rader berörs inte).
+- `gelato_sku_map` utökas så nycklar är `"<productType>|<size>|<variant>"` istället för bara `"<size>|<variant>"`.
+- `sizes` / pricing fortsätter ligga i `pricing.ts` per produkttyp; den konsoliderade raden refererar bara `enabled_product_types`.
+- `shopify_sync_state` får 1 rad per konsoliderad mall (en `shopify_product_id`).
+
+Befintliga rader och deras synkstatus förblir orörda → ingen migration av data.
+
+## Admin/Designer
+
+**Designern (`/admin/designer/:slug`)** får ett nytt val överst i sidofältet bredvid Stående/Liggande:
+
 ```
-poster/aluminum/acrylic: gid://shopify/TaxonomyCategory/ap-2-1-3
-canvas:                  gid://shopify/TaxonomyCategory/ap-2-1-1
+Visningsläge:  [ Standard ]  [ Canvas ]
 ```
-Prefixet `ap-` tillhör **Animals & Pet Supplies** i Shopifys Standard Product Taxonomy — därför hamnar produkterna under fågelmat / fågelbursartiklar. Korrekt gren är **Home & Garden > Decor > Artwork**, prefix `ho-`.
 
-**Fix:** Byt `DEFAULT_CATEGORY_GID` till rätt taxonomi-GID:er:
-- Posters → `gid://shopify/TaxonomyCategory/ho-1-2-2-13` ("Posters")
-- Canvas / Metallposter / Plexiglas (alla väggkonst) → `gid://shopify/TaxonomyCategory/ho-1-2-2` ("Artwork") eller specifik underkategori "Decorative Paintings" (`ho-1-2-2-4`).
+- **Standard-läge** styr layout för Poster / Metallposter / Plexiglas (identisk designyta).
+- **Canvas-läge** styr layout/wrap för Canvas (samma funktionalitet som idag).
+- Plexi-hörnpluppar är ren overlay i kundens editor när Plexiglas är vald variant — påverkar inte admin-designen.
+- Toggle visas bara om mallen har minst en standard-typ + canvas aktiverad; annars döljs den.
 
-Innan migrering verifierar jag exakta GID via Shopify-taxonomins offentliga JSON (`https://shopify.github.io/product-taxonomy/`) så vi sätter rätt id för varje kind. Befintliga produkter som redan synkats måste resyncas en gång (admin-knappen "Synka mall" räcker) för att kategorin ska uppdateras.
+**Mall-skapande (`CreateTemplateDialog`)** byter `Produkttyp`-väljaren mot multi-select med checkboxar:
 
-## Tekniska detaljer
-- Inga DB-migreringar, inga schemaändringar.
-- Edge-funktion uppdateras + auto-deployas.
-- Inga ändringar i Gelato-SKU-mappar eller pricing.
-- Inga UI-strängar utöver i18n; banner-strängen i ProductOptionsSection är redan på svenska och flyttar inte till i18n här (separat städ-jobb).
+```
+☑ Poster   ☑ Canvas   ☐ Metallposter   ☐ Plexiglas
+```
+
+Minst en måste väljas. Detta sätter `enabled_product_types` och `is_consolidated = true`.
+
+**`ProductOptionsSection`** visar fortsatt en flik per aktiverad produkttyp där admin väljer tillåtna storlekar + ramar/djup/material, precis som idag.
+
+## Editor (kundsidan)
+
+`FormatSection` har redan ett "Produkt"-toggle — vi återanvänder det:
+
+- Läser `enabled_product_types` från konsoliderade mallen
+- Vid byte av produkttyp ändras storleks-/utförande-listorna men handle förblir samma
+- Variant-resolver matchar på 3 selectedOptions (`Produkttyp`, `Storlek`, `Utförande`) istället för 2
+- Hängare och djup förblir samma data-id som idag (svensk källa) — bara att de nu lever i samma Shopify-option
+
+## Sync till Shopify (`shopify-sync-template`)
+
+Edge-funktionen får en gren när `is_consolidated = true`:
+
+1. Bygg variant-listan genom att iterera `enabled_product_types`, för varje typ generera `(storlek × utförande)` enligt admin-tillåtna val + Gelato-SKU finns
+2. Skapa/uppdatera **en** Shopify-produkt med 3 options
+3. SKU-mapping: `gelato_sku_map["<type>|<size>|<variant>"]` → variantens SKU
+4. Order-webhook (`shopify-order-webhook`) läser produkttyp från `selectedOptions` istället för från handle-suffix
+5. "Saknade SKU"-varningen i UI räknar nu per (type, size, variant)-tripel
+
+## Tekniska noter
+
+- `deriveTemplateSlug()` kan slopas för konsoliderade mallar — handle = slug direkt
+- `getEffectiveSizes()` får ny signatur som tar `productType`-arg när vi är i konsoliderat läge
+- Variant-resolver-cache nyckel blir `handle|size|utförande|produkttyp`
+- Liquid-temat behöver inget ändras — varianter visas redan via `selectedOptions`
+- Befintliga, gamla per-typ-produkter fortsätter fungera oförändrat och syns i admin som tidigare
+
+## Vad lämnas orört
+- Alla redan synkade mallar/produkter
+- Pricing-tabeller (`pricing.ts`) — fortsätter vara källa per produkttyp
+- 3D-canvas, AI-flöden, kart-renderare, mockups
+- Cart-sync, print-pipeline och Gelato-fulfillment (utöver SKU-lookup-uppdatering)

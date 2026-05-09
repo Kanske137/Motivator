@@ -1,6 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export type ProductType = "posters" | "canvas" | "aluminum" | "acrylic";
+/** DB-värdet för konsoliderade mallar — en rad per mall som hanterar
+ *  flera produkttyper i samma Shopify-produkt. Använd `expandConsolidatedConfig()`
+ *  innan andra delar av koden använder configs så `product_type` alltid är en
+ *  konkret typ. */
+export type StoredProductType = ProductType | "multi";
 export type Orientation = "portrait" | "landscape";
 
 export interface LayerDef {
@@ -59,6 +64,36 @@ export interface ProductConfig {
   description_html?: string | null;
   seo_title?: string | null;
   seo_description?: string | null;
+  /** True om denna rad representerar en konsoliderad mall (en Shopify-produkt
+   *  med flera produkttyper som varianter). När true används
+   *  `enabled_product_types` istället för `product_type`. */
+  is_consolidated?: boolean;
+  /** Vilka produkttyper mallen säljer. Tomt för icke-konsoliderade mallar. */
+  enabled_product_types?: ProductType[];
+}
+
+/** Mappar legacy "kind"-strängar (poster/posters/canvas/...) till `ProductType`. */
+export function kindToProductType(kind: string): ProductType {
+  const k = kind.toLowerCase();
+  if (k === "canvas") return "canvas";
+  if (k === "aluminum" || k === "metallic") return "aluminum";
+  if (k === "acrylic" || k === "akryl") return "acrylic";
+  return "posters";
+}
+
+/** Expandera en konsoliderad rad till N "virtuella" configs (en per
+ *  enabled_product_type) så befintlig kod som filtrerar configs på
+ *  template_slug fungerar oförändrat. Icke-konsoliderade rader returneras
+ *  oförändrade. Alla virtuella rader delar samma `id` och `shopify_handle`. */
+export function expandConsolidatedConfig(row: ProductConfig): ProductConfig[] {
+  if (!row.is_consolidated) return [row];
+  const types = row.enabled_product_types ?? [];
+  if (types.length === 0) return [row];
+  return types.map((pt) => ({
+    ...row,
+    product_type: pt,
+    template_slug: row.template_slug ?? row.shopify_handle,
+  }));
 }
 
 /** Strip -poster / -canvas / -aluminum / -acrylic suffix to get the
@@ -112,6 +147,27 @@ export async function loadAllConfigs(): Promise<ProductConfig[]> {
     .order("created_at");
   if (error) {
     console.error("loadAllConfigs error", error);
+    return [];
+  }
+  // Expandera konsoliderade rader till virtuella per-produkttyp-configs så att
+  // FormatSection / EditorPage kan filtrera per `template_slug` precis som
+  // tidigare. Den underliggande raden bevaras med samma id.
+  const out: ProductConfig[] = [];
+  for (const row of (data ?? []) as unknown as ProductConfig[]) {
+    out.push(...expandConsolidatedConfig(row));
+  }
+  return out;
+}
+
+/** Ladda RAW-rader (utan att expandera konsoliderade). Används av admin/
+ *  designer-sidor som behöver läsa själva DB-raden inkl. is_consolidated. */
+export async function loadAllConfigsRaw(): Promise<ProductConfig[]> {
+  const { data, error } = await supabase
+    .from("product_configs")
+    .select("*")
+    .order("created_at");
+  if (error) {
+    console.error("loadAllConfigsRaw error", error);
     return [];
   }
   return (data ?? []) as unknown as ProductConfig[];

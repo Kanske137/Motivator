@@ -55,8 +55,10 @@ export type Database = {
           category_gid: string | null
           created_at: string
           description_html: string | null
+          enabled_product_types: string[]
           gelato_sku_map: Json
           id: string
+          is_consolidated: boolean
           layouts: Json
           map_styles: Json
           product_type: string
@@ -77,8 +79,10 @@ export type Database = {
           category_gid?: string | null
           created_at?: string
           description_html?: string | null
+          enabled_product_types?: string[]
           gelato_sku_map?: Json
           id?: string
+          is_consolidated?: boolean
           layouts?: Json
           map_styles?: Json
           product_type: string
@@ -99,8 +103,10 @@ export type Database = {
           category_gid?: string | null
           created_at?: string
           description_html?: string | null
+          enabled_product_types?: string[]
           gelato_sku_map?: Json
           id?: string
+          is_consolidated?: boolean
           layouts?: Json
           map_styles?: Json
           product_type?: string

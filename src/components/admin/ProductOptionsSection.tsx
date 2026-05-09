@@ -215,10 +215,14 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
           </div>
         )}
 
-        {/* Per-rad: visa bara det produktblock som hör till den här raden.
-            Poster-raden äger `poster`-blocket; canvas-raden äger `canvas`-blocket.
-            Detta förhindrar att admin av misstag ändrar fel sidas konfiguration. */}
-        {config.product_type === "posters" && (
+        {/* Konsoliderade mallar visar ALLA aktiverade produkttyper i samma vy.
+            Per-typs-mallar visar bara sitt eget block. */}
+        {(() => {
+          const consolidated = (config as { is_consolidated?: boolean }).is_consolidated;
+          const enabled = (config as { enabled_product_types?: string[] }).enabled_product_types ?? [];
+          const showPoster = consolidated ? enabled.includes("posters") : config.product_type === "posters";
+          return showPoster;
+        })() && (
           <div className="space-y-3 rounded-md border p-4">
             <div className="flex items-center justify-between">
               <Label className="text-sm font-medium">Poster</Label>
@@ -246,7 +250,11 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
           </div>
         )}
 
-        {config.product_type === "canvas" && (
+        {(() => {
+          const consolidated = (config as { is_consolidated?: boolean }).is_consolidated;
+          const enabled = (config as { enabled_product_types?: string[] }).enabled_product_types ?? [];
+          return consolidated ? enabled.includes("canvas") : config.product_type === "canvas";
+        })() && (
           <div className="space-y-3 rounded-md border p-4">
             <div className="flex items-center justify-between">
               <Label className="text-sm font-medium">Canvas</Label>
@@ -274,7 +282,11 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
           </div>
         )}
 
-        {config.product_type === "aluminum" && (
+        {(() => {
+          const consolidated = (config as { is_consolidated?: boolean }).is_consolidated;
+          const enabled = (config as { enabled_product_types?: string[] }).enabled_product_types ?? [];
+          return consolidated ? enabled.includes("aluminum") : config.product_type === "aluminum";
+        })() && (
           <div className="space-y-3 rounded-md border p-4">
             <div className="flex items-center justify-between">
               <Label className="text-sm font-medium">{t("productKind.aluminum")}</Label>
@@ -302,7 +314,11 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
           </div>
         )}
 
-        {config.product_type === "acrylic" && (
+        {(() => {
+          const consolidated = (config as { is_consolidated?: boolean }).is_consolidated;
+          const enabled = (config as { enabled_product_types?: string[] }).enabled_product_types ?? [];
+          return consolidated ? enabled.includes("acrylic") : config.product_type === "acrylic";
+        })() && (
           <div className="space-y-3 rounded-md border p-4">
             <div className="flex items-center justify-between">
               <Label className="text-sm font-medium">{t("productKind.acrylic")}</Label>
