@@ -268,13 +268,15 @@ const GET_PRODUCT_FULL = `
   }`;
 
 // Shopify Standard Product Taxonomy GIDs.
-// Posters: gid://shopify/TaxonomyCategory/ap-2-1-3 ("Posters")
-// Canvas:  gid://shopify/TaxonomyCategory/ap-2-1-1 ("Decorative Paintings")
+// Branch: Home & Garden > Decor > Artwork > Posters, Prints, & Visual Artwork
+//   hg-3-4-2-1  Posters
+//   hg-3-4-2-2  Prints
+//   hg-3-4-2-4  Paintings
 const DEFAULT_CATEGORY_GID: Record<Kind, string> = {
-  poster: "gid://shopify/TaxonomyCategory/ap-2-1-3",
-  canvas: "gid://shopify/TaxonomyCategory/ap-2-1-1",
-  aluminum: "gid://shopify/TaxonomyCategory/ap-2-1-3",
-  acrylic: "gid://shopify/TaxonomyCategory/ap-2-1-3",
+  poster:   "gid://shopify/TaxonomyCategory/hg-3-4-2-1",
+  canvas:   "gid://shopify/TaxonomyCategory/hg-3-4-2-4",
+  aluminum: "gid://shopify/TaxonomyCategory/hg-3-4-2-1",
+  acrylic:  "gid://shopify/TaxonomyCategory/hg-3-4-2-2",
 };
 
 function buildVariantInput(
