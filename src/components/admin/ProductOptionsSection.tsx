@@ -215,9 +215,14 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
           </div>
         )}
 
-        {/* Konsoliderade mallar visar ALLA aktiverade produkttyper i samma
-            vy. Per-typs-mallar visar bara sitt eget block. */}
-        {(() => null)()}
+        {/* Konsoliderade mallar visar ALLA aktiverade produkttyper i samma vy.
+            Per-typs-mallar visar bara sitt eget block. */}
+        {(() => {
+          const consolidated = (config as { is_consolidated?: boolean }).is_consolidated;
+          const enabled = (config as { enabled_product_types?: string[] }).enabled_product_types ?? [];
+          const showPoster = consolidated ? enabled.includes("posters") : config.product_type === "posters";
+          return showPoster;
+        })() && (
           <div className="space-y-3 rounded-md border p-4">
             <div className="flex items-center justify-between">
               <Label className="text-sm font-medium">Poster</Label>
