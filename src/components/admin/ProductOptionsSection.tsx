@@ -7,6 +7,7 @@
 // This way the admin can enable e.g. canvas on a poster-only legacy config and
 // still see canvas-shaped sizes/depths instead of poster frames.
 import { useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Info, Plus, Trash2, Upload, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -46,6 +47,7 @@ interface Props {
 type Kind = "poster" | "canvas" | "aluminum" | "acrylic";
 
 export default function ProductOptionsSection({ config, value, onChange }: Props) {
+  const { t } = useTranslation();
   // Variant names from config (used so Gelato-mapped variants always appear)
   const configVariantNames = useMemo(
     () => Array.from(new Set(config.sizes.flatMap((s) => s.variants.map((v) => v.name)))),
@@ -155,11 +157,15 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
   }
 
   // Banner only fires when an *enabled* combination lacks a Gelato SKU.
+  // Undantag: Hängare-varianter saknas medvetet hos Gelato för små storlekar
+  // (t.ex. 13×18) — de visas som "ej tillgänglig" (greyed out) i kundvyn och
+  // ska inte flaggas som synk-fel här.
   const missingSkus = useMemo(() => {
     const out: { kind: Kind; size: string; variant: string }[] = [];
     if (value.poster?.enabled) {
       for (const s of value.poster.allowedSizes ?? []) {
         for (const f of value.poster.allowedFrames ?? []) {
+          if (/^Hängare/i.test(f)) continue; // medvetet otillgängliga kombinationer
           if (!hasGelatoSku("poster", s, f)) out.push({ kind: "poster", size: s, variant: f });
         }
       }
@@ -271,7 +277,7 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
         {config.product_type === "aluminum" && (
           <div className="space-y-3 rounded-md border p-4">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">Aluminium</Label>
+              <Label className="text-sm font-medium">{t("productKind.aluminum")}</Label>
               <Switch
                 checked={value.aluminum?.enabled ?? false}
                 onCheckedChange={(c) => toggleEnabled("aluminum", c)}
@@ -299,7 +305,7 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
         {config.product_type === "acrylic" && (
           <div className="space-y-3 rounded-md border p-4">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">Akryl</Label>
+              <Label className="text-sm font-medium">{t("productKind.acrylic")}</Label>
               <Switch
                 checked={value.acrylic?.enabled ?? false}
                 onCheckedChange={(c) => toggleEnabled("acrylic", c)}

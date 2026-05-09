@@ -50,8 +50,8 @@
   "productKind": {
     "poster": "Poster",
     "canvas": "Canvas",
-    "aluminum": "Aluminium",
-    "acrylic": "Akryl"
+    "aluminum": "Metallposter",
+    "acrylic": "Plexiglas"
   },
   "frame": {
     "none": "Ingen",

@@ -50,8 +50,8 @@
   "productKind": {
     "poster": "Juliste",
     "canvas": "Kangas",
-    "aluminum": "Alumiini",
-    "acrylic": "Akryyli"
+    "aluminum": "Metallijuliste",
+    "acrylic": "Pleksilasi"
   },
   "frame": {
     "none": "Ei mitään",

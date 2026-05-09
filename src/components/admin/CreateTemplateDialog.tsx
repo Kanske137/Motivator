@@ -3,6 +3,7 @@
 // Inserts one product_configs row PER selected product type — they all share
 // the same template_slug so they appear together in the customer Format toggle.
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -32,12 +33,12 @@ type Kind = "poster" | "canvas" | "aluminum" | "acrylic";
 
 const KIND_META: Record<
   Kind,
-  { label: string; productType: ProductType; suffix: string; titleSuffix: string }
+  { i18nKey: string; productType: ProductType; suffix: string }
 > = {
-  poster:   { label: "Poster",    productType: "posters",  suffix: "-poster",   titleSuffix: " - Poster" },
-  canvas:   { label: "Canvas",    productType: "canvas",   suffix: "-canvas",   titleSuffix: " - Canvas" },
-  aluminum: { label: "Aluminium", productType: "aluminum", suffix: "-aluminum", titleSuffix: " - Aluminium" },
-  acrylic:  { label: "Akryl",     productType: "acrylic",  suffix: "-acrylic",  titleSuffix: " - Akryl" },
+  poster:   { i18nKey: "productKind.poster",   productType: "posters",  suffix: "-poster" },
+  canvas:   { i18nKey: "productKind.canvas",   productType: "canvas",   suffix: "-canvas" },
+  aluminum: { i18nKey: "productKind.aluminum", productType: "aluminum", suffix: "-aluminum" },
+  acrylic:  { i18nKey: "productKind.acrylic",  productType: "acrylic",  suffix: "-acrylic" },
 };
 
 function slugify(s: string): string {
@@ -93,6 +94,7 @@ function buildSeedTemplate(kind: Kind): Template {
 
 export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [title, setTitle] = useState("");
   const [handle, setHandle] = useState("");
   const [handleEdited, setHandleEdited] = useState(false);
@@ -144,7 +146,7 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
       kind,
       handle: `${templateSlug}${KIND_META[kind].suffix}`,
       productType: KIND_META[kind].productType,
-      titleSuffix: onlyOne ? "" : KIND_META[kind].titleSuffix,
+      titleSuffix: onlyOne ? "" : ` - ${t(KIND_META[kind].i18nKey)}`,
     }));
 
     const baseTextConfig = {
@@ -255,7 +257,7 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
                     checked={selected[k]}
                     onCheckedChange={(c) => toggleKind(k, c === true)}
                   />
-                  <span className="text-sm font-medium">{KIND_META[k].label}</span>
+                  <span className="text-sm font-medium">{t(KIND_META[k].i18nKey)}</span>
                 </label>
               ))}
             </div>
