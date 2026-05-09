@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { loadAllConfigs, type ProductConfig } from "@/lib/product-config";
+import { loadAllConfigsRaw, type ProductConfig } from "@/lib/product-config";
 import { Loader2, ExternalLink, Zap, Pencil, Plus, CheckCircle2, AlertCircle, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -38,7 +38,7 @@ export default function AdminConfigs() {
 
   useEffect(() => {
     (async () => {
-      const all = await loadAllConfigs();
+      const all = await loadAllConfigsRaw();
       const enriched = all.map((c) => {
         const raw = (c as unknown as { template?: unknown }).template;
         const { template } = resolveTemplate(c, raw);
@@ -157,35 +157,30 @@ export default function AdminConfigs() {
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
-            {configs.map((c) => (
+            {configs.map((c) => {
+              const isMulti = c.is_consolidated && (c.enabled_product_types?.length ?? 0) > 0;
+              const thumbType = isMulti ? c.enabled_product_types![0] : c.product_type;
+              const typeBadges = isMulti ? c.enabled_product_types! : [c.product_type];
+              return (
               <Card key={c.id} className="p-5">
                 <div className="flex gap-4">
-                  <TemplateThumbnail template={c.__template} productType={c.product_type} />
+                  <TemplateThumbnail template={c.__template} productType={thumbType} />
                   <div className="flex-1 min-w-0 space-y-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <h2 className="font-semibold truncate">{c.title}</h2>
                         <p className="text-xs text-muted-foreground font-mono truncate">{c.shopify_handle}</p>
                       </div>
-                      <span className="text-[10px] uppercase tracking-wider bg-secondary text-secondary-foreground px-2 py-1 rounded shrink-0">
-                        {c.product_type}
-                      </span>
+                      <div className="flex flex-wrap gap-1 justify-end shrink-0 max-w-[50%]">
+                        {typeBadges.map((t) => (
+                          <span key={t} className="text-[10px] uppercase tracking-wider bg-secondary text-secondary-foreground px-2 py-1 rounded">
+                            {t}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                     <div className="text-xs text-muted-foreground space-y-0.5">
-                      <div>{
-                        (c.product_type === "canvas" && c.__template.canvasLayout
-                          ? c.__template.canvasLayout
-                          : c.__template.defaultLayout
-                        ).portrait.layers.length
-                      } lager (stående)</div>
-                      <div>
-                        {[
-                          c.__template.productOptions.poster?.enabled && "poster",
-                          c.__template.productOptions.canvas?.enabled && "canvas",
-                        ]
-                          .filter(Boolean)
-                          .join(" + ") || "ingen produkt aktiverad"}
-                      </div>
+                      <div>{c.__template.defaultLayout.portrait.layers.length} lager (stående)</div>
                       <div>{c.__template.publishedAt ? "Publicerad" : "Draft"}</div>
                     </div>
                     <div className="flex gap-2 pt-1">
@@ -205,7 +200,8 @@ export default function AdminConfigs() {
                   </div>
                 </div>
               </Card>
-            ))}
+              );
+            })}
           </div>
         )}
 
