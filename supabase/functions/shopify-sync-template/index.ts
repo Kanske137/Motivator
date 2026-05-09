@@ -630,23 +630,28 @@ Deno.serve(async (req) => {
 
     for (const group of groups) {
       const baseHandleHasNoSuffix = !/-(poster|posters|canvas|aluminum|acrylic)$/i.test(cfg.shopify_handle);
-      const handleForKind = groups.length === 1 && baseHandleHasNoSuffix
+      // Konsoliderad: ALLTID base-handle och base-titel (mallnamn).
+      const handleForKind = group.isConsolidated
         ? cfg.shopify_handle
-        : `${templateSlug}-${group.kind}`;
-      const titleForKind =
-        groups.length === 1 ? cfg.title : `${cfg.title} – ${group.productType}`;
+        : (groups.length === 1 && baseHandleHasNoSuffix
+          ? cfg.shopify_handle
+          : `${templateSlug}-${group.kind}`);
+      const titleForKind = group.isConsolidated
+        ? cfg.title
+        : (groups.length === 1 ? cfg.title : `${cfg.title} – ${group.productType}`);
 
       // Effective metadata (config values + sensible defaults).
       const tags = [
         ...new Set([
           templateSlug,
-          group.kind,
+          group.isConsolidated ? "multi" : group.kind,
           "personalized",
           "print-on-demand",
           ...(cfgMeta.tags ?? []),
         ]),
       ];
-      const categoryGid = cfgMeta.category_gid ?? DEFAULT_CATEGORY_GID[group.kind];
+      const categoryGid = cfgMeta.category_gid
+        ?? (group.isConsolidated ? DEFAULT_CATEGORY_GID.poster : DEFAULT_CATEGORY_GID[group.kind as Kind]);
       const status = (cfgMeta.status ?? "DRAFT").toUpperCase();
       const descriptionHtml =
         cfgMeta.description_html ?? "<p>Personlig design — skapas i editorn.</p>";
