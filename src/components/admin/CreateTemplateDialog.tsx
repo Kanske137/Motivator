@@ -3,6 +3,7 @@
 // Inserts one product_configs row PER selected product type — they all share
 // the same template_slug so they appear together in the customer Format toggle.
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
