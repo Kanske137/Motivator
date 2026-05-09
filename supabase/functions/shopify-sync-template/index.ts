@@ -514,10 +514,16 @@ function normalizeOptionValue(s: string): string {
 function optionKeyFromSelected(
   selected: { name: string; value: string }[],
   variantOptionName: string,
+  isConsolidated = false,
 ): string | null {
   const size = selected.find((s) => s.name === "Storlek")?.value;
   const variant = selected.find((s) => s.name === variantOptionName)?.value;
   if (!size || !variant) return null;
+  if (isConsolidated) {
+    const ptype = selected.find((s) => s.name === "Produkttyp")?.value;
+    if (!ptype) return null;
+    return `${normalizeOptionValue(ptype)}|${normalizeOptionValue(size)}|${normalizeOptionValue(variant)}`;
+  }
   return `${normalizeOptionValue(size)}|${normalizeOptionValue(variant)}`;
 }
 
