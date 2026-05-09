@@ -105,14 +105,15 @@ function LayerTransformControls({ layer }: { layer: TemplateLayer }) {
 interface Props {
   configs: ProductConfig[];
   activeHandle: string;
-  onProductChange: (handle: string) => void;
+  activeProductType: ProductType;
+  onProductChange: (handle: string, productType: ProductType) => void;
 }
 
 const cardClass =
   "rounded-2xl bg-card border border-border shadow-[0_1px_2px_rgba(0,0,0,0.04)] px-4";
 
 
-export function ControlPanel({ configs, activeHandle, onProductChange }: Props) {
+export function ControlPanel({ configs, activeHandle, activeProductType, onProductChange }: Props) {
   const { t } = useTranslation();
   const config = useEditorStore((s) => s.config);
   const template = useEditorStore((s) => s.template);
