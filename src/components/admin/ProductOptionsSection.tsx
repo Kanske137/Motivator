@@ -155,11 +155,15 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
   }
 
   // Banner only fires when an *enabled* combination lacks a Gelato SKU.
+  // Undantag: Hängare-varianter saknas medvetet hos Gelato för små storlekar
+  // (t.ex. 13×18) — de visas som "ej tillgänglig" (greyed out) i kundvyn och
+  // ska inte flaggas som synk-fel här.
   const missingSkus = useMemo(() => {
     const out: { kind: Kind; size: string; variant: string }[] = [];
     if (value.poster?.enabled) {
       for (const s of value.poster.allowedSizes ?? []) {
         for (const f of value.poster.allowedFrames ?? []) {
+          if (/^Hängare/i.test(f)) continue; // medvetet otillgängliga kombinationer
           if (!hasGelatoSku("poster", s, f)) out.push({ kind: "poster", size: s, variant: f });
         }
       }
