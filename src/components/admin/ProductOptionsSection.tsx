@@ -305,7 +305,7 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
         {config.product_type === "acrylic" && (
           <div className="space-y-3 rounded-md border p-4">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">Akryl</Label>
+              <Label className="text-sm font-medium">{t("productKind.acrylic")}</Label>
               <Switch
                 checked={value.acrylic?.enabled ?? false}
                 onCheckedChange={(c) => toggleEnabled("acrylic", c)}
