@@ -291,7 +291,7 @@ export function FormatSection({ configs, activeHandle, activeProductType, onProd
             {toggleEntries.map((e) => (
               <button
                 key={e.kind}
-                onClick={() => onProductChange(e.handle)}
+                onClick={() => onProductChange(e.handle, e.productType)}
                 className={`flex-1 h-10 rounded-full text-sm font-medium transition ${
                   e.active
                     ? "bg-primary text-primary-foreground shadow-sm"
