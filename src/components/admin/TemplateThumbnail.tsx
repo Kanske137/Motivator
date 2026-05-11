@@ -28,16 +28,8 @@ export default function TemplateThumbnail({ template, width = 120, height = 160,
     [layout],
   );
 
-  // For canvas with canvasLayout: layer % cover the FULL surface (front + 2× wrap).
-  // Compute the front-zone rect inside the thumbnail so we can draw a dashed marker.
-  const designDepthCm = template?.productOptions?.canvas?.canvasDesignDepthCm ?? 2;
-  const frontInsetPct = useCanvasLayout
-    ? // assume design surface = front + 2× depth at admin's design size; we
-      // approximate the inset proportionally (depth / (front+2*depth)).
-      // Front fraction is unknown without size, so use a stable visual: 2cm wrap
-      // on a 30cm side ≈ 2/(30+4) ≈ 6%. Use designDepth as scaling hint.
-      Math.min(20, Math.max(4, (designDepthCm / (designDepthCm * 2 + 30)) * 100))
-    : 0;
+  // Canvas layouts are now front-relative — layers fill the thumbnail
+  // directly, same as poster. No special wrap-zone marker needed.
 
   if (!layout) {
     return (
