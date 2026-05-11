@@ -37,7 +37,8 @@ export function MockupGallery() {
     showLabels, mapShape, posterBgColor,
     layerValues,
     layerTransforms,
-    designSource, photoPreviewUrl, aiPrintFileUrl,
+    photoSources,
+    photoAiResults,
     aiPhotoResults,
     whiteMarginEnabled,
   } = useEditorStore();
