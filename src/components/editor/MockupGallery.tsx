@@ -157,7 +157,7 @@ export function MockupGallery() {
     layerValues, layerTransforms, posterBgColor, whiteMarginEnabled,
     mapStyleId, mapCenter, mapZoom, showLabels, mapShape,
     text, textFont, textVisible,
-    designSource, photoPreviewUrl, aiPrintFileUrl,
+    photoSources, photoAiResults,
     aiPhotoResults,
   ]);
 
