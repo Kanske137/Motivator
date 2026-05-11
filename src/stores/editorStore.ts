@@ -625,10 +625,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   setVariant: (variant) => set({ variant }),
   setOrientation: (orientation) => {
-    const { template, config } = get();
+    const state = get();
+    const { template, config, photoSources, photoAiResults } = state;
     if (!template) return set({ orientation });
     const layerValues = hydrateLayerValues(template, orientation, config?.product_type);
-    set({ orientation, layerValues, layerTransforms: {}, whiteMarginEnabled: true, ...mirrorLegacy({ template, orientation, layerValues, config }) });
+    set({
+      orientation,
+      layerValues,
+      layerTransforms: {},
+      whiteMarginEnabled: true,
+      ...mirrorLegacy({ template, orientation, layerValues, config }),
+      ...mirrorPhoto({ template, orientation, config, photoSources, photoAiResults }),
+    });
   },
 
   // ---------- per-photo-layer setters ----------
