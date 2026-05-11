@@ -403,6 +403,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   originalPhotoUrl: null,
   photoHash: null,
   aiPrintFileUrl: null,
+  photoSources: {},
+  photoAiResults: {},
   shopifyVariantId: null,
   shopifyVariantResolving: false,
   aiResultCache: loadAiCache(),
