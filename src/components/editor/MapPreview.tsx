@@ -861,7 +861,11 @@ function PhotoLayerView({
           />
         )
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center bg-muted/40 border-2 border-dashed border-foreground/30 text-[11px] text-muted-foreground text-center px-2">
+        <div
+          className={`absolute inset-0 flex items-center justify-center bg-muted/40 text-[11px] text-muted-foreground text-center px-2${
+            shape === "rect" ? " border-2 border-dashed border-foreground/30" : ""
+          }`}
+        >
           Ladda upp en bild
         </div>
       )}
