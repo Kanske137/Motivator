@@ -127,7 +127,7 @@ export default function AdminConfigs() {
                 <Plus className="h-4 w-4 mr-2" />
                 Skapa ny mall
               </Button>
-              <Button onClick={syncToShopify} disabled={syncing || !installStatus?.installed}>
+              <Button onClick={() => setConfirmSyncOpen(true)} disabled={syncing || !installStatus?.installed || configs.length === 0}>
                 {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
                 Synka till Shopify
               </Button>
