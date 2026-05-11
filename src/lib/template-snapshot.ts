@@ -593,6 +593,19 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
       w: (eff.wPct / 100) * frontPxW,
       h: (eff.hPct / 100) * frontPxH,
     };
+    // Bleed/wrap extension: front-relative full-bleed media (map / image /
+    // photo / aiPhoto) that touches a front edge gets extended into the
+    // wrap+bleed band so canvas edges never look empty regardless of size.
+    const BLEED_EPS = 0.5;
+    const bleedEligible =
+      layer.type === "map" || layer.type === "image" ||
+      layer.type === "photo" || layer.type === "aiPhoto";
+    if (wrapPxExtra > 0 && bleedEligible) {
+      if (eff.xPct <= BLEED_EPS) { rect.x -= wrapPxExtra; rect.w += wrapPxExtra; }
+      if (eff.yPct <= BLEED_EPS) { rect.y -= wrapPxExtra; rect.h += wrapPxExtra; }
+      if (eff.xPct + eff.wPct >= 100 - BLEED_EPS) { rect.w += wrapPxExtra; }
+      if (eff.yPct + eff.hPct >= 100 - BLEED_EPS) { rect.h += wrapPxExtra; }
+    }
 
     if (layer.type === "map") {
       const lv = input.layerValues?.[layer.id];
