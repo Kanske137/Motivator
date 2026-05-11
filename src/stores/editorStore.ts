@@ -384,6 +384,32 @@ function mirrorLegacy(
   };
 }
 
+/** Recompute legacy first-photo-layer mirrors. The mirrors keep the cart
+ *  payload + EditorPage's existing reads working unchanged. */
+function mirrorPhoto(
+  state: Pick<EditorState, "template" | "orientation" | "config" | "photoSources" | "photoAiResults">,
+) {
+  const layout = state.template
+    ? getActiveLayoutBlock(state.template, state.config?.product_type)[state.orientation]
+    : undefined;
+  const firstPhoto = layout?.layers.find((l) => l.type === "photo");
+  const id = firstPhoto?.id ?? null;
+  const src = id ? state.photoSources[id] : undefined;
+  const ai = id ? state.photoAiResults[id] : undefined;
+  // Aggregate `designSource` across ALL photo layers so the cart payload
+  // reflects the strongest source in use anywhere on the template.
+  const anyAi = Object.keys(state.photoAiResults).length > 0;
+  const anyPhoto = Object.keys(state.photoSources).length > 0;
+  const designSource: DesignSource = anyAi ? "ai" : anyPhoto ? "photo" : "map";
+  return {
+    designSource,
+    photoFile: src?.file ?? null,
+    photoPreviewUrl: src?.previewUrl ?? null,
+    photoHash: src?.hash ?? null,
+    originalPhotoUrl: src?.originalUrl ?? null,
+    aiPrintFileUrl: ai ?? null,
+  };
+}
 export const useEditorStore = create<EditorState>((set, get) => ({
   config: null,
   template: null,
