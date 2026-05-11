@@ -1,16 +1,18 @@
-## Plan: Bekräftelsedialog vid Shopify-synk
+## Mål
+Dölj de streckade linjerna runt tomma bildbehållare i kund-editorn när formen INTE är rektangel/kvadrat (cirkel, hjärta, stjärna), eftersom de då klipps av clip-pathen och ser trasiga ut. Behåll dem som vanligt för rektangulära former.
 
-Lägg till en `AlertDialog` i `src/pages/AdminConfigs.tsx` som visas när användaren klickar "Synka till Shopify" — synken körs först när användaren bekräftar.
+## Ändringar
 
-### Ändringar
+**`src/components/editor/MapPreview.tsx`**
 
-**`src/pages/AdminConfigs.tsx`**
-- Importera `AlertDialog`-komponenter från `@/components/ui/alert-dialog`.
-- Lägg till state `confirmSyncOpen`.
-- Ändra "Synka till Shopify"-knappen så den öppnar dialogen istället för att direkt anropa `syncToShopify`.
-- Dialoginnehåll:
-  - Titel: "Synka alla mallar till Shopify?"
-  - Beskrivning: visar antal mallar som kommer synkas (`configs.length`) och varnar att befintliga produkter i Shopify uppdateras.
-  - Avbryt-knapp + Bekräfta-knapp ("Ja, synka") som anropar `syncToShopify()` och stänger dialogen.
+1. **Tom foto-platshållare (rad ~862, inuti `PhotoLayerView`)**
+   - Komponenten har redan `shape: "rect" | "circle" | "heart" | "star"`.
+   - Visa `border-2 border-dashed border-foreground/30` endast när `shape === "rect"`.
+   - För övriga former: behåll `bg-muted/40` och texten "Ladda upp en bild" centrerad, men utan border.
 
-Ingen ändring av själva sync-logiken eller edge functions.
+2. **Tom AI-bild-platshållare (rad ~502-510)**
+   - `effectiveShape` finns redan i scope.
+   - Visa `border-2 border-dashed border-primary/40 rounded` endast när `effectiveShape === "rect"`.
+   - För övriga former: behåll `bg-accent/30` + ikon/text, men utan border.
+
+Inga ändringar i admin-editorn, ingen logikförändring, ingen i18n (befintlig text behålls).

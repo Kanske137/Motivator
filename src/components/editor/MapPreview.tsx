@@ -500,7 +500,9 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
                   />
                 ) : (
                   <div
-                    className="w-full h-full flex flex-col items-center justify-center gap-1 text-center px-2 bg-accent/30 border-2 border-dashed border-primary/40 rounded"
+                    className={`w-full h-full flex flex-col items-center justify-center gap-1 text-center px-2 bg-accent/30 rounded${
+                      effectiveShape === "rect" ? " border-2 border-dashed border-primary/40" : ""
+                    }`}
                     style={{ clipPath: staticClip }}
                   >
                     <span className="text-base">✨</span>
