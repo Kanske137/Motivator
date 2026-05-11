@@ -1,95 +1,53 @@
-## Mål
+# Stabil canvas-layout över alla storlekar
 
-När en mall har **fler än en `photo`-layer** ska kunden kunna ladda upp **olika bilder per behållare** — och välja form + AI-stil per behållare. Idag delas en enda `photoFile` mellan alla photo-layers, så samma bild dyker upp överallt.
+## Problem
 
-När mallen bara har **en photo-layer** ska beteendet vara oförändrat (ingen flik-rad).
+Idag lagras `canvasLayout`-lagrens `xPct/yPct/wPct/hPct` relativt **hela editor-ytan = front + 2 × wrap (cm)**. Eftersom wrap är konstant i cm men front växer med storleken, krymper wrap-andelen procentuellt på större canvas. Resultat: ett lager som ligger 25 % från toppen på 30×40 cm hamnar visuellt på en annan plats på frontytan när kunden väljer 50×70 cm. Att kompensera per storlek (`sizeOverrides`) är ohållbart.
 
----
+## Lösning – ankra canvas-lager till FRONT-ytan
 
-## Ny UX i bild-collapsiblet (kundsidan)
+Behandla `canvasLayout` på samma sätt som `defaultLayout`: koordinater är % av **frontytan** (synliga ytan), inte av hela editorn. Wrap-bandet ritas automatiskt runt frontytan vid render/print för aktuell vald djup, utan att flytta lagren. Layout blir då storleksoberoende — samma % av fronten oavsett 30×40 eller 70×100.
 
-- 1 photo-layer → identiskt med idag: PhotoUploadSection + (valbar) form + AI-stil.
-- ≥2 photo-layers → en `Tabs`-rad högst upp med en flik per layer:
-  - Etikett: `layer.name` om satt, annars `t("layer.imageTab", { n })` ("Foto 1", "Foto 2", …).
-  - Per flik: `PhotoUploadSection` (för **denna** layer), formväljare (om upplåst), och `AiStyleSection` (om AI-stilar är aktiverade och bild finns för denna layer).
-  - Visuell indikator i fliken om bild är uppladdad (liten prick).
+Bakgrund och full-bleed-media (kart-, foto-, bildlager som rör frontens kant) extenderas automatiskt ut i wrap-bandet så att kanterna inte blir tomma.
 
-Inga ändringar i admin-editorn, kart-/text-sektionerna, eller i översättningsbeteendet (alla nya strängar via i18n-nycklar i `sv.json` + översatta till övriga språk).
+## Tekniska ändringar
 
----
+### 1. Datamodell & migration
+- Tolka `canvasLayout`-koordinater som **front-relativa** (samma kontrakt som `defaultLayout`).
+- En engångs-migration i `template-migrate.ts` konverterar befintliga `canvasLayout` från full-area-% till front-%-koordinater med hjälp av `getCanvasDesignDepthCm(template)` och layoutens aspekt:
+  ```text
+  insetX = wrap / (frontW + 2*wrap)
+  insetY = wrap / (frontH + 2*wrap)
+  newX  = (oldX - insetX*100) / (1 - 2*insetX)
+  newW  =  oldW            / (1 - 2*insetX)
+  (analogt för y/h)
+  ```
+  Markera migrerad mall med `version`-bump eller flagga i `canvasLayout` så den inte konverteras två gånger.
+- `canvasDesignDepthCm` blir endast informativt (vilket djup admin tittade på i designern); påverkar inte längre hur lager mappas.
 
-## Datamodell (editorStore)
+### 2. Render – `MapPreview.tsx`
+- Sätt `layersIncludeWrap = false` för canvas (eller ta bort flaggan helt). `frontInsetX/Y`-vägen finns redan och löser positionerings­problemet automatiskt.
+- Lägg till **bleed-extension** för full-bleed-lager: när ett lagers rektangel rör frontens kanter (xPct ≤ 0.5 / yPct ≤ 0.5 / right ≥ 99.5 / bottom ≥ 99.5) extenderas det med `wrapCm`-motsvarande % ut i wrap-bandet i renderrutinen. Bakgrundsfärgen ritas alltid genom hela editor-ytan (redan så).
 
-Ersätt globala fält med per-layer maps keyade på `photoLayerId`:
+### 3. Admin – `DesignerPage.tsx` + canvas-designyta
+- Visa frontytan som primär designyta. Wrap-bandet ritas runt som en streckad/halvtransparent zon (visuellt — ingen drag-yta), märkt "Wrap (extenderas automatiskt)".
+- Drag/klamp av lager sker i front-koordinater (`xPct ∈ [0,100]` är frontytan). Inga manuella justeringar för bleed behövs — render/print extenderar automatiskt.
+- Behåll `canvasDesignDepthCm`-väljaren bara som visualiseringshjälp (visar hur tjock wrap-zonen tecknas), inte för koordinatmatte.
 
-| Idag (globalt)            | Nytt (per layer-id)                     |
-| -------------------------- | --------------------------------------- |
-| `photoFile: File \| null` | `photoSources: Record<id, { file, previewUrl, hash, originalUrl }>` |
-| `photoPreviewUrl`          | (i `photoSources[id].previewUrl`)       |
-| `photoHash`                | (i `photoSources[id].hash`)             |
-| `originalPhotoUrl`         | (i `photoSources[id].originalUrl`)      |
-| `aiPrintFileUrl`           | `photoAiResults: Record<id, string>` (aktiv stil per layer) |
-| `designSource: "map"\|"photo"\|"ai"` | Blir **härledd**: om någon photo-layer har källa → "photo"/"ai"; annars "map". Behålls som global för cart/print-payload-bakåtkompatibilitet. |
+### 4. Print/snapshot – `print-pipeline.ts` & `template-snapshot.ts`
+- Använd samma front-inset-logik: rita lager i frontytan, extendera markerade full-bleed-lager med wrap-cm. Det Gelato-PDF-utbytet får då rätt bleed automatiskt oavsett vald canvasstorlek.
+- Ta bort/uppdatera `wrapCm`-passering så koordinatomvandlingen sker centralt (en helper `withCanvasWrap(layer, frontW, frontH, wrapCm)` som returnerar print-rekt med bleed).
 
-`aiResultCache` (LRU) byter nyckel från `${photoHash}|${presetId}` till samma — keyas fortfarande på hashen, men hashen är nu per layer. Ingen schemaändring för cachen.
+### 5. Editor-store
+- Inget kontraktsbrott externt; `layersIncludeWrap`-prop till `MapPreview` blir false för canvas. Mirror-logik för `setOrientation`/`setConfig` är oförändrad.
 
-Nya/uppdaterade setters:
-- `setPhotoSource(layerId, file, previewUrl)`
-- `setPhotoHash(layerId, hash)`
-- `setOriginalPhotoUrl(layerId, url)`
-- `setAiPrintFileUrl(layerId, url)`
-- `clearAiResultOnly(layerId)`
-- `resetPhotoLayer(layerId)` (ersätter `resetDesignSource` per-layer; global `resetDesignSource` rensar alla)
+## Effekt
 
-Bakåt-kompatibla "legacy"-getters för `photoFile`, `photoPreviewUrl`, `aiPrintFileUrl` behålls och returnerar **första photo-layern** så att äldre konsumenter (cart-payload, mockup, snapshot) fortsätter funka medan vi migrerar dem.
+- En canvas-mall designas en enda gång på frontytan och håller exakt samma layout visuellt på 30×40, 50×70, 70×100 osv.
+- Wrap-bandet hanteras automatiskt via bleed-extension för bakgrund och kantnära media.
+- Inga per-storlek-overrides krävs.
 
----
+## Risker att täcka i implementation
 
-## Render-pipeline (per-layer källa)
-
-**`MapPreview.tsx`** — byt `photoOverlayUrl` (global) mot per-layer-uppslag inne i photo-loopen:
-
-```ts
-const src = photoAiResults[l.id] ?? photoSources[l.id]?.previewUrl ?? l.defaults.placeholderUrl ?? null;
-```
-
-**`template-snapshot.ts`** — `photoOverlayUrl?: string` → ersätts av `photoOverlays?: Record<layerId, string>`. I `photo`-grenen: `const url = input.photoOverlays?.[layer.id] ?? layer.defaults.placeholderUrl;`. Bakåtkompat: om bara `photoOverlayUrl` (legacy) skickas, mappa till alla photo-layers.
-
-**`MockupGallery.tsx`** och **`EditorPage.tsx` (cart payload)** — bygg `photoOverlays`-map från `photoSources` + `photoAiResults` (AI vinner per layer) och skicka in.
-
----
-
-## Komponentändringar
-
-- **`PhotoUploadSection`** → tar `layerId: string` prop. All läsning/skrivning går via per-layer-setters. Defaultvärde `firstPhotoLayerId` om ingen prop ges (bakåtkompat).
-- **`AiStyleSection`** → tar `layerId: string` prop. `photoFile/photoHash/originalPhotoUrl/aiPrintFileUrl` läses/skrivs per layer. Cache-anrop oförändrade (hash är fortfarande nyckel).
-- **`ControlPanel.tsx`** (Bild-accordion-sektionen) — om `photoLayers.length > 1`: rendera `Tabs` med en `TabsTrigger` per layer + en `TabsContent` med `PhotoUploadSection`, `PhotoShapeSection` och `AiStyleSection` för aktiv layer-id. Annars samma rendering som idag (med första layer-id som prop).
-
----
-
-## i18n-nycklar (sv.json + översättningar till en/de/no/da/fi/fr/es/it/nl/pl)
-
-- `layer.imageTab` ("Foto {{n}}") — finns redan i mönstret för `layer.transformationTab`.
-- Inga andra nya strängar; befintliga `photo.*` och `shape.*` återanvänds.
-
----
-
-## Ej i scope
-
-- Ingen ändring av admin-editorn, ingen ändring av Gelato print-pipeline-API:t (utöver att den nu får `photoOverlays`-map istället för en enda URL).
-- Ingen ändring av `aiPhoto`-layers (face-swap) — de är redan per-layer.
-- Ingen migration av sparat kund-state (state lever bara i sessionen).
-
----
-
-## Berörda filer
-
-- `src/stores/editorStore.ts` (datamodell + setters + legacy-mirrors)
-- `src/components/editor/PhotoUploadSection.tsx` (ta `layerId` prop)
-- `src/components/editor/AiStyleSection.tsx` (ta `layerId` prop)
-- `src/components/editor/ControlPanel.tsx` (Tabs i Bild-sektionen)
-- `src/components/editor/MapPreview.tsx` (per-layer src)
-- `src/components/editor/MockupGallery.tsx` (per-layer overlays)
-- `src/pages/EditorPage.tsx` (cart-payload bygger `photoOverlays`)
-- `src/lib/template-snapshot.ts` (input: `photoOverlays` map)
-- `src/i18n/locales/*.json` (verifiera `layer.imageTab` finns på alla språk)
+- Befintliga publicerade canvasmallar måste migreras vid load (icke-destruktivt — original sparas inte över förrän admin sparar nästa gång, men rendering följer migrerad version).
+- Lager som admin medvetet placerat **i** wrap-bandet (sällsynt, t.ex. dekoration på sidan) konverteras till frontkoordinater där `x/y < 0` eller `> 100` kan uppstå. Vi clampar dem till frontytan vid migration och loggar en varning i designern så admin kan justera.

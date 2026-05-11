@@ -655,8 +655,8 @@ export default function DesignerPage() {
               })();
             return (
               <div className="text-[11px] text-muted-foreground mb-2 flex items-center gap-2">
-                <span className="inline-block h-2 w-2 rounded-sm bg-muted border" />
-                Canvas-design · djup {designDepthCm} cm · grå zon = wrap (motivet syns runt kanten)
+                <span className="inline-block h-2 w-2 rounded-sm bg-primary/60 border" />
+                Canvas-design · designar mot synlig framsida · wrap (ca {designDepthCm} cm) extenderas automatiskt vid tryck
               </div>
             );
           })()}
@@ -669,18 +669,8 @@ export default function DesignerPage() {
               onSelect={setSelectedId}
               onChange={updateLayer}
               productType={config?.product_type}
-              wrapInsetPctX={(() => {
-                if (!isCanvasProduct) return 0;
-                const sizeCm = orientation === "portrait" ? 30 : 40;
-                const depth = template?.productOptions?.canvas?.canvasDesignDepthCm ?? 2;
-                return depth / (sizeCm + 2 * depth);
-              })()}
-              wrapInsetPctY={(() => {
-                if (!isCanvasProduct) return 0;
-                const sizeCm = orientation === "portrait" ? 40 : 30;
-                const depth = template?.productOptions?.canvas?.canvasDesignDepthCm ?? 2;
-                return depth / (sizeCm + 2 * depth);
-              })()}
+              wrapInsetPctX={0}
+              wrapInsetPctY={0}
             />
             {layers.length === 0 && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">

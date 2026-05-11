@@ -520,16 +520,18 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
   const h = Math.round(hCm * PX_PER_CM * scale);
   const pxPerMm = (PX_PER_CM * scale) / 10;
 
-  // Front-zone rect (where layer % coords live for poster). For canvas
-  // templates with a dedicated canvasLayout, layer % are anchored to the
-  // FULL editor surface (front + 2× wrap + bleed), so the rect spans the
-  // entire output.
+  // Front-zone rect (where layer % coords live). Canvas templates with the
+  // legacy fullArea coord-space still anchor layers to the FULL surface;
+  // post-migration canvas layouts are front-relative just like posters.
   const layersIncludeWrap =
-    input.productType === "canvas" && !!input.template.canvasLayout;
+    input.productType === "canvas" &&
+    !!input.template.canvasLayout &&
+    input.template.canvasLayout.coordSpace === "fullArea";
   const frontPxX = layersIncludeWrap ? 0 : Math.round(extraCm * PX_PER_CM * scale);
   const frontPxY = layersIncludeWrap ? 0 : Math.round(extraCm * PX_PER_CM * scale);
   const frontPxW = layersIncludeWrap ? w : Math.round(frontWcm * PX_PER_CM * scale);
   const frontPxH = layersIncludeWrap ? h : Math.round(frontHcm * PX_PER_CM * scale);
+  const wrapPxExtra = layersIncludeWrap ? 0 : Math.round(extraCm * PX_PER_CM * scale);
 
   const out = document.createElement("canvas");
   out.width = w;
@@ -591,6 +593,19 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
       w: (eff.wPct / 100) * frontPxW,
       h: (eff.hPct / 100) * frontPxH,
     };
+    // Bleed/wrap extension: front-relative full-bleed media (map / image /
+    // photo / aiPhoto) that touches a front edge gets extended into the
+    // wrap+bleed band so canvas edges never look empty regardless of size.
+    const BLEED_EPS = 0.5;
+    const bleedEligible =
+      layer.type === "map" || layer.type === "image" ||
+      layer.type === "photo" || layer.type === "aiPhoto";
+    if (wrapPxExtra > 0 && bleedEligible) {
+      if (eff.xPct <= BLEED_EPS) { rect.x -= wrapPxExtra; rect.w += wrapPxExtra; }
+      if (eff.yPct <= BLEED_EPS) { rect.y -= wrapPxExtra; rect.h += wrapPxExtra; }
+      if (eff.xPct + eff.wPct >= 100 - BLEED_EPS) { rect.w += wrapPxExtra; }
+      if (eff.yPct + eff.hPct >= 100 - BLEED_EPS) { rect.h += wrapPxExtra; }
+    }
 
     if (layer.type === "map") {
       const lv = input.layerValues?.[layer.id];

@@ -306,7 +306,7 @@ export default function EditorPage() {
             frameWidthCm={FRAME_WIDTH_CM}
             hangerColor={hangerColor ?? undefined}
             wrapCm={canvasDepthCm}
-            layersIncludeWrap={isCanvas && !!template?.canvasLayout}
+            layersIncludeWrap={isCanvas && template?.canvasLayout?.coordSpace === "fullArea"}
           />
         </div>
 

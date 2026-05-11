@@ -161,7 +161,75 @@ function autoLinkSingleLayerTemplate(template: Template): Template {
   return next;
 }
 
-/** Walk every orientation and migrate each layer. */
+/**
+ * Legacy canvasLayout used % of the FULL editor surface (front + 2× wrap).
+ * The new model uses % of the FRONT zone so layer positions stay visually
+ * stable across canvas sizes (wrap shrinks proportionally on larger sizes).
+ *
+ * For each orientation we figure out the front aspect from the first
+ * allowedSize for canvas + designDepth, derive insetX/insetY, then remap
+ * every layer rect from full-area to front-relative coords.
+ */
+function convertCanvasLayoutToFront(template: Template): NonNullable<Template["canvasLayout"]> {
+  const cl = template.canvasLayout!;
+  const opts = template.productOptions.canvas;
+  const depthCm = (() => {
+    const explicit = opts?.canvasDesignDepthCm;
+    if (typeof explicit === "number" && explicit > 0) return explicit;
+    const allowed = opts?.allowedDepths ?? [];
+    for (const v of allowed) {
+      const m = v.match(/(\d+(?:[.,]\d+)?)/);
+      if (m) {
+        const n = parseFloat(m[1].replace(",", "."));
+        if (n > 0) return n;
+      }
+    }
+    return 2;
+  })();
+  // Reference front size — first allowedSize, or 30x40 fallback.
+  const refSize = (opts?.allowedSizes ?? [])[0] ?? "30x40";
+  const m = refSize.match(/(\d+)\s*[xX×]\s*(\d+)/);
+  const a = m ? parseInt(m[1], 10) : 30;
+  const b = m ? parseInt(m[2], 10) : 40;
+
+  const remap = (
+    layout: OrientationLayout,
+    orient: "portrait" | "landscape",
+  ): OrientationLayout => {
+    const frontW = orient === "portrait" ? Math.min(a, b) : Math.max(a, b);
+    const frontH = orient === "portrait" ? Math.max(a, b) : Math.min(a, b);
+    const fullW = frontW + 2 * depthCm;
+    const fullH = frontH + 2 * depthCm;
+    const insetX = depthCm / fullW;
+    const insetY = depthCm / fullH;
+    const sx = 1 - 2 * insetX;
+    const sy = 1 - 2 * insetY;
+    const layers = layout.layers.map((l) => {
+      const newX = (l.xPct - insetX * 100) / sx;
+      const newY = (l.yPct - insetY * 100) / sy;
+      const newW = l.wPct / sx;
+      const newH = l.hPct / sy;
+      // Clamp to front zone — admins who deliberately placed decoration in
+      // the wrap band will see those layers snapped to the edge; they can
+      // adjust manually in the designer.
+      const clamp = (v: number) => Math.max(0, Math.min(100, v));
+      const xPct = clamp(newX);
+      const yPct = clamp(newY);
+      const wPct = Math.max(0.5, Math.min(100 - xPct, newW));
+      const hPct = Math.max(0.5, Math.min(100 - yPct, newH));
+      return { ...l, xPct, yPct, wPct, hPct };
+    });
+    return { ...layout, layers };
+  };
+
+  return {
+    portrait: remap(cl.portrait, "portrait"),
+    landscape: remap(cl.landscape, "landscape"),
+    coordSpace: "front",
+  };
+}
+
+
 function migrateTemplate(template: Template): Template {
   const orientations: Array<keyof Template["defaultLayout"]> = ["portrait", "landscape"];
   let next = template;
@@ -183,6 +251,7 @@ function migrateTemplate(template: Template): Template {
     const migrated = {
       portrait: { ...cl.portrait, layers: cl.portrait.layers.map(migrateLayer) },
       landscape: { ...cl.landscape, layers: cl.landscape.layers.map(migrateLayer) },
+      coordSpace: cl.coordSpace,
     };
     next = { ...next, canvasLayout: migrated };
   }
@@ -190,10 +259,20 @@ function migrateTemplate(template: Template): Template {
   // canvas-specific layout exists yet (legacy templates). Admin can then
   // edit it independently of the poster layout.
   if (next.productOptions.canvas?.enabled && !next.canvasLayout) {
+    const cloned = JSON.parse(JSON.stringify(next.defaultLayout)) as {
+      portrait: OrientationLayout;
+      landscape: OrientationLayout;
+    };
     next = {
       ...next,
-      canvasLayout: JSON.parse(JSON.stringify(next.defaultLayout)) as Template["canvasLayout"],
+      canvasLayout: { ...cloned, coordSpace: "front" },
     };
+  }
+  // One-time migration: convert legacy fullArea-relative canvasLayout coords
+  // to FRONT-relative coords. After this the renderer always interprets %
+  // as front-zone and adds wrap automatically.
+  if (next.canvasLayout && next.canvasLayout.coordSpace !== "front") {
+    next = { ...next, canvasLayout: convertCanvasLayoutToFront(next) };
   }
   // Seed default AI styles when none are configured (admin can edit/remove later).
   if (!next.productOptions.aiStyles || next.productOptions.aiStyles.length === 0) {
