@@ -284,6 +284,88 @@ function MapTabs({
   );
 }
 
+// ---------------- photo layers (Tabs when >1) ----------------
+
+function PhotoLayersControls({
+  photoLayers,
+  layerValues,
+  photoSources,
+  aiStyles,
+}: {
+  photoLayers: Array<Extract<TemplateLayer, { type: "photo" }>>;
+  layerValues: Record<string, unknown>;
+  photoSources: Record<string, { file: File; previewUrl: string } | undefined>;
+  aiStyles: Array<{ id: string; label: string; thumbnailUrl?: string; prompt: string; enabled?: boolean }>;
+}) {
+  const { t } = useTranslation();
+  const [activeId, setActiveId] = useState<string>(photoLayers[0]?.id ?? "");
+
+  useEffect(() => {
+    if (!photoLayers.some((l) => l.id === activeId)) {
+      setActiveId(photoLayers[0]?.id ?? "");
+    }
+  }, [photoLayers, activeId]);
+
+  if (photoLayers.length === 0) return null;
+
+  const renderForLayer = (l: Extract<TemplateLayer, { type: "photo" }>) => {
+    const showShape = !l.locks.shape || !l.locks.size || !l.locks.move;
+    const hasUpload = !!photoSources[l.id];
+    const showAi = hasUpload && aiStyles.length > 0;
+    return (
+      <div className="space-y-4">
+        <PhotoUploadSection layerId={l.id} />
+        {showShape && (
+          <div className="pt-4 border-t">
+            <PhotoShapeSection
+              layer={l}
+              value={(layerValues[l.id] as PhotoLayerValue | undefined) ?? null}
+              heading={null}
+            />
+          </div>
+        )}
+        {showAi && (
+          <div className="pt-4 border-t space-y-2">
+            <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              {t("section.aiStyle")}
+            </Label>
+            <AiStyleSection presets={aiStyles as any} layerId={l.id} />
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  if (photoLayers.length === 1) {
+    return renderForLayer(photoLayers[0]!);
+  }
+
+  const activeLayer = photoLayers.find((l) => l.id === activeId) ?? photoLayers[0]!;
+  return (
+    <div className="space-y-4">
+      <Tabs value={activeId} onValueChange={setActiveId}>
+        <TabsList className="w-full justify-start overflow-x-auto">
+          {photoLayers.map((l, idx) => {
+            const hasUpload = !!photoSources[l.id];
+            return (
+              <TabsTrigger key={l.id} value={l.id} className="text-xs gap-1.5">
+                {l.name || t("layer.imageTab", { n: idx + 1 })}
+                {hasUpload && (
+                  <span
+                    aria-hidden
+                    className="inline-block w-1.5 h-1.5 rounded-full bg-primary"
+                  />
+                )}
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
+      </Tabs>
+      {renderForLayer(activeLayer)}
+    </div>
+  );
+}
+
 // ---------------- per-layer sub-sections ----------------
 
 function PlaceLayerSection({
