@@ -224,6 +224,28 @@ export default function AdminConfigs() {
       </main>
 
       <CreateTemplateDialog open={createOpen} onOpenChange={setCreateOpen} />
+
+      <AlertDialog open={confirmSyncOpen} onOpenChange={setConfirmSyncOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Synka alla mallar till Shopify?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {configs.length} mall{configs.length === 1 ? "" : "ar"} kommer skickas till Shopify. Befintliga produkter med samma handle uppdateras (titel, varianter, metafält). Vill du fortsätta?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmSyncOpen(false);
+                syncToShopify();
+              }}
+            >
+              Ja, synka
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
