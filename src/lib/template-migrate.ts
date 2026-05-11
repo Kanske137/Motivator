@@ -183,6 +183,7 @@ function migrateTemplate(template: Template): Template {
     const migrated = {
       portrait: { ...cl.portrait, layers: cl.portrait.layers.map(migrateLayer) },
       landscape: { ...cl.landscape, layers: cl.landscape.layers.map(migrateLayer) },
+      coordSpace: cl.coordSpace,
     };
     next = { ...next, canvasLayout: migrated };
   }
@@ -190,10 +191,20 @@ function migrateTemplate(template: Template): Template {
   // canvas-specific layout exists yet (legacy templates). Admin can then
   // edit it independently of the poster layout.
   if (next.productOptions.canvas?.enabled && !next.canvasLayout) {
+    const cloned = JSON.parse(JSON.stringify(next.defaultLayout)) as {
+      portrait: OrientationLayout;
+      landscape: OrientationLayout;
+    };
     next = {
       ...next,
-      canvasLayout: JSON.parse(JSON.stringify(next.defaultLayout)) as Template["canvasLayout"],
+      canvasLayout: { ...cloned, coordSpace: "front" },
     };
+  }
+  // One-time migration: convert legacy fullArea-relative canvasLayout coords
+  // to FRONT-relative coords. After this the renderer always interprets %
+  // as front-zone and adds wrap automatically.
+  if (next.canvasLayout && next.canvasLayout.coordSpace !== "front") {
+    next = { ...next, canvasLayout: convertCanvasLayoutToFront(next) };
   }
   // Seed default AI styles when none are configured (admin can edit/remove later).
   if (!next.productOptions.aiStyles || next.productOptions.aiStyles.length === 0) {
