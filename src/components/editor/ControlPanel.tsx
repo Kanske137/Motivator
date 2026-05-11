@@ -120,7 +120,7 @@ export function ControlPanel({ configs, activeHandle, activeProductType, onProdu
   const productOptions = useEditorStore((s) => s.productOptions);
   const templateLayers = useEditorStore((s) => s.templateLayers);
   const layerValues = useEditorStore((s) => s.layerValues);
-  const photoFile = useEditorStore((s) => s.photoFile);
+  const photoSources = useEditorStore((s) => s.photoSources);
 
   if (!config) return null;
 
@@ -141,7 +141,6 @@ export function ControlPanel({ configs, activeHandle, activeProductType, onProdu
 
   const showImageSection = photoLayers.length > 0;
   const aiStyles = productOptions?.aiStyles ?? [];
-  const showAiInsideImage = !!photoFile && aiStyles.length > 0;
   const showAiPhotoSection = aiPhotoLayers.length > 0;
 
   return (
@@ -152,33 +151,15 @@ export function ControlPanel({ configs, activeHandle, activeProductType, onProdu
             {t("section.image")}
           </AccordionTrigger>
           <AccordionContent className="pt-1 pb-4">
-            <PhotoUploadSection />
-            {photoLayers.some((l) => !l.locks.shape || !l.locks.size || !l.locks.move) && (
-              <div className="mt-4 pt-4 border-t space-y-3">
-                {photoLayers
-                  .filter((l) => !l.locks.shape || !l.locks.size || !l.locks.move)
-                  .map((l, idx, arr) => (
-                    <PhotoShapeSection
-                      key={l.id}
-                      layer={l}
-                      value={(layerValues[l.id] as PhotoLayerValue | undefined) ?? null}
-                      heading={arr.length > 1 ? l.name || t("layer.imageTab", { n: idx + 1 }) : null}
-                    />
-                  ))}
-              </div>
-            )}
-            {showAiInsideImage && (
-              <div className="mt-4 pt-4 border-t space-y-2">
-                <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                  {t("section.aiStyle")}
-                </Label>
-                <AiStyleSection presets={aiStyles} />
-              </div>
-            )}
+            <PhotoLayersControls
+              photoLayers={photoLayers}
+              layerValues={layerValues}
+              photoSources={photoSources}
+              aiStyles={aiStyles}
+            />
           </AccordionContent>
         </AccordionItem>
       )}
-
       {showAiPhotoSection && (
         <AccordionItem value="forvandling" className={cn(cardClass, "border-b-0")}>
           <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
