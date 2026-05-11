@@ -39,6 +39,7 @@ export default function AdminConfigs() {
   const [installing, setInstalling] = useState(false);
   const [installStatus, setInstallStatus] = useState<InstallStatus | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [confirmSyncOpen, setConfirmSyncOpen] = useState(false);
   const [searchParams] = useSearchParams();
 
   const refreshInstallStatus = async () => {
