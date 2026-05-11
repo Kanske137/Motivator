@@ -272,10 +272,26 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
 
   const layerToEditorRect = (l: TemplateLayer) => {
     const eff = effectiveLayerRect(l, layerTransforms, { marginRemovedInsets });
-    const left = (frontInsetX + (eff.xPct / 100) * (1 - 2 * frontInsetX)) * 100;
-    const top = (frontInsetY + (eff.yPct / 100) * (1 - 2 * frontInsetY)) * 100;
-    const width = (eff.wPct / 100) * (1 - 2 * frontInsetX) * 100;
-    const height = (eff.hPct / 100) * (1 - 2 * frontInsetY) * 100;
+    let left = (frontInsetX + (eff.xPct / 100) * (1 - 2 * frontInsetX)) * 100;
+    let top = (frontInsetY + (eff.yPct / 100) * (1 - 2 * frontInsetY)) * 100;
+    let width = (eff.wPct / 100) * (1 - 2 * frontInsetX) * 100;
+    let height = (eff.hPct / 100) * (1 - 2 * frontInsetY) * 100;
+    // Bleed/wrap extension for front-relative full-bleed media: any layer
+    // touching a front edge auto-extends out into the wrap band so the
+    // canvas sides never look empty regardless of which size is selected.
+    const BLEED_EPS = 0.5;
+    const bleedEligible =
+      wrapCm > 0 && !layersIncludeWrap &&
+      (l.type === "map" || l.type === "image" ||
+        l.type === "photo" || l.type === "aiPhoto");
+    if (bleedEligible) {
+      const extX = frontInsetX * 100;
+      const extY = frontInsetY * 100;
+      if (eff.xPct <= BLEED_EPS) { left -= extX; width += extX; }
+      if (eff.yPct <= BLEED_EPS) { top -= extY; height += extY; }
+      if (eff.xPct + eff.wPct >= 100 - BLEED_EPS) { width += extX; }
+      if (eff.yPct + eff.hPct >= 100 - BLEED_EPS) { height += extY; }
+    }
     return { left, top, width, height };
   };
 
