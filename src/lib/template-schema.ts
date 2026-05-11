@@ -342,11 +342,20 @@ export const templateSchema = z
     }),
     /** Optional canvas-specific layout. When present and the active product
      *  type is "canvas", runtime + admin use this instead of `defaultLayout`.
-     *  Layer % are relative to the FULL editor surface (front + 2× wrap). */
+     *
+     *  `coordSpace`:
+     *    - "front" (current): layer % are relative to the FRONT zone only.
+     *      Wrap is added symmetrically by the renderer; full-bleed layers
+     *      touching a front edge auto-extend into the wrap band so the
+     *      canvas edges never look empty. This keeps a layer in the same
+     *      visual position regardless of which size the customer picks.
+     *    - "fullArea" (legacy): layer % are relative to FRONT + 2×wrap.
+     *      Migrated to "front" automatically on read. */
     canvasLayout: z
       .object({
         portrait: orientationLayoutSchema,
         landscape: orientationLayoutSchema,
+        coordSpace: z.enum(["front", "fullArea"]).optional(),
       })
       .optional(),
     sizeOverrides: z.record(z.string(), sizeOverrideSchema).default({}),
