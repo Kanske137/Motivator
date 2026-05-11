@@ -43,9 +43,12 @@ export async function getPrintFileUrl(args: PrintPipelineArgs): Promise<string> 
         "Mallen saknar bildplats — be admin lägga till ett bildlager.",
       );
     }
-    if (!templateInput.photoOverlayUrl) {
+    const hasOverlay =
+      !!templateInput.photoOverlayUrl ||
+      Object.keys(templateInput.photoOverlays ?? {}).length > 0;
+    if (!hasOverlay) {
       throw new Error(
-        `Source=${source} men ingen photoOverlayUrl tillhandahölls.`,
+        `Source=${source} men inga photo overlays tillhandahölls.`,
       );
     }
   }
