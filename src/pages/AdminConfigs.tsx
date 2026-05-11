@@ -10,6 +10,16 @@ import { resolveTemplate } from "@/lib/template-migrate";
 import type { Template } from "@/lib/template-schema";
 import CreateTemplateDialog from "@/components/admin/CreateTemplateDialog";
 import TemplateThumbnail from "@/components/admin/TemplateThumbnail";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface ConfigWithTemplate extends ProductConfig {
   __template: Template;
@@ -29,6 +39,7 @@ export default function AdminConfigs() {
   const [installing, setInstalling] = useState(false);
   const [installStatus, setInstallStatus] = useState<InstallStatus | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [confirmSyncOpen, setConfirmSyncOpen] = useState(false);
   const [searchParams] = useSearchParams();
 
   const refreshInstallStatus = async () => {
@@ -116,7 +127,7 @@ export default function AdminConfigs() {
                 <Plus className="h-4 w-4 mr-2" />
                 Skapa ny mall
               </Button>
-              <Button onClick={syncToShopify} disabled={syncing || !installStatus?.installed}>
+              <Button onClick={() => setConfirmSyncOpen(true)} disabled={syncing || !installStatus?.installed || configs.length === 0}>
                 {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
                 Synka till Shopify
               </Button>
@@ -213,6 +224,28 @@ export default function AdminConfigs() {
       </main>
 
       <CreateTemplateDialog open={createOpen} onOpenChange={setCreateOpen} />
+
+      <AlertDialog open={confirmSyncOpen} onOpenChange={setConfirmSyncOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Synka alla mallar till Shopify?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {configs.length} mall{configs.length === 1 ? "" : "ar"} kommer skickas till Shopify. Befintliga produkter med samma handle uppdateras (titel, varianter, metafält). Vill du fortsätta?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmSyncOpen(false);
+                syncToShopify();
+              }}
+            >
+              Ja, synka
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
