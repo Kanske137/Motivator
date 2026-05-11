@@ -161,18 +161,6 @@ export default function TemplateThumbnail({ template, width = 120, height = 160,
         }
         return null;
       })}
-      {useCanvasLayout && (
-        <div
-          className="absolute pointer-events-none border border-dashed border-primary/70"
-          style={{
-            left: `${frontInsetPct}%`,
-            top: `${frontInsetPct}%`,
-            right: `${frontInsetPct}%`,
-            bottom: `${frontInsetPct}%`,
-          }}
-          aria-hidden
-        />
-      )}
       {isAcrylic && (
         <>
           {[
