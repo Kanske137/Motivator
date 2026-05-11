@@ -1,12 +1,14 @@
-// Customer-side AI-style picker. Visible when a photo is uploaded and the
-// active product template defines `aiStyles`. Each preset triggers the
-// `replicate-style` edge function which returns a `printFileUrl` already
-// uploaded to the print-files bucket.
+// Per-photo-layer AI-style picker. Visible when a photo is uploaded for the
+// given layer and the active product template defines `aiStyles`. Each preset
+// triggers the `replicate-style` edge function which returns a `printFileUrl`
+// already uploaded to the print-files bucket.
 //
 // Cache: results are keyed by (photoHash, presetId) where photoHash is a
 // SHA-256 of the file bytes. This survives URL churn (re-uploads create new
-// paths) and full page reloads.
+// paths) and full page reloads, and even works across photo layers when the
+// customer happens to upload the same image twice.
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, Sparkles, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEditorStore } from "@/stores/editorStore";
@@ -20,6 +22,8 @@ import { AiProgress } from "./AiProgress";
 
 interface Props {
   presets: AiStylePreset[];
+  /** Photo layer this AI section operates on. */
+  layerId: string;
 }
 
 /** Convert a Blob to a JPEG dataURL via canvas (Replicate prefers HTTPS URLs,
@@ -33,22 +37,24 @@ async function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-export function AiStyleSection({ presets }: Props) {
-  const photoFile = useEditorStore((s) => s.photoFile);
-  const photoPreviewUrl = useEditorStore((s) => s.photoPreviewUrl);
-  const originalPhotoUrl = useEditorStore((s) => s.originalPhotoUrl);
-  const setOriginalPhotoUrl = useEditorStore((s) => s.setOriginalPhotoUrl);
-  const photoHash = useEditorStore((s) => s.photoHash);
-  const setPhotoHash = useEditorStore((s) => s.setPhotoHash);
-  const aiPrintFileUrl = useEditorStore((s) => s.aiPrintFileUrl);
-  const setAiPrintFileUrl = useEditorStore((s) => s.setAiPrintFileUrl);
-  const clearAiResultOnly = useEditorStore((s) => s.clearAiResultOnly);
+export function AiStyleSection({ presets, layerId }: Props) {
+  const { t } = useTranslation();
+  const source = useEditorStore((s) => s.photoSources[layerId]);
+  const aiPrintFileUrl = useEditorStore((s) => s.photoAiResults[layerId] ?? null);
+  const setPhotoHashFor = useEditorStore((s) => s.setPhotoHashFor);
+  const setOriginalPhotoUrlFor = useEditorStore((s) => s.setOriginalPhotoUrlFor);
+  const setAiPrintFileUrlFor = useEditorStore((s) => s.setAiPrintFileUrlFor);
+  const clearAiResultOnlyFor = useEditorStore((s) => s.clearAiResultOnlyFor);
   const addAiResultToCache = useEditorStore((s) => s.addAiResultToCache);
   const getCachedAiResult = useEditorStore((s) => s.getCachedAiResult);
   const listAiResultsForPhoto = useEditorStore((s) => s.listAiResultsForPhoto);
   const clearAiResult = useEditorStore((s) => s.clearAiResult);
   // Subscribe to the cache so the history list re-renders when entries change.
   const aiResultCache = useEditorStore((s) => s.aiResultCache);
+
+  const photoFile = source?.file ?? null;
+  const photoHash = source?.hash ?? null;
+  const originalPhotoUrl = source?.originalUrl ?? null;
 
   const [busyId, setBusyId] = useState<string | null>(null);
   const [stage, setStage] = useState<string | null>(null);
@@ -61,13 +67,13 @@ export function AiStyleSection({ presets }: Props) {
     let cancelled = false;
     hashFile(photoFile)
       .then((h) => {
-        if (!cancelled) setPhotoHash(h);
+        if (!cancelled) setPhotoHashFor(layerId, h);
       })
       .catch((e) => console.warn("[AiStyle] hashFile failed", e));
     return () => {
       cancelled = true;
     };
-  }, [photoFile, setPhotoHash]);
+  }, [photoFile, layerId, setPhotoHashFor]);
 
   const ensureUploadedPhotoUrl = async (): Promise<string | null> => {
     if (originalPhotoUrl) return originalPhotoUrl;
@@ -76,7 +82,7 @@ export function AiStyleSection({ presets }: Props) {
       const dataUrl = await blobToDataUrl(photoFile);
       const designId = `src-${(crypto as any)?.randomUUID?.() ?? Date.now()}`;
       const url = await uploadCartPreview(dataUrl, designId);
-      setOriginalPhotoUrl(url);
+      setOriginalPhotoUrlFor(layerId, url);
       return url;
     } catch (e) {
       console.error("[AiStyle] upload failed", e);
@@ -90,7 +96,7 @@ export function AiStyleSection({ presets }: Props) {
     if (!photoFile) return null;
     try {
       const h = await hashFile(photoFile);
-      setPhotoHash(h);
+      setPhotoHashFor(layerId, h);
       return h;
     } catch (e) {
       console.warn("[AiStyle] hashFile failed", e);
@@ -112,7 +118,7 @@ export function AiStyleSection({ presets }: Props) {
       if (hash) {
         const cached = getCachedAiResult(hash, preset.id);
         if (cached) {
-          setAiPrintFileUrl(cached);
+          setAiPrintFileUrlFor(layerId, cached);
           toast.success(`Stil "${preset.label}" återanvänd`);
           return;
         }
@@ -132,7 +138,7 @@ export function AiStyleSection({ presets }: Props) {
       setStage("Hämtar resultat…");
       const printFileUrl = (data as { printFileUrl?: string })?.printFileUrl;
       if (!printFileUrl) throw new Error("Tjänsten returnerade ingen bild");
-      setAiPrintFileUrl(printFileUrl);
+      setAiPrintFileUrlFor(layerId, printFileUrl);
       if (hash) addAiResultToCache(hash, preset.id, preset.label, printFileUrl);
       toast.success(`Stil "${preset.label}" tillämpad`);
     } catch (e) {
@@ -146,9 +152,7 @@ export function AiStyleSection({ presets }: Props) {
   };
 
   const undoAi = () => {
-    // Drop AI result only — keep photoFile/photoHash/originalPhotoUrl so the
-    // history list stays visible and a re-applied style is a cache hit.
-    clearAiResultOnly();
+    clearAiResultOnlyFor(layerId);
   };
 
   if (!photoFile) {
@@ -238,7 +242,7 @@ export function AiStyleSection({ presets }: Props) {
                   <button
                     type="button"
                     onClick={() => {
-                      setAiPrintFileUrl(entry.url);
+                      setAiPrintFileUrlFor(layerId, entry.url);
                       toast.success(`Stil "${entry.presetLabel}" återanvänd`);
                     }}
                     className={cn(
