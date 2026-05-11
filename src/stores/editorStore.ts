@@ -80,6 +80,18 @@ export interface AiPhotoSource {
   uploadedUrl: string | null;
 }
 
+/** Per-photo-layer customer state. Each `photo` layer in the template has
+ *  its own uploaded file + AI state, so multi-photo templates show
+ *  independent images per behållare. */
+export interface PhotoLayerSource {
+  file: File;
+  previewUrl: string;
+  /** SHA-256 of the file bytes; lazy-computed by AiStyleSection. */
+  hash: string | null;
+  /** Public URL after lazy upload to cart-previews (so Replicate can fetch). */
+  originalUrl: string | null;
+}
+
 interface EditorState {
   config: ProductConfig | null;
   template: Template | null;
@@ -105,15 +117,19 @@ interface EditorState {
   variant: string | null;
   orientation: Orientation;
 
-  // print-pipeline source
+  /** Per-photo-layer uploaded sources, keyed by layer id. */
+  photoSources: Record<string, PhotoLayerSource>;
+  /** Per-photo-layer AI-styled print-file URL, keyed by layer id. */
+  photoAiResults: Record<string, string>;
+
+  // ---- legacy mirrors of the FIRST photo layer (kept for backward compat
+  // with cart payload + existing snapshot/mockup callers). Computed via
+  // `mirrorPhoto()` on every per-layer change. New code should read the
+  // per-layer maps above instead. ----
   designSource: DesignSource;
   photoFile: File | null;
   photoPreviewUrl: string | null;
-  /** Public URL of the original photo (uploaded to cart-previews lazily) so
-   *  Replicate can fetch it for AI styles. Cached so we don't re-upload. */
   originalPhotoUrl: string | null;
-  /** SHA-256 of the uploaded photo's bytes. Stable across re-uploads and
-   *  page reloads → used as the cache key for AI results. */
   photoHash: string | null;
   aiPrintFileUrl: string | null;
   /** Real Shopify variant GID (e.g. gid://shopify/ProductVariant/123). Resolved
