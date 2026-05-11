@@ -504,6 +504,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     let nextLayerTransforms: Record<string, { xPct?: number; yPct?: number; wPct?: number; hPct?: number }> = {};
     let nextAiPhotoResults = state.aiPhotoResults;
     let nextAiPhotoSources = state.aiPhotoSources;
+    let nextPhotoSources = state.photoSources;
+    let nextPhotoAiResults = state.photoAiResults;
 
     if (!isFirstLoad && layoutBlockChanged) {
       const idMap = buildLayerIdMap(prevTemplate, prevProductType, template, config.product_type);
@@ -536,6 +538,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         remappedAiSources[newId] = val;
       }
       nextAiPhotoSources = remappedAiSources;
+      // Carry over per-photo-layer sources + AI results (keyed by photo layer ID)
+      const remappedPhotoSources: Record<string, PhotoLayerSource> = {};
+      for (const [oldId, val] of Object.entries(state.photoSources)) {
+        const newId = idMap[oldId] ?? oldId;
+        remappedPhotoSources[newId] = val;
+      }
+      nextPhotoSources = remappedPhotoSources;
+      const remappedPhotoAi: Record<string, string> = {};
+      for (const [oldId, val] of Object.entries(state.photoAiResults)) {
+        const newId = idMap[oldId] ?? oldId;
+        remappedPhotoAi[newId] = val;
+      }
+      nextPhotoAiResults = remappedPhotoAi;
     } else if (!isFirstLoad) {
       // Same layout block (e.g. poster ↔ aluminum) → keep existing per-layer state untouched.
       nextLayerValues = { ...freshLayerValues, ...state.layerValues };
@@ -552,12 +567,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       layerTransforms: nextLayerTransforms,
       aiPhotoResults: nextAiPhotoResults,
       aiPhotoSources: nextAiPhotoSources,
+      photoSources: nextPhotoSources,
+      photoAiResults: nextPhotoAiResults,
       whiteMarginEnabled: true,
       ...(isFirstLoad && layout?.background?.color
         ? { posterBgColor: layout.background.color }
         : {}),
     };
-    set({ ...next, ...mirrorLegacy({ template, orientation, layerValues: nextLayerValues, config }) });
+    set({
+      ...next,
+      ...mirrorLegacy({ template, orientation, layerValues: nextLayerValues, config }),
+      ...mirrorPhoto({ template, orientation, config, photoSources: nextPhotoSources, photoAiResults: nextPhotoAiResults }),
+    });
   },
 
   setPosterBgColor: (posterBgColor) => set({ posterBgColor }),
