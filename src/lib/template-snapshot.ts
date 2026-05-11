@@ -61,8 +61,13 @@ export interface TemplateSnapshotInput {
   /** Akryl-skruvar i hörnen (preview/cart only — aldrig i tryckfil). */
   acrylicCorners?: boolean;
 
-  /** Customer-uploaded photo or AI result. Rendered into every `photo` layer. */
+  /** Legacy single-photo overlay applied to every `photo` layer. Used as a
+   *  fallback when `photoOverlays` does not have an entry for a given layer. */
   photoOverlayUrl?: string;
+  /** Per-photo-layer overlay URLs (customer upload or AI result), keyed by
+   *  layer id. Lets multi-photo templates render different images per
+   *  behållare. */
+  photoOverlays?: Record<string, string>;
 
   /** Per-aiPhoto-layer face-swap result URLs. Falls back to the layer's
    *  admin-set referenceImageUrl when no result is present. */
@@ -617,7 +622,10 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
         console.warn("[template-snapshot] image layer failed", e);
       }
     } else if (layer.type === "photo") {
-      const url = input.photoOverlayUrl ?? layer.defaults.placeholderUrl;
+      const url =
+        input.photoOverlays?.[layer.id] ??
+        input.photoOverlayUrl ??
+        layer.defaults.placeholderUrl;
       if (url) {
         const lv = input.layerValues?.[layer.id];
         const pv = lv && lv.kind === "photo" ? lv : null;

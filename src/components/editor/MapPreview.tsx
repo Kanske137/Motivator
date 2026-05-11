@@ -190,9 +190,8 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
     layerValues,
     layerTransforms,
     setLayerTransform,
-    designSource,
-    photoPreviewUrl,
-    aiPrintFileUrl,
+    photoSources,
+    photoAiResults,
     aiPhotoResults,
     whiteMarginEnabled,
   } = useEditorStore();
@@ -201,10 +200,6 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
   const allLayers = templateLayers();
   // Center-alignment guides shown while dragging a layer (in % of editor).
   const [guides, setGuides] = useState<{ h: boolean; v: boolean }>({ h: false, v: false });
-  // When the customer has uploaded a photo (or generated an AI image) we
-  // show that image inside every map layer's shape instead of Mapbox.
-  const photoOverlayUrl =
-    designSource === "ai" ? aiPrintFileUrl : designSource === "photo" ? photoPreviewUrl : null;
 
   // Outer poster/canvas frame
   const sizeCm = parseCm(size);
@@ -436,7 +431,11 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
               heartIdRef.current,
               starIdRef.current,
             );
-            const src = photoOverlayUrl ?? l.defaults.placeholderUrl ?? null;
+            const src =
+              photoAiResults[l.id] ??
+              photoSources[l.id]?.previewUrl ??
+              l.defaults.placeholderUrl ??
+              null;
             return (
               <div key={l.id} style={wrapStyle}>
                 <PhotoLayerView

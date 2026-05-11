@@ -80,6 +80,18 @@ export interface AiPhotoSource {
   uploadedUrl: string | null;
 }
 
+/** Per-photo-layer customer state. Each `photo` layer in the template has
+ *  its own uploaded file + AI state, so multi-photo templates show
+ *  independent images per behållare. */
+export interface PhotoLayerSource {
+  file: File;
+  previewUrl: string;
+  /** SHA-256 of the file bytes; lazy-computed by AiStyleSection. */
+  hash: string | null;
+  /** Public URL after lazy upload to cart-previews (so Replicate can fetch). */
+  originalUrl: string | null;
+}
+
 interface EditorState {
   config: ProductConfig | null;
   template: Template | null;
@@ -105,15 +117,19 @@ interface EditorState {
   variant: string | null;
   orientation: Orientation;
 
-  // print-pipeline source
+  /** Per-photo-layer uploaded sources, keyed by layer id. */
+  photoSources: Record<string, PhotoLayerSource>;
+  /** Per-photo-layer AI-styled print-file URL, keyed by layer id. */
+  photoAiResults: Record<string, string>;
+
+  // ---- legacy mirrors of the FIRST photo layer (kept for backward compat
+  // with cart payload + existing snapshot/mockup callers). Computed via
+  // `mirrorPhoto()` on every per-layer change. New code should read the
+  // per-layer maps above instead. ----
   designSource: DesignSource;
   photoFile: File | null;
   photoPreviewUrl: string | null;
-  /** Public URL of the original photo (uploaded to cart-previews lazily) so
-   *  Replicate can fetch it for AI styles. Cached so we don't re-upload. */
   originalPhotoUrl: string | null;
-  /** SHA-256 of the uploaded photo's bytes. Stable across re-uploads and
-   *  page reloads → used as the cache key for AI results. */
   photoHash: string | null;
   aiPrintFileUrl: string | null;
   /** Real Shopify variant GID (e.g. gid://shopify/ProductVariant/123). Resolved
@@ -151,6 +167,17 @@ interface EditorState {
    *  a cache hit. */
   clearAiResultOnly: () => void;
   resetDesignSource: () => void;
+
+  // ---------- per-photo-layer setters ----------
+  setPhotoSourceFor: (layerId: string, file: File | null, previewUrl: string | null) => void;
+  setPhotoHashFor: (layerId: string, hash: string) => void;
+  setOriginalPhotoUrlFor: (layerId: string, url: string) => void;
+  setAiPrintFileUrlFor: (layerId: string, url: string | null) => void;
+  clearAiResultOnlyFor: (layerId: string) => void;
+  /** Returns a per-layer overlay map (AI result wins over upload) for use
+   *  by the snapshot/print pipeline + mockup gallery. */
+  getPhotoOverlays: () => Record<string, string>;
+  firstPhotoLayerId: () => string | null;
   setShopifyVariantId: (id: string | null) => void;
   setShopifyVariantResolving: (resolving: boolean) => void;
 
@@ -357,6 +384,32 @@ function mirrorLegacy(
   };
 }
 
+/** Recompute legacy first-photo-layer mirrors. The mirrors keep the cart
+ *  payload + EditorPage's existing reads working unchanged. */
+function mirrorPhoto(
+  state: Pick<EditorState, "template" | "orientation" | "config" | "photoSources" | "photoAiResults">,
+) {
+  const layout = state.template
+    ? getActiveLayoutBlock(state.template, state.config?.product_type)[state.orientation]
+    : undefined;
+  const firstPhoto = layout?.layers.find((l) => l.type === "photo");
+  const id = firstPhoto?.id ?? null;
+  const src = id ? state.photoSources[id] : undefined;
+  const ai = id ? state.photoAiResults[id] : undefined;
+  // Aggregate `designSource` across ALL photo layers so the cart payload
+  // reflects the strongest source in use anywhere on the template.
+  const anyAi = Object.keys(state.photoAiResults).length > 0;
+  const anyPhoto = Object.keys(state.photoSources).length > 0;
+  const designSource: DesignSource = anyAi ? "ai" : anyPhoto ? "photo" : "map";
+  return {
+    designSource,
+    photoFile: src?.file ?? null,
+    photoPreviewUrl: src?.previewUrl ?? null,
+    photoHash: src?.hash ?? null,
+    originalPhotoUrl: src?.originalUrl ?? null,
+    aiPrintFileUrl: ai ?? null,
+  };
+}
 export const useEditorStore = create<EditorState>((set, get) => ({
   config: null,
   template: null,
@@ -376,6 +429,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   originalPhotoUrl: null,
   photoHash: null,
   aiPrintFileUrl: null,
+  photoSources: {},
+  photoAiResults: {},
   shopifyVariantId: null,
   shopifyVariantResolving: false,
   aiResultCache: loadAiCache(),
@@ -449,6 +504,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     let nextLayerTransforms: Record<string, { xPct?: number; yPct?: number; wPct?: number; hPct?: number }> = {};
     let nextAiPhotoResults = state.aiPhotoResults;
     let nextAiPhotoSources = state.aiPhotoSources;
+    let nextPhotoSources = state.photoSources;
+    let nextPhotoAiResults = state.photoAiResults;
 
     if (!isFirstLoad && layoutBlockChanged) {
       const idMap = buildLayerIdMap(prevTemplate, prevProductType, template, config.product_type);
@@ -481,6 +538,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         remappedAiSources[newId] = val;
       }
       nextAiPhotoSources = remappedAiSources;
+      // Carry over per-photo-layer sources + AI results (keyed by photo layer ID)
+      const remappedPhotoSources: Record<string, PhotoLayerSource> = {};
+      for (const [oldId, val] of Object.entries(state.photoSources)) {
+        const newId = idMap[oldId] ?? oldId;
+        remappedPhotoSources[newId] = val;
+      }
+      nextPhotoSources = remappedPhotoSources;
+      const remappedPhotoAi: Record<string, string> = {};
+      for (const [oldId, val] of Object.entries(state.photoAiResults)) {
+        const newId = idMap[oldId] ?? oldId;
+        remappedPhotoAi[newId] = val;
+      }
+      nextPhotoAiResults = remappedPhotoAi;
     } else if (!isFirstLoad) {
       // Same layout block (e.g. poster ↔ aluminum) → keep existing per-layer state untouched.
       nextLayerValues = { ...freshLayerValues, ...state.layerValues };
@@ -497,12 +567,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       layerTransforms: nextLayerTransforms,
       aiPhotoResults: nextAiPhotoResults,
       aiPhotoSources: nextAiPhotoSources,
+      photoSources: nextPhotoSources,
+      photoAiResults: nextPhotoAiResults,
       whiteMarginEnabled: true,
       ...(isFirstLoad && layout?.background?.color
         ? { posterBgColor: layout.background.color }
         : {}),
     };
-    set({ ...next, ...mirrorLegacy({ template, orientation, layerValues: nextLayerValues, config }) });
+    set({
+      ...next,
+      ...mirrorLegacy({ template, orientation, layerValues: nextLayerValues, config }),
+      ...mirrorPhoto({ template, orientation, config, photoSources: nextPhotoSources, photoAiResults: nextPhotoAiResults }),
+    });
   },
 
   setPosterBgColor: (posterBgColor) => set({ posterBgColor }),
@@ -549,58 +625,130 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   setVariant: (variant) => set({ variant }),
   setOrientation: (orientation) => {
-    const { template, config } = get();
+    const state = get();
+    const { template, config, photoSources, photoAiResults } = state;
     if (!template) return set({ orientation });
     const layerValues = hydrateLayerValues(template, orientation, config?.product_type);
-    set({ orientation, layerValues, layerTransforms: {}, whiteMarginEnabled: true, ...mirrorLegacy({ template, orientation, layerValues, config }) });
+    set({
+      orientation,
+      layerValues,
+      layerTransforms: {},
+      whiteMarginEnabled: true,
+      ...mirrorLegacy({ template, orientation, layerValues, config }),
+      ...mirrorPhoto({ template, orientation, config, photoSources, photoAiResults }),
+    });
   },
 
-  setPhotoSource: (file, previewUrl) => {
-    const prev = get();
-    // If a file is being cleared, also clear hash + originalPhotoUrl.
-    // If a new file is set, callers should follow up with `setPhotoHash` once
-    // the SHA-256 has been computed. We optimistically null the AI result and
-    // upload URL since they belong to the previous photo.
+  // ---------- per-photo-layer setters ----------
+  setPhotoSourceFor: (layerId, file, previewUrl) => {
+    const state = get();
+    const prevSrc = state.photoSources[layerId];
+    if (prevSrc?.previewUrl?.startsWith("blob:") && prevSrc.previewUrl !== previewUrl) {
+      try { URL.revokeObjectURL(prevSrc.previewUrl); } catch { /* noop */ }
+    }
+    const nextSources = { ...state.photoSources };
+    const nextResults = { ...state.photoAiResults };
+    if (!file || !previewUrl) {
+      delete nextSources[layerId];
+      delete nextResults[layerId];
+    } else {
+      nextSources[layerId] = { file, previewUrl, hash: null, originalUrl: null };
+      // New photo → drop any AI result for this layer.
+      delete nextResults[layerId];
+    }
+    // Reset offset for this specific photo layer.
+    const layerValues = { ...state.layerValues };
+    const v = layerValues[layerId];
+    if (v && v.kind === "photo") {
+      layerValues[layerId] = { ...v, offsetX: 0, offsetY: 0 };
+    }
     set({
-      photoFile: file,
-      photoPreviewUrl: previewUrl,
-      designSource: file ? "photo" : "map",
-      aiPrintFileUrl: file ? null : prev.aiPrintFileUrl,
-      originalPhotoUrl: file ? null : prev.originalPhotoUrl,
-      photoHash: file ? null : prev.photoHash,
-      layerValues: resetPhotoOffsets(prev.layerValues),
+      photoSources: nextSources,
+      photoAiResults: nextResults,
+      layerValues,
+      ...mirrorPhoto({ ...state, photoSources: nextSources, photoAiResults: nextResults }),
     });
   },
-  setOriginalPhotoUrl: (url) => set({ originalPhotoUrl: url }),
+  setPhotoHashFor: (layerId, hash) => {
+    const state = get();
+    const cur = state.photoSources[layerId];
+    if (!cur || cur.hash === hash) return;
+    const nextSources = { ...state.photoSources, [layerId]: { ...cur, hash } };
+    set({ photoSources: nextSources, ...mirrorPhoto({ ...state, photoSources: nextSources }) });
+  },
+  setOriginalPhotoUrlFor: (layerId, url) => {
+    const state = get();
+    const cur = state.photoSources[layerId];
+    if (!cur) return;
+    const nextSources = { ...state.photoSources, [layerId]: { ...cur, originalUrl: url } };
+    set({ photoSources: nextSources, ...mirrorPhoto({ ...state, photoSources: nextSources }) });
+  },
+  setAiPrintFileUrlFor: (layerId, url) => {
+    const state = get();
+    const nextResults = { ...state.photoAiResults };
+    if (url) nextResults[layerId] = url;
+    else delete nextResults[layerId];
+    set({ photoAiResults: nextResults, ...mirrorPhoto({ ...state, photoAiResults: nextResults }) });
+  },
+  clearAiResultOnlyFor: (layerId) => {
+    const state = get();
+    if (!(layerId in state.photoAiResults)) return;
+    const nextResults = { ...state.photoAiResults };
+    delete nextResults[layerId];
+    set({ photoAiResults: nextResults, ...mirrorPhoto({ ...state, photoAiResults: nextResults }) });
+  },
+  getPhotoOverlays: () => {
+    const { photoSources, photoAiResults } = get();
+    const out: Record<string, string> = {};
+    for (const [id, src] of Object.entries(photoSources)) {
+      if (src.previewUrl) out[id] = src.previewUrl;
+    }
+    for (const [id, url] of Object.entries(photoAiResults)) {
+      if (url) out[id] = url;
+    }
+    return out;
+  },
+  firstPhotoLayerId: () => {
+    const layers = get().templateLayers();
+    return layers.find((l) => l.type === "photo")?.id ?? null;
+  },
+
+  // ---------- legacy globals → operate on first photo layer ----------
+  setPhotoSource: (file, previewUrl) => {
+    const id = get().firstPhotoLayerId();
+    if (id) get().setPhotoSourceFor(id, file, previewUrl);
+  },
+  setOriginalPhotoUrl: (url) => {
+    const id = get().firstPhotoLayerId();
+    if (id && url) get().setOriginalPhotoUrlFor(id, url);
+  },
   setPhotoHash: (hash) => {
-    // If the new hash matches what we already had, this is the same photo
-    // being re-set (e.g. via undo) — nothing to invalidate.
-    const prev = get();
-    if (prev.photoHash === hash) return;
-    set({ photoHash: hash });
+    const id = get().firstPhotoLayerId();
+    if (id && hash) get().setPhotoHashFor(id, hash);
   },
   setAiPrintFileUrl: (url) => {
-    set({ aiPrintFileUrl: url, designSource: url ? "ai" : "map" });
+    const id = get().firstPhotoLayerId();
+    if (id) get().setAiPrintFileUrlFor(id, url);
   },
   clearAiResultOnly: () => {
-    // Drop only the AI-styled result, preserve photo identity so the history
-    // list keeps showing and re-applying a cached style is instant.
-    const { photoFile } = get();
+    const id = get().firstPhotoLayerId();
+    if (id) get().clearAiResultOnlyFor(id);
+  },
+  resetDesignSource: () => {
+    const state = get();
+    // Revoke all blob URLs.
+    for (const src of Object.values(state.photoSources)) {
+      if (src.previewUrl?.startsWith("blob:")) {
+        try { URL.revokeObjectURL(src.previewUrl); } catch { /* noop */ }
+      }
+    }
     set({
-      aiPrintFileUrl: null,
-      designSource: photoFile ? "photo" : "map",
+      photoSources: {},
+      photoAiResults: {},
+      layerValues: resetPhotoOffsets(state.layerValues),
+      ...mirrorPhoto({ ...state, photoSources: {}, photoAiResults: {} }),
     });
   },
-  resetDesignSource: () =>
-    set({
-      designSource: "map",
-      photoFile: null,
-      photoPreviewUrl: null,
-      originalPhotoUrl: null,
-      photoHash: null,
-      aiPrintFileUrl: null,
-      layerValues: resetPhotoOffsets(get().layerValues),
-    }),
   setShopifyVariantId: (shopifyVariantId) => set({ shopifyVariantId }),
   setShopifyVariantResolving: (shopifyVariantResolving) => set({ shopifyVariantResolving }),
 

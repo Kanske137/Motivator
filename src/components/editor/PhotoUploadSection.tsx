@@ -1,7 +1,8 @@
-// Customer-side photo upload. Replaces the map content with the uploaded
-// image (clipped by the same map-layer shapes). The original photo is uploaded
-// lazily to the cart-previews bucket on first AI request — kept here as a
-// preview-only File until then.
+// Per-photo-layer customer upload. The component takes a `layerId` so
+// templates with multiple `photo` layers can have an independent uploaded
+// image per behållare. The original photo is uploaded lazily to the
+// cart-previews bucket on first AI request — kept here as a preview-only
+// File until then.
 import { useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Upload, Image as ImageIcon, Trash2 } from "lucide-react";
@@ -13,13 +14,19 @@ import { cn } from "@/lib/utils";
 const ACCEPT = "image/jpeg,image/png,image/webp,image/heic";
 const MAX_BYTES = 25 * 1024 * 1024; // 25 MB
 
-export function PhotoUploadSection() {
+interface Props {
+  /** Photo layer id to bind this uploader to. */
+  layerId: string;
+}
+
+export function PhotoUploadSection({ layerId }: Props) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
-  const photoFile = useEditorStore((s) => s.photoFile);
-  const photoPreviewUrl = useEditorStore((s) => s.photoPreviewUrl);
-  const setPhotoSource = useEditorStore((s) => s.setPhotoSource);
-  const resetDesignSource = useEditorStore((s) => s.resetDesignSource);
+  const source = useEditorStore((s) => s.photoSources[layerId]);
+  const setPhotoSourceFor = useEditorStore((s) => s.setPhotoSourceFor);
+
+  const photoFile = source?.file ?? null;
+  const photoPreviewUrl = source?.previewUrl ?? null;
 
   const onFiles = useCallback(
     (files: FileList | null) => {
@@ -35,17 +42,14 @@ export function PhotoUploadSection() {
         });
         return;
       }
-      // Revoke previous blob URL
-      if (photoPreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(photoPreviewUrl);
       const url = URL.createObjectURL(f);
-      setPhotoSource(f, url);
+      setPhotoSourceFor(layerId, f, url);
     },
-    [photoPreviewUrl, setPhotoSource],
+    [layerId, setPhotoSourceFor, t],
   );
 
   const onRemove = () => {
-    if (photoPreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(photoPreviewUrl);
-    resetDesignSource();
+    setPhotoSourceFor(layerId, null, null);
   };
 
   return (

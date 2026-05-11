@@ -178,12 +178,7 @@ export default function EditorPage() {
         ? (variant?.match(/(\d+)/)?.[1] ? parseInt(variant.match(/(\d+)/)![1], 10) : 2)
         : 0,
       bleedCm: isCanvas ? 0.3 : 0,
-      photoOverlayUrl:
-        designSource === "ai"
-          ? aiPrintFileUrl ?? undefined
-          : designSource === "photo"
-          ? useEditorStore.getState().photoPreviewUrl ?? undefined
-          : undefined,
+      photoOverlays: useEditorStore.getState().getPhotoOverlays(),
       aiPhotoResults,
     };
 
