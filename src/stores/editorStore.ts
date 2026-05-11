@@ -167,6 +167,17 @@ interface EditorState {
    *  a cache hit. */
   clearAiResultOnly: () => void;
   resetDesignSource: () => void;
+
+  // ---------- per-photo-layer setters ----------
+  setPhotoSourceFor: (layerId: string, file: File | null, previewUrl: string | null) => void;
+  setPhotoHashFor: (layerId: string, hash: string) => void;
+  setOriginalPhotoUrlFor: (layerId: string, url: string) => void;
+  setAiPrintFileUrlFor: (layerId: string, url: string | null) => void;
+  clearAiResultOnlyFor: (layerId: string) => void;
+  /** Returns a per-layer overlay map (AI result wins over upload) for use
+   *  by the snapshot/print pipeline + mockup gallery. */
+  getPhotoOverlays: () => Record<string, string>;
+  firstPhotoLayerId: () => string | null;
   setShopifyVariantId: (id: string | null) => void;
   setShopifyVariantResolving: (resolving: boolean) => void;
 
