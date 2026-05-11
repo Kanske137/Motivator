@@ -622,7 +622,10 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
         console.warn("[template-snapshot] image layer failed", e);
       }
     } else if (layer.type === "photo") {
-      const url = input.photoOverlayUrl ?? layer.defaults.placeholderUrl;
+      const url =
+        input.photoOverlays?.[layer.id] ??
+        input.photoOverlayUrl ??
+        layer.defaults.placeholderUrl;
       if (url) {
         const lv = input.layerValues?.[layer.id];
         const pv = lv && lv.kind === "photo" ? lv : null;
