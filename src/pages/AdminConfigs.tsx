@@ -10,6 +10,16 @@ import { resolveTemplate } from "@/lib/template-migrate";
 import type { Template } from "@/lib/template-schema";
 import CreateTemplateDialog from "@/components/admin/CreateTemplateDialog";
 import TemplateThumbnail from "@/components/admin/TemplateThumbnail";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface ConfigWithTemplate extends ProductConfig {
   __template: Template;
