@@ -97,12 +97,7 @@ export function MockupGallery() {
           wrapCm: isCanvas ? canvasDepthCm : 0,
           bleedCm: isCanvas ? BLEED_CM : 0,
           acrylicCorners: config.product_type === "acrylic",
-          photoOverlayUrl:
-            designSource === "ai"
-              ? aiPrintFileUrl ?? undefined
-              : designSource === "photo"
-              ? photoPreviewUrl ?? undefined
-              : undefined,
+          photoOverlays: { ...photoSources && Object.fromEntries(Object.entries(photoSources).map(([id, s]) => [id, s.previewUrl])), ...photoAiResults },
           aiPhotoResults,
         });
         if (myReq !== reqIdRef.current) return;
