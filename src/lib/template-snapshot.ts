@@ -520,16 +520,18 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
   const h = Math.round(hCm * PX_PER_CM * scale);
   const pxPerMm = (PX_PER_CM * scale) / 10;
 
-  // Front-zone rect (where layer % coords live for poster). For canvas
-  // templates with a dedicated canvasLayout, layer % are anchored to the
-  // FULL editor surface (front + 2× wrap + bleed), so the rect spans the
-  // entire output.
+  // Front-zone rect (where layer % coords live). Canvas templates with the
+  // legacy fullArea coord-space still anchor layers to the FULL surface;
+  // post-migration canvas layouts are front-relative just like posters.
   const layersIncludeWrap =
-    input.productType === "canvas" && !!input.template.canvasLayout;
+    input.productType === "canvas" &&
+    !!input.template.canvasLayout &&
+    input.template.canvasLayout.coordSpace === "fullArea";
   const frontPxX = layersIncludeWrap ? 0 : Math.round(extraCm * PX_PER_CM * scale);
   const frontPxY = layersIncludeWrap ? 0 : Math.round(extraCm * PX_PER_CM * scale);
   const frontPxW = layersIncludeWrap ? w : Math.round(frontWcm * PX_PER_CM * scale);
   const frontPxH = layersIncludeWrap ? h : Math.round(frontHcm * PX_PER_CM * scale);
+  const wrapPxExtra = layersIncludeWrap ? 0 : Math.round(extraCm * PX_PER_CM * scale);
 
   const out = document.createElement("canvas");
   out.width = w;
