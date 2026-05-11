@@ -431,7 +431,11 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
               heartIdRef.current,
               starIdRef.current,
             );
-            const src = photoOverlayUrl ?? l.defaults.placeholderUrl ?? null;
+            const src =
+              photoAiResults[l.id] ??
+              photoSources[l.id]?.previewUrl ??
+              l.defaults.placeholderUrl ??
+              null;
             return (
               <div key={l.id} style={wrapStyle}>
                 <PhotoLayerView
