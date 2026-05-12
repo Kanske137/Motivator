@@ -544,6 +544,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         remappedAiSources[newId] = val;
       }
       nextAiPhotoSources = remappedAiSources;
+      const remappedAiSelected: Record<string, string> = {};
+      for (const [oldId, val] of Object.entries(state.aiPhotoSelectedRefUrl)) {
+        const newId = idMap[oldId] ?? oldId;
+        remappedAiSelected[newId] = val;
+      }
+      nextAiPhotoSelectedRefUrl = remappedAiSelected;
       // Carry over per-photo-layer sources + AI results (keyed by photo layer ID)
       const remappedPhotoSources: Record<string, PhotoLayerSource> = {};
       for (const [oldId, val] of Object.entries(state.photoSources)) {
