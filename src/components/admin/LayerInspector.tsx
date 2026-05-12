@@ -931,3 +931,177 @@ function AiPhotoDefaultsSection({
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// ReferenceFocalEditor: draggable thumb that lets the admin pick the visible
+// portion of a reference image (focal point). Mirrors the cover-pan math used
+// by the customer-side `PhotoLayerView` so what the admin sees matches what
+// the customer/print pipeline will render. Always clamps inside the image
+// bounds — focalX/Y can never push the picture off its own edges.
+// ---------------------------------------------------------------------------
+function ReferenceFocalEditor({
+  url,
+  label,
+  shape,
+  fit,
+  focalX,
+  focalY,
+  onChange,
+}: {
+  url: string;
+  label?: string;
+  shape: "rect" | "circle" | "heart" | "star";
+  fit: "cover" | "contain";
+  focalX: number;
+  focalY: number;
+  onChange: (focalX: number, focalY: number) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const dragRef = useRef<{
+    startX: number;
+    startY: number;
+    baseX: number;
+    baseY: number;
+    width: number;
+    height: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const update = () => {
+      const r = el.getBoundingClientRect();
+      setBox({ w: r.width, h: r.height });
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const { maxX, maxY, renderW, renderH } = (() => {
+    if (fit === "contain" || !natural || box.w === 0 || box.h === 0) {
+      return { maxX: 0, maxY: 0, renderW: 0, renderH: 0 };
+    }
+    const scale = Math.max(box.w / natural.w, box.h / natural.h);
+    const rW = natural.w * scale;
+    const rH = natural.h * scale;
+    const overflowXPct = ((rW - box.w) / box.w) * 100;
+    const overflowYPct = ((rH - box.h) / box.h) * 100;
+    return { maxX: overflowXPct / 2, maxY: overflowYPct / 2, renderW: rW, renderH: rH };
+  })();
+
+  // Re-clamp if image / box changed.
+  useEffect(() => {
+    if (fit === "contain") return;
+    const cx = Math.max(-maxX, Math.min(maxX, focalX));
+    const cy = Math.max(-maxY, Math.min(maxY, focalY));
+    if (cx !== focalX || cy !== focalY) onChange(cx, cy);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [maxX, maxY, fit]);
+
+  const canPan = fit !== "contain" && (maxX > 0 || maxY > 0);
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!canPan) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      baseX: focalX,
+      baseY: focalY,
+      width: rect.width,
+      height: rect.height,
+    };
+    el.setPointerCapture(e.pointerId);
+    setDragging(true);
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const s = dragRef.current;
+    if (!s) return;
+    const dxPct = ((e.clientX - s.startX) / s.width) * 100;
+    const dyPct = ((e.clientY - s.startY) / s.height) * 100;
+    const nx = Math.max(-maxX, Math.min(maxX, s.baseX + dxPct));
+    const ny = Math.max(-maxY, Math.min(maxY, s.baseY + dyPct));
+    onChange(nx, ny);
+  };
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = containerRef.current;
+    if (el && el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+    dragRef.current = null;
+    setDragging(false);
+  };
+
+  const clipPath = (() => {
+    if (shape === "circle" && box.w > 0 && box.h > 0) {
+      return `circle(${Math.min(box.w, box.h) / 2}px at 50% 50%)`;
+    }
+    if (shape === "heart") {
+      return "path('M 0.5 1 C 0.5 1 0 0.65 0 0.3 C 0 0.1 0.2 0 0.35 0 C 0.42 0 0.48 0.05 0.5 0.15 C 0.52 0.05 0.58 0 0.65 0 C 0.8 0 1 0.1 1 0.3 C 1 0.65 0.5 1 0.5 1 Z')";
+    }
+    return undefined;
+  })();
+
+  return (
+    <div className="space-y-1">
+      <div
+        ref={containerRef}
+        className="relative rounded-md overflow-hidden border bg-muted aspect-square"
+        style={{
+          cursor: canPan ? (dragging ? "grabbing" : "grab") : "default",
+          touchAction: canPan ? "none" : undefined,
+          clipPath,
+        }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
+        {fit === "contain" || !natural || renderW === 0 ? (
+          <img
+            src={url}
+            alt={label ?? "Referensbild"}
+            onLoad={(e) => {
+              const i = e.currentTarget;
+              setNatural({ w: i.naturalWidth, h: i.naturalHeight });
+            }}
+            className={`absolute inset-0 w-full h-full ${
+              fit === "contain" ? "object-contain" : "object-cover"
+            } pointer-events-none select-none`}
+            draggable={false}
+          />
+        ) : (
+          <img
+            src={url}
+            alt={label ?? "Referensbild"}
+            onLoad={(e) => {
+              const i = e.currentTarget;
+              setNatural({ w: i.naturalWidth, h: i.naturalHeight });
+            }}
+            style={{
+              position: "absolute",
+              width: `${renderW}px`,
+              height: `${renderH}px`,
+              left: `${(box.w - renderW) / 2 + (focalX / 100) * box.w}px`,
+              top: `${(box.h - renderH) / 2 + (focalY / 100) * box.h}px`,
+              userSelect: "none",
+              pointerEvents: "none",
+              maxWidth: "none",
+            }}
+            draggable={false}
+          />
+        )}
+      </div>
+      {canPan && (
+        <p className="text-[10px] text-muted-foreground leading-tight">
+          Dra för att välja synlig del
+        </p>
+      )}
+    </div>
+  );
+}
