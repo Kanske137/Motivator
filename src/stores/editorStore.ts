@@ -675,6 +675,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const photoAiResults = remap(state.photoAiResults);
     const aiPhotoSources = remap(state.aiPhotoSources);
     const aiPhotoResults = remap(state.aiPhotoResults);
+    const aiPhotoSelectedRefUrl = remap(state.aiPhotoSelectedRefUrl);
     const layerTransforms = remap(state.layerTransforms);
 
     set({
@@ -685,6 +686,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       photoAiResults,
       aiPhotoSources,
       aiPhotoResults,
+      aiPhotoSelectedRefUrl,
       whiteMarginEnabled: true,
       ...mirrorLegacy({ template, orientation, layerValues, config }),
       ...mirrorPhoto({ template, orientation, config, photoSources, photoAiResults }),
