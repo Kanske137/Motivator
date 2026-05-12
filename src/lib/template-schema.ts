@@ -125,6 +125,13 @@ export const aiPhotoDefaultsSchema = z.object({
         id: z.string().min(1),
         url: z.string().url(),
         label: z.string().optional(),
+        /** Admin-chosen focal point for the cover-fit reference image,
+         *  expressed as percent of the layer box. Same semantics as
+         *  `offsetX/offsetY` on photo layers (0 = centered, range -50..50).
+         *  Applied to both the reference preview and the face-swapped result
+         *  (which has the same dimensions as the reference). */
+        focalX: z.number().min(-50).max(50).optional(),
+        focalY: z.number().min(-50).max(50).optional(),
       }),
     )
     .default([]),
