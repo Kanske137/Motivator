@@ -626,13 +626,60 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setVariant: (variant) => set({ variant }),
   setOrientation: (orientation) => {
     const state = get();
-    const { template, config, photoSources, photoAiResults } = state;
+    const { template, config } = state;
     if (!template) return set({ orientation });
-    const layerValues = hydrateLayerValues(template, orientation, config?.product_type);
+    const prevOrientation = state.orientation;
+    const freshLayerValues = hydrateLayerValues(template, orientation, config?.product_type);
+
+    // Build a portrait↔landscape ID map within the active layout block by
+    // pairing layers of the same type index-by-index. Lets per-layer state
+    // (AI results, photo sources, transforms) follow over to the matching
+    // container in the new orientation.
+    const block = getActiveLayoutBlock(template, config?.product_type);
+    const prevLayers = block[prevOrientation]?.layers ?? [];
+    const nextLayers = block[orientation]?.layers ?? [];
+    const grouped: Record<string, TemplateLayer[]> = {};
+    for (const l of nextLayers) (grouped[l.type] ||= []).push(l);
+    const cursors: Record<string, number> = {};
+    const idMap: Record<string, string> = {};
+    for (const prev of prevLayers) {
+      const idx = cursors[prev.type] ?? 0;
+      const next = grouped[prev.type]?.[idx];
+      if (next) idMap[prev.id] = next.id;
+      cursors[prev.type] = idx + 1;
+    }
+    const remap = <T,>(m: Record<string, T>): Record<string, T> => {
+      const out: Record<string, T> = {};
+      for (const [oldId, v] of Object.entries(m)) {
+        const newId = idMap[oldId] ?? oldId;
+        out[newId] = v;
+      }
+      return out;
+    };
+
+    // Carry over layerValues for paired layers (same kind), otherwise fresh.
+    const layerValues: Record<string, LayerValue> = { ...freshLayerValues };
+    for (const [oldId, oldVal] of Object.entries(state.layerValues)) {
+      const newId = idMap[oldId] ?? oldId;
+      if (layerValues[newId] && layerValues[newId].kind === oldVal.kind) {
+        layerValues[newId] = oldVal;
+      }
+    }
+
+    const photoSources = remap(state.photoSources);
+    const photoAiResults = remap(state.photoAiResults);
+    const aiPhotoSources = remap(state.aiPhotoSources);
+    const aiPhotoResults = remap(state.aiPhotoResults);
+    const layerTransforms = remap(state.layerTransforms);
+
     set({
       orientation,
       layerValues,
-      layerTransforms: {},
+      layerTransforms,
+      photoSources,
+      photoAiResults,
+      aiPhotoSources,
+      aiPhotoResults,
       whiteMarginEnabled: true,
       ...mirrorLegacy({ template, orientation, layerValues, config }),
       ...mirrorPhoto({ template, orientation, config, photoSources, photoAiResults }),
