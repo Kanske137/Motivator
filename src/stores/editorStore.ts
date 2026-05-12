@@ -195,6 +195,7 @@ interface EditorState {
   setAiPhotoHash: (layerId: string, hash: string) => void;
   setAiPhotoUploadedUrl: (layerId: string, url: string) => void;
   setAiPhotoResult: (layerId: string, url: string | null) => void;
+  setAiPhotoSelectedRef: (layerId: string, url: string | null) => void;
   clearAiPhoto: (layerId: string) => void;
   addFaceSwapToCache: (
     layerId: string,
