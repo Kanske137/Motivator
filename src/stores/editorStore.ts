@@ -439,6 +439,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   aiResultCache: loadAiCache(),
   aiPhotoSources: {},
   aiPhotoResults: {},
+  aiPhotoSelectedRefUrl: {},
   faceSwapCache: loadFaceSwapCache(),
 
   // legacy mirrors (initial values, replaced once a config is loaded)
