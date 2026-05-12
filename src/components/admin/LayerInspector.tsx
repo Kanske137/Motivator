@@ -813,16 +813,11 @@ function AiPhotoDefaultsSection({
                   key={r.id}
                   className="rounded-lg border bg-muted/30 p-2 space-y-2"
                 >
-                  <div className="relative rounded-md overflow-hidden border bg-muted aspect-square">
-                    <img
-                      src={r.url}
-                      alt={r.label ?? "Referensbild"}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
                   <ReferenceFocalEditor
                     url={r.url}
                     label={r.label}
+                    shape={layer.defaults.shape}
+                    fit={layer.defaults.fit}
                     focalX={r.focalX ?? 0}
                     focalY={r.focalY ?? 0}
                     onChange={(fx, fy) => setFocal(r.id, fx, fy)}
