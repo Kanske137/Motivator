@@ -72,6 +72,10 @@ export interface TemplateSnapshotInput {
   /** Per-aiPhoto-layer face-swap result URLs. Falls back to the layer's
    *  admin-set referenceImageUrl when no result is present. */
   aiPhotoResults?: Record<string, string>;
+  /** Per-aiPhoto-layer customer selection of which admin reference image
+   *  is active. Used to look up the admin-set focal point so the printed
+   *  swap result is cropped the same way as the editor preview. */
+  aiPhotoSelectedRefUrl?: Record<string, string>;
 
   /** Customer toggle: when false, the white margin layer is omitted and all
    *  other layers are expanded proportionally to fill the freed area. */
