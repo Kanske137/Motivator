@@ -579,6 +579,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       layerTransforms: nextLayerTransforms,
       aiPhotoResults: nextAiPhotoResults,
       aiPhotoSources: nextAiPhotoSources,
+      aiPhotoSelectedRefUrl: nextAiPhotoSelectedRefUrl,
       photoSources: nextPhotoSources,
       photoAiResults: nextPhotoAiResults,
       whiteMarginEnabled: true,
