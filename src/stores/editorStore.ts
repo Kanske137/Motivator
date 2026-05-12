@@ -146,6 +146,9 @@ interface EditorState {
   aiPhotoSources: Record<string, AiPhotoSource>;
   /** Face-swap result URLs per aiPhoto layer (current selection only). */
   aiPhotoResults: Record<string, string>;
+  /** Customer-selected reference image URL per aiPhoto layer (when admin
+   *  uploaded multiple references). Drives live preview before "Skapa nu". */
+  aiPhotoSelectedRefUrl: Record<string, string>;
   /** Persistent face-swap cache keyed by `${faceHash}|${refUrl}|${layerId}`. */
   faceSwapCache: Record<string, FaceSwapCacheEntry>;
 
@@ -192,6 +195,7 @@ interface EditorState {
   setAiPhotoHash: (layerId: string, hash: string) => void;
   setAiPhotoUploadedUrl: (layerId: string, url: string) => void;
   setAiPhotoResult: (layerId: string, url: string | null) => void;
+  setAiPhotoSelectedRef: (layerId: string, url: string | null) => void;
   clearAiPhoto: (layerId: string) => void;
   addFaceSwapToCache: (
     layerId: string,
@@ -436,6 +440,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   aiResultCache: loadAiCache(),
   aiPhotoSources: {},
   aiPhotoResults: {},
+  aiPhotoSelectedRefUrl: {},
   faceSwapCache: loadFaceSwapCache(),
 
   // legacy mirrors (initial values, replaced once a config is loaded)
@@ -504,6 +509,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     let nextLayerTransforms: Record<string, { xPct?: number; yPct?: number; wPct?: number; hPct?: number }> = {};
     let nextAiPhotoResults = state.aiPhotoResults;
     let nextAiPhotoSources = state.aiPhotoSources;
+    let nextAiPhotoSelectedRefUrl = state.aiPhotoSelectedRefUrl;
     let nextPhotoSources = state.photoSources;
     let nextPhotoAiResults = state.photoAiResults;
 
@@ -538,6 +544,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         remappedAiSources[newId] = val;
       }
       nextAiPhotoSources = remappedAiSources;
+      const remappedAiSelected: Record<string, string> = {};
+      for (const [oldId, val] of Object.entries(state.aiPhotoSelectedRefUrl)) {
+        const newId = idMap[oldId] ?? oldId;
+        remappedAiSelected[newId] = val;
+      }
+      nextAiPhotoSelectedRefUrl = remappedAiSelected;
       // Carry over per-photo-layer sources + AI results (keyed by photo layer ID)
       const remappedPhotoSources: Record<string, PhotoLayerSource> = {};
       for (const [oldId, val] of Object.entries(state.photoSources)) {
@@ -567,6 +579,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       layerTransforms: nextLayerTransforms,
       aiPhotoResults: nextAiPhotoResults,
       aiPhotoSources: nextAiPhotoSources,
+      aiPhotoSelectedRefUrl: nextAiPhotoSelectedRefUrl,
       photoSources: nextPhotoSources,
       photoAiResults: nextPhotoAiResults,
       whiteMarginEnabled: true,
@@ -670,6 +683,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const photoAiResults = remap(state.photoAiResults);
     const aiPhotoSources = remap(state.aiPhotoSources);
     const aiPhotoResults = remap(state.aiPhotoResults);
+    const aiPhotoSelectedRefUrl = remap(state.aiPhotoSelectedRefUrl);
     const layerTransforms = remap(state.layerTransforms);
 
     set({
@@ -680,6 +694,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       photoAiResults,
       aiPhotoSources,
       aiPhotoResults,
+      aiPhotoSelectedRefUrl,
       whiteMarginEnabled: true,
       ...mirrorLegacy({ template, orientation, layerValues, config }),
       ...mirrorPhoto({ template, orientation, config, photoSources, photoAiResults }),
@@ -889,6 +904,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (url) cur[layerId] = url;
     else delete cur[layerId];
     set({ aiPhotoResults: cur });
+  },
+  setAiPhotoSelectedRef: (layerId, url) => {
+    const cur = { ...get().aiPhotoSelectedRefUrl };
+    if (url) cur[layerId] = url;
+    else delete cur[layerId];
+    set({ aiPhotoSelectedRefUrl: cur });
   },
   clearAiPhoto: (layerId) => {
     const sources = { ...get().aiPhotoSources };

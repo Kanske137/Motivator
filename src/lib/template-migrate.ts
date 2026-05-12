@@ -124,6 +124,16 @@ function coerceLegacyRaw(raw: unknown): unknown {
             d.subjectKind = "pet";
             l.defaults = d;
           }
+          // Backfill referenceImages from legacy single referenceImageUrl.
+          if (!Array.isArray(d.referenceImages)) d.referenceImages = [];
+          const list = d.referenceImages as Array<{ id?: string; url?: string }>;
+          if (list.length === 0 && typeof d.referenceImageUrl === "string" && d.referenceImageUrl) {
+            const id =
+              (typeof crypto !== "undefined" && (crypto as { randomUUID?: () => string }).randomUUID?.()) ||
+              `ref-${Date.now()}`;
+            d.referenceImages = [{ id, url: d.referenceImageUrl }];
+          }
+          l.defaults = d;
         }
       }
     }

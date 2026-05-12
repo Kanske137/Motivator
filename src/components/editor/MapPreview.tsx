@@ -193,6 +193,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
     photoSources,
     photoAiResults,
     aiPhotoResults,
+    aiPhotoSelectedRefUrl,
     whiteMarginEnabled,
   } = useEditorStore();
   const isAcrylic = config?.product_type === "acrylic";
@@ -484,10 +485,12 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
               heartIdRef.current,
               starIdRef.current,
             );
-            // Source priority: face-swap result → admin reference image →
-            // empty placeholder.
+            // Source priority: face-swap result → customer-selected reference
+            // (when admin uploaded multiple) → admin reference image → empty.
             const aiResultUrl = aiPhotoResults[l.id] ?? null;
-            const src = aiResultUrl ?? l.defaults.referenceImageUrl ?? null;
+            const selectedRefUrl = aiPhotoSelectedRefUrl[l.id] ?? null;
+            const src =
+              aiResultUrl ?? selectedRefUrl ?? l.defaults.referenceImageUrl ?? null;
             // Only force `contain` for removeBackground (Nano Banana 2 doesn't
             // always honor target aspect ratio, and its pure-white padding
             // blends seamlessly into the layer). For human face-swap (Replicate

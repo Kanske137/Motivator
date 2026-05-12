@@ -78,13 +78,43 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
   const clearAiPhoto = useEditorStore((s) => s.clearAiPhoto);
   const addFaceSwapToCache = useEditorStore((s) => s.addFaceSwapToCache);
   const getCachedFaceSwap = useEditorStore((s) => s.getCachedFaceSwap);
+  const aiPhotoSelectedRefUrl = useEditorStore((s) => s.aiPhotoSelectedRefUrl);
+  const setAiPhotoSelectedRef = useEditorStore((s) => s.setAiPhotoSelectedRef);
 
   const source = sources[layer.id];
   const result = results[layer.id] ?? null;
-  const refUrl = layer.defaults.referenceImageUrl ?? null;
   const subjectKind = layer.defaults.subjectKind ?? "human";
   const swapPrompt = layer.defaults.swapPrompt;
   const isRemoveBg = subjectKind === "removeBackground";
+
+  // Resolve admin-configured reference subjects. Falls back to the legacy
+  // single `referenceImageUrl` so old templates keep working unchanged.
+  const referenceImages = (() => {
+    const list = layer.defaults.referenceImages ?? [];
+    if (list.length > 0) return list;
+    if (layer.defaults.referenceImageUrl) {
+      return [{ id: "legacy", url: layer.defaults.referenceImageUrl, label: undefined }];
+    }
+    return [];
+  })();
+  const showSubjectPicker = !isRemoveBg && referenceImages.length >= 2;
+
+  // Customer-selected reference. Defaults to the first one on mount/change.
+  const selectedRefUrlFromStore = aiPhotoSelectedRefUrl[layer.id] ?? null;
+  const selectedRef =
+    referenceImages.find((r) => r.url === selectedRefUrlFromStore) ?? referenceImages[0] ?? null;
+  const refUrl = selectedRef?.url ?? layer.defaults.referenceImageUrl ?? null;
+
+  useEffect(() => {
+    // Initialize / heal the store's selection when references change.
+    if (isRemoveBg) return;
+    if (referenceImages.length === 0) return;
+    const stored = aiPhotoSelectedRefUrl[layer.id];
+    if (!stored || !referenceImages.some((r) => r.url === stored)) {
+      setAiPhotoSelectedRef(layer.id, referenceImages[0].url);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layer.id, isRemoveBg, referenceImages.map((r) => r.url).join("|")]);
 
   // Style picker state — only relevant for removeBackground mode.
   const visibleStyles = (aiStylePresets ?? []).filter((p) => p.enabled !== false);
@@ -292,6 +322,37 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         <p className="text-xs text-destructive">
           {t("aiPhoto.notConfigured")}
         </p>
+      )}
+
+      {showSubjectPicker && (
+        <div className="space-y-2">
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
+            {t("aiPhoto.chooseSubject")}
+          </Label>
+          <div className="grid grid-cols-3 gap-2">
+            {referenceImages.map((r) => {
+              const isActive = (selectedRef?.url ?? null) === r.url;
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => setAiPhotoSelectedRef(layer.id, r.url)}
+                  className={cn(
+                    "relative aspect-square rounded-xl overflow-hidden ring-1 ring-border bg-muted transition hover:-translate-y-0.5",
+                    isActive && "ring-2 ring-primary",
+                  )}
+                >
+                  <img src={r.url} alt={r.label ?? ""} className="w-full h-full object-cover" />
+                  {r.label && (
+                    <span className="absolute bottom-0 inset-x-0 bg-background/85 backdrop-blur-sm text-[10px] py-1 text-center font-medium">
+                      {r.label}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       )}
 
       <div className="space-y-2">

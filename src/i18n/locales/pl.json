@@ -139,7 +139,8 @@
     "styleHintBackgroundOnly": "Tło jest zawsze usuwane — styl wpływa tylko na motyw.",
     "subjectHintHuman": "Zdjęcie powinno pokazywać twarz prosto z przodu, dobrze oświetloną.",
     "subjectHintPet": "Zdjęcie powinno wyraźnie pokazywać pysk zwierzęcia, najlepiej z przodu.",
-    "subjectHintRemoveBg": "Prześlij zdjęcie, na którym motyw jest wyraźnie widoczny — usuniemy tło za Ciebie."
+    "subjectHintRemoveBg": "Prześlij zdjęcie, na którym motyw jest wyraźnie widoczny — usuniemy tło za Ciebie.",
+    "chooseSubject": "Wybierz motyw"
   },
   "preview": {
     "title": "Podgląd",

@@ -5,7 +5,7 @@
 //   - Map: search a default place (geocoding) → updates center/zoom +
 //     placeName/city/country, AND auto-builds text for any linked text layers.
 import React, { useEffect, useRef, useState } from "react";
-import { Loader2, Search, Upload } from "lucide-react";
+import { Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { ProductConfig } from "@/lib/product-config";
 import { Button } from "@/components/ui/button";
@@ -707,6 +707,11 @@ function AiPhotoDefaultsSection({
     onChange({ ...layer, defaults: { ...layer.defaults, ...patch } });
   };
 
+  const referenceImages = layer.defaults.referenceImages ?? [];
+
+  const syncLegacy = (list: typeof referenceImages) =>
+    list[0]?.url ?? undefined;
+
   const onFile = async (f: File | null | undefined) => {
     if (!f) return;
     if (!f.type.startsWith("image/")) {
@@ -716,14 +721,37 @@ function AiPhotoDefaultsSection({
     setUploading(true);
     try {
       const url = await uploadAiReferenceImage(f);
-      updateDefaults({ referenceImageUrl: url });
+      const id =
+        (typeof crypto !== "undefined" && (crypto as { randomUUID?: () => string }).randomUUID?.()) ||
+        `ref-${Date.now()}`;
+      const nextList = [...referenceImages, { id, url }];
+      updateDefaults({
+        referenceImages: nextList,
+        referenceImageUrl: syncLegacy(nextList),
+      });
       toast.success("Referensbild uppladdad");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Okänt fel";
       toast.error("Uppladdning misslyckades", { description: msg });
     } finally {
       setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
     }
+  };
+
+  const removeReference = (id: string) => {
+    const nextList = referenceImages.filter((r) => r.id !== id);
+    updateDefaults({
+      referenceImages: nextList,
+      referenceImageUrl: syncLegacy(nextList),
+    });
+  };
+
+  const setLabel = (id: string, label: string) => {
+    const nextList = referenceImages.map((r) =>
+      r.id === id ? { ...r, label: label || undefined } : r,
+    );
+    updateDefaults({ referenceImages: nextList });
   };
 
   const isRemoveBg = layer.defaults.subjectKind === "removeBackground";
@@ -736,7 +764,7 @@ function AiPhotoDefaultsSection({
       <p className="text-[11px] text-muted-foreground -mt-1">
         {isRemoveBg
           ? "Kunden laddar upp en bild — vi tar bort bakgrunden och lägger till en lekfull prick-/akvarell-effekt runt motivet. Kunden kan dessutom välja en av de aktiverade AI-stilarna nedanför."
-          : "Kunden laddar upp ett ansikte som byts in på referensbilden via AI. Allt annat (kläder, miljö, pose) bevaras från referensbilden."}
+          : "Kunden laddar upp ett ansikte som byts in på referensbilden via AI. Allt annat (kläder, miljö, pose) bevaras från referensbilden. Lägg till flera motiv så får kunden välja vilket de vill bli."}
       </p>
 
       <Field label="Motiv">
@@ -744,8 +772,6 @@ function AiPhotoDefaultsSection({
           value={layer.defaults.subjectKind}
           onValueChange={(v) => {
             const kind = v as AiPhotoSubjectKind;
-            // Auto-fyll prompten med default för det nya motivet — admin kan
-            // sedan redigera fritt.
             updateDefaults({ subjectKind: kind, swapPrompt: defaultPromptFor(kind) });
           }}
         >
@@ -760,46 +786,61 @@ function AiPhotoDefaultsSection({
 
       {!isRemoveBg && (
         <div className="space-y-2">
-          <Label className="text-xs">Referensbild</Label>
-          {layer.defaults.referenceImageUrl ? (
-            <div className="relative rounded-lg overflow-hidden border bg-muted aspect-square w-32">
-              <img
-                src={layer.defaults.referenceImageUrl}
-                alt="Referensbild"
-                className="w-full h-full object-cover"
-              />
-            </div>
-          ) : (
-            <div className="rounded-lg border border-dashed bg-muted/40 aspect-square w-32 flex items-center justify-center text-[10px] text-muted-foreground text-center px-2">
-              Ingen referensbild
+          <Label className="text-xs">Referensbilder ({referenceImages.length})</Label>
+          {referenceImages.length === 0 && (
+            <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-4 text-[11px] text-muted-foreground text-center">
+              Inga referensbilder uppladdade än.
             </div>
           )}
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={uploading}
-              onClick={() => inputRef.current?.click()}
-            >
-              {uploading ? (
-                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-              ) : (
-                <Upload className="h-3.5 w-3.5 mr-1.5" />
-              )}
-              {layer.defaults.referenceImageUrl ? "Byt referensbild" : "Ladda upp referensbild"}
-            </Button>
-            {layer.defaults.referenceImageUrl && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => updateDefaults({ referenceImageUrl: undefined })}
-              >
-                Ta bort
-              </Button>
+          {referenceImages.length > 0 && (
+            <div className="grid grid-cols-2 gap-2">
+              {referenceImages.map((r) => (
+                <div
+                  key={r.id}
+                  className="rounded-lg border bg-muted/30 p-2 space-y-2"
+                >
+                  <div className="relative rounded-md overflow-hidden border bg-muted aspect-square">
+                    <img
+                      src={r.url}
+                      alt={r.label ?? "Referensbild"}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <Input
+                    value={r.label ?? ""}
+                    onChange={(e) => setLabel(r.id, e.target.value)}
+                    placeholder="Etikett (valfritt)"
+                    className="h-8 text-xs"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeReference(r.id)}
+                    className="w-full h-8 text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                    Ta bort
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={uploading}
+            onClick={() => inputRef.current?.click()}
+            className="w-full"
+          >
+            {uploading ? (
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+            ) : (
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
             )}
-          </div>
+            Lägg till referensbild
+          </Button>
           <input
             ref={inputRef}
             type="file"

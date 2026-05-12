@@ -139,7 +139,8 @@
     "styleHintBackgroundOnly": "Baggrunden fjernes altid — stilen påvirker kun motivet.",
     "subjectHintHuman": "Billedet skal vise ansigtet lige forfra, godt belyst.",
     "subjectHintPet": "Billedet skal vise dyrets ansigt tydeligt, gerne forfra.",
-    "subjectHintRemoveBg": "Upload et billede hvor motivet er tydeligt — vi fjerner baggrunden for dig."
+    "subjectHintRemoveBg": "Upload et billede hvor motivet er tydeligt — vi fjerner baggrunden for dig.",
+    "chooseSubject": "Vælg motiv"
   },
   "preview": {
     "title": "Forhåndsvisning",

@@ -139,7 +139,8 @@
     "styleHintBackgroundOnly": "El fondo siempre se elimina — el estilo solo afecta al sujeto.",
     "subjectHintHuman": "La imagen debe mostrar el rostro de frente, bien iluminado.",
     "subjectHintPet": "La imagen debe mostrar la cara del animal claramente, preferiblemente de frente.",
-    "subjectHintRemoveBg": "Sube una imagen donde el sujeto se vea claramente — nosotros eliminamos el fondo."
+    "subjectHintRemoveBg": "Sube una imagen donde el sujeto se vea claramente — nosotros eliminamos el fondo.",
+    "chooseSubject": "Elige el motivo"
   },
   "preview": {
     "title": "Vista previa",
