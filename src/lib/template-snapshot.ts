@@ -72,6 +72,10 @@ export interface TemplateSnapshotInput {
   /** Per-aiPhoto-layer face-swap result URLs. Falls back to the layer's
    *  admin-set referenceImageUrl when no result is present. */
   aiPhotoResults?: Record<string, string>;
+  /** Per-aiPhoto-layer customer selection of which admin reference image
+   *  is active. Used to look up the admin-set focal point so the printed
+   *  swap result is cropped the same way as the editor preview. */
+  aiPhotoSelectedRefUrl?: Record<string, string>;
 
   /** Customer toggle: when false, the white margin layer is omitted and all
    *  other layers are expanded proportionally to fill the freed area. */
@@ -660,8 +664,18 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
         const lv = input.layerValues?.[layer.id];
         const av = lv && lv.kind === "aiPhoto" ? lv : null;
         const shape = (av?.shape ?? layer.defaults.shape) as "rect" | "circle" | "heart" | "star";
-        const offsetX = av?.offsetX ?? 0;
-        const offsetY = av?.offsetY ?? 0;
+        // Resolve admin focal for the active reference (face-swap result has
+        // identical dimensions, so the focal applies cleanly). Falls back
+        // to per-layer offset for placeholders / removeBg.
+        const refList = layer.defaults.referenceImages ?? [];
+        const activeRefUrl =
+          input.aiPhotoSelectedRefUrl?.[layer.id] ?? layer.defaults.referenceImageUrl ?? null;
+        const activeRef = activeRefUrl
+          ? refList.find((r) => r.url === activeRefUrl) ?? null
+          : null;
+        const usingRefOrSwap = !!(aiResultUrl || activeRefUrl);
+        const offsetX = usingRefOrSwap ? activeRef?.focalX ?? 0 : av?.offsetX ?? 0;
+        const offsetY = usingRefOrSwap ? activeRef?.focalY ?? 0 : av?.offsetY ?? 0;
         // Only force `contain` for removeBackground results (Nano Banana 2
         // may not perfectly match target aspect; its white padding blends in).
         // For human face-swap (Replicate preserves reference dimensions) and

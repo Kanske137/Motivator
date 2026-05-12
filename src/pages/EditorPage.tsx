@@ -180,6 +180,7 @@ export default function EditorPage() {
       bleedCm: isCanvas ? 0.3 : 0,
       photoOverlays: useEditorStore.getState().getPhotoOverlays(),
       aiPhotoResults,
+      aiPhotoSelectedRefUrl: useEditorStore.getState().aiPhotoSelectedRefUrl,
     };
 
     setIsPreparing(true);

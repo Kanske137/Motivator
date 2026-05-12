@@ -478,8 +478,6 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
               | "circle"
               | "heart"
               | "star";
-            const offsetX = av?.offsetX ?? 0;
-            const offsetY = av?.offsetY ?? 0;
             const staticClip = shapeClipPath(
               effectiveShape,
               heartIdRef.current,
@@ -491,6 +489,22 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
             const selectedRefUrl = aiPhotoSelectedRefUrl[l.id] ?? null;
             const src =
               aiResultUrl ?? selectedRefUrl ?? l.defaults.referenceImageUrl ?? null;
+            // Resolve the active reference item to read its admin-set focal
+            // point. The face-swap result has the same dimensions as the
+            // reference, so the same focal works for both.
+            const refList = l.defaults.referenceImages ?? [];
+            const activeRefUrl = selectedRefUrl ?? l.defaults.referenceImageUrl ?? null;
+            const activeRef = activeRefUrl
+              ? refList.find((r) => r.url === activeRefUrl) ?? null
+              : null;
+            const refFocalX = activeRef?.focalX ?? 0;
+            const refFocalY = activeRef?.focalY ?? 0;
+            // If the visible image is the admin reference or its swap result,
+            // honor the admin-chosen focal. Otherwise (no AI result, no ref —
+            // e.g. removeBackground placeholder) fall back to layer offset.
+            const usingRefOrSwap = !!(aiResultUrl || activeRefUrl);
+            const offsetX = usingRefOrSwap ? refFocalX : av?.offsetX ?? 0;
+            const offsetY = usingRefOrSwap ? refFocalY : av?.offsetY ?? 0;
             // Only force `contain` for removeBackground (Nano Banana 2 doesn't
             // always honor target aspect ratio, and its pure-white padding
             // blends seamlessly into the layer). For human face-swap (Replicate
@@ -514,7 +528,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
                     staticClipPath={staticClip}
                     offsetX={offsetX}
                     offsetY={offsetY}
-                    draggable={!!src}
+                    draggable={!!src && !usingRefOrSwap}
                   />
                 ) : (
                   <div
@@ -760,14 +774,21 @@ function PhotoLayerView({
   } | null>(null);
 
   // Re-clamp current offset whenever bounds change (e.g. new image loaded).
+  // Skip the store writeback when the offset is read-only (admin focal on
+  // reference/swap images) — we just clamp inline for rendering instead.
   useEffect(() => {
-    if (fit === "contain") return;
+    if (fit === "contain" || !draggable) return;
     const cx = Math.max(-maxX, Math.min(maxX, offsetX));
     const cy = Math.max(-maxY, Math.min(maxY, offsetY));
     if (cx !== offsetX || cy !== offsetY) {
       setLayerPhotoOffset(layerId, cx, cy);
     }
-  }, [maxX, maxY, fit, layerId, offsetX, offsetY, setLayerPhotoOffset]);
+  }, [maxX, maxY, fit, layerId, offsetX, offsetY, setLayerPhotoOffset, draggable]);
+
+  // Clamped values used purely for rendering (covers both draggable and
+  // read-only focal cases — image never escapes its own bounds).
+  const renderOffsetX = fit === "contain" ? 0 : Math.max(-maxX, Math.min(maxX, offsetX));
+  const renderOffsetY = fit === "contain" ? 0 : Math.max(-maxY, Math.min(maxY, offsetY));
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
@@ -869,8 +890,8 @@ function PhotoLayerView({
               position: "absolute",
               width: `${renderW}px`,
               height: `${renderH}px`,
-              left: `${(box.w - renderW) / 2 + (offsetX / 100) * box.w}px`,
-              top: `${(box.h - renderH) / 2 + (offsetY / 100) * box.h}px`,
+              left: `${(box.w - renderW) / 2 + (renderOffsetX / 100) * box.w}px`,
+              top: `${(box.h - renderH) / 2 + (renderOffsetY / 100) * box.h}px`,
               userSelect: "none",
               pointerEvents: "none",
               maxWidth: "none",
