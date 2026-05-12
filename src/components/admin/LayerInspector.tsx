@@ -754,6 +754,20 @@ function AiPhotoDefaultsSection({
     updateDefaults({ referenceImages: nextList });
   };
 
+  const setFocal = (id: string, focalX: number, focalY: number) => {
+    const nextList = referenceImages.map((r) =>
+      r.id === id ? { ...r, focalX, focalY } : r,
+    );
+    updateDefaults({ referenceImages: nextList });
+  };
+
+  const resetFocal = (id: string) => {
+    const nextList = referenceImages.map((r) =>
+      r.id === id ? { ...r, focalX: 0, focalY: 0 } : r,
+    );
+    updateDefaults({ referenceImages: nextList });
+  };
+
   const isRemoveBg = layer.defaults.subjectKind === "removeBackground";
 
   return (
