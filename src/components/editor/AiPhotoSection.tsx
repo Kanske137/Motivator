@@ -324,6 +324,37 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         </p>
       )}
 
+      {showSubjectPicker && (
+        <div className="space-y-2">
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
+            {t("aiPhoto.chooseSubject")}
+          </Label>
+          <div className="grid grid-cols-3 gap-2">
+            {referenceImages.map((r) => {
+              const isActive = (selectedRef?.url ?? null) === r.url;
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => setAiPhotoSelectedRef(layer.id, r.url)}
+                  className={cn(
+                    "relative aspect-square rounded-xl overflow-hidden ring-1 ring-border bg-muted transition hover:-translate-y-0.5",
+                    isActive && "ring-2 ring-primary",
+                  )}
+                >
+                  <img src={r.url} alt={r.label ?? ""} className="w-full h-full object-cover" />
+                  {r.label && (
+                    <span className="absolute bottom-0 inset-x-0 bg-background/85 backdrop-blur-sm text-[10px] py-1 text-center font-medium">
+                      {r.label}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="space-y-2">
         <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
           {t("aiPhoto.yourImage")}
