@@ -110,6 +110,51 @@ export default function EditorPage() {
     })();
   }, []);
 
+  // Iframe-höjdkommunikation: meddela föräldern (Shopify-temat) när
+  // innehållshöjden ändras så att iframen kan växa/krympa utan intern scroll.
+  // Körs ENDAST när appen faktiskt är inbäddad i en iframe.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.self === window.top) return;
+    if (typeof ResizeObserver === "undefined") return;
+
+    let lastSent = 0;
+    let timer: number | null = null;
+
+    const post = () => {
+      const height = Math.ceil(
+        document.documentElement.scrollHeight ||
+          document.documentElement.getBoundingClientRect().height,
+      );
+      lastSent = Date.now();
+      window.parent.postMessage({ type: "EDITOR_RESIZE", height }, "*");
+    };
+
+    const schedule = () => {
+      const since = Date.now() - lastSent;
+      if (since >= 100) {
+        post();
+      } else if (timer == null) {
+        timer = window.setTimeout(() => {
+          timer = null;
+          post();
+        }, 100 - since);
+      }
+    };
+
+    // Initial mätning efter att första renderingen lagt sig.
+    const initial = window.setTimeout(post, 0);
+
+    const ro = new ResizeObserver(schedule);
+    ro.observe(document.documentElement);
+
+    return () => {
+      ro.disconnect();
+      window.clearTimeout(initial);
+      if (timer != null) window.clearTimeout(timer);
+    };
+  }, []);
+
   // Resolva aktiv config från redan laddade configs när URL-params ändras.
   // Detta undviker omladdning/spinner vid produkttyp-byte i konsoliderade mallar.
   useEffect(() => {
