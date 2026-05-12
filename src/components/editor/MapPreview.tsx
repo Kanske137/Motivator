@@ -774,14 +774,21 @@ function PhotoLayerView({
   } | null>(null);
 
   // Re-clamp current offset whenever bounds change (e.g. new image loaded).
+  // Skip the store writeback when the offset is read-only (admin focal on
+  // reference/swap images) — we just clamp inline for rendering instead.
   useEffect(() => {
-    if (fit === "contain") return;
+    if (fit === "contain" || !draggable) return;
     const cx = Math.max(-maxX, Math.min(maxX, offsetX));
     const cy = Math.max(-maxY, Math.min(maxY, offsetY));
     if (cx !== offsetX || cy !== offsetY) {
       setLayerPhotoOffset(layerId, cx, cy);
     }
-  }, [maxX, maxY, fit, layerId, offsetX, offsetY, setLayerPhotoOffset]);
+  }, [maxX, maxY, fit, layerId, offsetX, offsetY, setLayerPhotoOffset, draggable]);
+
+  // Clamped values used purely for rendering (covers both draggable and
+  // read-only focal cases — image never escapes its own bounds).
+  const renderOffsetX = fit === "contain" ? 0 : Math.max(-maxX, Math.min(maxX, offsetX));
+  const renderOffsetY = fit === "contain" ? 0 : Math.max(-maxY, Math.min(maxY, offsetY));
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
