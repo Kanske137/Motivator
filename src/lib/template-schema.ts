@@ -113,8 +113,21 @@ export type AiPhotoSubjectKind = z.infer<typeof aiPhotoSubjectKindSchema>;
 export const aiPhotoDefaultsSchema = z.object({
   shape: photoShapeSchema,
   fit: imageFitSchema,
-  /** Admin-uploaded reference image (the king/princess/etc body+outfit). */
+  /** Admin-uploaded reference image (the king/princess/etc body+outfit).
+   *  Legacy: kept in sync with `referenceImages[0]?.url` when the admin uses
+   *  the multi-reference list, so snapshot/print pipelines stay unchanged. */
   referenceImageUrl: z.string().url().optional(),
+  /** One or more admin-uploaded reference subjects. The customer can pick
+   *  which one face-swaps onto. When empty/single, no picker is shown. */
+  referenceImages: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        url: z.string().url(),
+        label: z.string().optional(),
+      }),
+    )
+    .default([]),
   /** Free-text prompt sent to the face-swap model. Edited by admin. */
   swapPrompt: z.string().min(1).default(
     "Replace only the face/head onto the reference subject. Preserve the reference outfit, hair contour, lighting, pose and background.",
