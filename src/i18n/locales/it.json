@@ -139,7 +139,8 @@
     "styleHintBackgroundOnly": "Lo sfondo viene sempre rimosso — lo stile influenza solo il soggetto.",
     "subjectHintHuman": "L'immagine deve mostrare il viso di fronte, ben illuminato.",
     "subjectHintPet": "L'immagine deve mostrare chiaramente il viso dell'animale, preferibilmente di fronte.",
-    "subjectHintRemoveBg": "Carica un'immagine dove il soggetto è chiaramente visibile — rimuoviamo lo sfondo per te."
+    "subjectHintRemoveBg": "Carica un'immagine dove il soggetto è chiaramente visibile — rimuoviamo lo sfondo per te.",
+    "chooseSubject": ""
   },
   "preview": {
     "title": "Anteprima",

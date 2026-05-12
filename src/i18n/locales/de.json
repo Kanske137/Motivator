@@ -139,7 +139,8 @@
     "styleHintBackgroundOnly": "Der Hintergrund wird immer entfernt — der Stil betrifft nur das Motiv.",
     "subjectHintHuman": "Das Bild sollte das Gesicht von vorne zeigen, gut beleuchtet.",
     "subjectHintPet": "Das Bild sollte das Gesicht des Tieres deutlich zeigen, am besten von vorne.",
-    "subjectHintRemoveBg": "Lade ein Bild hoch, auf dem das Motiv klar sichtbar ist — wir entfernen den Hintergrund für dich."
+    "subjectHintRemoveBg": "Lade ein Bild hoch, auf dem das Motiv klar sichtbar ist — wir entfernen den Hintergrund für dich.",
+    "chooseSubject": ""
   },
   "preview": {
     "title": "Vorschau",

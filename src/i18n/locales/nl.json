@@ -139,7 +139,8 @@
     "styleHintBackgroundOnly": "De achtergrond wordt altijd verwijderd — de stijl beïnvloedt alleen het onderwerp.",
     "subjectHintHuman": "De afbeelding moet het gezicht recht van voren tonen, goed verlicht.",
     "subjectHintPet": "De afbeelding moet het gezicht van het dier duidelijk tonen, bij voorkeur van voren.",
-    "subjectHintRemoveBg": "Upload een afbeelding waar het onderwerp duidelijk zichtbaar is — wij verwijderen de achtergrond voor je."
+    "subjectHintRemoveBg": "Upload een afbeelding waar het onderwerp duidelijk zichtbaar is — wij verwijderen de achtergrond voor je.",
+    "chooseSubject": ""
   },
   "preview": {
     "title": "Voorbeeld",
