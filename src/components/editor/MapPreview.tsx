@@ -193,6 +193,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
     photoSources,
     photoAiResults,
     aiPhotoResults,
+    aiPhotoSelectedRefUrl,
     whiteMarginEnabled,
   } = useEditorStore();
   const isAcrylic = config?.product_type === "acrylic";
