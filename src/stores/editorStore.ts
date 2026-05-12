@@ -895,6 +895,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     else delete cur[layerId];
     set({ aiPhotoResults: cur });
   },
+  setAiPhotoSelectedRef: (layerId, url) => {
+    const cur = { ...get().aiPhotoSelectedRefUrl };
+    if (url) cur[layerId] = url;
+    else delete cur[layerId];
+    set({ aiPhotoSelectedRefUrl: cur });
+  },
   clearAiPhoto: (layerId) => {
     const sources = { ...get().aiPhotoSources };
     const prev = sources[layerId];
