@@ -116,6 +116,25 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layer.id, isRemoveBg, referenceImages.map((r) => r.url).join("|")]);
 
+  // Sync the visible swap result to whatever reference subject is currently
+  // selected. If we have a cached swap for (face, ref) → show it instantly.
+  // Otherwise clear the stale result so the editor falls back to the newly
+  // selected reference image (the customer can then tap "Skapa" to swap).
+  useEffect(() => {
+    if (isRemoveBg) return;
+    if (!refUrl) return;
+    const hash = source?.hash;
+    if (!hash) return;
+    const slot = refSlotFor(subjectKind, refUrl, null);
+    const cached = getCachedFaceSwap(layer.id, hash, slot);
+    if (cached) {
+      if (results[layer.id] !== cached) setAiPhotoResult(layer.id, cached);
+    } else if (results[layer.id]) {
+      setAiPhotoResult(layer.id, "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layer.id, isRemoveBg, refUrl, source?.hash, subjectKind]);
+
   // Style picker state — only relevant for removeBackground mode.
   const visibleStyles = (aiStylePresets ?? []).filter((p) => p.enabled !== false);
   const [selectedStyleId, setSelectedStyleId] = useState<string | null>(null);
