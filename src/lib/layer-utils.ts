@@ -452,6 +452,7 @@ export function createLayer(type: LayerType, existing: TemplateLayer[]): Templat
           shape: "rect",
           fit: "cover",
           subjectKind: "human",
+          referenceImages: [],
           swapPrompt:
             "Replace only the face/head onto the reference subject. Preserve the reference outfit, hair contour, lighting, pose and background.",
         },
