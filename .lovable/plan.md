@@ -1,53 +1,58 @@
-# Stabil canvas-layout över alla storlekar
+# Plan: Bevara AI-referenslager (aiPhoto) vid byte mellan stående/liggande
 
 ## Problem
+När en kund jobbar i stående och har använt ett `aiPhoto`-lager i läget **Ta bort bakgrund** (genererat resultat sparat), och sedan byter orientering till liggande, försvinner bilden i den nya orienteringens behållare.
 
-Idag lagras `canvasLayout`-lagrens `xPct/yPct/wPct/hPct` relativt **hela editor-ytan = front + 2 × wrap (cm)**. Eftersom wrap är konstant i cm men front växer med storleken, krymper wrap-andelen procentuellt på större canvas. Resultat: ett lager som ligger 25 % från toppen på 30×40 cm hamnar visuellt på en annan plats på frontytan när kunden väljer 50×70 cm. Att kompensera per storlek (`sizeOverrides`) är ohållbart.
+## Orsak
+`aiPhotoSources` och `aiPhotoResults` i editorStore är keyade på lager-ID. Lager-ID skiljer sig mellan `template.layouts[productType].portrait.layers` och `…landscape.layers`. När `setConfig` byter layout-block görs en remapping via `buildLayerIdMap`, men i `setOrientation` (rad ~627–640 i `src/stores/editorStore.ts`) görs **ingen** sådan remap — `aiPhotoSources` och `aiPhotoResults` (samt `photoSources`/`photoAiResults`) lämnas oförändrade och pekar fortfarande på den gamla orienteringens lager-ID. Resultatet hittas inte längre via `aiPhotoResults[newId]` och bilden visas inte.
 
-## Lösning – ankra canvas-lager till FRONT-ytan
+## Åtgärd (minimal, isolerad till editorStore)
 
-Behandla `canvasLayout` på samma sätt som `defaultLayout`: koordinater är % av **frontytan** (synliga ytan), inte av hela editorn. Wrap-bandet ritas automatiskt runt frontytan vid render/print för aktuell vald djup, utan att flytta lagren. Layout blir då storleksoberoende — samma % av fronten oavsett 30×40 eller 70×100.
+Endast `setOrientation` i `src/stores/editorStore.ts` ändras. Övrig funktionalitet rörs inte.
 
-Bakgrund och full-bleed-media (kart-, foto-, bildlager som rör frontens kant) extenderas automatiskt ut i wrap-bandet så att kanterna inte blir tomma.
+1. Bygg en lager-ID-mappning mellan föregående och nästa orientering inom samma template + samma produkt-typ. Återanvänd parnings-logiken från `buildLayerIdMap` (parar lager av samma `type` index-för-index), men begränsad till de två orienteringarna i aktivt layout-block.
+2. Använd den mappningen för att **remap:a** följande state-maps innan `set(...)`:
+   - `aiPhotoSources`
+   - `aiPhotoResults`
+   - `photoSources`
+   - `photoAiResults`
+   - `layerTransforms` (idag nollställs den; behåll genom att remap:a istället så även vanliga foton flyttar med sin form/offset till motsvarande behållare i den nya orienteringen — samma princip som vid layoutblock-byte)
+3. Skicka de remap:ade maparna in i `mirrorPhoto(...)` så legacy-mirrors (`photoFile`, `aiPrintFileUrl` m.m.) blir korrekta för den nya orienteringen.
 
-## Tekniska ändringar
+Inget annat ändras: `MapPreview`, `AiPhotoSection`, `AiStyleSection`, snapshot- och print-pipeline läser fortfarande från samma maps via lager-ID, men nu med rätt nycklar för den nya orienteringen.
 
-### 1. Datamodell & migration
-- Tolka `canvasLayout`-koordinater som **front-relativa** (samma kontrakt som `defaultLayout`).
-- En engångs-migration i `template-migrate.ts` konverterar befintliga `canvasLayout` från full-area-% till front-%-koordinater med hjälp av `getCanvasDesignDepthCm(template)` och layoutens aspekt:
-  ```text
-  insetX = wrap / (frontW + 2*wrap)
-  insetY = wrap / (frontH + 2*wrap)
-  newX  = (oldX - insetX*100) / (1 - 2*insetX)
-  newW  =  oldW            / (1 - 2*insetX)
-  (analogt för y/h)
-  ```
-  Markera migrerad mall med `version`-bump eller flagga i `canvasLayout` så den inte konverteras två gånger.
-- `canvasDesignDepthCm` blir endast informativt (vilket djup admin tittade på i designern); påverkar inte längre hur lager mappas.
+## Teknisk detalj — implementationsskiss
 
-### 2. Render – `MapPreview.tsx`
-- Sätt `layersIncludeWrap = false` för canvas (eller ta bort flaggan helt). `frontInsetX/Y`-vägen finns redan och löser positionerings­problemet automatiskt.
-- Lägg till **bleed-extension** för full-bleed-lager: när ett lagers rektangel rör frontens kanter (xPct ≤ 0.5 / yPct ≤ 0.5 / right ≥ 99.5 / bottom ≥ 99.5) extenderas det med `wrapCm`-motsvarande % ut i wrap-bandet i renderrutinen. Bakgrundsfärgen ritas alltid genom hela editor-ytan (redan så).
+Inuti `setOrientation`:
 
-### 3. Admin – `DesignerPage.tsx` + canvas-designyta
-- Visa frontytan som primär designyta. Wrap-bandet ritas runt som en streckad/halvtransparent zon (visuellt — ingen drag-yta), märkt "Wrap (extenderas automatiskt)".
-- Drag/klamp av lager sker i front-koordinater (`xPct ∈ [0,100]` är frontytan). Inga manuella justeringar för bleed behövs — render/print extenderar automatiskt.
-- Behåll `canvasDesignDepthCm`-väljaren bara som visualiseringshjälp (visar hur tjock wrap-zonen tecknas), inte för koordinatmatte.
+```text
+prevOrientation = state.orientation
+prevLayers = activeLayoutBlock(template, productType)[prevOrientation].layers
+nextLayers = activeLayoutBlock(template, productType)[orientation].layers
 
-### 4. Print/snapshot – `print-pipeline.ts` & `template-snapshot.ts`
-- Använd samma front-inset-logik: rita lager i frontytan, extendera markerade full-bleed-lager med wrap-cm. Det Gelato-PDF-utbytet får då rätt bleed automatiskt oavsett vald canvasstorlek.
-- Ta bort/uppdatera `wrapCm`-passering så koordinatomvandlingen sker centralt (en helper `withCanvasWrap(layer, frontW, frontH, wrapCm)` som returnerar print-rekt med bleed).
+idMap = pairByTypeIndex(prevLayers, nextLayers)   // samma logik som buildLayerIdMap
 
-### 5. Editor-store
-- Inget kontraktsbrott externt; `layersIncludeWrap`-prop till `MapPreview` blir false för canvas. Mirror-logik för `setOrientation`/`setConfig` är oförändrad.
+remap(map) = Object.fromEntries(
+  Object.entries(map).map(([oldId, v]) => [idMap[oldId] ?? oldId, v])
+)
 
-## Effekt
+aiPhotoSources  = remap(state.aiPhotoSources)
+aiPhotoResults  = remap(state.aiPhotoResults)
+photoSources    = remap(state.photoSources)
+photoAiResults  = remap(state.photoAiResults)
+layerTransforms = remap(state.layerTransforms)
+```
 
-- En canvas-mall designas en enda gång på frontytan och håller exakt samma layout visuellt på 30×40, 50×70, 70×100 osv.
-- Wrap-bandet hanteras automatiskt via bleed-extension för bakgrund och kantnära media.
-- Inga per-storlek-overrides krävs.
+`buildLayerIdMap` kan brytas ut/återanvändas genom att lägga till en variant som tar två lagerlistor direkt (eller anropa befintlig och plocka ut just dessa två orienteringar).
 
-## Risker att täcka i implementation
+## Vad det INTE påverkar
+- `setConfig` (layoutblock-byte) — oförändrat.
+- AI-genereringsflödet, cache, prompt-logik — oförändrat.
+- Rendering, snapshot, print-pipeline — oförändrat.
+- Lager utan motsvarande "partner" i nya orienteringen tappas (samma beteende som vid layoutblock-byte idag).
 
-- Befintliga publicerade canvasmallar måste migreras vid load (icke-destruktivt — original sparas inte över förrän admin sparar nästa gång, men rendering följer migrerad version).
-- Lager som admin medvetet placerat **i** wrap-bandet (sällsynt, t.ex. dekoration på sidan) konverteras till frontkoordinater där `x/y < 0` eller `> 100` kan uppstå. Vi clampar dem till frontytan vid migration och loggar en varning i designern så admin kan justera.
+## Verifiering
+1. Stående med `aiPhoto`-lager i Ta bort bakgrund-läge, generera resultat → byt till liggande → bilden ska visas i liggande behållaren.
+2. Byt tillbaka till stående → samma bild kvar.
+3. Vanliga `photo`-lager fortsätter fungera som förut vid orienteringsbyte.
+4. Mall med två `aiPhoto`-lager: båda följer med korrekt parade till sina motsvarigheter.
