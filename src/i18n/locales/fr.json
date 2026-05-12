@@ -140,7 +140,7 @@
     "subjectHintHuman": "L'image doit montrer le visage de face, bien éclairé.",
     "subjectHintPet": "L'image doit montrer clairement le visage de l'animal, de préférence de face.",
     "subjectHintRemoveBg": "Téléchargez une image où le sujet est clairement visible — nous supprimerons l'arrière-plan.",
-    "chooseSubject": ""
+    "chooseSubject": "Choisir le sujet"
   },
   "preview": {
     "title": "Aperçu",

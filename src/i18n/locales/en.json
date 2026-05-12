@@ -140,7 +140,7 @@
     "subjectHintHuman": "The image should show the face straight on, well lit.",
     "subjectHintPet": "The image should clearly show the animal's face, preferably from the front.",
     "subjectHintRemoveBg": "Upload an image where the subject is clearly visible — we'll remove the background for you.",
-    "chooseSubject": ""
+    "chooseSubject": "Choose subject"
   },
   "preview": {
     "title": "Preview",

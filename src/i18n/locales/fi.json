@@ -140,7 +140,7 @@
     "subjectHintHuman": "Kuvassa kasvojen tulee näkyä suoraan edestä, hyvin valaistuna.",
     "subjectHintPet": "Kuvan tulee näyttää eläimen kasvot selvästi, mieluiten edestä.",
     "subjectHintRemoveBg": "Lataa kuva, jossa aihe näkyy selvästi — poistamme taustan puolestasi.",
-    "chooseSubject": ""
+    "chooseSubject": "Valitse aihe"
   },
   "preview": {
     "title": "Esikatsele",
