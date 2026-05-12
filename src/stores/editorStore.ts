@@ -509,6 +509,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     let nextLayerTransforms: Record<string, { xPct?: number; yPct?: number; wPct?: number; hPct?: number }> = {};
     let nextAiPhotoResults = state.aiPhotoResults;
     let nextAiPhotoSources = state.aiPhotoSources;
+    let nextAiPhotoSelectedRefUrl = state.aiPhotoSelectedRefUrl;
     let nextPhotoSources = state.photoSources;
     let nextPhotoAiResults = state.photoAiResults;
 
