@@ -5,7 +5,7 @@
 //   - Map: search a default place (geocoding) → updates center/zoom +
 //     placeName/city/country, AND auto-builds text for any linked text layers.
 import React, { useEffect, useRef, useState } from "react";
-import { Loader2, Plus, Search, Trash2, Upload } from "lucide-react";
+import { Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { ProductConfig } from "@/lib/product-config";
 import { Button } from "@/components/ui/button";
