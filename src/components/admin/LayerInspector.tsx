@@ -820,22 +820,40 @@ function AiPhotoDefaultsSection({
                       className="w-full h-full object-cover"
                     />
                   </div>
+                  <ReferenceFocalEditor
+                    url={r.url}
+                    label={r.label}
+                    focalX={r.focalX ?? 0}
+                    focalY={r.focalY ?? 0}
+                    onChange={(fx, fy) => setFocal(r.id, fx, fy)}
+                  />
                   <Input
                     value={r.label ?? ""}
                     onChange={(e) => setLabel(r.id, e.target.value)}
                     placeholder="Etikett (valfritt)"
                     className="h-8 text-xs"
                   />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeReference(r.id)}
-                    className="w-full h-8 text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                    Ta bort
-                  </Button>
+                  <div className="flex gap-1.5">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => resetFocal(r.id)}
+                      className="flex-1 h-8 text-xs"
+                    >
+                      Återställ utsnitt
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeReference(r.id)}
+                      className="flex-1 h-8 text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                      Ta bort
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
