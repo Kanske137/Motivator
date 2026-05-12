@@ -146,6 +146,9 @@ interface EditorState {
   aiPhotoSources: Record<string, AiPhotoSource>;
   /** Face-swap result URLs per aiPhoto layer (current selection only). */
   aiPhotoResults: Record<string, string>;
+  /** Customer-selected reference image URL per aiPhoto layer (when admin
+   *  uploaded multiple references). Drives live preview before "Skapa nu". */
+  aiPhotoSelectedRefUrl: Record<string, string>;
   /** Persistent face-swap cache keyed by `${faceHash}|${refUrl}|${layerId}`. */
   faceSwapCache: Record<string, FaceSwapCacheEntry>;
 
