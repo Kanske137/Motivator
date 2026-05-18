@@ -253,13 +253,20 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
     return () => ro.disconnect();
   }, [frameColor, frameWidthCm, sizeCm?.w, sizeCm?.h]);
 
-  const isPortrait = posterAspect < 1;
+  // VIEWPORT-OBEROENDE storlek: motivet dimensioneras av tillgänglig BREDD
+  // (stabil i en iframe) × bildförhållande, med ett PX-tak. ALDRIG vh/dvh —
+  // i en iframe sätter föräldern iframens höjd utifrån vår rapporterade
+  // innehållshöjd, så vh-mått här ger en självrefererande resize-loop som
+  // kollapsar editorn. `aspectRatio` + `maxHeight` i px bevarar ratio och
+  // ger en porträtt-poster ungefär samma visuella storlek som tidigare
+  // (~78vh på en vanlig desktop ≈ 680 px).
+  const PREVIEW_MAX_PX = 680;
   const frameStyle: React.CSSProperties = {
     aspectRatio: `${posterAspect}`,
-    width: isPortrait ? "auto" : "min(100%, 70vh)",
-    height: isPortrait ? "min(100%, 78vh)" : "auto",
+    width: `min(100%, ${PREVIEW_MAX_PX}px)`,
+    height: "auto",
     maxWidth: "100%",
-    maxHeight: "78vh",
+    maxHeight: `${PREVIEW_MAX_PX}px`,
     background: posterBgColor,
     borderStyle: frameColor ? "solid" : undefined,
     borderColor: frameColor,

@@ -65,6 +65,12 @@ export default function EditorPage() {
   // rapporterar den till föräldra-iframen (Shopify-temat).
   const rootRef = useRef<HTMLDivElement>(null);
   const ready = !loading && !!config;
+  // True när appen körs inbäddad i en <iframe> (Shopify-temat). Stabilt för
+  // sidans livstid. ENBART i detta läge ska editorn växa till sitt innehåll
+  // (ingen min-h-screen, ingen intern panel-scroll) så att föräldra-iframen
+  // kan storleksanpassas. Standalone / Lovable-preview behåller exakt
+  // originalupplevelsen (fixed-viewport + intern scroll).
+  const embedded = typeof window !== "undefined" && window.self !== window.top;
   const { map: shopifyPriceMap, derivedFx } = useShopifyPriceMap();
   const livePrice = priceFromMap(shopifyPriceMap, size, variant);
   const displayPrice = livePrice
@@ -345,7 +351,11 @@ export default function EditorPage() {
     return (
       <div
         ref={rootRef}
-        className="flex items-center justify-center bg-background py-24"
+        className={
+          embedded
+            ? "flex items-center justify-center bg-background py-24"
+            : "min-h-screen flex items-center justify-center bg-background"
+        }
       >
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
@@ -353,7 +363,14 @@ export default function EditorPage() {
   }
 
   return (
-    <div ref={rootRef} className="flex flex-col bg-background">
+    <div
+      ref={rootRef}
+      className={
+        embedded
+          ? "flex flex-col bg-background"
+          : "min-h-screen flex flex-col bg-background"
+      }
+    >
       {/* Top bar (only outside iframe) */}
       {window.self === window.top && (
         <header className="border-b bg-background sticky top-0 z-30">
@@ -366,8 +383,9 @@ export default function EditorPage() {
 
       {/* Main: split on desktop, stacked on mobile */}
       <div className="flex-1 flex flex-col md:flex-row min-h-0">
-        {/* Preview */}
-        <div className="paper-grain flex items-center justify-center h-[60vh] md:h-auto md:flex-1 md:min-h-[70vh]">
+        {/* Preview — viewport-OBEROENDE höjd (ingen vh): motivets storlek
+            styrs av MapPreview (bredd × bildförhållande, px-tak). */}
+        <div className="paper-grain flex items-center justify-center md:flex-1 min-h-[420px] py-6">
           <MapPreview
             frameColor={frameColor}
             frameWidthCm={FRAME_WIDTH_CM}
@@ -378,7 +396,13 @@ export default function EditorPage() {
         </div>
 
         {/* Control panel */}
-        <aside className="w-full md:w-[380px] lg:w-[420px] border-l bg-background pb-24 md:pb-6">
+        {/* Standalone: intern scroll som original. Inbäddad: ingen intern
+            scroll — panelen växer och iframen storleksanpassas i stället. */}
+        <aside
+          className={`w-full md:w-[380px] lg:w-[420px] border-l bg-background pb-24 md:pb-6${
+            embedded ? "" : " overflow-y-auto"
+          }`}
+        >
           <div className="p-4 md:p-5">
             <ControlPanel
               configs={configs}
