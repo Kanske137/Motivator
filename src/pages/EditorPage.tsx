@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Loader2, ShoppingCart } from "lucide-react";
@@ -60,6 +60,11 @@ export default function EditorPage() {
   const addItem = useCartStore((s) => s.addItem);
   const isAdding = useCartStore((s) => s.isLoading);
   const [isPreparing, setIsPreparing] = useState(false);
+
+  // Editorns rot-element — ResizeObserver:n nedan mäter dess höjd och
+  // rapporterar den till föräldra-iframen (Shopify-temat).
+  const rootRef = useRef<HTMLDivElement>(null);
+  const ready = !loading && !!config;
   const { map: shopifyPriceMap, derivedFx } = useShopifyPriceMap();
   const livePrice = priceFromMap(shopifyPriceMap, size, variant);
   const displayPrice = livePrice
@@ -111,21 +116,32 @@ export default function EditorPage() {
   }, []);
 
   // Iframe-höjdkommunikation: meddela föräldern (Shopify-temat) när
-  // innehållshöjden ändras så att iframen kan växa/krympa utan intern scroll.
+  // editorns innehållshöjd ändras så att iframen kan växa/krympa utan
+  // intern scroll. Observern sitter på editorns ROT-element (rootRef) så
+  // att höjden vi rapporterar är exakt så hög som innehållet — inte 100vh.
   // Körs ENDAST när appen faktiskt är inbäddad i en iframe.
+  // Re-attachas när `ready` växlar (loading-spinner → editor) så att
+  // observern alltid sitter på det rot-element som faktiskt renderas.
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (window.self === window.top) return;
     if (typeof ResizeObserver === "undefined") return;
+    const el = rootRef.current;
+    if (!el) return;
 
+    let lastHeight = -1;
     let lastSent = 0;
     let timer: number | null = null;
 
+    const measure = () =>
+      Math.ceil(Math.max(el.getBoundingClientRect().height, el.scrollHeight));
+
     const post = () => {
-      const height = Math.ceil(
-        document.documentElement.scrollHeight ||
-          document.documentElement.getBoundingClientRect().height,
-      );
+      const height = measure();
+      // 1px-jitterskydd: hoppa över sub-pixel-/avrundningsbrus som annars
+      // kan ge en oändlig resize-loop tillsammans med föräldra-iframen.
+      if (Math.abs(height - lastHeight) <= 1) return;
+      lastHeight = height;
       lastSent = Date.now();
       window.parent.postMessage({ type: "EDITOR_RESIZE", height }, "*");
     };
@@ -142,18 +158,20 @@ export default function EditorPage() {
       }
     };
 
-    // Initial mätning efter att första renderingen lagt sig.
+    // Initial mätning efter att första renderingen lagt sig (mount).
     const initial = window.setTimeout(post, 0);
 
+    // ResizeObserver fångar alla efterföljande höjdändringar automatiskt:
+    // flikbyte, produkttyp-byte, async-laddat innehåll (mockups, kartor).
     const ro = new ResizeObserver(schedule);
-    ro.observe(document.documentElement);
+    ro.observe(el);
 
     return () => {
       ro.disconnect();
       window.clearTimeout(initial);
       if (timer != null) window.clearTimeout(timer);
     };
-  }, []);
+  }, [ready]);
 
   // Resolva aktiv config från redan laddade configs när URL-params ändras.
   // Detta undviker omladdning/spinner vid produkttyp-byte i konsoliderade mallar.
@@ -325,14 +343,17 @@ export default function EditorPage() {
 
   if (loading || !config) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div
+        ref={rootRef}
+        className="flex items-center justify-center bg-background py-24"
+      >
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div ref={rootRef} className="flex flex-col bg-background">
       {/* Top bar (only outside iframe) */}
       {window.self === window.top && (
         <header className="border-b bg-background sticky top-0 z-30">
@@ -357,7 +378,7 @@ export default function EditorPage() {
         </div>
 
         {/* Control panel */}
-        <aside className="w-full md:w-[380px] lg:w-[420px] border-l bg-background overflow-y-auto pb-24 md:pb-6">
+        <aside className="w-full md:w-[380px] lg:w-[420px] border-l bg-background pb-24 md:pb-6">
           <div className="p-4 md:p-5">
             <ControlPanel
               configs={configs}
