@@ -197,17 +197,32 @@ export function MapPreview({
     return () => ro.disconnect();
   }, [frameColor, frameWidthCm, sizeCm?.w, sizeCm?.h]);
 
-  const isPortrait = posterAspect < 1;
-  // Innehållsdriven storlek: ingen vh. Postern är width-driven (width:100% +
-  // aspectRatio) men cappad så att höjden inte överstiger desktopens
-  // preview-höjd (~720px). Formeln maxWidth = aspect * 720px funkar på
-  // både mobil (smal skärm → 100% vinner) och desktop (h-[720px] container).
-  const DESKTOP_MAX_H = 820;
+  // Mät tillgänglig höjd i preview-containern (.preview-area) så att postern
+  // växer/krymper med omgivande yta istället för att vara hårt cappad.
+  const [containerH, setContainerH] = useState(0);
+  useEffect(() => {
+    const el = frameRef.current?.closest(".preview-area") as HTMLElement | null;
+    if (!el) return;
+    const update = () => setContainerH(el.getBoundingClientRect().height);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    window.addEventListener("resize", update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+
+  // Fallback-tak för första rendering innan ResizeObserver mätt klart.
+  const FALLBACK_MAX_H = 820;
+  const effectiveMaxH = containerH > 0 ? Math.max(320, containerH - 24) : FALLBACK_MAX_H;
   const frameStyle: React.CSSProperties = {
     aspectRatio: `${posterAspect}`,
     width: "100%",
     height: "auto",
-    maxWidth: `min(100%, ${posterAspect * DESKTOP_MAX_H}px)`,
+    maxHeight: `${effectiveMaxH}px`,
+    maxWidth: `${posterAspect * effectiveMaxH}px`,
     background: posterBgColor,
     borderStyle: frameColor ? "solid" : undefined,
     borderColor: frameColor,
@@ -218,6 +233,7 @@ export function MapPreview({
     // begränsas till ramen och kan inte krocka med dialoger / thumbnails.
     isolation: "isolate",
   };
+
 
   const layerToEditorRect = (l: TemplateLayer) => {
     const eff = effectiveLayerRect(l, layerTransforms, { marginRemovedInsets });

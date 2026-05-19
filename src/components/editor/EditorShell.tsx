@@ -61,7 +61,7 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
   ) : null;
 
   return (
-    <div className="editor-root flex flex-col">
+    <div className="editor-root mx-auto w-full max-w-[1400px] flex flex-col">
       {/* Desktop layout — innehållsdriven höjd utan intern scroll. */}
       <div className="editor-body hidden lg:flex items-start min-h-0">
         <NavRail
@@ -71,7 +71,7 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
           orientation="vertical"
           className="shrink-0"
         />
-        <aside className="section-panel w-[340px] shrink-0 border-r bg-background min-h-0">
+        <aside className="section-panel w-[320px] xl:w-[380px] 2xl:w-[420px] shrink-0 border-r bg-background min-h-0">
           <div className="p-6 space-y-5">
             {activeMeta && (
               <header className="space-y-1">
