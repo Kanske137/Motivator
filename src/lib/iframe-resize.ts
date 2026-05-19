@@ -16,7 +16,14 @@ export function postEditorResize() {
   let contentBottom = 0;
   const scope = document.getElementById("root") ?? document.body;
   for (const child of Array.from(scope.children)) {
-    const rect = (child as HTMLElement).getBoundingClientRect();
+    const el = child as HTMLElement;
+    const cs = getComputedStyle(el);
+    // Hoppa över portal-containrar (Drawer/toast/modal) och element som
+    // tagits ur flödet — de speglar inte editorns verkliga innehållshöjd.
+    if (cs.position === "fixed" || cs.position === "absolute") continue;
+    if (cs.display === "none") continue;
+    const rect = el.getBoundingClientRect();
+    if (rect.height === 0) continue;
     const bottom = rect.bottom + window.scrollY;
     if (bottom > contentBottom) contentBottom = bottom;
   }
