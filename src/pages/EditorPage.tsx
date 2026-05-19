@@ -29,7 +29,6 @@ import { resolveShopifyVariantId } from "@/lib/shopify-variant-resolver";
 import { hangerColorFromVariant } from "@/lib/mockup-scenes";
 import { toast } from "sonner";
 
-
 const FRAME_COLORS: Record<string, string> = {
   Ingen: "",
   Vit: "hsl(0 0% 98%)",
@@ -56,8 +55,36 @@ export default function EditorPage() {
   const [configs, setConfigs] = useState<ProductConfig[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const { config, template, layoutId, layerValues, layerTransforms, whiteMarginEnabled, setConfig, currentPrice, currentLayout, mapStyleId, mapCenter, mapZoom, text, textFont, textVisible, showLabels, mapShape, orientation, size, variant, posterBgColor, designSource, aiPrintFileUrl, aiPhotoResults, shopifyVariantId, shopifyVariantResolving, setShopifyVariantId, setShopifyVariantResolving } =
-    useEditorStore();
+  const {
+    config,
+    template,
+    layoutId,
+    layerValues,
+    layerTransforms,
+    whiteMarginEnabled,
+    setConfig,
+    currentPrice,
+    currentLayout,
+    mapStyleId,
+    mapCenter,
+    mapZoom,
+    text,
+    textFont,
+    textVisible,
+    showLabels,
+    mapShape,
+    orientation,
+    size,
+    variant,
+    posterBgColor,
+    designSource,
+    aiPrintFileUrl,
+    aiPhotoResults,
+    shopifyVariantId,
+    shopifyVariantResolving,
+    setShopifyVariantId,
+    setShopifyVariantResolving,
+  } = useEditorStore();
   const { t } = useTranslation();
   const shopCtx = useShopContextStore();
   const addItem = useCartStore((s) => s.addItem);
@@ -77,9 +104,7 @@ export default function EditorPage() {
   const sameTemplateConfigs = useMemo(() => {
     if (!config) return [] as ProductConfig[];
     const slug = config.template_slug ?? deriveTemplateSlug(config.shopify_handle);
-    return configs.filter(
-      (c) => (c.template_slug ?? deriveTemplateSlug(c.shopify_handle)) === slug,
-    );
+    return configs.filter((c) => (c.template_slug ?? deriveTemplateSlug(c.shopify_handle)) === slug);
   }, [configs, config]);
 
   // Resolve real Shopify variant ID whenever handle/size/variant changes.
@@ -114,50 +139,60 @@ export default function EditorPage() {
   }, []);
 
   // Iframe-höjdkommunikation: rapportera .editor-root verkliga höjd.
-  // Innehållsdriven — inga 100vh i trädet, ingen intern scroll ⇒ varje
-  // höjdändring (flikbyte, async thumbnails, fontladdning) fångas av
-  // ResizeObserver och postas till Shopify som EDITOR_RESIZE.
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (window.self === window.top) return;
     if (loading || !config) return;
-
     let timer: number | null = null;
     let ro: ResizeObserver | null = null;
-
+    const imgCleanups: Array<() => void> = [];
     const attach = () => {
       const root = document.querySelector(".editor-root");
       if (!root) {
-        // Försök igen nästa frame om .editor-root inte hunnit mountas.
         requestAnimationFrame(attach);
         return;
       }
       postEditorResize();
       if (typeof ResizeObserver !== "undefined") {
         ro = new ResizeObserver(() => postEditorResize());
-        ro.observe(root);
+        // Observera HELA app-roten (header + editor-root + mockup-galleri)
+        // och vart och ett av dess barn — annars fångas inte när
+        // MockupGallery växer (den ligger utanför .editor-root).
+        const appRoot = (root.parentElement ?? root) as HTMLElement;
+        ro.observe(appRoot);
+        Array.from(appRoot.children).forEach((child) => ro!.observe(child));
       }
+      // Mockup-bilder laddar asynkront och ändrar höjden efter mount.
+      // Rapportera om när varje bild blivit klar.
+      Array.from(document.querySelectorAll("img")).forEach((img) => {
+        if (!img.complete) {
+          const onDone = () => postEditorResize();
+          img.addEventListener("load", onDone, { once: true });
+          img.addEventListener("error", onDone, { once: true });
+          imgCleanups.push(() => {
+            img.removeEventListener("load", onDone);
+            img.removeEventListener("error", onDone);
+          });
+        }
+      });
     };
-
     const r1 = requestAnimationFrame(() => {
       const r2 = requestAnimationFrame(attach);
       (attach as any)._r2 = r2;
     });
-
     const onResize = () => {
       if (timer != null) window.clearTimeout(timer);
       timer = window.setTimeout(() => postEditorResize(), 100);
     };
     window.addEventListener("resize", onResize);
-
     return () => {
       cancelAnimationFrame(r1);
       window.removeEventListener("resize", onResize);
       if (timer != null) window.clearTimeout(timer);
       if (ro) ro.disconnect();
+      imgCleanups.forEach((fn) => fn());
     };
   }, [loading, config]);
-
 
   // Resolva aktiv config från redan laddade configs när URL-params ändras.
   // Detta undviker omladdning/spinner vid produkttyp-byte i konsoliderade mallar.
@@ -187,15 +222,12 @@ export default function EditorPage() {
   const frameColor = config?.product_type === "posters" ? FRAME_COLORS[variant ?? "Ingen"] : "";
   const hangerColor = config?.product_type === "posters" ? hangerColorFromVariant(variant) : null;
   const isCanvas = config?.product_type === "canvas";
-  const canvasDepthCm = isCanvas
-    ? (variant?.match(/(\d+)/)?.[1] ? parseInt(variant!.match(/(\d+)/)![1], 10) : 2)
-    : 0;
+  const canvasDepthCm = isCanvas ? (variant?.match(/(\d+)/)?.[1] ? parseInt(variant!.match(/(\d+)/)![1], 10) : 2) : 0;
 
   const orientationLabel = orientation === "portrait" ? t("orientation.portrait") : t("orientation.landscape");
   const translatedVariant = translateVariantName(variant, t);
-  const variantLabel = config?.product_type === "canvas"
-    ? `${translatedVariant} ${t("format.depth").toLowerCase()}`
-    : translatedVariant;
+  const variantLabel =
+    config?.product_type === "canvas" ? `${translatedVariant} ${t("format.depth").toLowerCase()}` : translatedVariant;
   const summary = [size ? `${size} cm` : null, variantLabel.trim() ? variantLabel : null, orientationLabel]
     .filter(Boolean)
     .join(" · ");
@@ -224,9 +256,7 @@ export default function EditorPage() {
       liveText: text,
       liveTextFont: textFont,
       liveTextVisible: textVisible,
-      wrapCm: isCanvas
-        ? (variant?.match(/(\d+)/)?.[1] ? parseInt(variant.match(/(\d+)/)![1], 10) : 2)
-        : 0,
+      wrapCm: isCanvas ? (variant?.match(/(\d+)/)?.[1] ? parseInt(variant.match(/(\d+)/)![1], 10) : 2) : 0,
       bleedCm: isCanvas ? 0.3 : 0,
       photoOverlays: useEditorStore.getState().getPhotoOverlays(),
       aiPhotoResults,
@@ -297,7 +327,7 @@ export default function EditorPage() {
           quantity: 1,
           properties,
         },
-        "*"
+        "*",
       );
       toast.success(t("cartAdd.added"));
       return;
@@ -347,12 +377,7 @@ export default function EditorPage() {
   );
 
   const ctaNode = (
-    <StickyCta
-      price={displayPrice}
-      summary={summary}
-      loading={isAdding || isPreparing}
-      onAdd={handleAddToCart}
-    />
+    <StickyCta price={displayPrice} summary={summary} loading={isAdding || isPreparing} onAdd={handleAddToCart} />
   );
 
   const standalone = window.self === window.top;
@@ -376,7 +401,6 @@ export default function EditorPage() {
         preview={previewNode}
         cta={ctaNode}
       />
-
 
       {/* Mockup gallery */}
       <MockupGallery />
