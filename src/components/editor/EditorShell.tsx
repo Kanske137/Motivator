@@ -61,7 +61,7 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
   ) : null;
 
   return (
-    <div className="editor-root mx-auto w-full max-w-[1400px] flex flex-col">
+    <div className="editor-root flex flex-col">
       {/* Desktop layout — innehållsdriven höjd utan intern scroll. */}
       <div className="editor-body hidden lg:flex items-start min-h-0">
         <NavRail
