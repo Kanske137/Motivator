@@ -63,7 +63,7 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
   return (
     <div className="editor-root flex flex-col">
       {/* Desktop layout — innehållsdriven höjd utan intern scroll. */}
-      <div className="editor-body hidden lg:flex items-start min-h-0">
+      <div className="editor-body hidden lg:flex items-stretch min-h-[1100px]">
         <NavRail
           sections={sections}
           activeId={(activeId ?? sections[0]?.id) as SectionId}
@@ -81,9 +81,7 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
             {sectionContent}
           </div>
         </aside>
-        <main className="preview-area flex-1 paper-grain flex items-center justify-center p-6 lg:p-10">
-          {preview}
-        </main>
+        <main className="preview-area flex-1 paper-grain flex items-center justify-center p-6 lg:p-10">{preview}</main>
       </div>
 
       {/* Mobile/tablet layout */}
