@@ -1,26 +1,43 @@
-## Mål
-1. Eliminera intern scroll i editor-iframen så att hela `.editor-root` rapporterar sin sanna höjd via `EDITOR_RESIZE`.
-2. Återställ full bredd-layout (nav-rail längst till vänster, preview tar allt övrigt utrymme) — ta bort centreringen som infördes förra varvet.
+## Plan
 
-## Ändringar
+1. **Ta bort den fasta desktop-höjden**
+   - Ändra `EditorShell.tsx` så `.editor-body` inte längre har `h-[720px]`, `xl:h-[820px]`, `h-full` eller annan fast höjd.
+   - Sätt desktop-raden till `items-start` i stället för `items-stretch`, så kolumnerna inte sträcks till samma höjd.
 
-### `src/components/editor/EditorShell.tsx`
-- **Rot-containern**: ta bort `mx-auto w-full max-w-[1400px]`. Behåll `editor-root flex flex-col`. Detta gör att nav-rail åter ligger längst till vänster och preview-arean fyller hela återstående bredd (viktigt för landskaps-posters).
-- **`<aside className="section-panel ...">`**: säkerställ att ingen `overflow-y-auto` finns. (Aktuell kod har det inte — verifiera och håll det så.) Behåll `min-h-0`.
-- **Mobil preview-wrapper**: inga `h-[60vh]` / `min-h-[70vh]` / `h-screen` får finnas i trädet. Verifiera att endast naturliga höjder används.
+2. **Ta bort intern scroll från section-panelen**
+   - Ta bort `overflow-y-auto`, `h-full` och höjdbegränsningar från `.section-panel`.
+   - Panelen får bli så hög som sitt innehåll kräver; iframe-höjden ska i stället växa via `EDITOR_RESIZE`.
+   - Lämna mobilens Drawer-scroll orörd, eftersom den är en overlay/bottom-sheet och inte desktopens iframe-layout.
 
-### `src/pages/EditorPage.tsx`
-- **Loading-vyn** (`min-h-[400px] flex items-center justify-center`): redan korrekt, lämna orörd.
-- **Yttersta `<div className="flex flex-col bg-background">`**: redan utan `min-h-screen`. Lämna orörd.
+3. **Gör preview-ytan naturligt innehållsdriven**
+   - Ta bort `h-full` från `.preview-area` på desktop.
+   - Behåll flex-centrering runt själva postern, men utan att preview-kolumnen sträcks av den långa panelen.
+   - Justera `MapPreview.tsx` bort från desktop-container-antagandet `DESKTOP_MAX_H = 720`, eftersom containern inte längre ska ha fast höjd.
 
-### `src/components/editor/MapPreview.tsx`
-- Lämnas orörd. Den dynamiska höjden via `ResizeObserver` på `.preview-area` fungerar redan utan vh-höjder.
+4. **Gör höjdrapporteringen robust och alltid aktiv**
+   - Flytta bort lazy import-mönstret i `EditorPage.tsx` och importera `postEditorResize` direkt, så rapporteringen inte kan fördröjas/tystna via async import.
+   - Installera `ResizeObserver` efter render med dubbel `requestAnimationFrame`, så `.editor-root` faktiskt finns när observern kopplas.
+   - Låt observern lyssna på `.editor-root`, och rapportera även vid mount och debounced `window.resize`.
+   - Behåll jitter-skyddet i `postEditorResize()` (`>1px` skillnad krävs), men säkerställ att den kan anropas vid varje höjdändring.
 
-## Varför det löser problemen
-- Utan `max-w-[1400px] mx-auto` återställs den tidigare layouten: nav-rail vänsterställd, panel intill, preview fyller resten — landskap blir lika stort som porträtt.
-- Inga `overflow-*-auto` eller `*vh`-höjder i editor-trädet innebär att `.editor-root` växer fritt med innehållet. `ResizeObserver` rapporterar då rätt höjd vid varje flikbyte, och Shopify-sidan sätter iframens höjd därefter — ingen intern scroll, inget tomrum.
+5. **Behåll manuell rapportering vid flikbyte**
+   - `EditorShell.tsx` behåller en dubbel-RAF-effekt på `activeId`, så varje flikbyte explicit triggar `postEditorResize()` efter att flikens innehåll renderats.
+   - `ResizeObserver` blir huvudskyddet för asynkrona höjdändringar, men flik-effekten ger tydlig deterministisk signal.
 
-## Verifiering
-- `window.addEventListener('message', e => e.data?.type==='EDITOR_RESIZE' && console.log('H:', e.data.height))` ska logga olika värden vid flikbyte.
-- Ingen scrollbar inuti panelen i någon flik.
-- Nav-rail visuellt längst till vänster på desktop; preview-arean fyller all återstående bredd.
+6. **Verifiering**
+   - Sök igenom editorträdet efter `100vh`, `100dvh`, `h-screen`, `min-h-screen`, `h-dvh`, samt kvarvarande felaktig desktop-scroll/fasta höjdklasser i `EditorShell.tsx`.
+   - Kontrollera att `.section-panel` inte längre har intern scroll och att `.editor-body` använder `items-start`.
+   - Kontrollera att `ResizeObserver` kopplas efter att `.editor-root` finns och att `postEditorResize()` fortfarande mäter `.editor-root.getBoundingClientRect().height`.
+
+## Teknisk målbild
+
+```text
+.editor-root        flex column; ingen height/max-height/overflow
+  .editor-body      desktop: flex row; align-items:flex-start; naturlig höjd
+    .nav-rail       naturlig höjd
+    .section-panel  ingen intern scroll; växer med innehåll
+    .preview-area   naturlig höjd; centrerar poster utan att sträckas
+  .sticky-cta       shrink-0; inte fixed
+```
+
+Shopify-temat ändras inte.
