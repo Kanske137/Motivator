@@ -216,7 +216,15 @@ export function MapPreview({
 
   // Fallback-tak för första rendering innan ResizeObserver mätt klart.
   const FALLBACK_MAX_H = 820;
-  const effectiveMaxH = containerH > 0 ? Math.max(320, containerH - 24) : FALLBACK_MAX_H;
+  // Cap mot 80% av viewporten när vi kör standalone (utanför iframe), så att
+  // postern inte blir absurt stor på stora skärmar. I iframe styrs höjden av
+  // Shopify-sidan via EDITOR_RESIZE och vi vill inte introducera vh-loop.
+  const standalone = typeof window !== "undefined" && window.self === window.top;
+  const viewportCap = standalone && typeof window !== "undefined"
+    ? Math.round(window.innerHeight * 0.8)
+    : Infinity;
+  const measured = containerH > 0 ? Math.max(320, containerH - 24) : FALLBACK_MAX_H;
+  const effectiveMaxH = Math.min(measured, viewportCap);
   const frameStyle: React.CSSProperties = {
     aspectRatio: `${posterAspect}`,
     width: "100%",
