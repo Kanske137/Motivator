@@ -10,7 +10,17 @@ export function postEditorResize() {
   if (window.self === window.top) return;
   const root = document.querySelector(".editor-root") as HTMLElement | null;
   if (!root) return;
-  const h = Math.ceil(Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0));
+  // Mät det verkliga innehållets botten — INTE document/body scrollHeight,
+  // som i en iframe aldrig kan bli mindre än iframens egen höjd (ger en
+  // feedback-loop som blåser upp höjden och skapar tomt gap).
+  let contentBottom = 0;
+  const scope = document.getElementById("root") ?? document.body;
+  for (const child of Array.from(scope.children)) {
+    const rect = (child as HTMLElement).getBoundingClientRect();
+    const bottom = rect.bottom + window.scrollY;
+    if (bottom > contentBottom) contentBottom = bottom;
+  }
+  const h = Math.ceil(contentBottom);
   if (!h) return;
   if (Math.abs(h - lastSent) <= 1) return;
   lastSent = h;
