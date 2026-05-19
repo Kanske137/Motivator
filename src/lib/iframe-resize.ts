@@ -10,7 +10,7 @@ export function postEditorResize() {
   if (window.self === window.top) return;
   const root = document.querySelector(".editor-root") as HTMLElement | null;
   if (!root) return;
-  const h = Math.ceil(root.getBoundingClientRect().height);
+  const h = Math.ceil(Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0));
   if (!h) return;
   if (Math.abs(h - lastSent) <= 1) return;
   lastSent = h;
