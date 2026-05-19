@@ -10,22 +10,26 @@ export function postEditorResize() {
   if (window.self === window.top) return;
   const root = document.querySelector(".editor-root") as HTMLElement | null;
   if (!root) return;
-  // Mät det verkliga innehållets botten — INTE document/body scrollHeight,
-  // som i en iframe aldrig kan bli mindre än iframens egen höjd (ger en
-  // feedback-loop som blåser upp höjden och skapar tomt gap).
+  // Mät det verkliga innehållet. I en iframe sträcks <html>, <body> och
+  // #root:s flex-barn alltid till minst iframens höjd — så vi mäter inte
+  // dem. Vi går ner till de faktiska innehållsblocken (header, editor-root,
+  // mockup-galleri) och tar den lägsta verkliga underkanten.
   let contentBottom = 0;
-  const scope = document.getElementById("root") ?? document.body;
-  for (const child of Array.from(scope.children)) {
-    const el = child as HTMLElement;
-    const cs = getComputedStyle(el);
-    // Hoppa över portal-containrar (Drawer/toast/modal) och element som
-    // tagits ur flödet — de speglar inte editorns verkliga innehållshöjd.
-    if (cs.position === "fixed" || cs.position === "absolute") continue;
-    if (cs.display === "none") continue;
-    const rect = el.getBoundingClientRect();
-    if (rect.height === 0) continue;
+  const measure = (el: Element) => {
+    const cs = getComputedStyle(el as HTMLElement);
+    if (cs.position === "fixed" || cs.position === "absolute") return;
+    if (cs.display === "none") return;
+    const rect = (el as HTMLElement).getBoundingClientRect();
+    if (rect.height === 0) return;
     const bottom = rect.bottom + window.scrollY;
     if (bottom > contentBottom) contentBottom = bottom;
+  };
+  // EditorPage-roten är <div class="flex flex-col bg-background"> — dess
+  // direkta barn är de verkliga blocken. Mät dem, inte rot-divens som
+  // sträcks av iframens höjd.
+  const appRoot = root.parentElement ?? document.body;
+  for (const child of Array.from(appRoot.children)) {
+    measure(child);
   }
   const h = Math.ceil(contentBottom);
   if (!h) return;
