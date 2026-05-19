@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { deriveTemplateSlug, getEffectiveSizes, type ProductConfig, type ProductType } from "@/lib/product-config";
+import { getActiveLayoutBlock } from "@/lib/template-schema";
 import { FrameOption } from "./FrameOption";
 import frameWhite from "@/assets/frames/frame-white.jpg";
 import frameOak from "@/assets/frames/frame-oak.jpg";
@@ -88,7 +89,7 @@ export function FormatSection({ configs, activeHandle, activeProductType, onProd
     if (!a || !b || a.currencyCode !== b.currencyCode) return null;
     return formatMoneyDelta(b.amount - a.amount, b.currencyCode, shopCtx.locale);
   };
-  const { config, productOptions, template, size, variant, orientation, setSize, setVariant, setOrientation } = useEditorStore();
+  const { config, productOptions, template, layoutId, size, variant, orientation, setSize, setVariant, setOrientation } = useEditorStore();
 
   const allowedOrientations = template?.orientations ?? ["portrait", "landscape"];
 
@@ -207,8 +208,9 @@ export function FormatSection({ configs, activeHandle, activeProductType, onProd
   const setWhiteMarginEnabled = useEditorStore((s) => s.setWhiteMarginEnabled);
   const BG_SWATCHES = ["#EFE7D6","#FFFFFF","#F8F4EC","#E5E5E5","#D9CDB5","#D6E4D2","#CFE0EA","#1A1A1A"];
 
-  const activeLayoutBlock =
-    template && (isCanvas && template.canvasLayout ? template.canvasLayout : template.defaultLayout);
+  const activeLayoutBlock = template
+    ? getActiveLayoutBlock(template, config.product_type, layoutId)
+    : null;
   const hasMarginLayer = (activeLayoutBlock?.[orientation]?.layers ?? []).some(
     (l) => l.type === "margin",
   );

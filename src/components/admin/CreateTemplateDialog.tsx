@@ -92,6 +92,7 @@ function buildSeedTemplate(kinds: Kind[]): Template {
       landscape: { aspect: "4:3", background: { color: "#EFE7D6" }, layers: [] },
     },
     sizeOverrides: {},
+    extraLayouts: [],
   };
 }
 

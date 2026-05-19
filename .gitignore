@@ -12,9 +12,6 @@ dist
 dist-ssr
 *.local
 
-# Local-only iframe height test harness (not for production)
-test-iframe.html
-
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

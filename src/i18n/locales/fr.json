@@ -31,7 +31,8 @@
     "map": "Carte",
     "text": "Texte",
     "format": "Format",
-    "aiStyle": "Style IA"
+    "aiStyle": "Style IA",
+    "style": "Style"
   },
   "format": {
     "backgroundColor": "Couleur de fond",
@@ -86,7 +87,8 @@
     "show": "Afficher le texte",
     "placeholder": "Votre texte ici…",
     "font": "Police",
-    "tab": "Texte {{n}}"
+    "tab": "Texte {{n}}",
+    "autoHint": "Laissez vide pour revenir au texte automatique"
   },
   "layer": {
     "size": "Taille",
@@ -187,5 +189,13 @@
     "success": "Modèle et produit Shopify supprimés",
     "successWithErrors": "Modèle supprimé, mais la suppression Shopify a échoué partiellement",
     "error": "Impossible de supprimer le modèle"
+  },
+  "mapStyle": {
+    "skandinavisk": "Scandinave",
+    "midnatt": "Minuit",
+    "mintgron": "Vert Menthe/Sauge",
+    "marinbla": "Bleu Marin",
+    "varmbeige": "Beige Chaud/Crème",
+    "skogsgron": "Vert Forêt Profond/Noir"
   }
 }

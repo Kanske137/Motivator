@@ -31,7 +31,8 @@
     "map": "Kort",
     "text": "Tekst",
     "format": "Format",
-    "aiStyle": "AI-stil"
+    "aiStyle": "AI-stil",
+    "style": "Stil"
   },
   "format": {
     "backgroundColor": "Baggrundsfarve",
@@ -86,7 +87,8 @@
     "show": "Vis tekst",
     "placeholder": "Din tekst her…",
     "font": "Skrifttype",
-    "tab": "Tekst {{n}}"
+    "tab": "Tekst {{n}}",
+    "autoHint": "Lad være tom for at vende tilbage til automatisk tekst"
   },
   "layer": {
     "size": "Størrelse",
@@ -187,5 +189,13 @@
     "success": "Skabelonen og Shopify-produktet er slettet",
     "successWithErrors": "Skabelonen er slettet, men Shopify-sletning havde fejl",
     "error": "Kunne ikke slette skabelonen"
+  },
+  "mapStyle": {
+    "skandinavisk": "Skandinavisk",
+    "midnatt": "Midnat",
+    "mintgron": "Mintgrøn/Salvie",
+    "marinbla": "Marinblå",
+    "varmbeige": "Varm Beige/Creme",
+    "skogsgron": "Dyb Skovgrøn/Sort"
   }
 }

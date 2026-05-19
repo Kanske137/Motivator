@@ -36,6 +36,7 @@ export async function getPrintFileUrl(args: PrintPipelineArgs): Promise<string> 
     const layers = getActiveLayoutBlock(
       templateInput.template,
       templateInput.productType,
+      templateInput.layoutId,
     )[templateInput.orientation]?.layers;
     const hasPhotoLayer = !!layers?.some((l) => l.type === "photo");
     if (!hasPhotoLayer) {

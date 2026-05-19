@@ -261,8 +261,8 @@ export function getEffectiveSizes(
 export const MAPBOX_STYLE_LABELS: Record<string, string> = {
   "light-v11": "Ljus",
   "dark-v11": "Mörk",
-  "outdoors-v12": "Terräng",
-  "satellite-v9": "Satellit",
-  "streets-v12": "Gatukarta",
-  "navigation-night-v1": "Natt",
+  "outdoors-v12": "Mintgrön/Salvia",
+  "satellite-v9": "Marin Blå",
+  "streets-v12": "Varm Beige/Cream",
+  "navigation-night-v1": "Djup Skogsgrön/Svart",
 };

@@ -31,7 +31,8 @@
     "map": "Kart",
     "text": "Tekst",
     "format": "Format",
-    "aiStyle": "AI-stil"
+    "aiStyle": "AI-stil",
+    "style": "Stil"
   },
   "format": {
     "backgroundColor": "Bakgrunnsfarge",
@@ -86,7 +87,8 @@
     "show": "Vis tekst",
     "placeholder": "Din tekst her…",
     "font": "Skrifttype",
-    "tab": "Tekst {{n}}"
+    "tab": "Tekst {{n}}",
+    "autoHint": "La stå tomt for å gå tilbake til automatisk tekst"
   },
   "layer": {
     "size": "Størrelse",
@@ -187,5 +189,13 @@
     "success": "Malen og Shopify-produktet er slettet",
     "successWithErrors": "Malen er slettet, men Shopify-slettingen hadde feil",
     "error": "Kunne ikke slette malen"
+  },
+  "mapStyle": {
+    "skandinavisk": "Skandinavisk",
+    "midnatt": "Midnatt",
+    "mintgron": "Mintgrønn/Salvie",
+    "marinbla": "Marinblå",
+    "varmbeige": "Varm Beige/Creme",
+    "skogsgron": "Dyp Skogsgrønn/Svart"
   }
 }

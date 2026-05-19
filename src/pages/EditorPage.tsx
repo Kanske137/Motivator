@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Loader2, ShoppingCart } from "lucide-react";
@@ -16,8 +16,10 @@ import {
   type ProductType,
 } from "@/lib/product-config";
 import { MapPreview } from "@/components/editor/MapPreview";
-import { ControlPanel } from "@/components/editor/ControlPanel";
+import { EditorShell } from "@/components/editor/EditorShell";
+import { StickyCta } from "@/components/editor/StickyCta";
 import { MockupGallery } from "@/components/editor/MockupGallery";
+import { postEditorResize } from "@/lib/iframe-resize";
 import { useCartStore } from "@/stores/cartStore";
 import { CartDrawer } from "@/components/CartDrawer";
 import { renderTemplateSnapshot } from "@/lib/template-snapshot";
@@ -26,6 +28,7 @@ import { getPrintFileUrl } from "@/lib/print-pipeline";
 import { resolveShopifyVariantId } from "@/lib/shopify-variant-resolver";
 import { hangerColorFromVariant } from "@/lib/mockup-scenes";
 import { toast } from "sonner";
+
 
 const FRAME_COLORS: Record<string, string> = {
   Ingen: "",
@@ -53,24 +56,13 @@ export default function EditorPage() {
   const [configs, setConfigs] = useState<ProductConfig[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const { config, template, layerValues, layerTransforms, whiteMarginEnabled, setConfig, currentPrice, currentLayout, mapStyleId, mapCenter, mapZoom, text, textFont, textVisible, showLabels, mapShape, orientation, size, variant, posterBgColor, designSource, aiPrintFileUrl, aiPhotoResults, shopifyVariantId, shopifyVariantResolving, setShopifyVariantId, setShopifyVariantResolving } =
+  const { config, template, layoutId, layerValues, layerTransforms, whiteMarginEnabled, setConfig, currentPrice, currentLayout, mapStyleId, mapCenter, mapZoom, text, textFont, textVisible, showLabels, mapShape, orientation, size, variant, posterBgColor, designSource, aiPrintFileUrl, aiPhotoResults, shopifyVariantId, shopifyVariantResolving, setShopifyVariantId, setShopifyVariantResolving } =
     useEditorStore();
   const { t } = useTranslation();
   const shopCtx = useShopContextStore();
   const addItem = useCartStore((s) => s.addItem);
   const isAdding = useCartStore((s) => s.isLoading);
   const [isPreparing, setIsPreparing] = useState(false);
-
-  // Editorns rot-element — ResizeObserver:n nedan mäter dess höjd och
-  // rapporterar den till föräldra-iframen (Shopify-temat).
-  const rootRef = useRef<HTMLDivElement>(null);
-  const ready = !loading && !!config;
-  // True när appen körs inbäddad i en <iframe> (Shopify-temat). Stabilt för
-  // sidans livstid. ENBART i detta läge ska editorn växa till sitt innehåll
-  // (ingen min-h-screen, ingen intern panel-scroll) så att föräldra-iframen
-  // kan storleksanpassas. Standalone / Lovable-preview behåller exakt
-  // originalupplevelsen (fixed-viewport + intern scroll).
-  const embedded = typeof window !== "undefined" && window.self !== window.top;
   const { map: shopifyPriceMap, derivedFx } = useShopifyPriceMap();
   const livePrice = priceFromMap(shopifyPriceMap, size, variant);
   const displayPrice = livePrice
@@ -121,63 +113,51 @@ export default function EditorPage() {
     })();
   }, []);
 
-  // Iframe-höjdkommunikation: meddela föräldern (Shopify-temat) när
-  // editorns innehållshöjd ändras så att iframen kan växa/krympa utan
-  // intern scroll. Observern sitter på editorns ROT-element (rootRef) så
-  // att höjden vi rapporterar är exakt så hög som innehållet — inte 100vh.
-  // Körs ENDAST när appen faktiskt är inbäddad i en iframe.
-  // Re-attachas när `ready` växlar (loading-spinner → editor) så att
-  // observern alltid sitter på det rot-element som faktiskt renderas.
+  // Iframe-höjdkommunikation: rapportera .editor-root verkliga höjd.
+  // Innehållsdriven — inga 100vh i trädet, ingen intern scroll ⇒ varje
+  // höjdändring (flikbyte, async thumbnails, fontladdning) fångas av
+  // ResizeObserver och postas till Shopify som EDITOR_RESIZE.
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (window.self === window.top) return;
-    if (typeof ResizeObserver === "undefined") return;
-    const el = rootRef.current;
-    if (!el) return;
+    if (loading || !config) return;
 
-    let lastHeight = -1;
-    let lastSent = 0;
     let timer: number | null = null;
+    let ro: ResizeObserver | null = null;
 
-    const measure = () =>
-      Math.ceil(Math.max(el.getBoundingClientRect().height, el.scrollHeight));
-
-    const post = () => {
-      const height = measure();
-      // 1px-jitterskydd: hoppa över sub-pixel-/avrundningsbrus som annars
-      // kan ge en oändlig resize-loop tillsammans med föräldra-iframen.
-      if (Math.abs(height - lastHeight) <= 1) return;
-      lastHeight = height;
-      lastSent = Date.now();
-      window.parent.postMessage({ type: "EDITOR_RESIZE", height }, "*");
-    };
-
-    const schedule = () => {
-      const since = Date.now() - lastSent;
-      if (since >= 100) {
-        post();
-      } else if (timer == null) {
-        timer = window.setTimeout(() => {
-          timer = null;
-          post();
-        }, 100 - since);
+    const attach = () => {
+      const root = document.querySelector(".editor-root");
+      if (!root) {
+        // Försök igen nästa frame om .editor-root inte hunnit mountas.
+        requestAnimationFrame(attach);
+        return;
+      }
+      postEditorResize();
+      if (typeof ResizeObserver !== "undefined") {
+        ro = new ResizeObserver(() => postEditorResize());
+        ro.observe(root);
       }
     };
 
-    // Initial mätning efter att första renderingen lagt sig (mount).
-    const initial = window.setTimeout(post, 0);
+    const r1 = requestAnimationFrame(() => {
+      const r2 = requestAnimationFrame(attach);
+      (attach as any)._r2 = r2;
+    });
 
-    // ResizeObserver fångar alla efterföljande höjdändringar automatiskt:
-    // flikbyte, produkttyp-byte, async-laddat innehåll (mockups, kartor).
-    const ro = new ResizeObserver(schedule);
-    ro.observe(el);
+    const onResize = () => {
+      if (timer != null) window.clearTimeout(timer);
+      timer = window.setTimeout(() => postEditorResize(), 100);
+    };
+    window.addEventListener("resize", onResize);
 
     return () => {
-      ro.disconnect();
-      window.clearTimeout(initial);
+      cancelAnimationFrame(r1);
+      window.removeEventListener("resize", onResize);
       if (timer != null) window.clearTimeout(timer);
+      if (ro) ro.disconnect();
     };
-  }, [ready]);
+  }, [loading, config]);
+
 
   // Resolva aktiv config från redan laddade configs när URL-params ändras.
   // Detta undviker omladdning/spinner vid produkttyp-byte i konsoliderade mallar.
@@ -230,6 +210,7 @@ export default function EditorPage() {
       template,
       orientation,
       productType: config?.product_type,
+      layoutId,
       size,
       layerValues,
       layerTransforms,
@@ -349,30 +330,36 @@ export default function EditorPage() {
 
   if (loading || !config) {
     return (
-      <div
-        ref={rootRef}
-        className={
-          embedded
-            ? "flex items-center justify-center bg-background py-24"
-            : "min-h-screen flex items-center justify-center bg-background"
-        }
-      >
+      <div className="min-h-[400px] flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
+  const previewNode = (
+    <MapPreview
+      frameColor={frameColor}
+      frameWidthCm={FRAME_WIDTH_CM}
+      hangerColor={hangerColor ?? undefined}
+      wrapCm={canvasDepthCm}
+      layersIncludeWrap={isCanvas && template?.canvasLayout?.coordSpace === "fullArea"}
+    />
+  );
+
+  const ctaNode = (
+    <StickyCta
+      price={displayPrice}
+      summary={summary}
+      loading={isAdding || isPreparing}
+      onAdd={handleAddToCart}
+    />
+  );
+
+  const standalone = window.self === window.top;
   return (
-    <div
-      ref={rootRef}
-      className={
-        embedded
-          ? "flex flex-col bg-background"
-          : "min-h-screen flex flex-col bg-background"
-      }
-    >
+    <div className="flex flex-col bg-background">
       {/* Top bar (only outside iframe) */}
-      {window.self === window.top && (
+      {standalone && (
         <header className="border-b bg-background sticky top-0 z-30">
           <div className="px-4 py-3 flex items-center justify-between">
             <h1 className="font-serif-display text-xl md:text-2xl font-semibold">{config.title}</h1>
@@ -381,87 +368,18 @@ export default function EditorPage() {
         </header>
       )}
 
-      {/* Main: split on desktop, stacked on mobile */}
-      <div className="flex-1 flex flex-col md:flex-row min-h-0">
-        {/* Preview — viewport-OBEROENDE höjd (ingen vh): motivets storlek
-            styrs av MapPreview (bredd × bildförhållande, px-tak). */}
-        <div className="paper-grain flex items-center justify-center md:flex-1 min-h-[420px] py-6">
-          <MapPreview
-            frameColor={frameColor}
-            frameWidthCm={FRAME_WIDTH_CM}
-            hangerColor={hangerColor ?? undefined}
-            wrapCm={canvasDepthCm}
-            layersIncludeWrap={isCanvas && template?.canvasLayout?.coordSpace === "fullArea"}
-          />
-        </div>
+      <EditorShell
+        configs={configs}
+        activeHandle={config.shopify_handle}
+        activeProductType={config.product_type}
+        onProductChange={onProductChange}
+        preview={previewNode}
+        cta={ctaNode}
+      />
 
-        {/* Control panel */}
-        {/* Standalone: intern scroll som original. Inbäddad: ingen intern
-            scroll — panelen växer och iframen storleksanpassas i stället. */}
-        <aside
-          className={`w-full md:w-[380px] lg:w-[420px] border-l bg-background pb-24 md:pb-6${
-            embedded ? "" : " overflow-y-auto"
-          }`}
-        >
-          <div className="p-4 md:p-5">
-            <ControlPanel
-              configs={configs}
-              activeHandle={config.shopify_handle}
-              activeProductType={config.product_type}
-              onProductChange={onProductChange}
-            />
-          </div>
-
-          {/* Desktop: format summary + buy inside panel */}
-          <div className="hidden md:block sticky bottom-0 border-t bg-background p-4 space-y-3">
-            <div className="text-xs text-muted-foreground truncate">
-              {summary}
-            </div>
-            <Button
-              onClick={handleAddToCart}
-              disabled={isAdding || isPreparing}
-              className="w-full h-14 rounded-full text-base font-semibold"
-            >
-              {(isAdding || isPreparing) ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <span className="flex items-center justify-between w-full">
-                  <span className="flex items-center">
-                    <ShoppingCart className="h-4 w-4 mr-2" />
-                    {t("common.addToCart")}
-                  </span>
-                  <span className="text-base">{displayPrice}</span>
-                </span>
-              )}
-            </Button>
-          </div>
-        </aside>
-      </div>
 
       {/* Mockup gallery */}
       <MockupGallery />
-
-      {/* Mobile sticky bottom bar */}
-      <div className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t bg-background p-3 flex items-center gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("header.yourChoice")}</div>
-          <div className="text-xs font-medium leading-tight truncate">{summary}</div>
-        </div>
-        <Button
-          onClick={handleAddToCart}
-          disabled={isAdding || isPreparing}
-          className="flex-1 h-12 rounded-full font-semibold"
-        >
-          {(isAdding || isPreparing) ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <span className="flex items-center justify-between w-full">
-              <span>{t("common.addToCart")}</span>
-              <span>{displayPrice}</span>
-            </span>
-          )}
-        </Button>
-      </div>
     </div>
   );
 }

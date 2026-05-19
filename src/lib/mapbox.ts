@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { mapStyleUrl } from "@/lib/map-style-catalog";
 
 let cachedToken: string | null = null;
 
@@ -73,5 +74,5 @@ export async function reverseGeocode(
 }
 
 export function styleUrl(styleId: string): string {
-  return `mapbox://styles/mapbox/${styleId}`;
+  return mapStyleUrl(styleId);
 }

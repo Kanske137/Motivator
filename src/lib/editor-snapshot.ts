@@ -165,7 +165,7 @@ export async function renderArtworkSnapshot(input: SnapshotInput): Promise<strin
       const style = map.getStyle();
       if (style?.layers) {
         for (const layer of style.layers) {
-          if (layer.type === "symbol") {
+          if (layer.type === "symbol" || layer.id.startsWith("label-")) {
             map.setLayoutProperty(layer.id, "visibility", input.showLabels ? "visible" : "none");
           }
         }

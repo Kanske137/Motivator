@@ -33,7 +33,7 @@ import type { AiStylePreset, MapStylePreset, ProductOptions } from "@/lib/templa
 import { DEFAULT_PRODUCT_VARIANTS, mergeUnique } from "@/lib/product-defaults";
 import { hasGelatoSku } from "@/lib/gelato-catalog";
 import { DEFAULT_AI_STYLES } from "@/lib/ai-style-defaults";
-import { MAP_STYLE_CATALOG } from "@/lib/map-style-catalog";
+import { MAP_STYLE_CATALOG, mapStyleThumbnailUrl, mapStyleLabelKey } from "@/lib/map-style-catalog";
 import { uploadCartPreview } from "@/lib/upload-preview";
 import { FONT_CATALOG, FONT_CATEGORY_LABELS, FONT_FAMILIES, type FontCategory } from "@/lib/font-catalog";
 import { toast } from "sonner";
@@ -378,6 +378,7 @@ function MapStylesEditor({
   value: MapStylePreset[] | undefined;
   onChange: (next: MapStylePreset[]) => void;
 }) {
+  const { t } = useTranslation();
   // Build the working list: catalog order, with `enabled` resolved from
   // (1) explicit template entry, (2) legacy config.map_styles, (3) default true.
   const legacy = config.map_styles ?? [];
@@ -415,26 +416,37 @@ function MapStylesEditor({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {MAP_STYLE_CATALOG.map((s) => {
                 const enabled = presets.find((p) => p.id === s.id)?.enabled ?? true;
+                const label = s.labelKey ? t(s.labelKey, { defaultValue: s.label }) : s.label;
                 return (
                   <div
                     key={s.id}
                     className="flex items-center gap-3 rounded-md border bg-background p-2"
                   >
-                    <div
-                      className="h-10 w-10 shrink-0 rounded-md border"
-                      style={{ background: s.previewBg }}
-                      aria-hidden
-                    />
+                    {mapStyleThumbnailUrl(s.id) ? (
+                      <img
+                        src={mapStyleThumbnailUrl(s.id)}
+                        alt={label}
+                        className="h-10 w-10 shrink-0 rounded-md border object-cover"
+                        loading="lazy"
+                        draggable={false}
+                      />
+                    ) : (
+                      <div
+                        className="h-10 w-10 shrink-0 rounded-md border"
+                        style={{ background: s.previewBg }}
+                        aria-hidden
+                      />
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm font-medium ${enabled ? "" : "text-muted-foreground line-through"}`}>
-                        {s.label}
+                        {label}
                       </p>
                       <p className="text-[10px] text-muted-foreground font-mono truncate">{s.id}</p>
                     </div>
                     <Switch
                       checked={enabled}
                       onCheckedChange={(c) => toggle(s.id, c)}
-                      aria-label={`Aktivera ${s.label}`}
+                      aria-label={`Aktivera ${label}`}
                     />
                   </div>
                 );

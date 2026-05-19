@@ -1,12 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Image as ImageIcon, Sparkles, MapPin, Palette, Type, Ruler, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,9 +11,10 @@ import { Circle, Heart, Star, Square, RotateCcw } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useEditorStore, type MapLayerValue, type TextLayerValue, type PhotoLayerValue, type PhotoShape } from "@/stores/editorStore";
 import { FONT_FAMILIES } from "@/lib/font-catalog";
+import { substituteTokens } from "@/lib/text-typography";
 import { geocode, type GeocodeResult } from "@/lib/mapbox";
 import { type ProductConfig, type ProductType } from "@/lib/product-config";
-import { getEnabledMapStyleIds, mapStyleLabel, mapStylePreviewBg } from "@/lib/map-style-catalog";
+import { getEnabledMapStyleIds, mapStyleLabel, mapStyleLabelKey, mapStylePreviewBg, mapStyleThumbnailUrl } from "@/lib/map-style-catalog";
 import { FormatSection } from "./FormatSection";
 import { PhotoUploadSection } from "./PhotoUploadSection";
 import { AiStyleSection } from "./AiStyleSection";
@@ -27,7 +23,8 @@ import { Loader2, Search } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { effectiveLayerRect, clampLayerRect } from "@/lib/layer-utils";
-import type { TemplateLayer } from "@/lib/template-schema";
+import type { TemplateLayer, Template } from "@/lib/template-schema";
+import { getAllLayouts, DEFAULT_LAYOUT_ID } from "@/lib/template-schema";
 
 /** Per-layer slider that scales a layer up/down while preserving aspect ratio.
  *  Shown in the customer editor for any layer where `locks.size === false`.
@@ -107,22 +104,81 @@ interface Props {
   activeHandle: string;
   activeProductType: ProductType;
   onProductChange: (handle: string, productType: ProductType) => void;
+  /** When set, only this section's content is rendered (no chrome). */
+  sectionId?: SectionId;
 }
 
-const cardClass =
-  "rounded-2xl bg-card border border-border shadow-[0_1px_2px_rgba(0,0,0,0.04)] px-4";
+export type SectionId = "bild" | "forvandling" | "karta" | "stil" | "text" | "format";
 
+export interface SectionMeta {
+  id: SectionId;
+  labelKey: string;
+  icon: LucideIcon;
+}
 
-export function ControlPanel({ configs, activeHandle, activeProductType, onProductChange }: Props) {
+const SECTION_ORDER: SectionId[] = ["bild", "forvandling", "karta", "stil", "text", "format"];
+
+const SECTION_META: Record<SectionId, { labelKey: string; icon: LucideIcon }> = {
+  bild: { labelKey: "section.image", icon: ImageIcon },
+  forvandling: { labelKey: "section.transformation", icon: Sparkles },
+  karta: { labelKey: "section.map", icon: MapPin },
+  stil: { labelKey: "section.style", icon: Palette },
+  text: { labelKey: "section.text", icon: Type },
+  format: { labelKey: "section.format", icon: Ruler },
+};
+
+/** Computes which sections are available for the currently loaded template. */
+export function useAvailableSections(): SectionMeta[] {
+  const template = useEditorStore((s) => s.template);
+  const templateLayers = useEditorStore((s) => s.templateLayers);
+  // Re-derive layers when layoutId changes (different style → different layers).
+  const layoutId = useEditorStore((s) => s.layoutId);
+
+  return useMemo(() => {
+    const layers = templateLayers();
+    const photoLayers = layers.filter((l) => l.type === "photo");
+    const aiPhotoLayers = layers.filter((l) => l.type === "aiPhoto");
+    const mapLayers = layers.filter((l) => l.type === "map");
+    const textLayers = layers.filter((l) => l.type === "text");
+
+    const editableMaps = mapLayers.filter(
+      (l: any) => !l.locks.position || !l.locks.style || !l.locks.shape || !l.locks.visibility || !l.locks.size || !l.locks.move,
+    );
+    const editableTexts = textLayers.filter(
+      (l: any) => !l.locks.content || !l.locks.font || !l.locks.visibility || !l.locks.size || !l.locks.move,
+    );
+    const allLayouts = template ? getAllLayouts(template) : [];
+
+    const flags: Record<SectionId, boolean> = {
+      bild: photoLayers.length > 0,
+      forvandling: aiPhotoLayers.length > 0,
+      karta: editableMaps.length > 0,
+      stil: allLayouts.length > 1,
+      text: editableTexts.length > 0,
+      format: true,
+    };
+    return SECTION_ORDER.filter((id) => flags[id]).map((id) => ({
+      id,
+      labelKey: SECTION_META[id].labelKey,
+      icon: SECTION_META[id].icon,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [template, layoutId, templateLayers]);
+}
+
+export function ControlPanel({ configs, activeHandle, activeProductType, onProductChange, sectionId }: Props) {
   const { t } = useTranslation();
   const config = useEditorStore((s) => s.config);
   const template = useEditorStore((s) => s.template);
+  const layoutId = useEditorStore((s) => s.layoutId);
+  const setLayoutId = useEditorStore((s) => s.setLayoutId);
   const productOptions = useEditorStore((s) => s.productOptions);
   const templateLayers = useEditorStore((s) => s.templateLayers);
   const layerValues = useEditorStore((s) => s.layerValues);
   const photoSources = useEditorStore((s) => s.photoSources);
 
   if (!config) return null;
+  if (!sectionId) return null;
 
   const layers = templateLayers();
   const mapLayers = layers.filter((l): l is Extract<TemplateLayer, { type: "map" }> => l.type === "map");
@@ -131,95 +187,103 @@ export function ControlPanel({ configs, activeHandle, activeProductType, onProdu
   const aiPhotoLayers = layers.filter(
     (l): l is Extract<TemplateLayer, { type: "aiPhoto" }> => l.type === "aiPhoto",
   );
-
   const editableMaps = mapLayers.filter(
     (l) => !l.locks.position || !l.locks.style || !l.locks.shape || !l.locks.visibility || !l.locks.size || !l.locks.move,
   );
   const editableTexts = textLayers.filter(
     (l) => !l.locks.content || !l.locks.font || !l.locks.visibility || !l.locks.size || !l.locks.move,
   );
-
-  const showImageSection = photoLayers.length > 0;
   const aiStyles = productOptions?.aiStyles ?? [];
-  const showAiPhotoSection = aiPhotoLayers.length > 0;
+  const allLayouts = template ? getAllLayouts(template) : [];
 
-  return (
-    <Accordion type="single" collapsible defaultValue="karta" className="w-full space-y-3">
-      {showImageSection && (
-        <AccordionItem value="bild" className={cn(cardClass, "border-b-0")}>
-          <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
-            {t("section.image")}
-          </AccordionTrigger>
-          <AccordionContent className="pt-1 pb-4">
-            <PhotoLayersControls
-              photoLayers={photoLayers}
-              layerValues={layerValues}
-              photoSources={photoSources}
-              aiStyles={aiStyles}
-            />
-          </AccordionContent>
-        </AccordionItem>
-      )}
-      {showAiPhotoSection && (
-        <AccordionItem value="forvandling" className={cn(cardClass, "border-b-0")}>
-          <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
-            {t("section.transformation")}
-          </AccordionTrigger>
-          <AccordionContent className="pt-1 pb-4 space-y-5">
-            {aiPhotoLayers.map((l, idx, arr) => (
-              <div key={l.id} className="space-y-3">
-                <AiPhotoSection
-                  layer={l}
-                  heading={arr.length > 1 ? l.name || t("layer.transformationTab", { n: idx + 1 }) : null}
-                  aiStylePresets={aiStyles}
-                />
-                <LayerTransformControls layer={l} />
-              </div>
-            ))}
-          </AccordionContent>
-        </AccordionItem>
-      )}
-
-      {editableMaps.length > 0 && (
-        <AccordionItem value="karta" className={cn(cardClass, "border-b-0")}>
-          <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
-            {t("section.map")}
-          </AccordionTrigger>
-          <AccordionContent className="pt-1 pb-4 overflow-visible">
-            <MapTabs config={config} layers={editableMaps} layerValues={layerValues} />
-          </AccordionContent>
-        </AccordionItem>
-      )}
-
-      {editableTexts.length > 0 && (
-        <AccordionItem value="text" className={cn(cardClass, "border-b-0")}>
-          <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
-            {t("section.text")}
-          </AccordionTrigger>
-          <AccordionContent className="pt-1 pb-4 space-y-6">
-            {editableTexts.map((l, idx) => (
+  switch (sectionId) {
+    case "bild":
+      return (
+        <PhotoLayersControls
+          photoLayers={photoLayers}
+          layerValues={layerValues}
+          photoSources={photoSources}
+          aiStyles={aiStyles}
+        />
+      );
+    case "forvandling":
+      return (
+        <div className="space-y-5">
+          {aiPhotoLayers.map((l, idx, arr) => (
+            <div key={l.id} className="space-y-3">
+              <AiPhotoSection
+                layer={l}
+                heading={arr.length > 1 ? l.name || t("layer.transformationTab", { n: idx + 1 }) : null}
+                aiStylePresets={aiStyles}
+              />
+              <LayerTransformControls layer={l} />
+            </div>
+          ))}
+        </div>
+      );
+    case "karta":
+      return <MapTabs config={config} layers={editableMaps} layerValues={layerValues} />;
+    case "stil":
+      return (
+        <div className="grid grid-cols-3 gap-2">
+          {allLayouts.map((l) => {
+            const id = l.id;
+            const active = (layoutId ?? DEFAULT_LAYOUT_ID) === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setLayoutId(id)}
+                className={cn(
+                  "rounded-xl border bg-background overflow-hidden text-left transition",
+                  active ? "ring-2 ring-primary border-transparent" : "border-border hover:border-foreground/30",
+                )}
+              >
+                <div className="aspect-square bg-muted flex items-center justify-center overflow-hidden">
+                  {l.thumbnailUrl ? (
+                    <img src={l.thumbnailUrl} alt={l.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{l.name.slice(0, 2)}</span>
+                  )}
+                </div>
+                <div className="px-2 py-1.5 text-[11px] font-medium truncate">{l.name}</div>
+              </button>
+            );
+          })}
+        </div>
+      );
+    case "text":
+      return (
+        <div className="space-y-6">
+          {editableTexts.map((l, idx) => {
+            const linkedMapId = l.defaults.linkedMapLayerId;
+            const linkedMap =
+              linkedMapId ? (layerValues[linkedMapId] as MapLayerValue | undefined) : undefined;
+            return (
               <TextLayerSection
                 key={l.id}
                 config={config}
                 layer={l}
                 value={(layerValues[l.id] as TextLayerValue | undefined) ?? null}
+                linkedMap={linkedMap ?? null}
                 heading={editableTexts.length > 1 ? `${l.name || t("text.tab", { n: idx + 1 })}` : null}
               />
-            ))}
-          </AccordionContent>
-        </AccordionItem>
-      )}
-
-      <AccordionItem value="format" className={cn(cardClass, "border-b-0")}>
-        <AccordionTrigger className="text-sm font-semibold h-14 hover:no-underline">
-          {t("section.format")}
-        </AccordionTrigger>
-        <AccordionContent className="pt-1 pb-4">
-          <FormatSection configs={configs} activeHandle={activeHandle} activeProductType={activeProductType} onProductChange={onProductChange} />
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
-  );
+            );
+          })}
+        </div>
+      );
+    case "format":
+      return (
+        <FormatSection
+          configs={configs}
+          activeHandle={activeHandle}
+          activeProductType={activeProductType}
+          onProductChange={onProductChange}
+        />
+      );
+    default:
+      return null;
+  }
 }
 
 // ---------------- map tabs (place + style merged) ----------------
@@ -514,21 +578,36 @@ function MapStyleLayerSection({
       )}
       {!layer.locks.style && (
         <div className="grid grid-cols-3 gap-2">
-          {enabledStyleIds.map((s) => (
-            <button
-              key={s}
-              onClick={() => setLayerMapStyle(layer.id, s)}
-              className={cn(
-                "relative aspect-square rounded-xl overflow-hidden transition hover:-translate-y-0.5",
-                s === styleId ? "ring-2 ring-primary" : "ring-1 ring-border",
-              )}
-            >
-              <div className="absolute inset-0" style={{ background: mapStylePreviewBg(s) }} />
-              <span className="absolute bottom-0 left-0 right-0 bg-background/85 backdrop-blur-sm text-[10px] py-1 font-medium">
-                {mapStyleLabel(s)}
-              </span>
-            </button>
-          ))}
+          {enabledStyleIds.map((s) => {
+            const thumb = mapStyleThumbnailUrl(s);
+            const labelKey = mapStyleLabelKey(s);
+            const label = labelKey ? t(labelKey, { defaultValue: mapStyleLabel(s) }) : mapStyleLabel(s);
+            return (
+              <button
+                key={s}
+                onClick={() => setLayerMapStyle(layer.id, s)}
+                className={cn(
+                  "relative aspect-square rounded-xl overflow-hidden transition hover:-translate-y-0.5",
+                  s === styleId ? "ring-2 ring-primary" : "ring-1 ring-border",
+                )}
+              >
+                {thumb ? (
+                  <img
+                    src={thumb}
+                    alt={label}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    loading="lazy"
+                    draggable={false}
+                  />
+                ) : (
+                  <div className="absolute inset-0" style={{ background: mapStylePreviewBg(s) }} />
+                )}
+                <span className="absolute bottom-0 left-0 right-0 bg-background/85 backdrop-blur-sm text-[10px] py-1 font-medium">
+                  {label}
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
       {!layer.locks.style && (
@@ -571,11 +650,13 @@ function TextLayerSection({
   config,
   layer,
   value,
+  linkedMap,
   heading,
 }: {
   config: ProductConfig;
   layer: Extract<TemplateLayer, { type: "text" }>;
   value: TextLayerValue | null;
+  linkedMap: MapLayerValue | null;
   heading: string | null;
 }) {
   const { t } = useTranslation();
@@ -583,7 +664,30 @@ function TextLayerSection({
   const setLayerTextFont = useEditorStore((s) => s.setLayerTextFont);
   const setLayerTextVisible = useEditorStore((s) => s.setLayerTextVisible);
   const productOptions = useEditorStore((s) => s.productOptions);
-  const text = value?.text ?? layer.defaults.text;
+
+  const linked = !!layer.defaults.linkedMapLayerId;
+  const place = linkedMap
+    ? {
+        placeName: linkedMap.placeName,
+        city: linkedMap.city ?? null,
+        country: linkedMap.country ?? null,
+        center: linkedMap.center,
+      }
+    : null;
+  // Auto-text built from the linked map (or defaults when not linked).
+  const autoText = linked
+    ? substituteTokens(layer.defaults, place)
+    : layer.defaults.text;
+  // Customer override wins over auto-text. When override is null, the field
+  // shows (and reverts to) auto-text. A kartuppdatering clears override in
+  // the store, so the textarea immediately reflects the new auto-text.
+  const committedText = value?.overrideText ?? autoText;
+
+  // Local edit buffer used only WHILE the textarea is focused, so React
+  // doesn't yank the caret if the store re-renders between keystrokes.
+  const [draft, setDraft] = useState<string | null>(null);
+  const text = draft !== null ? draft : committedText;
+
   const font = value?.font ?? layer.defaults.font;
   const visible = value?.visible ?? true;
   const allowedFonts =
@@ -605,14 +709,30 @@ function TextLayerSection({
         </div>
       )}
       {!layer.locks.content && (
-        <Textarea
-          value={text}
-          onChange={(e) => setLayerText(layer.id, e.target.value)}
-          placeholder={t("text.placeholder")}
-          maxLength={config.text_config.maxChars}
-          rows={3}
-          className="rounded-xl"
-        />
+        <>
+          <Textarea
+            value={text}
+            onFocus={() => setDraft(committedText)}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              setLayerText(layer.id, e.target.value);
+            }}
+            onBlur={() => setDraft(null)}
+            placeholder={t("text.placeholder")}
+            maxLength={
+              linked
+                ? Math.max(config.text_config.maxChars, autoText.length + 120)
+                : config.text_config.maxChars
+            }
+            rows={3}
+            className="rounded-xl"
+          />
+          {linked && (
+            <p className="text-[11px] text-muted-foreground -mt-1 px-1">
+              {t("text.autoHint")}
+            </p>
+          )}
+        </>
       )}
       {!layer.locks.font && (
         <div className="space-y-2">

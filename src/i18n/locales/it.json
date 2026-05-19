@@ -31,7 +31,8 @@
     "map": "Mappa",
     "text": "Testo",
     "format": "Formato",
-    "aiStyle": "Stile IA"
+    "aiStyle": "Stile IA",
+    "style": "Stile"
   },
   "format": {
     "backgroundColor": "Colore di sfondo",
@@ -86,7 +87,8 @@
     "show": "Mostra testo",
     "placeholder": "Il tuo testo qui…",
     "font": "Carattere",
-    "tab": "Testo {{n}}"
+    "tab": "Testo {{n}}",
+    "autoHint": "Lascia vuoto per tornare al testo automatico"
   },
   "layer": {
     "size": "Dimensione",
@@ -187,5 +189,13 @@
     "success": "Modello e prodotto Shopify eliminati",
     "successWithErrors": "Modello eliminato, ma l'eliminazione su Shopify ha avuto errori",
     "error": "Impossibile eliminare il modello"
+  },
+  "mapStyle": {
+    "skandinavisk": "Scandinavo",
+    "midnatt": "Mezzanotte",
+    "mintgron": "Verde Menta/Salvia",
+    "marinbla": "Blu Marino",
+    "varmbeige": "Beige Caldo/Crema",
+    "skogsgron": "Verde Foresta Scuro/Nero"
   }
 }

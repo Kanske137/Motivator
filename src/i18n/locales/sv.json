@@ -31,7 +31,8 @@
     "map": "Karta",
     "text": "Text",
     "format": "Format",
-    "aiStyle": "AI-stil"
+    "aiStyle": "AI-stil",
+    "style": "Stil"
   },
   "format": {
     "backgroundColor": "Bakgrundsfärg",
@@ -86,7 +87,8 @@
     "show": "Visa text",
     "placeholder": "Din text här…",
     "font": "Typsnitt",
-    "tab": "Text {{n}}"
+    "tab": "Text {{n}}",
+    "autoHint": "Lämna tomt för att återgå till automatisk text"
   },
   "layer": {
     "size": "Storlek",
@@ -187,5 +189,13 @@
     "success": "Mallen och Shopify-produkten är raderade",
     "successWithErrors": "Mallen är raderad, men Shopify-radering hade fel",
     "error": "Kunde inte radera mallen"
+  },
+  "mapStyle": {
+    "skandinavisk": "Skandinavisk",
+    "midnatt": "Midnatt",
+    "mintgron": "Mintgrön/Salvia",
+    "marinbla": "Marin Blå",
+    "varmbeige": "Varm Beige/Cream",
+    "skogsgron": "Djup Skogsgrön/Svart"
   }
 }

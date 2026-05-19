@@ -31,7 +31,8 @@
     "map": "Map",
     "text": "Text",
     "format": "Format",
-    "aiStyle": "AI style"
+    "aiStyle": "AI style",
+    "style": "Style"
   },
   "format": {
     "backgroundColor": "Background colour",
@@ -86,7 +87,8 @@
     "show": "Show text",
     "placeholder": "Your text here…",
     "font": "Font",
-    "tab": "Text {{n}}"
+    "tab": "Text {{n}}",
+    "autoHint": "Leave empty to return to automatic text"
   },
   "layer": {
     "size": "Size",
@@ -187,5 +189,13 @@
     "success": "Template and Shopify product deleted",
     "successWithErrors": "Template deleted, but Shopify deletion had errors",
     "error": "Could not delete template"
+  },
+  "mapStyle": {
+    "skandinavisk": "Scandinavian",
+    "midnatt": "Midnight",
+    "mintgron": "Mint Green/Sage",
+    "marinbla": "Marine Blue",
+    "varmbeige": "Warm Beige/Cream",
+    "skogsgron": "Deep Forest Green/Black"
   }
 }

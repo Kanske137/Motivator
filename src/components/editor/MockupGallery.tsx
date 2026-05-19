@@ -31,7 +31,7 @@ type GallerySlot =
 export function MockupGallery() {
   const { t } = useTranslation();
   const {
-    config, template, size, variant, orientation,
+    config, template, size, variant, orientation, layoutId,
     mapStyleId, mapCenter, mapZoom,
     text, textFont, textVisible,
     showLabels, mapShape, posterBgColor,
@@ -82,6 +82,7 @@ export function MockupGallery() {
           orientation,
           size,
           productType: config.product_type,
+          layoutId,
           layerValues,
           layerTransforms,
           whiteMarginEnabled,
@@ -153,7 +154,7 @@ export function MockupGallery() {
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
     };
   }, [
-    config, template, size, variant, orientation, isCanvas, canvasDepthCm,
+    config, template, size, variant, orientation, isCanvas, canvasDepthCm, layoutId,
     layerValues, layerTransforms, posterBgColor, whiteMarginEnabled,
     mapStyleId, mapCenter, mapZoom, showLabels, mapShape,
     text, textFont, textVisible,

@@ -31,7 +31,8 @@
     "map": "Karte",
     "text": "Text",
     "format": "Format",
-    "aiStyle": "KI-Stil"
+    "aiStyle": "KI-Stil",
+    "style": "Stil"
   },
   "format": {
     "backgroundColor": "Hintergrundfarbe",
@@ -86,7 +87,8 @@
     "show": "Text anzeigen",
     "placeholder": "Dein Text hier…",
     "font": "Schriftart",
-    "tab": "Text {{n}}"
+    "tab": "Text {{n}}",
+    "autoHint": "Leer lassen, um zum automatischen Text zurückzukehren"
   },
   "layer": {
     "size": "Größe",
@@ -187,5 +189,13 @@
     "success": "Vorlage und Shopify-Produkt gelöscht",
     "successWithErrors": "Vorlage gelöscht, aber Shopify-Löschung hatte Fehler",
     "error": "Vorlage konnte nicht gelöscht werden"
+  },
+  "mapStyle": {
+    "skandinavisk": "Skandinavisch",
+    "midnatt": "Mitternacht",
+    "mintgron": "Minzgrün/Salbei",
+    "marinbla": "Marineblau",
+    "varmbeige": "Warmes Beige/Creme",
+    "skogsgron": "Tiefes Waldgrün/Schwarz"
   }
 }

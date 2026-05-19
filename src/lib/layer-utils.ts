@@ -373,7 +373,8 @@ export function createLayer(type: LayerType, existing: TemplateLayer[]): Templat
         defaults: {
           text: "STOCKHOLM",
           font: "Inter",
-          fontSizePct: 8,
+          fontSizePt: 36,
+          lineHeight: 1.15,
           align: "center",
           color: "#1A1A1A",
         },

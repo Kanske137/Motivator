@@ -42,10 +42,15 @@ export interface MapLayerValue {
 
 export interface TextLayerValue {
   kind: "text";
+  /** Effective rendered text (legacy mirror). Equals
+   *  `overrideText ?? autoText(place)` and is recomputed every time the
+   *  linked map's place changes. Cart/snapshot/mirrors read this. */
   text: string;
+  /** Customer override. When null, layer follows the auto-text built from the
+   *  linked map. Cleared on every kartuppdatering — kartan vinner alltid. */
+  overrideText: string | null;
   font: string;
   visible: boolean;
-  isCustom: boolean;
 }
 
 export type PhotoShape = "rect" | "circle" | "heart" | "star";
@@ -96,6 +101,10 @@ interface EditorState {
   config: ProductConfig | null;
   template: Template | null;
   productOptions: ProductOptions | null;
+
+  /** Active named-layout id ("Stil"). Null while no template is loaded.
+   *  Defaults to the implicit "default" Standard-layout. */
+  layoutId: string | null;
 
   // Per-layer values keyed by layer id (covers map + text layers).
   layerValues: Record<string, LayerValue>;
@@ -158,6 +167,7 @@ interface EditorState {
   setSize: (s: string) => void;
   setVariant: (v: string) => void;
   setOrientation: (o: Orientation) => void;
+  setLayoutId: (id: string) => void;
   setWhiteMarginEnabled: (v: boolean) => void;
   setLayerTransform: (id: string, patch: { xPct?: number; yPct?: number; wPct?: number; hPct?: number }) => void;
   resetLayerTransform: (id: string) => void;
@@ -265,17 +275,26 @@ interface AutoTextFields {
   coordinates?: boolean;
 }
 
+import { buildLinkedText, resolveLinkedTokens, tokensFromLegacyFields } from "@/lib/text-typography";
+import type { TextDefaults } from "@/lib/template-schema";
+
 function buildAutoText(args: ApplyPlaceArgs, fields?: AutoTextFields): string {
-  const showCity = fields?.city ?? true;
-  const showCountry = fields?.country ?? true;
-  const showCoords = fields?.coordinates ?? true;
-  const [lng, lat] = args.center;
-  const cityLine = showCity
-    ? (args.city ?? args.placeName.split(",")[0] ?? "").trim().toUpperCase()
-    : "";
-  const countryLine = showCountry ? (args.country?.trim() ?? "") : "";
-  const coordLine = showCoords ? `${lat.toFixed(4)}°N · ${lng.toFixed(4)}°E` : "";
-  return [cityLine, countryLine, coordLine].filter(Boolean).join("\n");
+  // Legacy entry point — preserved so older call sites keep working.
+  return buildLinkedText(undefined, tokensFromLegacyFields(fields), {
+    placeName: args.placeName,
+    city: args.city,
+    country: args.country,
+    center: args.center,
+  });
+}
+
+function buildAutoTextForLayer(args: ApplyPlaceArgs, d: TextDefaults): string {
+  return buildLinkedText(d.text, resolveLinkedTokens(d), {
+    placeName: args.placeName,
+    city: args.city,
+    country: args.country,
+    center: args.center,
+  });
 }
 
 
@@ -283,8 +302,9 @@ function hydrateLayerValues(
   template: Template,
   orientation: Orientation,
   productType: string | null | undefined,
+  layoutId?: string | null,
 ): Record<string, LayerValue> {
-  const layout = getActiveLayoutBlock(template, productType)[orientation];
+  const layout = getActiveLayoutBlock(template, productType, layoutId)[orientation];
   const out: Record<string, LayerValue> = {};
   if (!layout) return out;
   for (const l of layout.layers) {
@@ -304,9 +324,9 @@ function hydrateLayerValues(
       out[l.id] = {
         kind: "text",
         text: l.defaults.text,
+        overrideText: null,
         font: l.defaults.font,
         visible: true,
-        isCustom: false,
       };
     } else if (l.type === "photo") {
       out[l.id] = {
@@ -335,13 +355,15 @@ function hydrateLayerValues(
 function buildLayerIdMap(
   prevTemplate: Template | null,
   prevProductType: string | null | undefined,
+  prevLayoutId: string | null | undefined,
   nextTemplate: Template,
   nextProductType: string | null | undefined,
+  nextLayoutId: string | null | undefined,
 ): Record<string, string> {
   const map: Record<string, string> = {};
   if (!prevTemplate) return map;
-  const prevBlock = getActiveLayoutBlock(prevTemplate, prevProductType);
-  const nextBlock = getActiveLayoutBlock(nextTemplate, nextProductType);
+  const prevBlock = getActiveLayoutBlock(prevTemplate, prevProductType, prevLayoutId);
+  const nextBlock = getActiveLayoutBlock(nextTemplate, nextProductType, nextLayoutId);
   for (const orientation of ["portrait", "landscape"] as const) {
     const prevLayers = prevBlock[orientation]?.layers ?? [];
     const nextLayers = nextBlock[orientation]?.layers ?? [];
@@ -364,10 +386,10 @@ function buildLayerIdMap(
 
 /** Recompute legacy "first map / first text" mirrors from layerValues. */
 function mirrorLegacy(
-  state: Pick<EditorState, "template" | "orientation" | "layerValues" | "config">,
+  state: Pick<EditorState, "template" | "orientation" | "layerValues" | "config" | "layoutId">,
 ) {
   const layout = state.template
-    ? getActiveLayoutBlock(state.template, state.config?.product_type)[state.orientation]
+    ? getActiveLayoutBlock(state.template, state.config?.product_type, state.layoutId)[state.orientation]
     : undefined;
   const firstMap = layout?.layers.find((l) => l.type === "map");
   const firstText = layout?.layers.find((l) => l.type === "text");
@@ -391,10 +413,10 @@ function mirrorLegacy(
 /** Recompute legacy first-photo-layer mirrors. The mirrors keep the cart
  *  payload + EditorPage's existing reads working unchanged. */
 function mirrorPhoto(
-  state: Pick<EditorState, "template" | "orientation" | "config" | "photoSources" | "photoAiResults">,
+  state: Pick<EditorState, "template" | "orientation" | "config" | "photoSources" | "photoAiResults" | "layoutId">,
 ) {
   const layout = state.template
-    ? getActiveLayoutBlock(state.template, state.config?.product_type)[state.orientation]
+    ? getActiveLayoutBlock(state.template, state.config?.product_type, state.layoutId)[state.orientation]
     : undefined;
   const firstPhoto = layout?.layers.find((l) => l.type === "photo");
   const id = firstPhoto?.id ?? null;
@@ -420,6 +442,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   productOptions: null,
   layerValues: {},
   layerTransforms: {},
+  layoutId: null,
   posterBgColor: "#EFE7D6",
   whiteMarginEnabled: true,
 
@@ -497,13 +520,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const isFirstLoad = state.config === null;
     const prevTemplate = state.template;
     const prevProductType = state.config?.product_type;
+    const prevLayoutId = state.layoutId;
+    // Keep prior layoutId if it still exists in the new template, else default.
+    const allLayoutIds = new Set([
+      "default",
+      ...((template.extraLayouts ?? []).map((l) => l.id)),
+    ]);
+    const nextLayoutId = prevLayoutId && allLayoutIds.has(prevLayoutId) ? prevLayoutId : "default";
     const layoutBlockChanged =
       !!prevTemplate &&
-      getActiveLayoutBlock(prevTemplate, prevProductType) !==
-        getActiveLayoutBlock(template, config.product_type);
+      getActiveLayoutBlock(prevTemplate, prevProductType, prevLayoutId) !==
+        getActiveLayoutBlock(template, config.product_type, nextLayoutId);
 
-    const freshLayerValues = hydrateLayerValues(template, orientation, config.product_type);
-    const layout = getActiveLayoutBlock(template, config.product_type)[orientation];
+    const freshLayerValues = hydrateLayerValues(template, orientation, config.product_type, nextLayoutId);
+    const layout = getActiveLayoutBlock(template, config.product_type, nextLayoutId)[orientation];
 
     let nextLayerValues = freshLayerValues;
     let nextLayerTransforms: Record<string, { xPct?: number; yPct?: number; wPct?: number; hPct?: number }> = {};
@@ -514,7 +544,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     let nextPhotoAiResults = state.photoAiResults;
 
     if (!isFirstLoad && layoutBlockChanged) {
-      const idMap = buildLayerIdMap(prevTemplate, prevProductType, template, config.product_type);
+      const idMap = buildLayerIdMap(prevTemplate, prevProductType, prevLayoutId, template, config.product_type, nextLayoutId);
       // Carry over per-layer values (photo shape/offset, text content, map state, …)
       const merged: Record<string, LayerValue> = { ...freshLayerValues };
       for (const [oldId, oldVal] of Object.entries(state.layerValues)) {
@@ -573,6 +603,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       config,
       template,
       productOptions,
+      layoutId: nextLayoutId,
       size: nextSize,
       variant: nextVariant,
       layerValues: nextLayerValues,
@@ -583,14 +614,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       photoSources: nextPhotoSources,
       photoAiResults: nextPhotoAiResults,
       whiteMarginEnabled: true,
-      ...(isFirstLoad && layout?.background?.color
+      // Sync background colour from the active layout/orientation block on
+      // every config load so per-style/per-product backgrounds take effect.
+      ...(layout?.background?.color
         ? { posterBgColor: layout.background.color }
         : {}),
     };
     set({
       ...next,
-      ...mirrorLegacy({ template, orientation, layerValues: nextLayerValues, config }),
-      ...mirrorPhoto({ template, orientation, config, photoSources: nextPhotoSources, photoAiResults: nextPhotoAiResults }),
+      ...mirrorLegacy({ template, orientation, layerValues: nextLayerValues, config, layoutId: nextLayoutId }),
+      ...mirrorPhoto({ template, orientation, config, photoSources: nextPhotoSources, photoAiResults: nextPhotoAiResults, layoutId: nextLayoutId }),
     });
   },
 
@@ -599,7 +632,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setLayerTransform: (id, patch) => {
     const state = get();
     const layer = state.template
-      ? getActiveLayoutBlock(state.template, state.config?.product_type)[state.orientation].layers.find((l) => l.id === id)
+      ? getActiveLayoutBlock(state.template, state.config?.product_type, state.layoutId)[state.orientation].layers.find((l) => l.id === id)
       : undefined;
     if (!layer) return;
     const cur = state.layerTransforms[id] ?? {};
@@ -642,13 +675,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { template, config } = state;
     if (!template) return set({ orientation });
     const prevOrientation = state.orientation;
-    const freshLayerValues = hydrateLayerValues(template, orientation, config?.product_type);
+    const freshLayerValues = hydrateLayerValues(template, orientation, config?.product_type, state.layoutId);
 
     // Build a portrait↔landscape ID map within the active layout block by
     // pairing layers of the same type index-by-index. Lets per-layer state
     // (AI results, photo sources, transforms) follow over to the matching
     // container in the new orientation.
-    const block = getActiveLayoutBlock(template, config?.product_type);
+    const block = getActiveLayoutBlock(template, config?.product_type, state.layoutId);
     const prevLayers = block[prevOrientation]?.layers ?? [];
     const nextLayers = block[orientation]?.layers ?? [];
     const grouped: Record<string, TemplateLayer[]> = {};
@@ -686,6 +719,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const aiPhotoSelectedRefUrl = remap(state.aiPhotoSelectedRefUrl);
     const layerTransforms = remap(state.layerTransforms);
 
+    const nextBgColor = block[orientation]?.background?.color;
     set({
       orientation,
       layerValues,
@@ -696,11 +730,163 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       aiPhotoResults,
       aiPhotoSelectedRefUrl,
       whiteMarginEnabled: true,
-      ...mirrorLegacy({ template, orientation, layerValues, config }),
-      ...mirrorPhoto({ template, orientation, config, photoSources, photoAiResults }),
+      ...(nextBgColor ? { posterBgColor: nextBgColor } : {}),
+      ...mirrorLegacy({ template, orientation, layerValues, config, layoutId: state.layoutId }),
+      ...mirrorPhoto({ template, orientation, config, photoSources, photoAiResults, layoutId: state.layoutId }),
     });
   },
 
+  setLayoutId: (nextLayoutId) => {
+    const state = get();
+    const { template, config } = state;
+    if (!template) return set({ layoutId: nextLayoutId });
+    const prevLayoutId = state.layoutId;
+    if (prevLayoutId === nextLayoutId) return;
+
+    const productType = config?.product_type;
+    const freshLayerValues = hydrateLayerValues(template, state.orientation, productType, nextLayoutId);
+
+    // Map old layer ids to new layer ids by pairing same-type layers index-
+    // by-index across both orientations so per-layer state (uploads, AI
+    // results, transforms, text content) follows the customer over.
+    const idMap = buildLayerIdMap(template, productType, prevLayoutId, template, productType, nextLayoutId);
+
+    const remap = <T,>(m: Record<string, T>): Record<string, T> => {
+      const out: Record<string, T> = {};
+      for (const [oldId, v] of Object.entries(m)) {
+        const newId = idMap[oldId] ?? oldId;
+        out[newId] = v;
+      }
+      return out;
+    };
+
+    // Merge strategy: ALWAYS start from the destination layout's fresh
+    // defaults. Layout-defining fields (map styleId/shape/showLabels, photo
+    // shape, text content/font) are intentionally per-layout and must NEVER
+    // bleed from a previous layout — otherwise switching e.g. Midnatt →
+    // Standard keeps Midnatt's map style. Only truly customer-owned values
+    // (a panned map center, custom-edited text, photo offset) survive — and
+    // only when the destination's locks allow them.
+    const nextBlock = getActiveLayoutBlock(template, productType, nextLayoutId);
+    const nextLayersById: Record<string, TemplateLayer> = {};
+    for (const o of ["portrait", "landscape"] as const) {
+      for (const l of nextBlock[o]?.layers ?? []) nextLayersById[l.id] = l;
+    }
+
+    // Build a map of prev-layout defaults keyed by old layer id so we can
+    // detect "the customer hasn't actually changed this from the previous
+    // layout's default" — those values should not be carried over.
+    const prevBlock = getActiveLayoutBlock(template, productType, prevLayoutId);
+    const prevLayersById: Record<string, TemplateLayer> = {};
+    for (const o of ["portrait", "landscape"] as const) {
+      for (const l of prevBlock[o]?.layers ?? []) prevLayersById[l.id] = l;
+    }
+
+    const layerValues: Record<string, LayerValue> = { ...freshLayerValues };
+    for (const [oldId, oldVal] of Object.entries(state.layerValues)) {
+      const newId = idMap[oldId] ?? oldId;
+      const fresh = layerValues[newId];
+      const newLayer = nextLayersById[newId];
+      const prevLayer = prevLayersById[oldId];
+      if (!fresh || !newLayer || fresh.kind !== oldVal.kind) continue;
+      if (oldVal.kind === "map" && fresh.kind === "map" && newLayer.type === "map" && prevLayer?.type === "map") {
+        const locks = newLayer.locks;
+        // Only carry over the panned map position when the customer has
+        // actually moved it away from the previous layout's default center.
+        const prevCenter = prevLayer.defaults.center;
+        const movedByCustomer =
+          Math.abs(prevCenter[0] - oldVal.center[0]) > 1e-6 ||
+          Math.abs(prevCenter[1] - oldVal.center[1]) > 1e-6 ||
+          Math.abs((prevLayer.defaults.zoom ?? 0) - oldVal.zoom) > 1e-3;
+        layerValues[newId] = {
+          ...fresh,
+          ...(!locks.position && movedByCustomer
+            ? {
+                center: oldVal.center,
+                zoom: oldVal.zoom,
+                placeName: oldVal.placeName,
+                city: oldVal.city,
+                country: oldVal.country,
+              }
+            : {}),
+        };
+      } else if (oldVal.kind === "text" && fresh.kind === "text" && newLayer.type === "text") {
+        const locks = newLayer.locks;
+        // Only customer-edited override survives a layout switch — otherwise
+        // the destination layout's default text should win.
+        layerValues[newId] = {
+          ...fresh,
+          ...(!locks.content && oldVal.overrideText !== null
+            ? { overrideText: oldVal.overrideText, text: oldVal.overrideText }
+            : {}),
+        };
+      } else if (oldVal.kind === "photo" && fresh.kind === "photo" && newLayer.type === "photo") {
+        const locks = newLayer.locks;
+        // Photo shape is layout-defining; only customer offset survives.
+        layerValues[newId] = {
+          ...fresh,
+          ...(!locks.move ? { offsetX: oldVal.offsetX, offsetY: oldVal.offsetY } : {}),
+        };
+      } else if (oldVal.kind === "aiPhoto" && fresh.kind === "aiPhoto" && newLayer.type === "aiPhoto") {
+        const locks = newLayer.locks;
+        layerValues[newId] = {
+          ...fresh,
+          ...(!locks.move ? { offsetX: oldVal.offsetX, offsetY: oldVal.offsetY } : {}),
+        };
+      }
+    }
+
+    // Re-generate auto-text for text layers linked to a map, so place names
+    // (city/country/coords) follow the carried-over map position when the
+    // customer switches layout. Customer override is preserved.
+    for (const o of ["portrait", "landscape"] as const) {
+      for (const l of nextBlock[o]?.layers ?? []) {
+        if (l.type !== "text") continue;
+        const linkedMapId = l.defaults.linkedMapLayerId;
+        if (!linkedMapId) continue;
+        const tv = layerValues[l.id];
+        if (!tv || tv.kind !== "text") continue;
+        const mv = layerValues[linkedMapId];
+        if (!mv || mv.kind !== "map") continue;
+        const autoText = buildAutoTextForLayer(
+          { placeName: mv.placeName, city: mv.city, country: mv.country, center: mv.center },
+          l.defaults,
+        );
+        layerValues[l.id] = { ...tv, text: tv.overrideText ?? autoText };
+      }
+    }
+
+    // Layer transforms only apply when size/move locks are open; carry only
+    // those entries forward to avoid resurrecting stale rects on locked layers.
+    const layerTransformsRemapped = remap(state.layerTransforms);
+    const layerTransforms: typeof state.layerTransforms = {};
+    for (const [id, val] of Object.entries(layerTransformsRemapped)) {
+      const layer = nextLayersById[id];
+      if (!layer) continue;
+      if (!layer.locks.size || !layer.locks.move) layerTransforms[id] = val;
+    }
+
+    const photoSources = remap(state.photoSources);
+    const photoAiResults = remap(state.photoAiResults);
+    const aiPhotoSources = remap(state.aiPhotoSources);
+    const aiPhotoResults = remap(state.aiPhotoResults);
+    const aiPhotoSelectedRefUrl = remap(state.aiPhotoSelectedRefUrl);
+
+    const nextBgColor = nextBlock[state.orientation]?.background?.color;
+    set({
+      layoutId: nextLayoutId,
+      layerValues,
+      layerTransforms,
+      photoSources,
+      photoAiResults,
+      aiPhotoSources,
+      aiPhotoResults,
+      aiPhotoSelectedRefUrl,
+      ...(nextBgColor ? { posterBgColor: nextBgColor } : {}),
+      ...mirrorLegacy({ template, orientation: state.orientation, layerValues, config, layoutId: nextLayoutId }),
+      ...mirrorPhoto({ template, orientation: state.orientation, config, photoSources, photoAiResults, layoutId: nextLayoutId }),
+    });
+  },
   // ---------- per-photo-layer setters ----------
   setPhotoSourceFor: (layerId, file, previewUrl) => {
     const state = get();
@@ -951,7 +1137,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     applyPlaceInternal(set, get, id, args, /* moveCenter */ false);
   },
 
-  setLayerText: (id, t) => updateText(set, get, id, { text: t, isCustom: true }),
+  setLayerText: (id, t) => setLayerOverrideText(set, get, id, t),
   setLayerTextFont: (id, f) => updateText(set, get, id, { font: f }),
   setLayerTextVisible: (id, v) => updateText(set, get, id, { visible: v }),
   setLayerPhotoShape: (id, s) => updatePhoto(set, get, id, { shape: s }),
@@ -983,7 +1169,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   setText: (t) => {
     const id = get().firstTextLayerId();
-    if (id) updateText(set, get, id, { text: t, isCustom: true });
+    if (id) setLayerOverrideText(set, get, id, t);
   },
   setTextFont: (f) => {
     const id = get().firstTextLayerId();
@@ -1017,7 +1203,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   templateLayers: () => {
     const { template, orientation, config } = get();
     if (!template) return [];
-    return [...getActiveLayoutBlock(template, config?.product_type)[orientation].layers].sort((a, b) => a.zIndex - b.zIndex);
+    return [...getActiveLayoutBlock(template, config?.product_type, get().layoutId)[orientation].layers].sort((a, b) => a.zIndex - b.zIndex);
   },
   firstMapLayerId: () => {
     const layers = get().templateLayers();
@@ -1047,7 +1233,7 @@ function updateMap(set: SetFn, get: GetFn, id: string, patch: Partial<MapLayerVa
   if (!cur || cur.kind !== "map") return;
   const next: MapLayerValue = { ...cur, ...patch };
   const layerValues = { ...state.layerValues, [id]: next };
-  set({ layerValues, ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues, config: state.config }) });
+  set({ layerValues, ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues, config: state.config, layoutId: state.layoutId }) });
 }
 
 function updateText(set: SetFn, get: GetFn, id: string, patch: Partial<TextLayerValue>) {
@@ -1056,8 +1242,45 @@ function updateText(set: SetFn, get: GetFn, id: string, patch: Partial<TextLayer
   if (!cur || cur.kind !== "text") return;
   const next: TextLayerValue = { ...cur, ...patch };
   const layerValues = { ...state.layerValues, [id]: next };
-  set({ layerValues, ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues, config: state.config }) });
+  set({ layerValues, ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues, config: state.config, layoutId: state.layoutId }) });
 }
+
+/** Customer-facing text setter: stores raw override and recomputes the
+ *  effective `text` mirror from the linked map's current place. Empty/null
+ *  override means "follow auto". */
+function setLayerOverrideText(set: SetFn, get: GetFn, id: string, raw: string) {
+  const state = get();
+  const cur = state.layerValues[id];
+  if (!cur || cur.kind !== "text") return;
+  const layout = state.template
+    ? getActiveLayoutBlock(state.template, state.config?.product_type, state.layoutId)[state.orientation]
+    : null;
+  const layer = layout?.layers.find((l) => l.id === id);
+  const linkedMapId =
+    layer && layer.type === "text" ? layer.defaults.linkedMapLayerId : null;
+  const mv = linkedMapId ? state.layerValues[linkedMapId] : null;
+  const autoText =
+    layer && layer.type === "text"
+      ? mv && mv.kind === "map"
+        ? buildAutoTextForLayer(
+            { placeName: mv.placeName, city: mv.city, country: mv.country, center: mv.center },
+            layer.defaults,
+          )
+        : layer.defaults.text
+      : "";
+  // If the customer's input matches the auto-text exactly, treat as "follow
+  // auto" so future kartuppdateringar continue to flow. Otherwise persist as
+  // override (including empty string — that's a deliberate clear).
+  const overrideText = raw === autoText ? null : raw;
+  const next: TextLayerValue = {
+    ...cur,
+    overrideText,
+    text: overrideText ?? autoText,
+  };
+  const layerValues = { ...state.layerValues, [id]: next };
+  set({ layerValues, ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues, config: state.config, layoutId: state.layoutId }) });
+}
+
 function updatePhoto(set: SetFn, get: GetFn, id: string, patch: Partial<PhotoLayerValue>) {
   const state = get();
   const cur = state.layerValues[id];
@@ -1100,7 +1323,7 @@ function applyPlaceInternal(
   // promise is upheld by the migration step in template-migrate.ts which
   // back-fills `linkedMapLayerId` for single-map+single-text templates.
   const layers = state.template
-    ? getActiveLayoutBlock(state.template, state.config?.product_type)[state.orientation].layers
+    ? getActiveLayoutBlock(state.template, state.config?.product_type, state.layoutId)[state.orientation].layers
     : [];
   const newLayerValues: Record<string, LayerValue> = {
     ...state.layerValues,
@@ -1110,12 +1333,17 @@ function applyPlaceInternal(
     if (l.type !== "text") continue;
     if (l.defaults.linkedMapLayerId !== mapId) continue;
     const tv = state.layerValues[l.id];
-    if (!tv || tv.kind !== "text" || tv.isCustom) continue;
-    newLayerValues[l.id] = { ...tv, text: buildAutoText(args, l.defaults.linkedMapFields) };
+    if (!tv || tv.kind !== "text") continue;
+    // Kartan vinner alltid: rensa override + skriv ny auto-text.
+    newLayerValues[l.id] = {
+      ...tv,
+      overrideText: null,
+      text: buildAutoTextForLayer(args, l.defaults),
+    };
   }
 
   set({
     layerValues: newLayerValues,
-    ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues: newLayerValues, config: state.config }),
+    ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues: newLayerValues, config: state.config, layoutId: state.layoutId }),
   });
 }

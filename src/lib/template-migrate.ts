@@ -57,6 +57,7 @@ export function buildTemplateFromLegacy(config: ProductConfig): Template {
       landscape: emptyOrientationLayout(landscapeAspect),
     },
     sizeOverrides: {},
+    extraLayouts: [],
   };
 }
 
@@ -356,7 +357,7 @@ export function buildPlaceText(
   const countryLine = showCountry ? (args.country?.trim() ?? "") : "";
   const coordLine =
     showCoords && args.center
-      ? `${args.center[1].toFixed(4)}°N · ${args.center[0].toFixed(4)}°E`
+      ? `${args.center[1].toFixed(3)}°N · ${args.center[0].toFixed(3)}°E`
       : "";
   return [cityLine, countryLine, coordLine].filter(Boolean).join("\n");
 }
@@ -373,8 +374,24 @@ export function applyAdminPlaceToLinkedTexts(
   return layers.map((l) => {
     if (l.type !== "text") return l;
     if (l.defaults.linkedMapLayerId !== mapId) return l;
-    const text = buildPlaceText(place, l.defaults.linkedMapFields);
-    return { ...l, defaults: { ...l.defaults, text } };
+    const tokens =
+      l.defaults.linkedTokens && l.defaults.linkedTokens.length > 0
+        ? l.defaults.linkedTokens
+        : (() => {
+            const f = l.defaults.linkedMapFields;
+            const out: Array<"city" | "country" | "coordinates"> = [];
+            if (f?.city ?? true) out.push("city");
+            if (f?.country ?? true) out.push("country");
+            if (f?.coordinates ?? true) out.push("coordinates");
+            return out;
+          })();
+    // If the admin authored a template with [[city]]/[[country]]/[[coords]]
+    // placeholders, KEEP that template intact — only the runtime substitutes.
+    const hasPlaceholder = /\[\[(city|country|coords?)\]\]/.test(l.defaults.text);
+    const text = hasPlaceholder
+      ? l.defaults.text
+      : buildPlaceText(place, l.defaults.linkedMapFields);
+    return { ...l, defaults: { ...l.defaults, text, linkedTokens: tokens } };
   });
 }
 

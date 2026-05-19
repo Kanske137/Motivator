@@ -13,11 +13,13 @@
 // (mapCenter/mapZoom/mapStyleId/etc.) override the LIVE layer's defaults; all
 // other map layers stay locked to their template defaults.
 import mapboxgl from "mapbox-gl";
+import { drawShapeOnCanvas, type ClipShape } from "./shape-clip";
 import { getMapboxToken, styleUrl } from "./mapbox";
-import type { Template, TemplateLayer } from "./template-schema";
+import type { Template, TemplateLayer, TextSpan } from "./template-schema";
 import { getActiveLayoutBlock } from "./template-schema";
 import type { LayerValue } from "@/stores/editorStore";
 import { getActiveMarginInsetsPct, expandRectForRemovedMargin } from "./layer-utils";
+import { buildEffectiveTextWithSpans, type LinkedPlace } from "./text-typography";
 
 export interface TemplateSnapshotInput {
   template: Template;
@@ -26,6 +28,8 @@ export interface TemplateSnapshotInput {
   /** "poster" | "canvas" — determines whether the canvasLayout (if any) is
    *  used instead of defaultLayout. */
   productType?: string | null;
+  /** Active named-layout id ("Stil"). Defaults to the implicit Standard. */
+  layoutId?: string | null;
 
   // Per-layer values keyed by layer id. When provided, these override the
   // legacy live* fields. Falls back to layer.defaults when missing.
@@ -121,7 +125,7 @@ function createOffscreen(w: number, h: number): HTMLDivElement {
   return el;
 }
 
-/** Apply shape clip via Path2D. Mirrors the SVG paths used in MapPreview. */
+/** Apply shape clip via the shared shape-clip util (matches editor exactly). */
 function clipForShape(
   ctx: CanvasRenderingContext2D,
   shape: string,
@@ -130,41 +134,7 @@ function clipForShape(
   w: number,
   h: number,
 ): void {
-  ctx.beginPath();
-  if (shape === "rect") {
-    // No-op clip: cover the full bounding rect so subsequent draws are not
-    // clipped away. Mirrors the editor's "fill the layer" behaviour.
-    ctx.rect(x, y, w, h);
-  } else if (shape === "circle") {
-    // Perfect circle inscribed within the rect (diameter = shortest side),
-    // centered. Matches editor's `useCircleClip` / px-radius CSS clip-path.
-    const r = Math.min(w, h) / 2;
-    ctx.arc(x + w / 2, y + h / 2, r, 0, Math.PI * 2);
-  } else if (shape === "heart") {
-    const sx = (vx: number) => x + vx * w;
-    const sy = (vy: number) => y + vy * h;
-    ctx.moveTo(sx(0.5), sy(1));
-    ctx.bezierCurveTo(sx(0.5), sy(1), sx(0), sy(0.65), sx(0), sy(0.3));
-    ctx.bezierCurveTo(sx(0), sy(0.1), sx(0.2), sy(0), sx(0.35), sy(0));
-    ctx.bezierCurveTo(sx(0.42), sy(0), sx(0.48), sy(0.05), sx(0.5), sy(0.15));
-    ctx.bezierCurveTo(sx(0.52), sy(0.05), sx(0.58), sy(0), sx(0.65), sy(0));
-    ctx.bezierCurveTo(sx(0.8), sy(0), sx(1), sy(0.1), sx(1), sy(0.3));
-    ctx.bezierCurveTo(sx(1), sy(0.65), sx(0.5), sy(1), sx(0.5), sy(1));
-    ctx.closePath();
-  } else if (shape === "star") {
-    const sx = (vx: number) => x + vx * w;
-    const sy = (vy: number) => y + vy * h;
-    const pts: Array<[number, number]> = [
-      [0.5, 0], [0.618, 0.345], [0.976, 0.345], [0.690, 0.560], [0.794, 0.905],
-      [0.5, 0.690], [0.206, 0.905], [0.310, 0.560], [0.024, 0.345], [0.382, 0.345],
-    ];
-    ctx.moveTo(sx(pts[0][0]), sy(pts[0][1]));
-    for (let i = 1; i < pts.length; i++) ctx.lineTo(sx(pts[i][0]), sy(pts[i][1]));
-    ctx.closePath();
-  } else {
-    ctx.rect(x, y, w, h);
-  }
-  ctx.clip();
+  drawShapeOnCanvas(ctx, shape as ClipShape, x, y, w, h);
 }
 
 /** Render a single map layer onto the output canvas at the given pixel rect. */
@@ -214,7 +184,7 @@ async function drawMapLayer(
       const style = map.getStyle();
       if (style?.layers) {
         for (const sl of style.layers) {
-          if (sl.type === "symbol") {
+          if (sl.type === "symbol" || sl.id.startsWith("label-")) {
             map.setLayoutProperty(sl.id, "visibility", opts.showLabels ? "visible" : "none");
           }
         }
@@ -252,13 +222,27 @@ function drawTextLayer(
   layer: Extract<TemplateLayer, { type: "text" }>,
   liveText: string,
   liveFont: string,
+  canvasShortPx: number,
 ): void {
   const d = layer.defaults;
   const text = liveText || d.text;
+  const hasBg = !!d.backgroundColor && d.backgroundColor !== "transparent";
+  if (hasBg) {
+    ctx.save();
+    ctx.fillStyle = d.backgroundColor!;
+    ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    ctx.restore();
+  }
   if (!text.trim()) return;
   const lines = text.split("\n");
-  const fontPx = Math.max(8, Math.round(rect.h * (d.fontSizePct / 100)));
-  const lineH = Math.round(fontPx * 1.15);
+  // pt-based size when present (A4 reference); else legacy %-of-height.
+  // A4 short = 595.276pt.
+  const fontPx =
+    typeof d.fontSizePt === "number" && d.fontSizePt > 0
+      ? Math.max(6, Math.round((d.fontSizePt / 595.276) * canvasShortPx))
+      : Math.max(8, Math.round(rect.h * ((d.fontSizePct ?? 8) / 100)));
+  const lineMul = typeof d.lineHeight === "number" && d.lineHeight > 0 ? d.lineHeight : 1.15;
+  const lineH = Math.round(fontPx * lineMul);
   ctx.save();
   ctx.fillStyle = d.color;
   ctx.font = `500 ${fontPx}px ${liveFont || d.font}, Inter, sans-serif`;
@@ -267,6 +251,52 @@ function drawTextLayer(
   const tx = d.align === "left" ? rect.x : d.align === "right" ? rect.x + rect.w : rect.x + rect.w / 2;
   const totalH = lineH * lines.length;
   const firstY = rect.y + rect.h / 2 - totalH / 2 + lineH / 2;
+
+  // ---- Decoration (box / side-rules) ----
+  const dec = d.decoration && d.decoration.kind !== "none" ? d.decoration : null;
+  if (dec) {
+    const mmToPx = (mm: number) => (mm / 210) * canvasShortPx;
+    const padPx = mmToPx(dec.paddingMm ?? 2);
+    const thickPx = Math.max(1, mmToPx(dec.thicknessMm));
+    // Measure widest line.
+    let widest = 0;
+    for (const line of lines) {
+      const w = ctx.measureText(line).width;
+      if (w > widest) widest = w;
+    }
+    const textBoxW = widest;
+    const textBoxH = totalH;
+    const cx = rect.x + rect.w / 2;
+    const cy = rect.y + rect.h / 2;
+
+    if (dec.kind === "box") {
+      ctx.save();
+      ctx.strokeStyle = dec.color;
+      ctx.lineWidth = thickPx;
+      const bx = cx - textBoxW / 2 - padPx;
+      const by = cy - textBoxH / 2 - padPx;
+      ctx.strokeRect(bx, by, textBoxW + 2 * padPx, textBoxH + 2 * padPx);
+      ctx.restore();
+    } else if (dec.kind === "side-rules") {
+      ctx.save();
+      ctx.fillStyle = dec.color;
+      const ruleLenPx = dec.ruleLengthMm ? mmToPx(dec.ruleLengthMm) : null;
+      const textLeft = cx - textBoxW / 2;
+      const textRight = cx + textBoxW / 2;
+      const yMid = cy - thickPx / 2;
+      if (ruleLenPx) {
+        ctx.fillRect(textLeft - padPx - ruleLenPx, yMid, ruleLenPx, thickPx);
+        ctx.fillRect(textRight + padPx, yMid, ruleLenPx, thickPx);
+      } else {
+        const leftEnd = textLeft - padPx;
+        const rightStart = textRight + padPx;
+        if (leftEnd > rect.x) ctx.fillRect(rect.x, yMid, leftEnd - rect.x, thickPx);
+        if (rect.x + rect.w > rightStart) ctx.fillRect(rightStart, yMid, rect.x + rect.w - rightStart, thickPx);
+      }
+      ctx.restore();
+    }
+  }
+
   lines.forEach((line, i) => {
     ctx.fillText(line, tx, firstY + i * lineH);
   });
@@ -527,10 +557,17 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
   // Front-zone rect (where layer % coords live). Canvas templates with the
   // legacy fullArea coord-space still anchor layers to the FULL surface;
   // post-migration canvas layouts are front-relative just like posters.
+  const namedLayoutForCoord = (() => {
+    // Resolve the active named layout to inspect its canvasLayout coordSpace.
+    const all = (input.template.extraLayouts ?? []);
+    const hit = input.layoutId && input.layoutId !== "default"
+      ? all.find((l) => l.id === input.layoutId) : null;
+    return hit ?? { canvasLayout: input.template.canvasLayout };
+  })();
   const layersIncludeWrap =
     input.productType === "canvas" &&
-    !!input.template.canvasLayout &&
-    input.template.canvasLayout.coordSpace === "fullArea";
+    !!namedLayoutForCoord.canvasLayout &&
+    namedLayoutForCoord.canvasLayout.coordSpace === "fullArea";
   const frontPxX = layersIncludeWrap ? 0 : Math.round(extraCm * PX_PER_CM * scale);
   const frontPxY = layersIncludeWrap ? 0 : Math.round(extraCm * PX_PER_CM * scale);
   const frontPxW = layersIncludeWrap ? w : Math.round(frontWcm * PX_PER_CM * scale);
@@ -562,7 +599,7 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
   ctx.fillRect(0, 0, w, h);
 
   // Sort layers by zIndex
-  const layout = getActiveLayoutBlock(input.template, input.productType)[input.orientation];
+  const layout = getActiveLayoutBlock(input.template, input.productType, input.layoutId)[input.orientation];
   const sortedByZ = [...layout.layers].sort((a, b) => a.zIndex - b.zIndex);
   // Margin must always render visually on top of all other layers, regardless
   // of its zIndex. Reorder so margin layers are drawn last.
@@ -631,9 +668,19 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
       const isLive = layer.id === liveTextId;
       const visible = tv ? tv.visible : isLive ? input.liveTextVisible : true;
       if (!visible) continue;
-      const text = tv ? tv.text : isLive ? input.liveText : layer.defaults.text;
       const font = tv ? tv.font : isLive ? input.liveTextFont : layer.defaults.font;
-      drawTextLayer(ctx, rect, layer, text, font);
+      // Resolve effective text via the override-aware helper so customer
+      // overrides win, but kartan vinner alltid (overrideText cleared by
+      // applyPlaceInternal whenever the linked map updates).
+      const mapId = layer.defaults.linkedMapLayerId;
+      const mLv = mapId ? input.layerValues?.[mapId] : null;
+      const mv2 = mLv && mLv.kind === "map" ? mLv : null;
+      const place: LinkedPlace | null = mv2
+        ? { placeName: mv2.placeName, city: mv2.city ?? null, country: mv2.country ?? null, center: mv2.center }
+        : null;
+      const overrideText = tv?.overrideText ?? (isLive ? input.liveText ?? null : null);
+      const { text } = buildEffectiveTextWithSpans(layer.defaults, place, overrideText);
+      drawTextLayer(ctx, rect, layer, text, font, Math.min(frontPxW, frontPxH));
     } else if (layer.type === "image") {
       try {
         await drawImageLayer(ctx, rect, layer);

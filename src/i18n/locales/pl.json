@@ -31,7 +31,8 @@
     "map": "Mapa",
     "text": "Tekst",
     "format": "Format",
-    "aiStyle": "Styl AI"
+    "aiStyle": "Styl AI",
+    "style": "Styl"
   },
   "format": {
     "backgroundColor": "Kolor tła",
@@ -86,7 +87,8 @@
     "show": "Pokaż tekst",
     "placeholder": "Twój tekst tutaj…",
     "font": "Czcionka",
-    "tab": "Tekst {{n}}"
+    "tab": "Tekst {{n}}",
+    "autoHint": "Pozostaw puste, aby wrócić do automatycznego tekstu"
   },
   "layer": {
     "size": "Rozmiar",
@@ -187,5 +189,13 @@
     "success": "Szablon i produkt Shopify usunięte",
     "successWithErrors": "Szablon usunięty, ale usunięcie w Shopify miało błędy",
     "error": "Nie można usunąć szablonu"
+  },
+  "mapStyle": {
+    "skandinavisk": "Skandynawski",
+    "midnatt": "Północ",
+    "mintgron": "Miętowy/Szałwiowy",
+    "marinbla": "Granatowy",
+    "varmbeige": "Ciepły Beż/Krem",
+    "skogsgron": "Głęboka Zieleń Leśna/Czarny"
   }
 }

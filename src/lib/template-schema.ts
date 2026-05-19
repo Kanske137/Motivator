@@ -145,18 +145,76 @@ export const aiPhotoDefaultsSchema = z.object({
 });
 export type AiPhotoDefaults = z.infer<typeof aiPhotoDefaultsSchema>;
 
+// Token used in linked text: city / country / coords. Maps to placeholder
+// `[[city]]`, `[[country]]`, `[[coords]]` in the text. The renderer replaces
+// these at runtime with the linked map layer's place data.
+export const linkedTextTokenSchema = z.enum(["city", "country", "coordinates"]);
+export type LinkedTextToken = z.infer<typeof linkedTextTokenSchema>;
+
+// Rich-text span: applies optional style overrides to a [start,end) range of
+// the layer's plain `text` (utf-16 indices). Spans must be sorted and
+// non-overlapping. Empty array = single style for the whole text.
+export const textSpanSchema = z.object({
+  start: z.number().int().nonnegative(),
+  end: z.number().int().positive(),
+  font: z.string().min(1).optional(),
+  fontSizePt: z.number().positive().max(400).optional(),
+  color: hexColorSchema.optional(),
+  bold: z.boolean().optional(),
+  italic: z.boolean().optional(),
+  underline: z.boolean().optional(),
+});
+export type TextSpan = z.infer<typeof textSpanSchema>;
+
+// Decoration drawn around the text content (auto-fits to text bbox, not the
+// layer rect). "side-rules" = two horizontal lines flanking the text.
+export const textDecorationSchema = z.object({
+  kind: z.enum(["none", "box", "side-rules"]),
+  thicknessMm: z.number().positive().max(20).default(0.5),
+  color: hexColorSchema.default("#000000"),
+  paddingMm: z.number().min(0).max(50).default(2),
+  gapMm: z.number().min(0).max(50).optional(),
+  /** side-rules: fixed length per rule in mm. When omitted, rules expand
+   *  elastically to fill the layer width. */
+  ruleLengthMm: z.number().positive().max(300).optional(),
+  /** side-rules: where the rule starts. "text-edge" (default) → next to the
+   *  text and extends outward; "layer-edge" → from the layer edge inward. */
+  ruleAlign: z.enum(["text-edge", "layer-edge"]).optional(),
+});
+export type TextDecoration = z.infer<typeof textDecorationSchema>;
+
 export const textDefaultsSchema = z.object({
   text: z.string(),
   font: z.string().min(1),
-  fontSizePct: z.number().positive().max(100),
+  // Legacy: font size as % of the layer's HEIGHT. Kept for backwards
+  // compatibility with existing templates. New templates should use
+  // `fontSizePt` (true typographic size against an A4 short-side reference)
+  // so "12 pt" looks like 12 pt in MS Word on A4 regardless of canvas.
+  fontSizePct: z.number().positive().max(100).optional(),
+  fontSizePt: z.number().positive().max(400).optional(),
+  // Multiplier of the resolved font size, Word-style (default 1.15).
+  lineHeight: z.number().min(0.5).max(3).optional(),
+  // Letter spacing in em units (default 0).
+  letterSpacingEm: z.number().min(-0.2).max(1).optional(),
   align: textAlignSchema,
   color: hexColorSchema,
+  // Optional background colour for the entire text-layer rect. When omitted
+  // or empty, the background is transparent (default for all legacy layers).
+  backgroundColor: z.string().optional(),
+  // Rich-text style overrides (per character range).
+  spans: z.array(textSpanSchema).optional(),
+  // Decoration around the text content.
+  decoration: textDecorationSchema.optional(),
   // When set, this text auto-updates to match the selected place of the
   // referenced map layer (city/country/coords). Customer manual edits override
   // the auto-text until the field is cleared.
   linkedMapLayerId: z.string().nullable().optional(),
-  // Which place-derived rows are included when the text is linked to a map.
-  // Optional — when missing all three fields are included (legacy behaviour).
+  // New token-based linking. The order of tokens is the visible order. Use
+  // placeholders `[[city]]`, `[[country]]`, `[[coords]]` in `text` to control
+  // exact position + line-grouping; tokens not present in `text` are appended
+  // on their own lines in order.
+  linkedTokens: z.array(linkedTextTokenSchema).optional(),
+  // DEPRECATED — kept for back-compat. Migrated to `linkedTokens`.
   linkedMapFields: z
     .object({
       city: z.boolean().default(true),
@@ -378,7 +436,38 @@ export const templateSchema = z
         coordSpace: z.enum(["front", "fullArea"]).optional(),
       })
       .optional(),
+    /** Optional admin-overridden display name for the implicit Standard layout
+     *  shown in the customer "Stil"-row. Defaults to "Standard" when omitted. */
+    defaultLayoutName: z.string().min(1).optional(),
+    /** Optional thumbnail URL for the Standard layout shown in the "Stil"-row. */
+    defaultLayoutThumbnailUrl: z.string().url().optional(),
     sizeOverrides: z.record(z.string(), sizeOverrideSchema).default({}),
+    /** Extra named layouts ("Stilar") in addition to the implicit
+     *  "Standard"-layout backed by `defaultLayout`/`canvasLayout`. When the
+     *  customer switches stil, the renderer reads the matching block via
+     *  `getAllLayouts(template)` + `getActiveLayoutBlock(...layoutId)`.
+     *  Each entry holds a full layout block (portrait+landscape) for the
+     *  standard product types and an optional canvas-specific block. */
+    extraLayouts: z
+      .array(
+        z.object({
+          id: z.string().min(1),
+          name: z.string().min(1),
+          thumbnailUrl: z.string().url().optional(),
+          defaultLayout: z.object({
+            portrait: orientationLayoutSchema,
+            landscape: orientationLayoutSchema,
+          }),
+          canvasLayout: z
+            .object({
+              portrait: orientationLayoutSchema,
+              landscape: orientationLayoutSchema,
+              coordSpace: z.enum(["front", "fullArea"]).optional(),
+            })
+            .optional(),
+        }),
+      )
+      .default([]),
   })
   .superRefine((tpl, ctx) => {
     const anyEnabled =
@@ -426,19 +515,61 @@ export function isEmptyTemplate(value: unknown): boolean {
   return Object.keys(v).length === 0;
 }
 
+/** A named layout entry — Standard (the implicit default) or one of the
+ *  admin-defined extra "stilar". */
+export interface NamedLayout {
+  id: string;
+  name: string;
+  thumbnailUrl?: string;
+  defaultLayout: { portrait: OrientationLayout; landscape: OrientationLayout };
+  canvasLayout?: {
+    portrait: OrientationLayout;
+    landscape: OrientationLayout;
+    coordSpace?: "front" | "fullArea";
+  };
+}
+
+/** Stable id of the implicit "Standard"-layout backed by `defaultLayout`. */
+export const DEFAULT_LAYOUT_ID = "default";
+
+/** Enumerate every named layout: Standard first, then `extraLayouts` in order. */
+export function getAllLayouts(template: Template): NamedLayout[] {
+  const standard: NamedLayout = {
+    id: DEFAULT_LAYOUT_ID,
+    name: template.defaultLayoutName?.trim() || "Standard",
+    thumbnailUrl: template.defaultLayoutThumbnailUrl,
+    defaultLayout: template.defaultLayout,
+    canvasLayout: template.canvasLayout,
+  };
+  return [standard, ...(template.extraLayouts ?? [])];
+}
+
+/** Resolve a layout id to its NamedLayout — falls back to Standard. */
+export function getNamedLayout(template: Template, layoutId?: string | null): NamedLayout {
+  const all = getAllLayouts(template);
+  if (layoutId) {
+    const hit = all.find((l) => l.id === layoutId);
+    if (hit) return hit;
+  }
+  return all[0]!;
+}
+
 /**
  * Pick the layout block (portrait+landscape) the active product type should
  * render. Canvas products use `canvasLayout` when present so the wrap-zone
  * layout doesn't bleed onto poster siblings; everything else falls back to
- * `defaultLayout`.
+ * `defaultLayout`. When a `layoutId` is supplied, the matching named layout
+ * (Standard or one of `extraLayouts`) is used.
  */
 export function getActiveLayoutBlock(
   template: Template,
   productType: string | null | undefined,
+  layoutId?: string | null,
 ): { portrait: OrientationLayout; landscape: OrientationLayout } {
+  const named = getNamedLayout(template, layoutId);
   const isCanvas = productType === "canvas";
-  if (isCanvas && template.canvasLayout) return template.canvasLayout;
-  return template.defaultLayout;
+  if (isCanvas && named.canvasLayout) return named.canvasLayout;
+  return named.defaultLayout;
 }
 
 /** Resolve the depth (cm) the canvas template was DESIGNED against. */

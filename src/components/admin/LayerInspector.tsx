@@ -27,8 +27,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import type {
   AiPhotoSubjectKind,
   LayerLocks,
+  LinkedTextToken,
   TemplateLayer,
+  TextDecoration,
+  TextSpan,
 } from "@/lib/template-schema";
+import { resolveLinkedTokens, substituteTokens, FALLBACK_PLACE } from "@/lib/text-typography";
 import { geocode, type GeocodeResult } from "@/lib/mapbox";
 import { applyAdminPlaceToLinkedTexts } from "@/lib/template-migrate";
 import { MAP_STYLE_CATALOG } from "@/lib/map-style-catalog";
@@ -236,130 +240,11 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
       )}
 
       {layer.type === "text" && (
-        <div className="space-y-3 border-t pt-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Text — defaults
-          </p>
-          <Field label="Innehåll">
-            <Textarea
-              value={layer.defaults.text}
-              rows={3}
-              onChange={(e) => updateDefaults({ text: e.target.value })}
-            />
-          </Field>
-          <Field label="Typsnitt">
-            <Select
-              value={layer.defaults.font}
-              onValueChange={(v) => updateDefaults({ font: v })}
-            >
-              <SelectTrigger>
-                <SelectValue style={{ fontFamily: `"${layer.defaults.font}", system-ui, sans-serif` }} />
-              </SelectTrigger>
-              <SelectContent className="max-h-72">
-                {(["sans", "serif", "display", "script", "mono"] as FontCategory[]).map((cat) => {
-                  const items = FONT_CATALOG.filter((f) => f.category === cat);
-                  if (items.length === 0) return null;
-                  return (
-                    <SelectGroup key={cat}>
-                      <SelectLabel>{FONT_CATEGORY_LABELS[cat]}</SelectLabel>
-                      {items.map((f) => (
-                        <SelectItem
-                          key={f.family}
-                          value={f.family}
-                          style={{ fontFamily: `"${f.family}", system-ui, sans-serif` }}
-                        >
-                          {f.family}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Storlek (% av höjd)">
-              <Input
-                type="number"
-                min={1}
-                max={100}
-                step={0.5}
-                value={layer.defaults.fontSizePct}
-                onChange={(e) => updateDefaults({ fontSizePct: Number(e.target.value) })}
-              />
-            </Field>
-            <Field label="Justering">
-              <Select
-                value={layer.defaults.align}
-                onValueChange={(v) => updateDefaults({ align: v as typeof layer.defaults.align })}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="left">Vänster</SelectItem>
-                  <SelectItem value="center">Mitten</SelectItem>
-                  <SelectItem value="right">Höger</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-          </div>
-          <Field label="Färg">
-            <Input
-              type="color"
-              value={layer.defaults.color}
-              onChange={(e) => updateDefaults({ color: e.target.value })}
-            />
-          </Field>
-          <Field label="Länka till karta">
-            <Select
-              value={layer.defaults.linkedMapLayerId ?? "__none__"}
-              onValueChange={(v) =>
-                updateDefaults({ linkedMapLayerId: v === "__none__" ? null : v })
-              }
-            >
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Ingen (statisk text)</SelectItem>
-                {allLayers
-                  .filter((l) => l.type === "map")
-                  .map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.name || m.id}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          {layer.defaults.linkedMapLayerId && (
-            <div className="rounded-md border bg-muted/30 p-3 space-y-2 -mt-1">
-              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                Visa rader
-              </p>
-              {(["city", "country", "coordinates"] as const).map((key) => {
-                const labels = { city: "Stad / ort", country: "Land", coordinates: "Koordinater" };
-                const fields = layer.defaults.linkedMapFields ?? { city: true, country: true, coordinates: true };
-                const checked = fields[key] ?? true;
-                return (
-                  <label key={key} className="flex items-center gap-2 text-xs cursor-pointer">
-                    <Checkbox
-                      checked={checked}
-                      onCheckedChange={(c) =>
-                        updateDefaults({
-                          linkedMapFields: { ...fields, [key]: c === true },
-                        })
-                      }
-                    />
-                    <span>{labels[key]}</span>
-                  </label>
-                );
-              })}
-            </div>
-          )}
-          <p className="text-[11px] text-muted-foreground -mt-2">
-            När länkad uppdateras texten automatiskt med valda rader (stad / land /
-            koordinater) när kunden ändrar plats på den valda kartan, så länge kunden
-            inte har redigerat texten manuellt.
-          </p>
-        </div>
+        <TextLayerDefaults
+          layer={layer}
+          allLayers={allLayers}
+          updateDefaults={updateDefaults}
+        />
       )}
 
       {layer.type === "photo" && (
@@ -1102,6 +987,515 @@ function ReferenceFocalEditor({
           Dra för att välja synlig del
         </p>
       )}
+    </div>
+  );
+}
+
+// =====================================================================
+// Text layer v2 — defaults section
+// =====================================================================
+// (TextLayerDefaults helpers — types/imports defined at top of file)
+
+function TextLayerDefaults({
+  layer,
+  allLayers,
+  updateDefaults,
+}: {
+  layer: Extract<TemplateLayer, { type: "text" }>;
+  allLayers: TemplateLayer[];
+  updateDefaults: (patch: Partial<Extract<TemplateLayer, { type: "text" }>["defaults"]>) => void;
+}) {
+  const d = layer.defaults;
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const tokens = resolveLinkedTokens(d);
+  const decoration: TextDecoration = d.decoration ?? {
+    kind: "none",
+    thicknessMm: 0.5,
+    color: "#000000",
+    paddingMm: 2,
+  };
+
+  function insertAtCursor(text: string) {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart ?? d.text.length;
+    const end = ta.selectionEnd ?? d.text.length;
+    const next = d.text.slice(0, start) + text + d.text.slice(end);
+    updateDefaults({ text: next });
+    requestAnimationFrame(() => {
+      ta.focus();
+      const pos = start + text.length;
+      ta.setSelectionRange(pos, pos);
+    });
+  }
+
+  function moveToken(idx: number, dir: -1 | 1) {
+    const next = [...tokens];
+    const j = idx + dir;
+    if (j < 0 || j >= next.length) return;
+    [next[idx], next[j]] = [next[j], next[idx]];
+    updateDefaults({ linkedTokens: next });
+  }
+
+  function toggleToken(tok: LinkedTextToken) {
+    const has = tokens.includes(tok);
+    const next = has ? tokens.filter((t) => t !== tok) : [...tokens, tok];
+    updateDefaults({ linkedTokens: next });
+  }
+
+  function addSpanFromSelection() {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart ?? 0;
+    const end = ta.selectionEnd ?? 0;
+    if (end <= start) {
+      toast.message("Markera först en del av texten");
+      return;
+    }
+    const next: TextSpan[] = [...(d.spans ?? []), { start, end }];
+    updateDefaults({ spans: next });
+  }
+
+  function updateSpan(i: number, patch: Partial<TextSpan>) {
+    const arr = [...(d.spans ?? [])];
+    arr[i] = { ...arr[i], ...patch };
+    updateDefaults({ spans: arr });
+  }
+  function removeSpan(i: number) {
+    const arr = [...(d.spans ?? [])];
+    arr.splice(i, 1);
+    updateDefaults({ spans: arr });
+  }
+
+  return (
+    <div className="space-y-3 border-t pt-4">
+      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        Text — defaults
+      </p>
+      <Field label="Innehåll (Enter ger ny rad)">
+        <Textarea
+          ref={textareaRef}
+          value={d.text}
+          rows={4}
+          onChange={(e) => updateDefaults({ text: e.target.value })}
+          className="font-mono text-sm"
+        />
+      </Field>
+      {(d.linkedMapLayerId || /\[\[(city|country|coords?)\]\]/.test(d.text)) && (
+        <p className="text-[11px] text-muted-foreground -mt-1 px-0.5">
+          Förhandsvisning:{" "}
+          <span className="font-medium text-foreground/80 whitespace-pre-wrap">
+            {(() => {
+              const sibling = allLayers.find(
+                (l) => l.type === "map" && (!d.linkedMapLayerId || l.id === d.linkedMapLayerId),
+              );
+              const place =
+                sibling && sibling.type === "map"
+                  ? {
+                      placeName: sibling.defaults.placeName ?? "",
+                      city: sibling.defaults.city ?? null,
+                      country: sibling.defaults.country ?? null,
+                      center: [sibling.defaults.center[0]!, sibling.defaults.center[1]!] as [number, number],
+                    }
+                  : FALLBACK_PLACE;
+              return substituteTokens(d, place).replace(/\n/g, " · ") || "(tom)";
+            })()}
+          </span>
+        </p>
+      )}
+      <Field label="Typsnitt">
+        <Select value={d.font} onValueChange={(v) => updateDefaults({ font: v })}>
+          <SelectTrigger>
+            <SelectValue style={{ fontFamily: `"${d.font}", system-ui, sans-serif` }} />
+          </SelectTrigger>
+          <SelectContent className="max-h-72">
+            {(["sans", "serif", "display", "script", "mono"] as FontCategory[]).map((cat) => {
+              const items = FONT_CATALOG.filter((f) => f.category === cat);
+              if (items.length === 0) return null;
+              return (
+                <SelectGroup key={cat}>
+                  <SelectLabel>{FONT_CATEGORY_LABELS[cat]}</SelectLabel>
+                  {items.map((f) => (
+                    <SelectItem
+                      key={f.family}
+                      value={f.family}
+                      style={{ fontFamily: `"${f.family}", system-ui, sans-serif` }}
+                    >
+                      {f.family}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              );
+            })}
+          </SelectContent>
+        </Select>
+      </Field>
+      <div className="grid grid-cols-3 gap-3">
+        <Field label="Storlek (pt)">
+          <Input
+            type="number"
+            min={4}
+            max={400}
+            step={1}
+            value={d.fontSizePt ?? ""}
+            placeholder="12"
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              updateDefaults({ fontSizePt: Number.isFinite(n) && n > 0 ? n : undefined });
+            }}
+          />
+        </Field>
+        <Field label="Radavstånd">
+          <Input
+            type="number"
+            min={0.8}
+            max={3}
+            step={0.05}
+            value={d.lineHeight ?? 1.15}
+            onChange={(e) => updateDefaults({ lineHeight: Number(e.target.value) })}
+          />
+        </Field>
+        <Field label="Justering">
+          <Select
+            value={d.align}
+            onValueChange={(v) => updateDefaults({ align: v as typeof d.align })}
+          >
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="left">Vänster</SelectItem>
+              <SelectItem value="center">Mitten</SelectItem>
+              <SelectItem value="right">Höger</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+      </div>
+      {typeof d.fontSizePct === "number" && typeof d.fontSizePt !== "number" && (
+        <p className="text-[11px] text-amber-600">
+          Använder gammal storlek (% av höjd: {d.fontSizePct}%). Sätt en pt-storlek
+          för att uppgradera.
+        </p>
+      )}
+      <Field label="Färg">
+        <Input
+          type="color"
+          value={d.color}
+          onChange={(e) => updateDefaults({ color: e.target.value })}
+        />
+      </Field>
+      <Field label="Bakgrundsfärg">
+        <div className="flex items-center gap-2">
+          <Input
+            type="color"
+            value={d.backgroundColor || "#ffffff"}
+            onChange={(e) => updateDefaults({ backgroundColor: e.target.value })}
+            disabled={!d.backgroundColor}
+            className="flex-1"
+          />
+          {d.backgroundColor ? (
+            <button
+              type="button"
+              onClick={() => updateDefaults({ backgroundColor: undefined })}
+              className="text-[11px] px-2 py-1 rounded border hover:bg-muted"
+            >
+              Ta bort
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => updateDefaults({ backgroundColor: "#ffffff" })}
+              className="text-[11px] px-2 py-1 rounded border hover:bg-muted"
+            >
+              Lägg till
+            </button>
+          )}
+        </div>
+      </Field>
+
+      {/* Decoration */}
+      <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          Design (anpassar sig efter texten)
+        </p>
+        <Field label="Stil">
+          <Select
+            value={decoration.kind}
+            onValueChange={(v) =>
+              updateDefaults({
+                decoration: { ...decoration, kind: v as TextDecoration["kind"] },
+              })
+            }
+          >
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Ingen</SelectItem>
+              <SelectItem value="box">Ruta runt texten</SelectItem>
+              <SelectItem value="side-rules">Streck på sidorna</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        {decoration.kind !== "none" && (
+          <div className="grid grid-cols-3 gap-2">
+            <Field label="Tjocklek (mm)">
+              <Input
+                type="number"
+                min={0.1}
+                max={20}
+                step={0.1}
+                value={decoration.thicknessMm}
+                onChange={(e) =>
+                  updateDefaults({
+                    decoration: { ...decoration, thicknessMm: Number(e.target.value) },
+                  })
+                }
+              />
+            </Field>
+            <Field label="Padding (mm)">
+              <Input
+                type="number"
+                min={0}
+                max={50}
+                step={0.5}
+                value={decoration.paddingMm}
+                onChange={(e) =>
+                  updateDefaults({
+                    decoration: { ...decoration, paddingMm: Number(e.target.value) },
+                  })
+                }
+              />
+            </Field>
+            <Field label="Färg">
+              <Input
+                type="color"
+                value={decoration.color}
+                onChange={(e) =>
+                  updateDefaults({
+                    decoration: { ...decoration, color: e.target.value },
+                  })
+                }
+              />
+            </Field>
+          </div>
+        )}
+        {decoration.kind === "side-rules" && (
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Strecklängd (mm) — tomt = elastisk">
+              <Input
+                type="number"
+                min={0}
+                max={300}
+                step={1}
+                value={decoration.ruleLengthMm ?? ""}
+                placeholder="t.ex. 25"
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  updateDefaults({
+                    decoration: {
+                      ...decoration,
+                      ruleLengthMm: Number.isFinite(n) && n > 0 ? n : undefined,
+                    },
+                  });
+                }}
+              />
+            </Field>
+            <Field label="Strecken börjar vid">
+              <Select
+                value={decoration.ruleAlign ?? "text-edge"}
+                onValueChange={(v) =>
+                  updateDefaults({
+                    decoration: { ...decoration, ruleAlign: v as "text-edge" | "layer-edge" },
+                  })
+                }
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="text-edge">Texten</SelectItem>
+                  <SelectItem value="layer-edge">Layerkanten</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+        )}
+      </div>
+
+      {/* Map link */}
+      <Field label="Länka till karta">
+        <Select
+          value={d.linkedMapLayerId ?? "__none__"}
+          onValueChange={(v) =>
+            updateDefaults({ linkedMapLayerId: v === "__none__" ? null : v })
+          }
+        >
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">Ingen (statisk text)</SelectItem>
+            {allLayers
+              .filter((l) => l.type === "map")
+              .map((m) => (
+                <SelectItem key={m.id} value={m.id}>
+                  {m.name || m.id}
+                </SelectItem>
+              ))}
+          </SelectContent>
+        </Select>
+      </Field>
+      {d.linkedMapLayerId && (
+        <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            Länkade rader (drag för att ordna)
+          </p>
+          <p className="text-[10px] text-muted-foreground -mt-1">
+            Ordningen avgör visningsordning. För finkontroll: skriv
+            <code className="px-1">[[city]]</code>,
+            <code className="px-1">[[country]]</code> eller
+            <code className="px-1">[[coords]]</code> i innehållet — då följer
+            renderaren din egen layout (samma rad eller egen rad).
+          </p>
+          {(["city", "country", "coordinates"] as const).map((tok) => {
+            const labels = { city: "Stad / ort [[city]]", country: "Land [[country]]", coordinates: "Koordinater [[coords]]" };
+            const idx = tokens.indexOf(tok);
+            const checked = idx !== -1;
+            return (
+              <div key={tok} className="flex items-center gap-2 text-xs">
+                <Checkbox checked={checked} onCheckedChange={() => toggleToken(tok)} />
+                <span className="flex-1">{labels[tok]}</span>
+                {checked && (
+                  <>
+                    <button
+                      type="button"
+                      className="text-[11px] px-1.5 py-0.5 rounded border hover:bg-muted"
+                      disabled={idx <= 0}
+                      onClick={() => moveToken(idx, -1)}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      className="text-[11px] px-1.5 py-0.5 rounded border hover:bg-muted"
+                      disabled={idx >= tokens.length - 1}
+                      onClick={() => moveToken(idx, 1)}
+                    >
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      className="text-[11px] px-1.5 py-0.5 rounded border hover:bg-muted"
+                      onClick={() => insertAtCursor(`[[${tok === "coordinates" ? "coords" : tok}]]`)}
+                    >
+                      Infoga
+                    </button>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Spans (rich text overrides) */}
+      <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            Format-markeringar
+          </p>
+          <button
+            type="button"
+            className="text-[11px] px-2 py-1 rounded border hover:bg-muted"
+            onClick={addSpanFromSelection}
+          >
+            + Markering
+          </button>
+        </div>
+        <p className="text-[10px] text-muted-foreground">
+          Markera text i innehållet ovan, klicka <em>+ Markering</em> och sätt
+          font/storlek/färg endast för det området.
+        </p>
+        {(d.spans ?? []).length === 0 && (
+          <p className="text-[11px] text-muted-foreground italic">Inga markeringar.</p>
+        )}
+        {(d.spans ?? []).map((s, i) => (
+          <SpanEditor
+            key={i}
+            span={s}
+            text={d.text}
+            onChange={(p) => updateSpan(i, p)}
+            onRemove={() => removeSpan(i)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SpanEditor({
+  span,
+  text,
+  onChange,
+  onRemove,
+}: {
+  span: TextSpan;
+  text: string;
+  onChange: (p: Partial<TextSpan>) => void;
+  onRemove: () => void;
+}) {
+  const slice = text.slice(span.start, span.end);
+  return (
+    <div className="rounded border bg-background p-2 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <code className="text-[11px] truncate flex-1 bg-muted px-1.5 py-0.5 rounded">
+          [{span.start}–{span.end}] "{slice}"
+        </code>
+        <button
+          type="button"
+          className="text-[11px] text-destructive hover:underline"
+          onClick={onRemove}
+        >
+          Ta bort
+        </button>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <Input
+          type="number"
+          placeholder="pt"
+          value={span.fontSizePt ?? ""}
+          onChange={(e) => {
+            const n = Number(e.target.value);
+            onChange({ fontSizePt: Number.isFinite(n) && n > 0 ? n : undefined });
+          }}
+        />
+        <Input
+          placeholder="Typsnitt"
+          value={span.font ?? ""}
+          onChange={(e) => onChange({ font: e.target.value || undefined })}
+        />
+        <Input
+          type="color"
+          value={span.color ?? "#000000"}
+          onChange={(e) => onChange({ color: e.target.value })}
+        />
+      </div>
+      <div className="flex items-center gap-3 text-[11px]">
+        <label className="flex items-center gap-1">
+          <Checkbox
+            checked={!!span.bold}
+            onCheckedChange={(c) => onChange({ bold: c === true })}
+          />
+          Fet
+        </label>
+        <label className="flex items-center gap-1">
+          <Checkbox
+            checked={!!span.italic}
+            onCheckedChange={(c) => onChange({ italic: c === true })}
+          />
+          Kursiv
+        </label>
+        <label className="flex items-center gap-1">
+          <Checkbox
+            checked={!!span.underline}
+            onCheckedChange={(c) => onChange({ underline: c === true })}
+          />
+          Understruken
+        </label>
+      </div>
     </div>
   );
 }

@@ -31,7 +31,8 @@
     "map": "Kaart",
     "text": "Tekst",
     "format": "Formaat",
-    "aiStyle": "AI-stijl"
+    "aiStyle": "AI-stijl",
+    "style": "Stijl"
   },
   "format": {
     "backgroundColor": "Achtergrondkleur",
@@ -86,7 +87,8 @@
     "show": "Toon tekst",
     "placeholder": "Jouw tekst hier…",
     "font": "Lettertype",
-    "tab": "Tekst {{n}}"
+    "tab": "Tekst {{n}}",
+    "autoHint": "Laat leeg om terug te keren naar automatische tekst"
   },
   "layer": {
     "size": "Maat",
@@ -187,5 +189,13 @@
     "success": "Sjabloon en Shopify-product verwijderd",
     "successWithErrors": "Sjabloon verwijderd, maar Shopify-verwijdering had fouten",
     "error": "Kan het sjabloon niet verwijderen"
+  },
+  "mapStyle": {
+    "skandinavisk": "Scandinavisch",
+    "midnatt": "Middernacht",
+    "mintgron": "Mintgroen/Salie",
+    "marinbla": "Marineblauw",
+    "varmbeige": "Warm Beige/Crème",
+    "skogsgron": "Diep Bosgroen/Zwart"
   }
 }

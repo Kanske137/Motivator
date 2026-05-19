@@ -1,8 +1,11 @@
 // Mini Mapbox static-image preview used inside admin LayerCanvas tiles.
-// Clipped to the layer's shape via SVG clipPath. Falls back to a flat
-// gradient placeholder while the token is loading or if it fails.
+// Clipped to the layer's shape via the shared shape-clip util — heart/star
+// keep their natural 1:1 aspect inscribed inside the shortest side, exactly
+// like the editor preview and the print snapshot.
 import { useMemo } from "react";
 import { useMapboxToken } from "@/hooks/useMapboxToken";
+import { mapStyleUrl, parseMapboxStyleUrl } from "@/lib/map-style-catalog";
+import { buildShapeClipPath, type ClipShape } from "@/lib/shape-clip";
 import type { MapDefaults } from "@/lib/template-schema";
 
 interface Props {
@@ -18,52 +21,19 @@ export default function MapLayerPreview({ defaults, width, height }: Props) {
 
   const url = useMemo(() => {
     if (!token) return null;
+    const styleUrl = mapStyleUrl(defaults.styleId);
+    const parsed = parseMapboxStyleUrl(styleUrl);
+    if (!parsed) return null;
     const w = Math.min(MAX_PX, Math.max(120, Math.round(width)));
     const h = Math.min(MAX_PX, Math.max(120, Math.round(height)));
     const [lng, lat] = defaults.center;
-    const labels = defaults.showLabels ? "" : "/static";
-    void labels;
-    return `https://api.mapbox.com/styles/v1/mapbox/${defaults.styleId}/static/${lng},${lat},${defaults.zoom},0/${w}x${h}@2x?access_token=${token}&logo=false&attribution=false`;
+    return `https://api.mapbox.com/styles/v1/${parsed.username}/${parsed.styleId}/static/${lng},${lat},${defaults.zoom},0/${w}x${h}@2x?access_token=${token}&logo=false&attribution=false`;
   }, [token, defaults, width, height]);
 
-  const clipId = useMemo(() => `clip-${Math.random().toString(36).slice(2)}`, []);
-  const starId = useMemo(() => `star-${Math.random().toString(36).slice(2)}`, []);
-  const clipPath = (() => {
-    switch (defaults.shape) {
-      case "circle": {
-        // Perfect circle: diameter = min(width, height), centered.
-        const r = Math.max(0, Math.min(width, height) / 2);
-        return `circle(${r}px at 50% 50%)`;
-      }
-      case "heart":
-        return `url(#${clipId})`;
-      case "star":
-        return `url(#${starId})`;
-      default:
-        return undefined;
-    }
-  })();
+  const clipPath = buildShapeClipPath(defaults.shape as ClipShape, width, height);
 
   return (
     <div className="relative w-full h-full overflow-hidden">
-      {defaults.shape === "heart" && (
-        <svg width="0" height="0" className="absolute">
-          <defs>
-            <clipPath id={clipId} clipPathUnits="objectBoundingBox">
-              <path d="M0.5,1 C0.5,1 0,0.65 0,0.3 C0,0.1 0.2,0 0.35,0 C0.42,0 0.48,0.05 0.5,0.15 C0.52,0.05 0.58,0 0.65,0 C0.8,0 1,0.1 1,0.3 C1,0.65 0.5,1 0.5,1 Z" />
-            </clipPath>
-          </defs>
-        </svg>
-      )}
-      {defaults.shape === "star" && (
-        <svg width="0" height="0" className="absolute">
-          <defs>
-            <clipPath id={starId} clipPathUnits="objectBoundingBox">
-              <path d="M0.5,0 L0.618,0.345 L0.976,0.345 L0.690,0.560 L0.794,0.905 L0.5,0.690 L0.206,0.905 L0.310,0.560 L0.024,0.345 L0.382,0.345 Z" />
-            </clipPath>
-          </defs>
-        </svg>
-      )}
       {url ? (
         <img
           src={url}

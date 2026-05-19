@@ -4,8 +4,15 @@ import { useEditorStore, type PhotoLayerValue } from "@/stores/editorStore";
 import type { TemplateLayer } from "@/lib/template-schema";
 import { MapLayerInstance } from "./layers/MapLayerInstance";
 import { ImageLayerView, LineLayerView, MarginLayerView } from "./layers/StaticLayers";
+import { TextLayerView } from "./layers/TextLayerView";
+import { substituteTokensWithSpans, buildEffectiveTextWithSpans } from "@/lib/text-typography";
 import { ShapeLayerView } from "./layers/ShapeLayerView";
-import { lineThicknessPxFromCanvas, effectiveLayerRect, clampLayerRect, getActiveMarginInsetsPct } from "@/lib/layer-utils";
+import {
+  lineThicknessPxFromCanvas,
+  effectiveLayerRect,
+  clampLayerRect,
+  getActiveMarginInsetsPct,
+} from "@/lib/layer-utils";
 import { AcrylicCornerOverlay } from "./AcrylicCornerOverlay";
 
 interface Props {
@@ -29,18 +36,10 @@ function parseCm(size: string | null): { w: number; h: number } | null {
   return { w: parseInt(m[1], 10), h: parseInt(m[2], 10) };
 }
 
-/** Stable heart-clip SVG def shared across all layers. */
-function HeartClipDef({ id }: { id: string }) {
-  return (
-    <svg width="0" height="0" className="absolute pointer-events-none">
-      <defs>
-        <clipPath id={id} clipPathUnits="objectBoundingBox">
-          <path d="M0.5,1 C0.5,1 0,0.65 0,0.3 C0,0.1 0.2,0 0.35,0 C0.42,0 0.48,0.05 0.5,0.15 C0.52,0.05 0.58,0 0.65,0 C0.8,0 1,0.1 1,0.3 C1,0.65 0.5,1 0.5,1 Z" />
-        </clipPath>
-      </defs>
-    </svg>
-  );
-}
+// Shape clipping (heart/star/circle) is centralized in `@/lib/shape-clip` so
+// editor preview, admin thumbnail and print snapshot all share one source of
+// truth and stay pixel-identical.
+import { buildShapeClipPath, useShapeClip, type ClipShape } from "@/lib/shape-clip";
 
 /**
  * Posterhängare: tunna trälister topp+botten + snöre.
@@ -48,13 +47,7 @@ function HeartClipDef({ id }: { id: string }) {
  * Tjockleken skalas efter motivets verkliga höjd: Gelatos hängare har fast
  * 14 mm front (oavsett posterstorlek), så större postrar → relativt tunnare list.
  */
-function HangerOverlay({
-  color,
-  motifHeightCm,
-}: {
-  color: string;
-  motifHeightCm: number;
-}) {
+function HangerOverlay({ color, motifHeightCm }: { color: string; motifHeightCm: number }) {
   const isWhite = color.toLowerCase() === "#f5f5f2";
   // 21 mm = 2.1 cm fysisk listhöjd (Gelato-spec). Procent av motivets höjd.
   const slatPct = Math.max(0.8, (2.1 / Math.max(motifHeightCm, 1)) * 100);
@@ -71,17 +64,12 @@ function HangerOverlay({
     right: "-2%",
     height: `${slatPct}%`,
     background: color,
-    backgroundImage:
-      "linear-gradient(to bottom, rgba(255,255,255,0.22), rgba(255,255,255,0) 50%, rgba(0,0,0,0.28))",
+    backgroundImage: "linear-gradient(to bottom, rgba(255,255,255,0.22), rgba(255,255,255,0) 50%, rgba(0,0,0,0.28))",
     boxShadow: "0 4px 8px rgba(0,0,0,0.28)",
     border: isWhite ? "1px solid rgba(0,0,0,0.18)" : undefined,
   };
   return (
-    <div
-      className="pointer-events-none absolute inset-0"
-      style={{ zIndex: 46, overflow: "visible" }}
-      aria-hidden
-    >
+    <div className="pointer-events-none absolute inset-0" style={{ zIndex: 46, overflow: "visible" }} aria-hidden>
       {/* Snöre — fäst på topp-listens ÖVERKANT (= motivets överkant), triangulär form (spik) */}
       <svg
         className="absolute"
@@ -113,73 +101,29 @@ function HangerOverlay({
   );
 }
 
-
-function StarClipDef({ id }: { id: string }) {
-  return (
-    <svg width="0" height="0" className="absolute pointer-events-none">
-      <defs>
-        <clipPath id={id} clipPathUnits="objectBoundingBox">
-          <path d="M0.5,0 L0.618,0.345 L0.976,0.345 L0.690,0.560 L0.794,0.905 L0.5,0.690 L0.206,0.905 L0.310,0.560 L0.024,0.345 L0.382,0.345 Z" />
-        </clipPath>
-      </defs>
-    </svg>
-  );
+function shapeClipPath(shape: string): string | undefined {
+  // Pre-measurement fallback. Real pixel-accurate clip is produced by
+  // `useShapeClip` once the host element is laid out (1 frame later).
+  // Returning `undefined` for non-rect shapes briefly shows the unclipped
+  // rect, but in practice ResizeObserver fires synchronously before paint.
+  if (shape === "rect") return undefined;
+  return undefined;
 }
 
-function shapeClipPath(shape: string, heartId: string, starId: string): string | undefined {
-  switch (shape) {
-    case "rect":
-      return undefined;
-    case "circle":
-      // Fallback only — for perfect-circle in non-square containers, callers
-      // should use `useCircleClip` to get a px-based radius instead.
-      return "circle(50% at 50% 50%)";
-    case "heart":
-      return `url(#${heartId})`;
-    case "star":
-      return `url(#${starId})`;
-    default:
-      return undefined;
-  }
-}
+// (Per-shape pixel-accurate clip is built via `useShapeClip` from
+// `@/lib/shape-clip` directly inside MapLayerSlot / PhotoLayerView.)
 
-/**
- * Measures the host element and returns a pixel-based circle clip-path that
- * always renders a perfect circle (diameter = min(width, height)) centered
- * inside the container — even when the layer rect is non-square.
- */
-function useCircleClip(enabled: boolean): {
-  ref: React.RefObject<HTMLDivElement>;
-  clipPath: string | undefined;
-} {
-  const ref = useRef<HTMLDivElement>(null);
-  const [clipPath, setClipPath] = useState<string | undefined>(undefined);
-  useEffect(() => {
-    if (!enabled) {
-      setClipPath(undefined);
-      return;
-    }
-    const el = ref.current;
-    if (!el) return;
-    const update = () => {
-      const r = el.getBoundingClientRect();
-      const radius = Math.max(0, Math.min(r.width, r.height) / 2);
-      setClipPath(`circle(${radius}px at 50% 50%)`);
-    };
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [enabled]);
-  return { ref, clipPath };
-}
-
-export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPadding, wrapCm = 0, layersIncludeWrap = false }: Props) {
+export function MapPreview({
+  frameColor,
+  frameWidthCm = 2,
+  hangerColor,
+  innerPadding,
+  wrapCm = 0,
+  layersIncludeWrap = false,
+}: Props) {
   const frameRef = useRef<HTMLDivElement>(null);
   const [borderPx, setBorderPx] = useState(0);
   const [frameShortPx, setFrameShortPx] = useState(0);
-  const heartIdRef = useRef(`heart-${Math.random().toString(36).slice(2)}`);
-  const starIdRef = useRef(`star-${Math.random().toString(36).slice(2)}`);
 
   const {
     config,
@@ -253,20 +197,17 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
     return () => ro.disconnect();
   }, [frameColor, frameWidthCm, sizeCm?.w, sizeCm?.h]);
 
-  // VIEWPORT-OBEROENDE storlek: motivet dimensioneras av tillgänglig BREDD
-  // (stabil i en iframe) × bildförhållande, med ett PX-tak. ALDRIG vh/dvh —
-  // i en iframe sätter föräldern iframens höjd utifrån vår rapporterade
-  // innehållshöjd, så vh-mått här ger en självrefererande resize-loop som
-  // kollapsar editorn. `aspectRatio` + `maxHeight` i px bevarar ratio och
-  // ger en porträtt-poster ungefär samma visuella storlek som tidigare
-  // (~78vh på en vanlig desktop ≈ 680 px).
-  const PREVIEW_MAX_PX = 680;
+  const isPortrait = posterAspect < 1;
+  // Innehållsdriven storlek: ingen vh. Postern är width-driven (width:100% +
+  // aspectRatio) men cappad så att höjden inte överstiger desktopens
+  // preview-höjd (~720px). Formeln maxWidth = aspect * 720px funkar på
+  // både mobil (smal skärm → 100% vinner) och desktop (h-[720px] container).
+  const DESKTOP_MAX_H = 820;
   const frameStyle: React.CSSProperties = {
     aspectRatio: `${posterAspect}`,
-    width: `min(100%, ${PREVIEW_MAX_PX}px)`,
+    width: "100%",
     height: "auto",
-    maxWidth: "100%",
-    maxHeight: `${PREVIEW_MAX_PX}px`,
+    maxWidth: `min(100%, ${posterAspect * DESKTOP_MAX_H}px)`,
     background: posterBgColor,
     borderStyle: frameColor ? "solid" : undefined,
     borderColor: frameColor,
@@ -289,16 +230,26 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
     // canvas sides never look empty regardless of which size is selected.
     const BLEED_EPS = 0.5;
     const bleedEligible =
-      wrapCm > 0 && !layersIncludeWrap &&
-      (l.type === "map" || l.type === "image" ||
-        l.type === "photo" || l.type === "aiPhoto");
+      wrapCm > 0 &&
+      !layersIncludeWrap &&
+      (l.type === "map" || l.type === "image" || l.type === "photo" || l.type === "aiPhoto");
     if (bleedEligible) {
       const extX = frontInsetX * 100;
       const extY = frontInsetY * 100;
-      if (eff.xPct <= BLEED_EPS) { left -= extX; width += extX; }
-      if (eff.yPct <= BLEED_EPS) { top -= extY; height += extY; }
-      if (eff.xPct + eff.wPct >= 100 - BLEED_EPS) { width += extX; }
-      if (eff.yPct + eff.hPct >= 100 - BLEED_EPS) { height += extY; }
+      if (eff.xPct <= BLEED_EPS) {
+        left -= extX;
+        width += extX;
+      }
+      if (eff.yPct <= BLEED_EPS) {
+        top -= extY;
+        height += extY;
+      }
+      if (eff.xPct + eff.wPct >= 100 - BLEED_EPS) {
+        width += extX;
+      }
+      if (eff.yPct + eff.hPct >= 100 - BLEED_EPS) {
+        height += extY;
+      }
     }
     return { left, top, width, height };
   };
@@ -331,9 +282,16 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
         // Center-snap (horizontal: layer center == 50; vertical likewise)
         const centerXTarget = 50 - wPct / 2;
         const centerYTarget = 50 - hPct / 2;
-        let snapH = false, snapV = false;
-        if (Math.abs(nx - centerXTarget) < SNAP_PCT) { nx = centerXTarget; snapV = true; }
-        if (Math.abs(ny - centerYTarget) < SNAP_PCT) { ny = centerYTarget; snapH = true; }
+        let snapH = false,
+          snapV = false;
+        if (Math.abs(nx - centerXTarget) < SNAP_PCT) {
+          nx = centerXTarget;
+          snapV = true;
+        }
+        if (Math.abs(ny - centerYTarget) < SNAP_PCT) {
+          ny = centerYTarget;
+          snapH = true;
+        }
         const c = clampLayerRect({ xPct: nx, yPct: ny, wPct, hPct });
         setLayerTransform(l.id, c);
         setGuides({ h: snapH, v: snapV });
@@ -363,18 +321,11 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
   };
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center p-4 gap-2">
+    <div className="w-full flex flex-col items-center justify-center p-4 gap-2">
       <style>{`
         .mapboxgl-ctrl-logo, .mapboxgl-ctrl-attrib { display: none !important; }
       `}</style>
-      <div
-        ref={frameRef}
-        className="relative shadow-[0_30px_60px_-20px_rgba(0,0,0,0.25)]"
-        style={frameStyle}
-      >
-        <HeartClipDef id={heartIdRef.current} />
-        <StarClipDef id={starIdRef.current} />
-
+      <div ref={frameRef} className="relative shadow-[0_30px_60px_-20px_rgba(0,0,0,0.25)]" style={frameStyle}>
         {/* Loop all template layers in zIndex order */}
         {layers.map((l) => {
           const rect = layerToEditorRect(l);
@@ -386,7 +337,9 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
             height: `${rect.height}%`,
             zIndex: l.type === "margin" ? 40 : l.zIndex,
           };
-          const movable = !l.locks.move && (l.type === "map" || l.type === "photo" || l.type === "aiPhoto" || l.type === "text" || l.type === "image");
+          const movable =
+            !l.locks.move &&
+            (l.type === "map" || l.type === "photo" || l.type === "aiPhoto" || l.type === "text" || l.type === "image");
           const moveHandle = movable ? (
             <button
               type="button"
@@ -405,22 +358,15 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
             const mv = v && v.kind === "map" ? v : null;
             const effectiveShape = (mv?.shape ?? l.defaults.shape) as "circle" | "heart" | "star";
             const effectiveStyleId = mv?.styleId ?? l.defaults.styleId;
-            const effectiveCenter: [number, number] = mv?.center ?? [
-              l.defaults.center[0]!,
-              l.defaults.center[1]!,
-            ];
+            const effectiveCenter: [number, number] = mv?.center ?? [l.defaults.center[0]!, l.defaults.center[1]!];
             const effectiveZoom = mv?.zoom ?? l.defaults.zoom;
             const effectiveLabels = mv?.showLabels ?? l.defaults.showLabels;
-            const staticClip = shapeClipPath(
-              effectiveShape,
-              heartIdRef.current,
-              starIdRef.current,
-            );
+            const staticClip = shapeClipPath(effectiveShape);
             return (
               <MapLayerSlot
                 key={l.id}
                 wrapStyle={wrapStyle}
-                isCircle={effectiveShape === "circle"}
+                shape={effectiveShape}
                 staticClip={staticClip}
                 overlay={moveHandle}
               >
@@ -443,75 +389,59 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
           if (l.type === "photo") {
             const v = layerValues[l.id];
             const pv = v && v.kind === "photo" ? (v as PhotoLayerValue) : null;
-            const effectiveShape = (pv?.shape ?? l.defaults.shape) as
-              | "rect"
-              | "circle"
-              | "heart"
-              | "star";
+            const effectiveShape = (pv?.shape ?? l.defaults.shape) as "rect" | "circle" | "heart" | "star";
             const offsetX = pv?.offsetX ?? 0;
             const offsetY = pv?.offsetY ?? 0;
-            const staticClip = shapeClipPath(
-              effectiveShape,
-              heartIdRef.current,
-              starIdRef.current,
-            );
-            const src =
-              photoAiResults[l.id] ??
-              photoSources[l.id]?.previewUrl ??
-              l.defaults.placeholderUrl ??
-              null;
+            const staticClip = shapeClipPath(effectiveShape);
+            const src = photoAiResults[l.id] ?? photoSources[l.id]?.previewUrl ?? l.defaults.placeholderUrl ?? null;
             return (
-              <div key={l.id} style={wrapStyle}>
-                <PhotoLayerView
-                  layerId={l.id}
-                  src={src}
-                  fit={l.defaults.fit}
-                  shape={effectiveShape}
-                  staticClipPath={staticClip}
-                  offsetX={offsetX}
-                  offsetY={offsetY}
-                  draggable={!!src}
-                />
-                {moveHandle}
-              </div>
+              <MapLayerSlot
+                key={l.id}
+                wrapStyle={wrapStyle}
+                shape={effectiveShape}
+                staticClip={staticClip}
+                overlay={moveHandle}
+              >
+                {(clip) => (
+                  <PhotoLayerView
+                    layerId={l.id}
+                    src={src}
+                    fit={l.defaults.fit}
+                    shape={effectiveShape}
+                    staticClipPath={clip}
+                    offsetX={offsetX}
+                    offsetY={offsetY}
+                    draggable={!!src}
+                  />
+                )}
+              </MapLayerSlot>
             );
           }
 
           if (l.type === "aiPhoto") {
             const v = layerValues[l.id];
             const av = v && v.kind === "aiPhoto" ? v : null;
-            const effectiveShape = (av?.shape ?? l.defaults.shape) as
-              | "rect"
-              | "circle"
-              | "heart"
-              | "star";
-            const staticClip = shapeClipPath(
-              effectiveShape,
-              heartIdRef.current,
-              starIdRef.current,
-            );
+            const effectiveShape = (av?.shape ?? l.defaults.shape) as "rect" | "circle" | "heart" | "star";
+            const staticClip = shapeClipPath(effectiveShape);
             // Source priority: face-swap result → customer-selected reference
             // (when admin uploaded multiple) → admin reference image → empty.
             const aiResultUrl = aiPhotoResults[l.id] ?? null;
             const selectedRefUrl = aiPhotoSelectedRefUrl[l.id] ?? null;
-            const src =
-              aiResultUrl ?? selectedRefUrl ?? l.defaults.referenceImageUrl ?? null;
+            const src = aiResultUrl ?? selectedRefUrl ?? l.defaults.referenceImageUrl ?? null;
             // Resolve the active reference item to read its admin-set focal
             // point. The face-swap result has the same dimensions as the
             // reference, so the same focal works for both.
             const refList = l.defaults.referenceImages ?? [];
             const activeRefUrl = selectedRefUrl ?? l.defaults.referenceImageUrl ?? null;
-            const activeRef = activeRefUrl
-              ? refList.find((r) => r.url === activeRefUrl) ?? null
-              : null;
+            const activeRef = activeRefUrl ? (refList.find((r) => r.url === activeRefUrl) ?? null) : null;
             const refFocalX = activeRef?.focalX ?? 0;
             const refFocalY = activeRef?.focalY ?? 0;
             // If the visible image is the admin reference or its swap result,
             // honor the admin-chosen focal. Otherwise (no AI result, no ref —
             // e.g. removeBackground placeholder) fall back to layer offset.
             const usingRefOrSwap = !!(aiResultUrl || activeRefUrl);
-            const offsetX = usingRefOrSwap ? refFocalX : av?.offsetX ?? 0;
-            const offsetY = usingRefOrSwap ? refFocalY : av?.offsetY ?? 0;
+            const offsetX = usingRefOrSwap ? refFocalX : (av?.offsetX ?? 0);
+            const offsetY = usingRefOrSwap ? refFocalY : (av?.offsetY ?? 0);
             // Only force `contain` for removeBackground (Nano Banana 2 doesn't
             // always honor target aspect ratio, and its pure-white padding
             // blends seamlessly into the layer). For human face-swap (Replicate
@@ -520,38 +450,42 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
             // layer's default fit so the result fills the layer exactly like
             // the reference image did — no empty edges.
             const aiSubjectKind = l.defaults.subjectKind ?? "human";
-            const effectiveFit =
-              aiResultUrl && aiSubjectKind === "removeBackground"
-                ? "contain"
-                : l.defaults.fit;
+            const effectiveFit = aiResultUrl && aiSubjectKind === "removeBackground" ? "contain" : l.defaults.fit;
             return (
-              <div key={l.id} style={wrapStyle}>
-                {src ? (
-                  <PhotoLayerView
-                    layerId={l.id}
-                    src={src}
-                    fit={effectiveFit}
-                    shape={effectiveShape}
-                    staticClipPath={staticClip}
-                    offsetX={offsetX}
-                    offsetY={offsetY}
-                    draggable={!!src && !usingRefOrSwap}
-                  />
-                ) : (
-                  <div
-                    className={`w-full h-full flex flex-col items-center justify-center gap-1 text-center px-2 bg-accent/30 rounded${
-                      effectiveShape === "rect" ? " border-2 border-dashed border-primary/40" : ""
-                    }`}
-                    style={{ clipPath: staticClip }}
-                  >
-                    <span className="text-base">✨</span>
-                    <span className="text-[10px] text-muted-foreground leading-tight">
-                      AI-bild visas här efter Skapa nu
-                    </span>
-                  </div>
-                )}
-                {moveHandle}
-              </div>
+              <MapLayerSlot
+                key={l.id}
+                wrapStyle={wrapStyle}
+                shape={effectiveShape}
+                staticClip={staticClip}
+                overlay={moveHandle}
+              >
+                {(clip) =>
+                  src ? (
+                    <PhotoLayerView
+                      layerId={l.id}
+                      src={src}
+                      fit={effectiveFit}
+                      shape={effectiveShape}
+                      staticClipPath={clip}
+                      offsetX={offsetX}
+                      offsetY={offsetY}
+                      draggable={!!src && !usingRefOrSwap}
+                    />
+                  ) : (
+                    <div
+                      className={`w-full h-full flex flex-col items-center justify-center gap-1 text-center px-2 bg-accent/30 rounded${
+                        effectiveShape === "rect" ? " border-2 border-dashed border-primary/40" : ""
+                      }`}
+                      style={{ clipPath: clip }}
+                    >
+                      <span className="text-base">✨</span>
+                      <span className="text-[10px] text-muted-foreground leading-tight">
+                        AI-bild visas här efter Skapa nu
+                      </span>
+                    </div>
+                  )
+                }
+              </MapLayerSlot>
             );
           }
 
@@ -560,27 +494,38 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
             const tv = v && v.kind === "text" ? v : null;
             if (tv && !tv.visible) return null;
             const d = l.defaults;
-            const effectiveText = tv?.text ?? d.text;
+            // If user customised the text, render it raw. Otherwise substitute
+            // [[city]]/[[country]]/[[coords]] tokens using the linked map's
+            // current value — so tokens never appear as literal text on first
+            // load (before any pan/zoom).
+            const mapId = d.linkedMapLayerId;
+            const mv = mapId ? layerValues[mapId] : null;
+            const place =
+              mv && mv.kind === "map"
+                ? {
+                    placeName: mv.placeName,
+                    city: mv.city ?? null,
+                    country: mv.country ?? null,
+                    center: mv.center,
+                  }
+                : null;
+            const { text: effectiveText, spans: effectiveSpans } = buildEffectiveTextWithSpans(
+              d,
+              place,
+              tv?.overrideText ?? null,
+            );
             const effectiveFont = tv?.font || d.font;
+            const layerHeightPx = (l.hPct / 100) * (frameShortPx > 0 ? frameShortPx : 0);
             return (
-              <div key={l.id} style={{ ...wrapStyle, containerType: "size" }}>
-                <div
-                  className="absolute inset-0 whitespace-pre-line leading-tight"
-                  style={{
-                    fontFamily: effectiveFont,
-                    color: d.color,
-                    textAlign: d.align,
-                    fontSize: `calc(100cqh * ${d.fontSizePct / 100})`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent:
-                      d.align === "left" ? "flex-start" : d.align === "right" ? "flex-end" : "center",
-                    padding: "0 4px",
-                    pointerEvents: "none",
-                  }}
-                >
-                  <span style={{ width: "100%" }}>{effectiveText || "Lägg till text…"}</span>
-                </div>
+              <div key={l.id} style={wrapStyle}>
+                <TextLayerView
+                  layer={l}
+                  effectiveText={effectiveText}
+                  effectiveFont={effectiveFont}
+                  effectiveSpans={effectiveSpans}
+                  canvasShortPx={frameShortPx}
+                  layerHeightPx={layerHeightPx}
+                />
                 {moveHandle}
               </div>
             );
@@ -600,10 +545,7 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
             // pass through the wrapper to layers underneath.
             return (
               <div key={l.id} style={{ ...wrapStyle, pointerEvents: "none" }}>
-                <LineLayerView
-                  layer={l}
-                  thicknessPx={lineThicknessPxFromCanvas(l, frameShortPx)}
-                />
+                <LineLayerView layer={l} thicknessPx={lineThicknessPxFromCanvas(l, frameShortPx)} />
               </div>
             );
           }
@@ -658,23 +600,23 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
 
         {/* Center alignment guides (shown only while dragging snaps) */}
         {guides.v && (
-          <div className="absolute pointer-events-none top-0 bottom-0 left-1/2 -translate-x-1/2 border-l border-dashed border-primary" style={{ zIndex: 10000 }} />
+          <div
+            className="absolute pointer-events-none top-0 bottom-0 left-1/2 -translate-x-1/2 border-l border-dashed border-primary"
+            style={{ zIndex: 10000 }}
+          />
         )}
         {guides.h && (
-          <div className="absolute pointer-events-none left-0 right-0 top-1/2 -translate-y-1/2 border-t border-dashed border-primary" style={{ zIndex: 10000 }} />
+          <div
+            className="absolute pointer-events-none left-0 right-0 top-1/2 -translate-y-1/2 border-t border-dashed border-primary"
+            style={{ zIndex: 10000 }}
+          />
         )}
         {isAcrylic && (
-          <div
-            className="pointer-events-none absolute inset-0"
-            style={{ zIndex: 45 }}
-            aria-hidden
-          >
+          <div className="pointer-events-none absolute inset-0" style={{ zIndex: 45 }} aria-hidden>
             <AcrylicCornerOverlay frontWcm={frontW} frontHcm={frontH} zIndex={45} />
           </div>
         )}
-        {hangerColor && (
-          <HangerOverlay color={hangerColor} motifHeightCm={frontH} />
-        )}
+        {hangerColor && <HangerOverlay color={hangerColor} motifHeightCm={frontH} />}
       </div>
       {allLayers.some((l) => l.type === "map") && (
         <p className="text-[10px] text-muted-foreground">© Mapbox · © OpenStreetMap</p>
@@ -690,19 +632,19 @@ export function MapPreview({ frameColor, frameWidthCm = 2, hangerColor, innerPad
  */
 function MapLayerSlot({
   wrapStyle,
-  isCircle,
+  shape,
   staticClip,
   children,
   overlay,
 }: {
   wrapStyle: React.CSSProperties;
-  isCircle: boolean;
+  shape: ClipShape;
   staticClip: string | undefined;
   children: (clip: string | undefined) => React.ReactNode;
   overlay?: React.ReactNode;
 }) {
-  const { ref, clipPath } = useCircleClip(isCircle);
-  const effectiveClip = isCircle ? clipPath ?? staticClip : staticClip;
+  const { ref, clipPath } = useShapeClip(shape);
+  const effectiveClip = clipPath ?? staticClip;
   return (
     <div ref={ref} style={wrapStyle}>
       {children(effectiveClip)}
@@ -831,24 +773,21 @@ function PhotoLayerView({
     [layerId, setLayerPhotoOffset, maxX, maxY],
   );
 
-  const onPointerUp = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      const el = containerRef.current;
-      if (el && el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
-      dragStateRef.current = null;
-      setDragging(false);
-    },
-    [],
-  );
+  const onPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const el = containerRef.current;
+    if (el && el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+    dragStateRef.current = null;
+    setDragging(false);
+  }, []);
 
   const canPan = fit !== "contain" && draggable && (maxX > 0 || maxY > 0);
 
-  // Perfect-circle clip from measured pixel size (so non-square layers still
-  // render as a true circle, not an ellipse / cropped oval).
-  const clipPath =
-    shape === "circle" && box.w > 0 && box.h > 0
-      ? `circle(${Math.min(box.w, box.h) / 2}px at 50% 50%)`
-      : staticClipPath;
+  // Pixel-accurate clip path so heart/star/circle keep their natural 1:1
+  // aspect ratio inscribed inside the container's shortest side — even when
+  // the layer rect is non-square. Falls back to the (undefined) static clip
+  // for the very first paint before the ResizeObserver fires.
+  const measuredClip = box.w > 0 && box.h > 0 ? buildShapeClipPath(shape, box.w, box.h) : undefined;
+  const clipPath = measuredClip ?? staticClipPath;
 
   return (
     <div
@@ -874,9 +813,7 @@ function PhotoLayerView({
               const i = e.currentTarget;
               setNatural({ w: i.naturalWidth, h: i.naturalHeight });
             }}
-            className={`absolute inset-0 w-full h-full ${
-              fit === "contain" ? "object-contain" : "object-cover"
-            }`}
+            className={`absolute inset-0 w-full h-full ${fit === "contain" ? "object-contain" : "object-cover"}`}
             style={{ userSelect: "none", pointerEvents: "none" }}
             draggable={false}
           />

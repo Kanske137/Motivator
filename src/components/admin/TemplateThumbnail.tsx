@@ -68,7 +68,13 @@ export default function TemplateThumbnail({ template, width = 120, height = 160,
         if (layer.type === "text") {
           return (
             <div key={layer.id} style={style}>
-              <TextLayerPreview defaults={layer.defaults} height={h} />
+              <TextLayerPreview
+                layer={layer}
+                allLayers={layers}
+                height={h}
+                width={w}
+                canvasShortPx={Math.min(width, height)}
+              />
             </div>
           );
         }

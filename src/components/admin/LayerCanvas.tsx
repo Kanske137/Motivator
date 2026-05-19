@@ -135,7 +135,7 @@ export default function LayerCanvas({
       case "map":
         return <MapLayerPreview defaults={layer.defaults} width={wPx} height={hPx} />;
       case "text":
-        return <TextLayerPreview defaults={layer.defaults} height={hPx} />;
+        return <TextLayerPreview layer={layer} allLayers={layers} height={hPx} width={wPx} canvasShortPx={Math.min(size.w, size.h)} />;
       case "image":
         return layer.defaults.url ? (
           <img

@@ -25,7 +25,7 @@ function applyLabelVisibility(map: mapboxgl.Map, show: boolean) {
       const style = map.getStyle();
       if (!style?.layers) return;
       for (const layer of style.layers) {
-        if (layer.type === "symbol") {
+        if (layer.type === "symbol" || layer.id.startsWith("label-")) {
           map.setLayoutProperty(layer.id, "visibility", show ? "visible" : "none");
         }
       }

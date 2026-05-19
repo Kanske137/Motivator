@@ -32,6 +32,7 @@ import {
   type Orientation,
   type Template,
   type TemplateLayer,
+  DEFAULT_LAYOUT_ID,
 } from "@/lib/template-schema";
 import { createDefaultLayout, createLayer, createShapeLayer, moveLayer, normaliseZIndex } from "@/lib/layer-utils";
 import type { ShapeKind } from "@/lib/template-schema";
@@ -53,8 +54,9 @@ export default function DesignerPage() {
   const [orientation, setOrientation] = useState<Orientation>("portrait");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Designyta-läge: 'standard' = poster/metall/plexi-layout, 'canvas' = canvas-wrap.
-  // Endast meningsfullt för konsoliderade mallar med både canvas och annan typ.
   const [designMode, setDesignMode] = useState<"standard" | "canvas">("standard");
+  // Currently edited named-layout id ("Stil"). DEFAULT_LAYOUT_ID = Standard.
+  const [editingLayoutId, setEditingLayoutId] = useState<string>(DEFAULT_LAYOUT_ID);
 
   // Session-only undo stack: snapshots of `template` before each mutation.
   // Cleared on page reload (intentional — user explicitly asked).
@@ -190,8 +192,20 @@ export default function DesignerPage() {
   const isCanvasProduct = isConsolidated
     ? designMode === "canvas"
     : config?.product_type === "canvas";
+  // Resolve the currently edited named-layout block (Standard or extra "Stil").
+  const isStandardLayout = editingLayoutId === DEFAULT_LAYOUT_ID;
+  const editingExtraIndex = isStandardLayout
+    ? -1
+    : (template?.extraLayouts ?? []).findIndex((l) => l.id === editingLayoutId);
   const layoutBlock = template
-    ? (isCanvasProduct && template.canvasLayout) || template.defaultLayout
+    ? (() => {
+        if (isStandardLayout) {
+          return (isCanvasProduct && template.canvasLayout) || template.defaultLayout;
+        }
+        const extra = template.extraLayouts?.[editingExtraIndex];
+        if (!extra) return template.defaultLayout;
+        return (isCanvasProduct && extra.canvasLayout) || extra.defaultLayout;
+      })()
     : null;
   const layout = layoutBlock?.[orientation] ?? null;
   const layers = useMemo(() => layout?.layers ?? [], [layout]);
@@ -200,49 +214,48 @@ export default function DesignerPage() {
     [layers, selectedId],
   );
 
-  // ---------- mutators ----------
-  function setLayers(next: TemplateLayer[]) {
-    if (!template) return;
-    if (isCanvasProduct) {
-      const cl = template.canvasLayout ?? template.defaultLayout;
-      commitTemplate({
-        ...template,
-        canvasLayout: {
-          ...cl,
-          [orientation]: { ...cl[orientation], layers: next },
-        },
-      });
+  // Mutate the active orientation block (layers/background) on the active named layout.
+  function patchOrientationBlock(patch: { layers?: TemplateLayer[]; background?: { color: string } }) {
+    if (!template || !layoutBlock) return;
+    const cur = layoutBlock[orientation];
+    const nextOrient = {
+      ...cur,
+      ...(patch.layers ? { layers: patch.layers } : {}),
+      ...(patch.background ? { background: patch.background } : {}),
+    };
+    if (isStandardLayout) {
+      if (isCanvasProduct) {
+        const cl = template.canvasLayout ?? template.defaultLayout;
+        commitTemplate({ ...template, canvasLayout: { ...cl, [orientation]: nextOrient } });
+      } else {
+        commitTemplate({
+          ...template,
+          defaultLayout: { ...template.defaultLayout, [orientation]: nextOrient },
+        });
+      }
     } else {
-      commitTemplate({
-        ...template,
-        defaultLayout: {
-          ...template.defaultLayout,
-          [orientation]: { ...template.defaultLayout[orientation], layers: next },
-        },
-      });
+      const extras = [...(template.extraLayouts ?? [])];
+      const cur = extras[editingExtraIndex];
+      if (!cur) return;
+      const nextExtra = { ...cur };
+      if (isCanvasProduct) {
+        const cl = cur.canvasLayout ?? cur.defaultLayout;
+        nextExtra.canvasLayout = { ...cl, [orientation]: nextOrient };
+      } else {
+        nextExtra.defaultLayout = { ...cur.defaultLayout, [orientation]: nextOrient };
+      }
+      extras[editingExtraIndex] = nextExtra;
+      commitTemplate({ ...template, extraLayouts: extras });
     }
   }
 
+  // ---------- mutators ----------
+  function setLayers(next: TemplateLayer[]) {
+    patchOrientationBlock({ layers: next });
+  }
+
   function setLayoutBackground(color: string) {
-    if (!template || !layout) return;
-    if (isCanvasProduct) {
-      const cl = template.canvasLayout ?? template.defaultLayout;
-      commitTemplate({
-        ...template,
-        canvasLayout: {
-          ...cl,
-          [orientation]: { ...cl[orientation], background: { color } },
-        },
-      });
-    } else {
-      commitTemplate({
-        ...template,
-        defaultLayout: {
-          ...template.defaultLayout,
-          [orientation]: { ...layout, background: { color } },
-        },
-      });
-    }
+    patchOrientationBlock({ background: { color } });
   }
   function addLayer(type: LayerType) {
     const nextLayer = createLayer(type, layers);
@@ -505,6 +518,14 @@ export default function DesignerPage() {
 
         <ShopifyPublishingSection config={config} onChange={updateConfigMeta} />
 
+        <StylesSection
+          template={template}
+          editingLayoutId={editingLayoutId}
+          productType={config.product_type}
+          onSelect={(id) => { setEditingLayoutId(id); setSelectedId(null); }}
+          onChange={(next) => commitTemplate(next)}
+        />
+
         <Card className="p-5 space-y-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
@@ -722,5 +743,364 @@ export default function DesignerPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+// ---------- Stilar (named layouts) management ----------
+function StylesSection({
+  template,
+  editingLayoutId,
+  productType,
+  onSelect,
+  onChange,
+}: {
+  template: Template;
+  editingLayoutId: string;
+  productType: string | null;
+  onSelect: (id: string) => void;
+  onChange: (t: Template) => void;
+}) {
+  const extras = template.extraLayouts ?? [];
+  const [thumbDialogId, setThumbDialogId] = useState<string | null>(null);
+  const [thumbUrlDraft, setThumbUrlDraft] = useState("");
+  const [thumbMode, setThumbMode] = useState<"url" | "file">("url");
+  const [uploadingThumb, setUploadingThumb] = useState(false);
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
+
+  const isStandard = (id: string) => id === DEFAULT_LAYOUT_ID;
+
+  function addEmpty() {
+    const id = `style-${Date.now().toString(36)}`;
+    const fresh = {
+      portrait: { aspect: template.defaultLayout.portrait.aspect, background: { color: "#FFFFFF" }, layers: [] },
+      landscape: { aspect: template.defaultLayout.landscape.aspect, background: { color: "#FFFFFF" }, layers: [] },
+    };
+    onChange({ ...template, extraLayouts: [...extras, { id, name: `Stil ${extras.length + 1}`, defaultLayout: fresh }] });
+    onSelect(id);
+  }
+
+  function duplicateCurrent() {
+    const id = `style-${Date.now().toString(36)}`;
+    const src = isStandard(editingLayoutId)
+      ? { defaultLayout: template.defaultLayout, canvasLayout: template.canvasLayout }
+      : (() => {
+          const e = extras.find((l) => l.id === editingLayoutId);
+          return e ? { defaultLayout: e.defaultLayout, canvasLayout: e.canvasLayout } : null;
+        })();
+    if (!src) return;
+    const cloned: any = JSON.parse(JSON.stringify(src));
+    for (const o of ["portrait", "landscape"] as const) {
+      cloned.defaultLayout[o].layers = cloned.defaultLayout[o].layers.map((l: TemplateLayer, i: number) => ({ ...l, id: `${l.type}-${id}-${o[0]}-${i}` }));
+      if (cloned.canvasLayout) {
+        cloned.canvasLayout[o].layers = cloned.canvasLayout[o].layers.map((l: TemplateLayer, i: number) => ({ ...l, id: `${l.type}-${id}-c${o[0]}-${i}` }));
+      }
+    }
+    const baseName = isStandard(editingLayoutId)
+      ? (template.defaultLayoutName?.trim() || "Standard")
+      : (extras.find((l) => l.id === editingLayoutId)?.name ?? "Stil");
+    onChange({ ...template, extraLayouts: [...extras, { id, name: `${baseName} (kopia)`, ...cloned }] });
+    onSelect(id);
+  }
+
+  function rename(id: string) {
+    if (isStandard(id)) {
+      const cur = template.defaultLayoutName?.trim() || "Standard";
+      const name = window.prompt("Namn", cur);
+      if (!name?.trim()) return;
+      onChange({ ...template, defaultLayoutName: name.trim() });
+      return;
+    }
+    const cur = extras.find((l) => l.id === id);
+    if (!cur) return;
+    const name = window.prompt("Namn", cur.name);
+    if (!name?.trim()) return;
+    onChange({ ...template, extraLayouts: extras.map((l) => l.id === id ? { ...l, name: name.trim() } : l) });
+  }
+
+  function remove(id: string) {
+    if (isStandard(id)) return;
+    if (!window.confirm("Ta bort denna stil?")) return;
+    onChange({ ...template, extraLayouts: extras.filter((l) => l.id !== id) });
+    if (editingLayoutId === id) onSelect(DEFAULT_LAYOUT_ID);
+  }
+
+  function makeDefault(id: string) {
+    const cur = extras.find((l) => l.id === id);
+    if (!cur) return;
+    if (!window.confirm("Sätt som standard? Den nuvarande Standard-layouten flyttas till en stil.")) return;
+    const oldStandard = {
+      id: `style-${Date.now().toString(36)}`,
+      name: template.defaultLayoutName?.trim() || "Tidigare standard",
+      thumbnailUrl: template.defaultLayoutThumbnailUrl,
+      defaultLayout: template.defaultLayout,
+      canvasLayout: template.canvasLayout,
+    };
+    const nextExtras = extras.filter((l) => l.id !== id).concat([oldStandard]);
+    onChange({
+      ...template,
+      defaultLayout: cur.defaultLayout,
+      canvasLayout: cur.canvasLayout,
+      defaultLayoutName: cur.name,
+      defaultLayoutThumbnailUrl: cur.thumbnailUrl,
+      extraLayouts: nextExtras,
+    });
+    onSelect(DEFAULT_LAYOUT_ID);
+  }
+
+  function setThumbnailUrl(id: string, url: string | undefined) {
+    const trimmed = url?.trim();
+    const value = trimmed && trimmed.length > 0 ? trimmed : undefined;
+    if (isStandard(id)) {
+      onChange({ ...template, defaultLayoutThumbnailUrl: value });
+      return;
+    }
+    onChange({
+      ...template,
+      extraLayouts: extras.map((l) => l.id === id
+        ? { ...l, thumbnailUrl: value }
+        : l),
+    });
+  }
+
+  async function handleFileSelected(id: string, file: File) {
+    setUploadingThumb(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(reader.error ?? new Error("read failed"));
+        reader.readAsDataURL(file);
+      });
+      const { uploadCartPreview } = await import("@/lib/upload-preview");
+      const designId = `style-thumb-${id}-${Date.now()}`;
+      const url = await uploadCartPreview(dataUrl, designId);
+      setThumbUrlDraft(url);
+      setThumbnailUrl(id, url);
+      toast.success("Thumbnail uppladdad");
+    } catch (e) {
+      console.error("[styles] thumbnail upload failed", e);
+      toast.error("Kunde inte ladda upp", { description: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setUploadingThumb(false);
+    }
+  }
+
+  async function generateThumbnail(id: string) {
+    const isStd = isStandard(id);
+    const sourceBlock = isStd
+      ? { defaultLayout: template.defaultLayout, canvasLayout: template.canvasLayout, name: template.defaultLayoutName?.trim() || "Standard" }
+      : (() => {
+          const l = extras.find((x) => x.id === id);
+          return l ? { defaultLayout: l.defaultLayout, canvasLayout: l.canvasLayout, name: l.name } : null;
+        })();
+    if (!sourceBlock) return;
+    setGeneratingId(id);
+    try {
+      const { renderTemplateSnapshot } = await import("@/lib/template-snapshot");
+      const { uploadCartPreview } = await import("@/lib/upload-preview");
+      const tempTemplate: Template = {
+        ...template,
+        defaultLayout: sourceBlock.defaultLayout,
+        canvasLayout: sourceBlock.canvasLayout,
+        extraLayouts: [],
+      };
+      const allowedSizes = template.productOptions.poster?.allowedSizes
+        ?? template.productOptions.canvas?.allowedSizes
+        ?? template.productOptions.aluminum?.allowedSizes
+        ?? template.productOptions.acrylic?.allowedSizes
+        ?? [];
+      const size = allowedSizes[0] ?? "30x40";
+      const dataUrl = await renderTemplateSnapshot({
+        template: tempTemplate,
+        orientation: "portrait",
+        size,
+        productType: productType ?? "posters",
+        whiteMarginEnabled: true,
+        livePosterBgColor: sourceBlock.defaultLayout.portrait.background.color,
+        liveMapCenter: [18.0686, 59.3293],
+        liveMapZoom: 12,
+        liveMapStyleId: sourceBlock.defaultLayout.portrait.layers.find((l) => l.type === "map")?.defaults.styleId ?? "light-v11",
+        liveMapShape: "circle",
+        liveShowLabels: false,
+        liveText: "",
+        liveTextFont: "Inter",
+        liveTextVisible: true,
+        maxPxOverride: 480,
+      });
+      const designId = `style-thumb-${id}-${Date.now()}`;
+      const url = await uploadCartPreview(dataUrl, designId);
+      setThumbUrlDraft(url);
+      setThumbnailUrl(id, url);
+      toast.success("Thumbnail genererad");
+    } catch (e) {
+      console.error("[styles] thumbnail generation failed", e);
+      toast.error("Kunde inte generera thumbnail", { description: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setGeneratingId(null);
+    }
+  }
+
+  type CardItem = { id: string; name: string; isDefault: boolean; thumbnailUrl?: string };
+  const items: CardItem[] = [
+    { id: DEFAULT_LAYOUT_ID, name: template.defaultLayoutName?.trim() || "Standard", isDefault: true, thumbnailUrl: template.defaultLayoutThumbnailUrl },
+    ...extras.map((l) => ({ id: l.id, name: l.name, isDefault: false, thumbnailUrl: l.thumbnailUrl })),
+  ];
+
+  const dialogItem = thumbDialogId ? items.find((l) => l.id === thumbDialogId) : null;
+
+  function openThumbDialog(id: string, currentUrl?: string) {
+    setThumbDialogId(id);
+    setThumbUrlDraft(currentUrl ?? "");
+    setThumbMode("url");
+  }
+
+  return (
+    <Card className="p-5 space-y-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-base font-semibold">Stilar</h2>
+          <p className="text-xs text-muted-foreground">
+            Flera layouter för samma mall — kunden kan växla i editorn. Designytan nedan editar den valda stilen.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={duplicateCurrent}>Duplicera vald</Button>
+          <Button size="sm" variant="outline" onClick={addEmpty}>+ Tom stil</Button>
+        </div>
+      </div>
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4">
+        {items.map((it) => {
+          const active = it.id === editingLayoutId;
+          return (
+            <div
+              key={it.id}
+              className={`relative rounded-xl border bg-card transition overflow-hidden ${
+                active ? "ring-2 ring-primary border-transparent" : "border-border hover:border-foreground/30"
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => onSelect(it.id)}
+                className="block w-full text-left"
+              >
+                <div className="aspect-square bg-muted flex items-center justify-center overflow-hidden">
+                  {it.thumbnailUrl ? (
+                    <img src={it.thumbnailUrl} alt={it.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider px-2 text-center">
+                      Ingen thumbnail
+                    </span>
+                  )}
+                </div>
+                <div className="px-3 pt-2 pb-1 flex items-center gap-1.5 min-w-0">
+                  <span className="text-xs font-medium truncate">{it.name}</span>
+                  {it.isDefault && <span className="text-[9px] uppercase tracking-wider text-muted-foreground">·  std</span>}
+                </div>
+              </button>
+              <div className="px-2 pb-2 flex items-center gap-1 text-[11px]">
+                <button type="button" title="Byt namn" onClick={() => rename(it.id)} className="px-1.5 py-1 rounded hover:bg-muted">✎</button>
+                <button type="button" title="Sätt thumbnail" onClick={() => openThumbDialog(it.id, it.thumbnailUrl)} className="px-1.5 py-1 rounded hover:bg-muted">🖼</button>
+                {!it.isDefault && (
+                  <>
+                    <button type="button" title="Sätt som standard" onClick={() => makeDefault(it.id)} className="px-1.5 py-1 rounded hover:bg-muted">★</button>
+                    <button type="button" title="Ta bort" onClick={() => remove(it.id)} className="ml-auto px-1.5 py-1 rounded hover:bg-muted text-destructive">×</button>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {dialogItem && (
+        <div
+          className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setThumbDialogId(null)}
+        >
+          <div
+            className="bg-card border rounded-xl p-5 w-full max-w-md space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div>
+              <h3 className="text-base font-semibold">Thumbnail för "{dialogItem.name}"</h3>
+              <p className="text-xs text-muted-foreground">Ladda upp en bild, klistra in en URL eller låt systemet generera en ögonblicksbild av stilen.</p>
+            </div>
+
+            <Tabs value={thumbMode} onValueChange={(v) => setThumbMode(v as "url" | "file")}>
+              <TabsList className="grid grid-cols-2 w-full">
+                <TabsTrigger value="url">URL</TabsTrigger>
+                <TabsTrigger value="file">Ladda upp fil</TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            {thumbMode === "url" ? (
+              <div className="space-y-2">
+                <Label className="text-xs">Bild-URL</Label>
+                <input
+                  type="url"
+                  value={thumbUrlDraft}
+                  onChange={(e) => setThumbUrlDraft(e.target.value)}
+                  placeholder="https://…"
+                  className="w-full px-3 py-2 rounded-md border bg-background text-sm"
+                />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label className="text-xs">Välj bildfil</Label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  disabled={uploadingThumb}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleFileSelected(dialogItem.id, f);
+                    e.target.value = "";
+                  }}
+                  className="w-full text-sm"
+                />
+                {uploadingThumb && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Laddar upp…
+                  </div>
+                )}
+              </div>
+            )}
+
+            {thumbUrlDraft.trim() && (
+              <div className="aspect-square w-32 rounded-md overflow-hidden border bg-muted">
+                <img src={thumbUrlDraft} alt="preview" className="w-full h-full object-cover" />
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={generatingId === dialogItem.id}
+                onClick={() => generateThumbnail(dialogItem.id)}
+              >
+                {generatingId === dialogItem.id ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
+                Generera från stil
+              </Button>
+              <div className="ml-auto flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => { setThumbnailUrl(dialogItem.id, undefined); setThumbDialogId(null); }}
+                >
+                  Ta bort
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => { setThumbnailUrl(dialogItem.id, thumbUrlDraft); setThumbDialogId(null); }}
+                >
+                  Spara
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }

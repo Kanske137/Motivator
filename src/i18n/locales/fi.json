@@ -31,7 +31,8 @@
     "map": "Kartta",
     "text": "Teksti",
     "format": "Muoto",
-    "aiStyle": "AI-tyyli"
+    "aiStyle": "AI-tyyli",
+    "style": "Tyyli"
   },
   "format": {
     "backgroundColor": "Taustaväri",
@@ -86,7 +87,8 @@
     "show": "Näytä teksti",
     "placeholder": "Tekstisi tähän…",
     "font": "Fontti",
-    "tab": "Teksti {{n}}"
+    "tab": "Teksti {{n}}",
+    "autoHint": "Jätä tyhjäksi palauttaaksesi automaattisen tekstin"
   },
   "layer": {
     "size": "Koko",
@@ -187,5 +189,13 @@
     "success": "Malli ja Shopify-tuote poistettu",
     "successWithErrors": "Malli poistettu, mutta Shopify-poistossa oli virheitä",
     "error": "Mallin poisto epäonnistui"
+  },
+  "mapStyle": {
+    "skandinavisk": "Skandinaavinen",
+    "midnatt": "Keskiyö",
+    "mintgron": "Mintunvihreä/Salvia",
+    "marinbla": "Merensininen",
+    "varmbeige": "Lämmin Beige/Kerma",
+    "skogsgron": "Syvä Metsänvihreä/Musta"
   }
 }
