@@ -7,7 +7,7 @@
 // SHA-256 of the file bytes. This survives URL churn (re-uploads create new
 // paths) and full page reloads, and even works across photo layers when the
 // customer happens to upload the same image twice.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2, Sparkles, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
