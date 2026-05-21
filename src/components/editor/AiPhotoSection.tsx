@@ -434,7 +434,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
       </div>
 
       {/* Style picker — only for removeBackground when the template has presets. */}
-      {isRemoveBg && visibleStyles.length > 0 && (
+      {isRemoveBg && visibleStyles.length > 1 && (
         <div className="space-y-2">
           <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
             {t("aiPhoto.chooseStyleOptional")}

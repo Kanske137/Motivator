@@ -7,7 +7,7 @@
 // SHA-256 of the file bytes. This survives URL churn (re-uploads create new
 // paths) and full page reloads, and even works across photo layers when the
 // customer happens to upload the same image twice.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2, Sparkles, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -164,7 +164,35 @@ export function AiStyleSection({ presets, layerId }: Props) {
   }
 
   const visiblePresets = presets.filter((p) => p.enabled !== false);
+  const singlePreset = visiblePresets.length === 1 ? visiblePresets[0] : null;
+  const autoAppliedRef = useRef<string | null>(null);
+
+  // När bara EN stil är aktiverad: dölj väljaren men applicera stilen automatiskt
+  // så fort kunden har laddat upp en bild (cache används om möjligt).
+  useEffect(() => {
+    if (!singlePreset) return;
+    if (!photoFile || !photoHash) return;
+    if (aiPrintFileUrl) return;
+    if (busyId) return;
+    const key = `${photoHash}::${singlePreset.id}`;
+    if (autoAppliedRef.current === key) return;
+    autoAppliedRef.current = key;
+    void applyStyle(singlePreset);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [singlePreset?.id, photoFile, photoHash, aiPrintFileUrl, busyId]);
+
   if (visiblePresets.length === 0) return null;
+  if (singlePreset) {
+    // Visa endast progress vid auto-körning; ingen väljare/historik.
+    return (
+      <AiProgress
+        active={busyId !== null}
+        expectedSeconds={12}
+        label="Skapar bild"
+        stage={stage}
+      />
+    );
+  }
 
   // History for the active photo (driven by hash, not URL).
   const history = photoHash ? listAiResultsForPhoto(photoHash) : [];
