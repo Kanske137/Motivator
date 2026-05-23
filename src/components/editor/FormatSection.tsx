@@ -289,15 +289,15 @@ export function FormatSection({ configs, activeHandle, activeProductType, onProd
       {toggleEntries.length > 1 && (
         <div className="space-y-2">
           <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("format.product")}</Label>
-          <div className="flex p-1 bg-muted rounded-full">
+          <div className="grid grid-cols-2 gap-2">
             {toggleEntries.map((e) => (
               <button
                 key={e.kind}
                 onClick={() => onProductChange(e.handle, e.productType)}
-                className={`flex-1 h-10 rounded-full text-sm font-medium transition ${
+                className={`h-10 rounded-full text-sm font-medium transition ${
                   e.active
                     ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-foreground/70 hover:text-foreground"
+                    : "bg-muted text-foreground/70 hover:text-foreground"
                 }`}
               >
                 {e.label}
