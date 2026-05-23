@@ -125,6 +125,10 @@ export const aiPhotoDefaultsSchema = z.object({
         id: z.string().min(1),
         url: z.string().url(),
         label: z.string().optional(),
+        /** Which canvas orientation(s) this reference is valid for.
+         *  "any" (default) = shown in both portrait & landscape — keeps
+         *  legacy templates working without admin intervention. */
+        orientation: z.enum(["portrait", "landscape", "any"]).default("any"),
         /** Admin-chosen focal point for the cover-fit reference image,
          *  expressed as percent of the layer box. Same semantics as
          *  `offsetX/offsetY` on photo layers (0 = centered, range -50..50).
