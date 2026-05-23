@@ -653,6 +653,13 @@ function AiPhotoDefaultsSection({
     updateDefaults({ referenceImages: nextList });
   };
 
+  const setOrientation = (id: string, orientation: "portrait" | "landscape" | "any") => {
+    const nextList = referenceImages.map((r) =>
+      r.id === id ? { ...r, orientation } : r,
+    );
+    updateDefaults({ referenceImages: nextList });
+  };
+
   const isRemoveBg = layer.defaults.subjectKind === "removeBackground";
 
   return (
