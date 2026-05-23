@@ -720,6 +720,21 @@ function AiPhotoDefaultsSection({
                     placeholder="Etikett (valfritt)"
                     className="h-8 text-xs"
                   />
+                  <Select
+                    value={r.orientation ?? "any"}
+                    onValueChange={(v) =>
+                      setOrientation(r.id, v as "portrait" | "landscape" | "any")
+                    }
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Båda orienteringar</SelectItem>
+                      <SelectItem value="portrait">Endast porträtt</SelectItem>
+                      <SelectItem value="landscape">Endast landskap</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <div className="flex gap-1.5">
                     <Button
                       type="button"
