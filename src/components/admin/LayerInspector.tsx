@@ -609,7 +609,7 @@ function AiPhotoDefaultsSection({
       const id =
         (typeof crypto !== "undefined" && (crypto as { randomUUID?: () => string }).randomUUID?.()) ||
         `ref-${Date.now()}`;
-      const nextList = [...referenceImages, { id, url }];
+      const nextList = [...referenceImages, { id, url, orientation: "any" as const }];
       updateDefaults({
         referenceImages: nextList,
         referenceImageUrl: syncLegacy(nextList),
