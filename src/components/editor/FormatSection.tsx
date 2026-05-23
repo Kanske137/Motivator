@@ -342,7 +342,7 @@ export function FormatSection({ configs, activeHandle, activeProductType, onProd
           <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
             {isCanvas ? t("format.depth") : isAluminum ? t("format.material") : isAcrylic ? t("format.finish") : t("format.frameOrHanger")}
           </Label>
-          <div className={`grid gap-2 ${isCanvas ? "grid-cols-2" : "grid-cols-3"}`}>
+          <div className="grid gap-2 grid-cols-2">
             {visibleVariants.map((v) => {
               const diff = v.price - currentVariantPrice;
               const live = liveDelta(size, variant, size ?? "", v.name);
