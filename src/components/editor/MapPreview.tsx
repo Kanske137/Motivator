@@ -427,12 +427,22 @@ export function MapPreview({
             // (when admin uploaded multiple) → admin reference image → empty.
             const aiResultUrl = aiPhotoResults[l.id] ?? null;
             const selectedRefUrl = aiPhotoSelectedRefUrl[l.id] ?? null;
-            const src = aiResultUrl ?? selectedRefUrl ?? l.defaults.referenceImageUrl ?? null;
-            // Resolve the active reference item to read its admin-set focal
-            // point. The face-swap result has the same dimensions as the
-            // reference, so the same focal works for both.
+            // Resolve the active reference item, filtered by current
+            // orientation so a stale portrait selection doesn't render
+            // when the canvas is now in landscape (and vice versa).
             const refList = l.defaults.referenceImages ?? [];
-            const activeRefUrl = selectedRefUrl ?? l.defaults.referenceImageUrl ?? null;
+            const orientationMatches = refList.filter((r) => {
+              const o = (r as { orientation?: string }).orientation ?? "any";
+              return o === "any" || o === orientation;
+            });
+            const activeRefUrl =
+              (selectedRefUrl && orientationMatches.some((r) => r.url === selectedRefUrl)
+                ? selectedRefUrl
+                : null)
+              ?? orientationMatches[0]?.url
+              ?? l.defaults.referenceImageUrl
+              ?? null;
+            const src = aiResultUrl ?? activeRefUrl;
             const activeRef = activeRefUrl ? (refList.find((r) => r.url === activeRefUrl) ?? null) : null;
             const refFocalX = activeRef?.focalX ?? 0;
             const refFocalY = activeRef?.focalY ?? 0;
