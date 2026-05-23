@@ -609,7 +609,7 @@ function AiPhotoDefaultsSection({
       const id =
         (typeof crypto !== "undefined" && (crypto as { randomUUID?: () => string }).randomUUID?.()) ||
         `ref-${Date.now()}`;
-      const nextList = [...referenceImages, { id, url }];
+      const nextList = [...referenceImages, { id, url, orientation: "any" as const }];
       updateDefaults({
         referenceImages: nextList,
         referenceImageUrl: syncLegacy(nextList),
@@ -649,6 +649,13 @@ function AiPhotoDefaultsSection({
   const resetFocal = (id: string) => {
     const nextList = referenceImages.map((r) =>
       r.id === id ? { ...r, focalX: 0, focalY: 0 } : r,
+    );
+    updateDefaults({ referenceImages: nextList });
+  };
+
+  const setOrientation = (id: string, orientation: "portrait" | "landscape" | "any") => {
+    const nextList = referenceImages.map((r) =>
+      r.id === id ? { ...r, orientation } : r,
     );
     updateDefaults({ referenceImages: nextList });
   };
@@ -713,6 +720,21 @@ function AiPhotoDefaultsSection({
                     placeholder="Etikett (valfritt)"
                     className="h-8 text-xs"
                   />
+                  <Select
+                    value={r.orientation ?? "any"}
+                    onValueChange={(v) =>
+                      setOrientation(r.id, v as "portrait" | "landscape" | "any")
+                    }
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Båda orienteringar</SelectItem>
+                      <SelectItem value="portrait">Endast porträtt</SelectItem>
+                      <SelectItem value="landscape">Endast landskap</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <div className="flex gap-1.5">
                     <Button
                       type="button"

@@ -1,31 +1,45 @@
-## Mål
-När mallen bara har **en aktiverad** AI-stil ska kundfrontens stilväljare ("Välj stil (valfritt)" / "Välj stil") inte renderas. Den enda stilen ska ändå tillämpas automatiskt så funktionaliteten behålls.
+# Orienteringsmedvetna AI-referensbilder
 
-Gäller båda komponenterna:
-- `src/components/editor/AiPhotoSection.tsx` (AI-referenslager m. bakgrundsborttagning)
-- `src/components/editor/AiStyleSection.tsx` (vanliga fotolager m. stilval via Replicate)
+## Problem
+På `aiPhoto`-lager (människa/hund-katt) har vi nu lagt upp separata referensbilder för porträtt och landskap. Kundfronten visar dock alltid första bilden i listan (= porträtt) även när kunden växlar till landskap. Vi behöver:
 
-## Ändringar
+1. Att rätt referensbild visas automatiskt när orientering byts.
+2. Att face-swappade resultat per orientering finns kvar — så ett byte fram och tillbaka återanvänder tidigare swap.
 
-### 1. `AiPhotoSection.tsx`
-- Rad 437: byt villkor från `visibleStyles.length > 0` till `visibleStyles.length > 1`.
-- Auto-val finns redan (rad 144–149) som sätter `selectedStyleId` till första stilen → enda stilen blir aktiv automatiskt. Ingen annan logik behöver röras; `runSwap` använder `selectedStyleId` precis som idag.
+## Lösning
 
-### 2. `AiStyleSection.tsx`
-- Rad 167: ändra `if (visiblePresets.length === 0) return null;` till `if (visiblePresets.length === 0) return null;` **plus** ett nytt fall: om `visiblePresets.length === 1` → dölj hela UI:t (rubrik, grid, historik, "Återgå"-knapp) men lägg till en `useEffect` som automatiskt anropar `applyStyle(visiblePresets[0])` när:
-  - `photoFile` finns
-  - `aiPrintFileUrl` är tomt (ingen stil redan applicerad)
-  - inget pågående jobb (`busyId === null`)
-  - stilen inte redan finns i cachen för aktuell `photoHash` (då används cache direkt via befintlig logik i `applyStyle`)
-- För att undvika oändlig loop: kör bara om effekten har en `ref`-flagga per `(photoHash, presetId)` som markerar "redan försökt".
-- `AiProgress` behöver fortfarande visas under körning så kunden ser att något händer — alternativt döljs den helt eftersom UI:t i övrigt är borta. Förslag: behåll `AiProgress` synlig vid auto-körning så kunden ser laddning.
+### 1. Schema — tagga referensbilder med orientering
+`src/lib/template-schema.ts` → `aiPhotoDefaultsSchema.referenceImages[i]`:
+- Lägg till `orientation: z.enum(["portrait","landscape","any"]).default("any")`.
+- "any" = visas i båda (bakåtkompatibelt för befintliga mallar).
 
-## Vad som INTE ändras
-- Admin-sidan, mall-schema, edge functions, cache-logik, översättningar (inga nya UI-strängar behövs eftersom UI döljs), priser, kartor, textlager, övrig editor.
-- Beteende vid 0 stilar (oförändrat: ingen sektion).
-- Beteende vid 2+ stilar (oförändrat: väljaren visas som idag).
+### 2. Admin — välj orientering per referens
+`src/components/admin/LayerInspector.tsx` → `AiPhotoDefaultsSection`:
+- Lägg till en liten Select (Porträtt / Landskap / Båda) per referenskort, bredvid etikettfältet.
+- Skriver tillbaka via `updateDefaults({ referenceImages: ... })`.
+- Ingen ändring i upload-flödet.
 
-## Verifiering
-- Mall med 1 aktiverad stil: ladda upp bild → ingen "Välj stil"-rubrik syns, stilen appliceras automatiskt (AiPhotoSection: efter "Skapa"-klick som idag; AiStyleSection: direkt efter upload).
-- Mall med 2+ stilar: oförändrad väljare.
-- Mall med 0 stilar: ingen sektion, ingen auto-körning.
+### 3. Kund — auto-välj orienteringsmatchande referens
+`src/components/editor/AiPhotoSection.tsx`:
+- Läs `orientation` från `useEditorStore`.
+- Beräkna `orientedRefs = referenceImages.filter(r => r.orientation === orientation || r.orientation === "any" || !r.orientation)`.
+- Subject-pickern (3-grid) visar endast `orientedRefs`. `showSubjectPicker = orientedRefs.length >= 2`.
+- Healing-effekten (sätter default ref) ska köras både när listan ändras **och när `orientation` ändras**: om nuvarande valda ref inte finns i `orientedRefs`, byt till `orientedRefs[0]`.
+- `refUrl` resolvas alltid från `orientedRefs` (fallback `referenceImages[0]?.url` endast om listan är tom — då motsvarar dagens beteende).
+
+### 4. Caching — inget extra jobb
+Face-swap-cachen är redan keyad på `(layerId, faceHash, refUrl)` (se `editorStore.addFaceSwapToCache` + `face-swap-cache.ts`). Eftersom porträtt- och landskapsbilderna har olika `refUrl`:
+- Switch till landskap utan tidigare swap → visar landskapets oswappade referens (befintlig logik i useEffect som rensar `aiPhotoResult` om ingen cache finns).
+- Switch tillbaka till porträtt → cachen för porträtt-refUrl träffar → tidigare swappad porträttbild visas direkt.
+- Per mall: cachen lagras i localStorage globalt men är keyad på `layerId` (UUID unikt per mall-lager), så ingen kollision mellan mallar.
+
+### 5. Migrering
+Befintliga referensbilder saknar `orientation` → defaultar till `"any"` via Zod, så de fortsätter visas i båda orienteringarna utan admin-ingrepp. Adminen kan i efterhand sätta "Porträtt" på en och "Landskap" på den andra för aktuella mallar.
+
+## Tester / verifiering
+- Ladda mall med 1 porträtt-ref + 1 landskap-ref, ladda upp ansikte, kör swap i porträtt, byt till landskap → oswappad landskapsreferens visas, knapp "Skapa".
+- Kör swap i landskap, byt till porträtt → tidigare porträtt-swap dyker upp utan ny anrop.
+- Mall med endast `"any"`-referenser → oförändrat beteende.
+
+## Påverkas inte
+- Edge function `replicate-face-swap`, snapshot/print-pipeline, removeBackground-flödet, stilväljaren, hashing.

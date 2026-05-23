@@ -89,14 +89,24 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
 
   // Resolve admin-configured reference subjects. Falls back to the legacy
   // single `referenceImageUrl` so old templates keep working unchanged.
-  const referenceImages = (() => {
+  const allReferenceImages = (() => {
     const list = layer.defaults.referenceImages ?? [];
     if (list.length > 0) return list;
     if (layer.defaults.referenceImageUrl) {
-      return [{ id: "legacy", url: layer.defaults.referenceImageUrl, label: undefined }];
+      return [{ id: "legacy", url: layer.defaults.referenceImageUrl, label: undefined, orientation: "any" as const }];
     }
     return [];
   })();
+
+  // Filter by current canvas orientation. Refs tagged "any" (or missing the
+  // field on legacy data) show in both. The face-swap cache is already keyed
+  // by refUrl, so flipping orientation → different refUrl → automatically
+  // either re-uses a cached swap or shows the unswapped landscape/portrait ref.
+  const editorOrientation = useEditorStore((s) => s.orientation);
+  const referenceImages = allReferenceImages.filter((r) => {
+    const o = (r as { orientation?: string }).orientation ?? "any";
+    return o === "any" || o === editorOrientation;
+  });
   const showSubjectPicker = !isRemoveBg && referenceImages.length >= 2;
 
   // Customer-selected reference. Defaults to the first one on mount/change.
@@ -106,7 +116,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
   const refUrl = selectedRef?.url ?? layer.defaults.referenceImageUrl ?? null;
 
   useEffect(() => {
-    // Initialize / heal the store's selection when references change.
+    // Initialize / heal the store's selection when references or orientation change.
     if (isRemoveBg) return;
     if (referenceImages.length === 0) return;
     const stored = aiPhotoSelectedRefUrl[layer.id];
@@ -114,7 +124,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
       setAiPhotoSelectedRef(layer.id, referenceImages[0].url);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layer.id, isRemoveBg, referenceImages.map((r) => r.url).join("|")]);
+  }, [layer.id, isRemoveBg, editorOrientation, referenceImages.map((r) => r.url).join("|")]);
 
   // Sync the visible swap result to whatever reference subject is currently
   // selected. If we have a cached swap for (face, ref) → show it instantly.
