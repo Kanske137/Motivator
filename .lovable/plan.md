@@ -1,45 +1,55 @@
-# Orienteringsmedvetna AI-referensbilder
+# Fix: orienteringsbyte uppdaterar inte vald AI-referens
 
-## Problem
-På `aiPhoto`-lager (människa/hund-katt) har vi nu lagt upp separata referensbilder för porträtt och landskap. Kundfronten visar dock alltid första bilden i listan (= porträtt) även när kunden växlar till landskap. Vi behöver:
+## Root cause
+`MapPreview.tsx` (rad 430) renderar AI-bildlagret från:
+```ts
+const src = aiResultUrl ?? selectedRefUrl ?? l.defaults.referenceImageUrl ?? null;
+```
+`selectedRefUrl` kommer från `editorStore.aiPhotoSelectedRefUrl[layerId]`. När kunden byter orientering körs `setOrientation` i storen — den remappar `aiPhotoSelectedRefUrl` till nya layer-ID:n men **byter aldrig själva URL:en**. Så den gamla porträtt-URL:en följer med över till landskapslagret och visas på canvasen.
 
-1. Att rätt referensbild visas automatiskt när orientering byts.
-2. Att face-swappade resultat per orientering finns kvar — så ett byte fram och tillbaka återanvänder tidigare swap.
+Healing-logiken jag la in i `AiPhotoSection` rättar visserligen valet — men bara när komponenten är monterad (kontrollpanelen öppen för just det lagret). MapPreview hinner rendera fel innan dess.
 
-## Lösning
+## Fix — gör orienteringsbytet smart i storen
+`src/stores/editorStore.ts` → `setOrientation` (rad 673):
 
-### 1. Schema — tagga referensbilder med orientering
-`src/lib/template-schema.ts` → `aiPhotoDefaultsSchema.referenceImages[i]`:
-- Lägg till `orientation: z.enum(["portrait","landscape","any"]).default("any")`.
-- "any" = visas i båda (bakåtkompatibelt för befintliga mallar).
+Efter `const aiPhotoSelectedRefUrl = remap(state.aiPhotoSelectedRefUrl);`, lägg till en pass som för varje aiPhoto-lager i **nya** orienteringen kontrollerar att den valda refUrl:en finns bland refs som matchar nya orienteringen (`r.orientation === orientation || r.orientation === "any" || !r.orientation`). Om inte → välj första matchande ref. Om inga matchar (admin har bara taggat "any" eller listan tom) → behåll/använd `referenceImageUrl`-fallback.
 
-### 2. Admin — välj orientering per referens
-`src/components/admin/LayerInspector.tsx` → `AiPhotoDefaultsSection`:
-- Lägg till en liten Select (Porträtt / Landskap / Båda) per referenskort, bredvid etikettfältet.
-- Skriver tillbaka via `updateDefaults({ referenceImages: ... })`.
-- Ingen ändring i upload-flödet.
+```ts
+for (const l of nextLayers) {
+  if (l.type !== "aiPhoto") continue;
+  const refs = l.defaults.referenceImages ?? [];
+  if (refs.length === 0) continue;
+  const matching = refs.filter((r) => {
+    const o = r.orientation ?? "any";
+    return o === "any" || o === orientation;
+  });
+  if (matching.length === 0) continue;
+  const cur = aiPhotoSelectedRefUrl[l.id];
+  if (!cur || !matching.some((r) => r.url === cur)) {
+    aiPhotoSelectedRefUrl[l.id] = matching[0].url;
+  }
+}
+```
 
-### 3. Kund — auto-välj orienteringsmatchande referens
-`src/components/editor/AiPhotoSection.tsx`:
-- Läs `orientation` från `useEditorStore`.
-- Beräkna `orientedRefs = referenceImages.filter(r => r.orientation === orientation || r.orientation === "any" || !r.orientation)`.
-- Subject-pickern (3-grid) visar endast `orientedRefs`. `showSubjectPicker = orientedRefs.length >= 2`.
-- Healing-effekten (sätter default ref) ska köras både när listan ändras **och när `orientation` ändras**: om nuvarande valda ref inte finns i `orientedRefs`, byt till `orientedRefs[0]`.
-- `refUrl` resolvas alltid från `orientedRefs` (fallback `referenceImages[0]?.url` endast om listan är tom — då motsvarar dagens beteende).
+## Bonus — samma robusthet i MapPreview som säkerhetsnät
+`src/components/editor/MapPreview.tsx` (rad 430-435): byt resolvningen så den filtrerar refList efter `orientation` (läses från storen) innan den faller tillbaka, så att även om storen av någon anledning har en mismatchad URL ritas rätt bild:
+```ts
+const refList = l.defaults.referenceImages ?? [];
+const orientationMatches = refList.filter((r) => (r.orientation ?? "any") === "any" || (r.orientation ?? "any") === orientation);
+const activeRefUrl =
+  (selectedRefUrl && orientationMatches.some((r) => r.url === selectedRefUrl) ? selectedRefUrl : null)
+  ?? orientationMatches[0]?.url
+  ?? l.defaults.referenceImageUrl
+  ?? null;
+const src = aiResultUrl ?? activeRefUrl;
+```
+(`orientation` är redan tillgängligt i MapPreview-scopet — annars läs via `useEditorStore`.)
 
-### 4. Caching — inget extra jobb
-Face-swap-cachen är redan keyad på `(layerId, faceHash, refUrl)` (se `editorStore.addFaceSwapToCache` + `face-swap-cache.ts`). Eftersom porträtt- och landskapsbilderna har olika `refUrl`:
-- Switch till landskap utan tidigare swap → visar landskapets oswappade referens (befintlig logik i useEffect som rensar `aiPhotoResult` om ingen cache finns).
-- Switch tillbaka till porträtt → cachen för porträtt-refUrl träffar → tidigare swappad porträttbild visas direkt.
-- Per mall: cachen lagras i localStorage globalt men är keyad på `layerId` (UUID unikt per mall-lager), så ingen kollision mellan mallar.
+## Inget annat påverkas
+- Admin-canvas, AiPhotoSection-pickern, face-swap-cachen och snapshot/print: oförändrade.
+- Mallar med bara "any"-taggade referensbilder beter sig exakt som idag.
 
-### 5. Migrering
-Befintliga referensbilder saknar `orientation` → defaultar till `"any"` via Zod, så de fortsätter visas i båda orienteringarna utan admin-ingrepp. Adminen kan i efterhand sätta "Porträtt" på en och "Landskap" på den andra för aktuella mallar.
-
-## Tester / verifiering
-- Ladda mall med 1 porträtt-ref + 1 landskap-ref, ladda upp ansikte, kör swap i porträtt, byt till landskap → oswappad landskapsreferens visas, knapp "Skapa".
-- Kör swap i landskap, byt till porträtt → tidigare porträtt-swap dyker upp utan ny anrop.
-- Mall med endast `"any"`-referenser → oförändrat beteende.
-
-## Påverkas inte
-- Edge function `replicate-face-swap`, snapshot/print-pipeline, removeBackground-flödet, stilväljaren, hashing.
+## Verifiering på kundsidan
+1. Öppna "husdjur i renässansporträtt" som kund i porträtt → porträttreferensen visas på canvasen.
+2. Byt till landskap → landskapsreferensen ritas direkt, även utan att öppna AI-kontrollpanelen.
+3. Kör face-swap i porträtt → byt till landskap → byt tillbaka → cachad porträtt-swap dyker upp.
