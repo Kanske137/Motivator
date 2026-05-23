@@ -717,6 +717,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const aiPhotoSources = remap(state.aiPhotoSources);
     const aiPhotoResults = remap(state.aiPhotoResults);
     const aiPhotoSelectedRefUrl = remap(state.aiPhotoSelectedRefUrl);
+    // Orientation-aware healing: for every aiPhoto layer in the new
+    // orientation, ensure the selected reference URL matches an entry
+    // tagged for this orientation (or "any"). Otherwise switch to the
+    // first matching one. This keeps MapPreview in sync even before the
+    // AiPhotoSection control panel mounts.
+    for (const l of nextLayers) {
+      if (l.type !== "aiPhoto") continue;
+      const refs = l.defaults.referenceImages ?? [];
+      if (refs.length === 0) continue;
+      const matching = refs.filter((r) => {
+        const o = (r as { orientation?: string }).orientation ?? "any";
+        return o === "any" || o === orientation;
+      });
+      if (matching.length === 0) continue;
+      const cur = aiPhotoSelectedRefUrl[l.id];
+      if (!cur || !matching.some((r) => r.url === cur)) {
+        aiPhotoSelectedRefUrl[l.id] = matching[0].url;
+      }
+    }
     const layerTransforms = remap(state.layerTransforms);
 
     const nextBgColor = block[orientation]?.background?.color;
