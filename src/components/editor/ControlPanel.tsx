@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { effectiveLayerRect, clampLayerRect } from "@/lib/layer-utils";
 import type { TemplateLayer, Template } from "@/lib/template-schema";
 import { getAllLayouts, DEFAULT_LAYOUT_ID } from "@/lib/template-schema";
+import TemplateThumbnail from "@/components/admin/TemplateThumbnail";
 
 /** Per-layer slider that scales a layer up/down while preserving aspect ratio.
  *  Shown in the customer editor for any layer where `locks.size === false`.
