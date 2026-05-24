@@ -176,6 +176,7 @@ export function ControlPanel({ configs, activeHandle, activeProductType, onProdu
   const templateLayers = useEditorStore((s) => s.templateLayers);
   const layerValues = useEditorStore((s) => s.layerValues);
   const photoSources = useEditorStore((s) => s.photoSources);
+  const orientation = useEditorStore((s) => s.orientation);
 
   if (!config) return null;
   if (!sectionId) return null;
@@ -195,6 +196,7 @@ export function ControlPanel({ configs, activeHandle, activeProductType, onProdu
   );
   const aiStyles = productOptions?.aiStyles ?? [];
   const allLayouts = template ? getAllLayouts(template) : [];
+  const productType = config.product_type ?? null;
 
   switch (sectionId) {
     case "bild":
