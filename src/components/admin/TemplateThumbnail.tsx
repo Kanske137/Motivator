@@ -1,41 +1,80 @@
-// Tiny non-interactive preview of a template's portrait default layout.
-// Renders inside admin config cards. Reuses MapLayerPreview / TextLayerPreview
-// so the visual matches the editable canvas.
+// Tiny non-interactive preview of a template's layout.
+// Renders inside admin config cards AND inside the "Stilar"-picker (admin +
+// kundvy). Reuses MapLayerPreview / TextLayerPreview so the visual matches
+// the editable canvas. Two sizing modes:
+//
+//   • Default: pass `width` + `height` (px). Component is fixed-size.
+//   • `fill`: component takes the full size of its parent (use with a
+//     wrapper that sets `aspect-ratio`). `width`/`height` then act only as
+//     resolution hints for Mapbox/text scaling (default 240×320).
 import { useMemo } from "react";
-import type { Template } from "@/lib/template-schema";
+import type { Orientation, Template } from "@/lib/template-schema";
 import MapLayerPreview from "./MapLayerPreview";
 import TextLayerPreview from "./TextLayerPreview";
 import { ShapeLayerView } from "@/components/editor/layers/ShapeLayerView";
+
+type LayoutOverride = {
+  defaultLayout: Template["defaultLayout"];
+  canvasLayout?: Template["canvasLayout"];
+};
 
 interface Props {
   template: Template | null;
   width?: number;
   height?: number;
-  /** "poster" | "canvas" | "aluminum" | "acrylic" — when "canvas" and the template
-   *  has a canvasLayout, render the wrap-extended layout and overlay a dashed
-   *  front-zone marker. When "acrylic", overlay 4 silver corner discs. */
+  /** When true, the outer container fills its parent (use a wrapper with
+   *  `aspect-ratio` set). `width`/`height` are only used as resolution hints. */
+  fill?: boolean;
+  /** Which orientation block to render. Defaults to "portrait". */
+  orientation?: Orientation;
+  /** Render this layout block instead of `template.defaultLayout/canvasLayout`.
+   *  Useful for previewing one of `template.extraLayouts` without rebuilding
+   *  a full Template object. */
+  layoutOverride?: LayoutOverride;
+  /** "poster" | "canvas" | "aluminum" | "acrylic" */
   productType?: string | null;
 }
 
-export default function TemplateThumbnail({ template, width = 120, height = 160, productType }: Props) {
+export default function TemplateThumbnail({
+  template,
+  width = 120,
+  height = 160,
+  fill = false,
+  orientation = "portrait",
+  layoutOverride,
+  productType,
+}: Props) {
   const isCanvas = productType === "canvas";
   const isAcrylic = productType === "acrylic";
-  const useCanvasLayout = isCanvas && !!template?.canvasLayout;
-  const layoutBlock = useCanvasLayout ? template?.canvasLayout : template?.defaultLayout;
-  const layout = layoutBlock?.portrait ?? null;
+
+  const source = layoutOverride ?? (template
+    ? { defaultLayout: template.defaultLayout, canvasLayout: template.canvasLayout }
+    : null);
+
+  const useCanvasLayout = isCanvas && !!source?.canvasLayout;
+  const layoutBlock = useCanvasLayout ? source?.canvasLayout : source?.defaultLayout;
+  const layout = layoutBlock ? layoutBlock[orientation] : null;
   const layers = useMemo(
     () => (layout ? [...layout.layers].sort((a, b) => a.zIndex - b.zIndex) : []),
     [layout],
   );
 
-  // Canvas layouts are now front-relative — layers fill the thumbnail
-  // directly, same as poster. No special wrap-zone marker needed.
+  const containerStyle: React.CSSProperties = fill
+    ? { background: layout?.background.color }
+    : { width, height, background: layout?.background.color };
+  const containerClass = fill
+    ? "relative w-full h-full overflow-hidden shrink-0"
+    : "relative rounded border overflow-hidden shadow-sm shrink-0";
 
   if (!layout) {
     return (
       <div
-        className="rounded border border-dashed bg-muted flex items-center justify-center text-[10px] text-muted-foreground"
-        style={{ width, height }}
+        className={
+          fill
+            ? "w-full h-full bg-muted flex items-center justify-center text-[10px] text-muted-foreground"
+            : "rounded border border-dashed bg-muted flex items-center justify-center text-[10px] text-muted-foreground"
+        }
+        style={fill ? undefined : { width, height }}
       >
         Tom
       </div>
@@ -43,10 +82,7 @@ export default function TemplateThumbnail({ template, width = 120, height = 160,
   }
 
   return (
-    <div
-      className="relative rounded border overflow-hidden shadow-sm shrink-0"
-      style={{ width, height, background: layout.background.color }}
-    >
+    <div className={containerClass} style={containerStyle}>
       {layers.map((layer) => {
         const style: React.CSSProperties = {
           position: "absolute",
@@ -87,7 +123,6 @@ export default function TemplateThumbnail({ template, width = 120, height = 160,
           );
         }
         if (layer.type === "margin") {
-          // Thumbnail is a tiny preview — render border thickness as % of width.
           const pct = layer.defaults.thicknessPct;
           return (
             <div
@@ -147,7 +182,14 @@ export default function TemplateThumbnail({ template, width = 120, height = 160,
         if (layer.type === "aiPhoto") {
           const clipPath =
             layer.defaults.shape === "circle" ? "circle(50% at 50% 50%)" : undefined;
-          const src = layer.defaults.referenceImageUrl;
+          // Prefer an orientation-matching reference when available so the
+          // thumbnail mirrors what the customer will see in that orientation.
+          const refs = layer.defaults.referenceImages ?? [];
+          const orientMatch =
+            refs.find((r) => (r.orientation ?? "any") === orientation) ??
+            refs.find((r) => (r.orientation ?? "any") === "any") ??
+            refs[0];
+          const src = orientMatch?.url ?? layer.defaults.referenceImageUrl;
           return (
             <div key={layer.id} style={{ ...style, overflow: "hidden", clipPath }}>
               {src ? (

@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { effectiveLayerRect, clampLayerRect } from "@/lib/layer-utils";
 import type { TemplateLayer, Template } from "@/lib/template-schema";
 import { getAllLayouts, DEFAULT_LAYOUT_ID } from "@/lib/template-schema";
+import TemplateThumbnail from "@/components/admin/TemplateThumbnail";
 
 /** Per-layer slider that scales a layer up/down while preserving aspect ratio.
  *  Shown in the customer editor for any layer where `locks.size === false`.
@@ -176,6 +177,7 @@ export function ControlPanel({ configs, activeHandle, activeProductType, onProdu
   const templateLayers = useEditorStore((s) => s.templateLayers);
   const layerValues = useEditorStore((s) => s.layerValues);
   const photoSources = useEditorStore((s) => s.photoSources);
+  const orientation = useEditorStore((s) => s.orientation);
 
   if (!config) return null;
   if (!sectionId) return null;
@@ -195,6 +197,7 @@ export function ControlPanel({ configs, activeHandle, activeProductType, onProdu
   );
   const aiStyles = productOptions?.aiStyles ?? [];
   const allLayouts = template ? getAllLayouts(template) : [];
+  const productType = config.product_type ?? null;
 
   switch (sectionId) {
     case "bild":
@@ -229,6 +232,9 @@ export function ControlPanel({ configs, activeHandle, activeProductType, onProdu
           {allLayouts.map((l) => {
             const id = l.id;
             const active = (layoutId ?? DEFAULT_LAYOUT_ID) === id;
+            const aspect = l.defaultLayout[orientation]?.aspect ?? "3:4";
+            const aspectClass =
+              aspect === "1:1" ? "aspect-square" : aspect === "4:3" ? "aspect-[4/3]" : "aspect-[3/4]";
             return (
               <button
                 key={id}
@@ -239,11 +245,21 @@ export function ControlPanel({ configs, activeHandle, activeProductType, onProdu
                   active ? "ring-2 ring-primary border-transparent" : "border-border hover:border-foreground/30",
                 )}
               >
-                <div className="aspect-square bg-muted flex items-center justify-center overflow-hidden">
+                <div className={cn("bg-muted overflow-hidden", aspectClass)}>
                   {l.thumbnailUrl ? (
                     <img src={l.thumbnailUrl} alt={l.name} className="w-full h-full object-cover" />
+                  ) : template ? (
+                    <TemplateThumbnail
+                      template={template}
+                      layoutOverride={{ defaultLayout: l.defaultLayout, canvasLayout: l.canvasLayout }}
+                      orientation={orientation}
+                      productType={productType}
+                      fill
+                    />
                   ) : (
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{l.name.slice(0, 2)}</span>
+                    <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground uppercase tracking-wider">
+                      {l.name.slice(0, 2)}
+                    </div>
                   )}
                 </div>
                 <div className="px-2 py-1.5 text-[11px] font-medium truncate">{l.name}</div>

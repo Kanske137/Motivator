@@ -43,6 +43,7 @@ import LayerCanvas from "@/components/admin/LayerCanvas";
 import LayerList, { toggleAllLocks } from "@/components/admin/LayerList";
 import LayerInspector from "@/components/admin/LayerInspector";
 import DeleteTemplateDialog from "@/components/admin/DeleteTemplateDialog";
+import TemplateThumbnail from "@/components/admin/TemplateThumbnail";
 
 export default function DesignerPage() {
   const { handle } = useParams<{ handle: string }>();
@@ -940,10 +941,31 @@ function StylesSection({
     }
   }
 
-  type CardItem = { id: string; name: string; isDefault: boolean; thumbnailUrl?: string };
+  type CardItem = {
+    id: string;
+    name: string;
+    isDefault: boolean;
+    thumbnailUrl?: string;
+    defaultLayout: Template["defaultLayout"];
+    canvasLayout?: Template["canvasLayout"];
+  };
   const items: CardItem[] = [
-    { id: DEFAULT_LAYOUT_ID, name: template.defaultLayoutName?.trim() || "Standard", isDefault: true, thumbnailUrl: template.defaultLayoutThumbnailUrl },
-    ...extras.map((l) => ({ id: l.id, name: l.name, isDefault: false, thumbnailUrl: l.thumbnailUrl })),
+    {
+      id: DEFAULT_LAYOUT_ID,
+      name: template.defaultLayoutName?.trim() || "Standard",
+      isDefault: true,
+      thumbnailUrl: template.defaultLayoutThumbnailUrl,
+      defaultLayout: template.defaultLayout,
+      canvasLayout: template.canvasLayout,
+    },
+    ...extras.map((l) => ({
+      id: l.id,
+      name: l.name,
+      isDefault: false,
+      thumbnailUrl: l.thumbnailUrl,
+      defaultLayout: l.defaultLayout,
+      canvasLayout: l.canvasLayout,
+    })),
   ];
 
   const dialogItem = thumbDialogId ? items.find((l) => l.id === thumbDialogId) : null;
@@ -971,6 +993,9 @@ function StylesSection({
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4">
         {items.map((it) => {
           const active = it.id === editingLayoutId;
+          const aspect = it.defaultLayout.portrait?.aspect ?? "3:4";
+          const aspectClass =
+            aspect === "1:1" ? "aspect-square" : aspect === "4:3" ? "aspect-[4/3]" : "aspect-[3/4]";
           return (
             <div
               key={it.id}
@@ -983,13 +1008,22 @@ function StylesSection({
                 onClick={() => onSelect(it.id)}
                 className="block w-full text-left"
               >
-                <div className="aspect-square bg-muted flex items-center justify-center overflow-hidden">
+                <div className={`${aspectClass} bg-muted overflow-hidden relative`}>
                   {it.thumbnailUrl ? (
                     <img src={it.thumbnailUrl} alt={it.name} className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider px-2 text-center">
-                      Ingen thumbnail
-                    </span>
+                    <>
+                      <TemplateThumbnail
+                        template={template}
+                        layoutOverride={{ defaultLayout: it.defaultLayout, canvasLayout: it.canvasLayout }}
+                        orientation="portrait"
+                        productType={productType}
+                        fill
+                      />
+                      <span className="absolute top-1 left-1 text-[8px] uppercase tracking-wider font-semibold bg-background/80 backdrop-blur-sm px-1.5 py-0.5 rounded text-muted-foreground">
+                        Auto
+                      </span>
+                    </>
                   )}
                 </div>
                 <div className="px-3 pt-2 pb-1 flex items-center gap-1.5 min-w-0">
@@ -999,7 +1033,7 @@ function StylesSection({
               </button>
               <div className="px-2 pb-2 flex items-center gap-1 text-[11px]">
                 <button type="button" title="Byt namn" onClick={() => rename(it.id)} className="px-1.5 py-1 rounded hover:bg-muted">✎</button>
-                <button type="button" title="Sätt thumbnail" onClick={() => openThumbDialog(it.id, it.thumbnailUrl)} className="px-1.5 py-1 rounded hover:bg-muted">🖼</button>
+                <button type="button" title="Sätt thumbnail (override auto)" onClick={() => openThumbDialog(it.id, it.thumbnailUrl)} className="px-1.5 py-1 rounded hover:bg-muted">🖼</button>
                 {!it.isDefault && (
                   <>
                     <button type="button" title="Sätt som standard" onClick={() => makeDefault(it.id)} className="px-1.5 py-1 rounded hover:bg-muted">★</button>
@@ -1011,6 +1045,7 @@ function StylesSection({
           );
         })}
       </div>
+
 
       {dialogItem && (
         <div
