@@ -43,6 +43,7 @@ import LayerCanvas from "@/components/admin/LayerCanvas";
 import LayerList, { toggleAllLocks } from "@/components/admin/LayerList";
 import LayerInspector from "@/components/admin/LayerInspector";
 import DeleteTemplateDialog from "@/components/admin/DeleteTemplateDialog";
+import TemplateThumbnail from "@/components/admin/TemplateThumbnail";
 
 export default function DesignerPage() {
   const { handle } = useParams<{ handle: string }>();
