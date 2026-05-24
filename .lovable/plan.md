@@ -1,55 +1,43 @@
-# Fix: orienteringsbyte uppdaterar inte vald AI-referens
+## Mål
 
-## Root cause
-`MapPreview.tsx` (rad 430) renderar AI-bildlagret från:
-```ts
-const src = aiResultUrl ?? selectedRefUrl ?? l.defaults.referenceImageUrl ?? null;
-```
-`selectedRefUrl` kommer från `editorStore.aiPhotoSelectedRefUrl[layerId]`. När kunden byter orientering körs `setOrientation` i storen — den remappar `aiPhotoSelectedRefUrl` till nya layer-ID:n men **byter aldrig själva URL:en**. Så den gamla porträtt-URL:en följer med över till landskapslagret och visas på canvasen.
+I `Stilar`-väljaren — både i admin (`DesignerPage` → `StylesSection`) och i kundens flik `stil` (`ControlPanel`) — ska varje stil-thumbnail:
 
-Healing-logiken jag la in i `AiPhotoSection` rättar visserligen valet — men bara när komponenten är monterad (kontrollpanelen öppen för just det lagret). MapPreview hinner rendera fel innan dess.
+1. Få samma **aspektratio som stilens layout** (3:4 / 4:3 / 1:1, baserat på aktuell orientering på kundsidan, portrait i admin) så inget innehåll beskärs bort.
+2. **Som standard** visa en **live-render** av stilens layout (samma komponent som `TemplateThumbnail` redan använder för mall-kort). Då blir den alltid synkad när admin ändrar lagren — ingen manuell "Generera thumbnail" behövs.
+3. Endast om admin **explicit laddat upp** en egen `thumbnailUrl` ska den overrida live-renderingen.
 
-## Fix — gör orienteringsbytet smart i storen
-`src/stores/editorStore.ts` → `setOrientation` (rad 673):
+## Ändringar
 
-Efter `const aiPhotoSelectedRefUrl = remap(state.aiPhotoSelectedRefUrl);`, lägg till en pass som för varje aiPhoto-lager i **nya** orienteringen kontrollerar att den valda refUrl:en finns bland refs som matchar nya orienteringen (`r.orientation === orientation || r.orientation === "any" || !r.orientation`). Om inte → välj första matchande ref. Om inga matchar (admin har bara taggat "any" eller listan tom) → behåll/använd `referenceImageUrl`-fallback.
+### `src/pages/admin/DesignerPage.tsx` (`StylesSection`)
+- Byt `aspect-square` på stil-korten (rad 986) till `aspect-[W/H]` beräknat från `sourceBlock.defaultLayout.portrait.aspect` (`"3:4" | "4:3" | "1:1"`).
+- Om `it.thumbnailUrl` saknas → rendera `<TemplateThumbnail template={tempTemplateForStyle} productType={productType}/>` istället för "Ingen thumbnail"-texten. `tempTemplateForStyle` byggs på samma sätt som i `generateThumbnail` (mall med stilens `defaultLayout`/`canvasLayout` inlagd som default).
+- Om `it.thumbnailUrl` finns → visa bilden men i `object-contain` på fältet med rätt aspect (så bilden inte beskärs hårt) ELLER behåll `object-cover` men på rätt aspect-ratio (kortet matchar nu bildens form). Default: `object-cover` mot layout-aspekten — då matchar admins egna uppladdningar exakt slutproduktens form.
+- Behåll `generateThumbnail`-knappen (för att kunna "frysa" en bild om man vill) men gör "Sätt thumbnail"-knappen mer tydlig: tom = auto-live, uppladdad = override. Visa liten `↺ Auto`-badge när thumbnailUrl saknas.
 
-```ts
-for (const l of nextLayers) {
-  if (l.type !== "aiPhoto") continue;
-  const refs = l.defaults.referenceImages ?? [];
-  if (refs.length === 0) continue;
-  const matching = refs.filter((r) => {
-    const o = r.orientation ?? "any";
-    return o === "any" || o === orientation;
-  });
-  if (matching.length === 0) continue;
-  const cur = aiPhotoSelectedRefUrl[l.id];
-  if (!cur || !matching.some((r) => r.url === cur)) {
-    aiPhotoSelectedRefUrl[l.id] = matching[0].url;
-  }
-}
-```
+### `src/components/editor/ControlPanel.tsx` (case `"stil"`, rad 226-254)
+- Importera `useEditorStore` orientation + hämta varje stils `defaultLayout[orientation].aspect`.
+- Byt `aspect-square` (rad 242) till `aspect-[W/H]` beräknat från den enskilda stilens layout för aktuell orientering. (Olika stilar kan teoretiskt ha olika aspekt — varje kort styrs av sin egen layout.)
+- Om `l.thumbnailUrl` saknas → rendera `<TemplateThumbnail template={...stylesTemplate} />` med stilens layout som `defaultLayout` så kunden ser en mini-preview av faktiska lagren (samma som admin).
+- Om `l.thumbnailUrl` finns → behåll `<img>` men i den nya aspect-ratio-rutan.
+- Grid `grid-cols-3 gap-2` behålls; korten är nu olika höga om orientering byter — det är OK och förväntat.
 
-## Bonus — samma robusthet i MapPreview som säkerhetsnät
-`src/components/editor/MapPreview.tsx` (rad 430-435): byt resolvningen så den filtrerar refList efter `orientation` (läses från storen) innan den faller tillbaka, så att även om storen av någon anledning har en mismatchad URL ritas rätt bild:
-```ts
-const refList = l.defaults.referenceImages ?? [];
-const orientationMatches = refList.filter((r) => (r.orientation ?? "any") === "any" || (r.orientation ?? "any") === orientation);
-const activeRefUrl =
-  (selectedRefUrl && orientationMatches.some((r) => r.url === selectedRefUrl) ? selectedRefUrl : null)
-  ?? orientationMatches[0]?.url
-  ?? l.defaults.referenceImageUrl
-  ?? null;
-const src = aiResultUrl ?? activeRefUrl;
-```
-(`orientation` är redan tillgängligt i MapPreview-scopet — annars läs via `useEditorStore`.)
+### `src/components/admin/TemplateThumbnail.tsx`
+- Nuvarande signatur tar `width`/`height` props med default `120x160`. Lägg till möjlighet att rendera med `className`/auto-storlek (fylla container) så `StylesSection` och `ControlPanel` kan släppa in det i en flex/aspect-ratio-ruta utan att hårdkoda px. Konkret: om `width`/`height` ej anges → använd `w-full h-full` och läs `canvasShortPx` från `clientHeight` (eller bara ett rimligt default på 200). Behåll bakåtkompabiliteten.
+- Lägg till `layoutOverride?: { defaultLayout, canvasLayout }` så samma komponent kan rendera vilken stil som helst utan att vi bygger ett temporärt template-objekt vid varje render.
 
-## Inget annat påverkas
-- Admin-canvas, AiPhotoSection-pickern, face-swap-cachen och snapshot/print: oförändrade.
-- Mallar med bara "any"-taggade referensbilder beter sig exakt som idag.
+## Tekniska noter
 
-## Verifiering på kundsidan
-1. Öppna "husdjur i renässansporträtt" som kund i porträtt → porträttreferensen visas på canvasen.
-2. Byt till landskap → landskapsreferensen ritas direkt, även utan att öppna AI-kontrollpanelen.
-3. Kör face-swap i porträtt → byt till landskap → byt tillbaka → cachad porträtt-swap dyker upp.
+- Aspect-mapping:
+  - portrait `"3:4"` → `aspect-[3/4]`
+  - landscape `"4:3"` → `aspect-[4/3]`
+  - `"1:1"` → `aspect-square`
+- `TemplateThumbnail` renderar idag bara `portrait`. För kundsidan måste vi läsa store-`orientation` och plocka rätt block. Lägg till `orientation?: Orientation` prop med default `"portrait"`.
+- Live-renderingen är billig (statisk Mapbox-bild + DOM-lager), så att rendera 3-12 stilar samtidigt går bra. Mapbox-tile cachas redan av webbläsaren.
+- Inga ändringar i schema (`thumbnailUrl` förblir optional). Inga DB-migrationer.
+- i18n: nya småtexter ("Auto"-badge, tooltip "Auto-genererad förhandsvisning av stilen") läggs i `sv.json` + översätts till en/de/no/da/fi/fr/es/it/nl/pl enligt projekt-regeln.
+
+## Verifiering
+
+1. Admin `/admin/designer/husdjur-i-renassansportratt`: stil-korten är nu i 3:4, lagren syns live, ändrar man ett lager uppdateras kortet direkt utan klick.
+2. Ladda upp en custom thumbnail → kortet visar bilden i 3:4 utan beskärning.
+3. Kundsidan flik `stil`: kort i 3:4 i portrait, växla till landscape → kort blir 4:3 och visar landscape-layouten. Inga klippta delar.
