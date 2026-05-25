@@ -303,20 +303,28 @@ export async function compositeMockup({
   if (hangerColor && productType === "posters") {
     const slatH = Math.max(3, (2.1 / scene.referenceWidthCm) * area.w);
     const overhang = slatH * 0.15;
-    // Snörets höjd i cm av posterns verkliga höjd → triangel håller sig
-    // tydlig även på stora postrar (annars ser den platt ut).
     const cordRiseCm = Math.min(6, Math.max(2.5, realHcm * 0.06));
     const cordRise = (cordRiseCm / scene.referenceWidthCm) * area.w;
     const x0 = px - overhang;
     const x1 = px + posterW + overhang;
+
+    const hangTexUrl = textureForHex(hangerColor);
+    let hangTex: HTMLImageElement | null = null;
+    if (hangTexUrl) {
+      try { hangTex = await preloadTexture(hangTexUrl); } catch { hangTex = null; }
+    }
 
     const drawSlat = (yTop: number) => {
       ctx.save();
       ctx.shadowColor = "rgba(0,0,0,0.3)";
       ctx.shadowBlur = slatH * 0.5;
       ctx.shadowOffsetY = slatH * 0.2;
-      ctx.fillStyle = hangerColor;
-      ctx.fillRect(x0, yTop, x1 - x0, slatH);
+      if (hangTex) {
+        ctx.drawImage(hangTex, x0, yTop, x1 - x0, slatH);
+      } else {
+        ctx.fillStyle = hangerColor;
+        ctx.fillRect(x0, yTop, x1 - x0, slatH);
+      }
       ctx.restore();
       const grad = ctx.createLinearGradient(0, yTop, 0, yTop + slatH);
       grad.addColorStop(0, "rgba(255,255,255,0.22)");
