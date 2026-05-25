@@ -1,6 +1,7 @@
 import type { MockupScene } from "./mockup-scenes";
 import { parseSizeCm } from "./mockup-scenes";
 import type { Orientation, ProductType } from "./product-config";
+import { textureForHex, preloadTexture } from "./frame-textures";
 
 function loadImage(src: string, crossOrigin = false): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -192,23 +193,93 @@ export async function compositeMockup({
     ctx.restore();
   }
 
-  // 6. Ram (endast poster med vald färg)
+  // 6. Ram (endast poster med vald färg) — mitred corners + trätextur
   if (frameColor && frameWpx > 0 && productType !== "canvas") {
+    const texUrl = textureForHex(frameColor);
+    let texImg: HTMLImageElement | null = null;
+    if (texUrl) {
+      try { texImg = await preloadTexture(texUrl); } catch { texImg = null; }
+    }
+
+    // Drop shadow behind frame
     ctx.save();
-    ctx.fillStyle = frameColor;
+    ctx.shadowColor = "rgba(0,0,0,0.35)";
+    ctx.shadowBlur = frameWpx * 1.2;
+    ctx.shadowOffsetY = frameWpx * 0.4;
+    ctx.fillStyle = "rgba(0,0,0,0.001)"; // shape carrier
     ctx.fillRect(ox, oy, outerW, outerH);
+    ctx.restore();
 
+    const drawSide = (
+      poly: Array<[number, number]>,
+      tex: HTMLImageElement | null,
+      rotate: boolean,
+      stripW: number,
+      stripH: number,
+      px0: number,
+      py0: number,
+    ) => {
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(poly[0][0], poly[0][1]);
+      for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i][0], poly[i][1]);
+      ctx.closePath();
+      ctx.clip();
+      if (tex) {
+        if (rotate) {
+          // Side: rotate 90° so grain runs along the list length.
+          ctx.translate(px0 + stripW, py0);
+          ctx.rotate(Math.PI / 2);
+          ctx.drawImage(tex, 0, 0, stripH, stripW);
+        } else {
+          ctx.drawImage(tex, px0, py0, stripW, stripH);
+        }
+      } else {
+        ctx.fillStyle = frameColor;
+        ctx.fillRect(px0, py0, stripW, stripH);
+      }
+      ctx.restore();
+    };
+
+    // Top
+    drawSide(
+      [[ox, oy], [ox + outerW, oy], [ox + outerW - frameWpx, oy + frameWpx], [ox + frameWpx, oy + frameWpx]],
+      texImg, false, outerW, frameWpx, ox, oy,
+    );
+    // Bottom
+    drawSide(
+      [[ox + frameWpx, oy + outerH - frameWpx], [ox + outerW - frameWpx, oy + outerH - frameWpx], [ox + outerW, oy + outerH], [ox, oy + outerH]],
+      texImg, false, outerW, frameWpx, ox, oy + outerH - frameWpx,
+    );
+    // Left
+    drawSide(
+      [[ox, oy], [ox + frameWpx, oy + frameWpx], [ox + frameWpx, oy + outerH - frameWpx], [ox, oy + outerH]],
+      texImg, true, frameWpx, outerH, ox, oy,
+    );
+    // Right
+    drawSide(
+      [[ox + outerW - frameWpx, oy + frameWpx], [ox + outerW, oy], [ox + outerW, oy + outerH], [ox + outerW - frameWpx, oy + outerH - frameWpx]],
+      texImg, true, frameWpx, outerH, ox + outerW - frameWpx, oy,
+    );
+
+    // 45° highlight/shadow overlay across the whole frame for depth
+    ctx.save();
     const grad = ctx.createLinearGradient(ox, oy, ox + outerW, oy + outerH);
-    grad.addColorStop(0, "rgba(255,255,255,0.18)");
+    grad.addColorStop(0, "rgba(255,255,255,0.20)");
     grad.addColorStop(0.5, "rgba(0,0,0,0)");
-    grad.addColorStop(1, "rgba(0,0,0,0.22)");
+    grad.addColorStop(1, "rgba(0,0,0,0.24)");
     ctx.fillStyle = grad;
-    ctx.fillRect(ox, oy, outerW, outerH);
+    // Clip to outer rect minus inner print area so the gradient only paints on the frame band
+    ctx.beginPath();
+    ctx.rect(ox, oy, outerW, outerH);
+    ctx.rect(px + innerW, py, -innerW, innerH); // inner cutout (reverse winding)
+    ctx.fill("evenodd");
+    ctx.restore();
 
-    ctx.strokeStyle = "rgba(0,0,0,0.35)";
+    // Inner rim shadow where print meets frame
+    ctx.strokeStyle = "rgba(0,0,0,0.4)";
     ctx.lineWidth = Math.max(1, frameWpx * 0.08);
     ctx.strokeRect(px - 0.5, py - 0.5, innerW + 1, innerH + 1);
-    ctx.restore();
   }
 
   // 7. Front: postern själv — RAKT, ingen skew (innehåll ska aldrig förvrängas)
@@ -232,20 +303,28 @@ export async function compositeMockup({
   if (hangerColor && productType === "posters") {
     const slatH = Math.max(3, (2.1 / scene.referenceWidthCm) * area.w);
     const overhang = slatH * 0.15;
-    // Snörets höjd i cm av posterns verkliga höjd → triangel håller sig
-    // tydlig även på stora postrar (annars ser den platt ut).
     const cordRiseCm = Math.min(6, Math.max(2.5, realHcm * 0.06));
     const cordRise = (cordRiseCm / scene.referenceWidthCm) * area.w;
     const x0 = px - overhang;
     const x1 = px + posterW + overhang;
+
+    const hangTexUrl = textureForHex(hangerColor);
+    let hangTex: HTMLImageElement | null = null;
+    if (hangTexUrl) {
+      try { hangTex = await preloadTexture(hangTexUrl); } catch { hangTex = null; }
+    }
 
     const drawSlat = (yTop: number) => {
       ctx.save();
       ctx.shadowColor = "rgba(0,0,0,0.3)";
       ctx.shadowBlur = slatH * 0.5;
       ctx.shadowOffsetY = slatH * 0.2;
-      ctx.fillStyle = hangerColor;
-      ctx.fillRect(x0, yTop, x1 - x0, slatH);
+      if (hangTex) {
+        ctx.drawImage(hangTex, x0, yTop, x1 - x0, slatH);
+      } else {
+        ctx.fillStyle = hangerColor;
+        ctx.fillRect(x0, yTop, x1 - x0, slatH);
+      }
       ctx.restore();
       const grad = ctx.createLinearGradient(0, yTop, 0, yTop + slatH);
       grad.addColorStop(0, "rgba(255,255,255,0.22)");

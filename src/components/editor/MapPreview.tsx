@@ -40,6 +40,132 @@ function parseCm(size: string | null): { w: number; h: number } | null {
 // editor preview, admin thumbnail and print snapshot all share one source of
 // truth and stay pixel-identical.
 import { buildShapeClipPath, useShapeClip, type ClipShape } from "@/lib/shape-clip";
+import { textureForHex } from "@/lib/frame-textures";
+
+/**
+ * Realistisk träram med mitred (45°) hörn.
+ * Fyra trapets-sidor klipps via clip-path så hörnen möts i 45° — som en
+ * riktig posterram (Gelato-stil). Sidornas grain roteras 90° så ådringen
+ * löper längs varje list.
+ */
+function FrameBorder({
+  borderPx,
+  outerW,
+  outerH,
+  textureUrl,
+  fallbackColor,
+}: {
+  borderPx: number;
+  outerW: number;
+  outerH: number;
+  textureUrl: string | null;
+  fallbackColor: string;
+}) {
+  if (borderPx <= 0 || outerW <= 0 || outerH <= 0) return null;
+  const bp = borderPx;
+  const bg: React.CSSProperties = textureUrl
+    ? { backgroundImage: `url(${textureUrl})`, backgroundSize: "cover", backgroundRepeat: "no-repeat" }
+    : { backgroundColor: fallbackColor };
+
+  // Top + bottom: grain naturally horizontal — texture orientation matches list direction.
+  const topStyle: React.CSSProperties = {
+    ...bg,
+    position: "absolute",
+    top: -bp,
+    left: -bp,
+    width: outerW,
+    height: bp,
+    clipPath: `polygon(0 0, 100% 0, calc(100% - ${bp}px) 100%, ${bp}px 100%)`,
+  };
+  const bottomStyle: React.CSSProperties = {
+    ...bg,
+    position: "absolute",
+    bottom: -bp,
+    left: -bp,
+    width: outerW,
+    height: bp,
+    clipPath: `polygon(${bp}px 0, calc(100% - ${bp}px) 0, 100% 100%, 0 100%)`,
+  };
+
+  // Left + right sides: rotate texture 90° so grain runs vertically along the list.
+  // We render an inner <img>-sized div with dimensions (outerH × bp), rotated 90°,
+  // positioned to fill a (bp × outerH) strip via clip-path mitre.
+  const sideClipLeft = `polygon(0 0, 100% ${bp}px, 100% calc(100% - ${bp}px), 0 100%)`;
+  const sideClipRight = `polygon(0 ${bp}px, 100% 0, 100% 100%, 0 calc(100% - ${bp}px))`;
+
+  const sideInnerBg = (rotateDeg: number, translateX: number, translateY: number): React.CSSProperties => ({
+    ...bg,
+    position: "absolute",
+    width: outerH,
+    height: bp,
+    top: 0,
+    left: 0,
+    transformOrigin: "top left",
+    transform: `translate(${translateX}px, ${translateY}px) rotate(${rotateDeg}deg)`,
+  });
+
+  return (
+    <div className="pointer-events-none absolute inset-0" style={{ zIndex: 55 }} aria-hidden>
+      {/* Drop shadow behind the frame (drawn first, below sides) */}
+      <div
+        style={{
+          position: "absolute",
+          inset: -bp,
+          boxShadow: "0 8px 22px -6px rgba(0,0,0,0.32), 0 18px 40px -14px rgba(0,0,0,0.22)",
+        }}
+      />
+      <div style={topStyle} />
+      <div style={bottomStyle} />
+      {/* Left strip */}
+      <div
+        style={{
+          position: "absolute",
+          top: -bp,
+          left: -bp,
+          width: bp,
+          height: outerH,
+          clipPath: sideClipLeft,
+          overflow: "hidden",
+        }}
+      >
+        {/* rotate(90) around (0,0) maps (x,y) -> (-y,x); translate by (bp, 0) places result in bp×outerH strip */}
+        <div style={sideInnerBg(90, bp, 0)} />
+      </div>
+      {/* Right strip */}
+      <div
+        style={{
+          position: "absolute",
+          top: -bp,
+          right: -bp,
+          width: bp,
+          height: outerH,
+          clipPath: sideClipRight,
+          overflow: "hidden",
+        }}
+      >
+        <div style={sideInnerBg(90, bp, 0)} />
+      </div>
+      {/* Soft 45° highlight overlay for depth */}
+      <div
+        style={{
+          position: "absolute",
+          inset: -bp,
+          background:
+            "linear-gradient(135deg, rgba(255,255,255,0.18), rgba(255,255,255,0) 45%, rgba(0,0,0,0.22))",
+          mixBlendMode: "overlay",
+        }}
+      />
+      {/* Inner shadow rim where frame meets the print */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.28), inset 0 2px 6px -2px rgba(0,0,0,0.38)",
+        }}
+      />
+    </div>
+  );
+}
 
 /**
  * Posterhängare: tunna trälister topp+botten + snöre.
@@ -47,7 +173,7 @@ import { buildShapeClipPath, useShapeClip, type ClipShape } from "@/lib/shape-cl
  * Tjockleken skalas efter motivets verkliga höjd: Gelatos hängare har fast
  * 14 mm front (oavsett posterstorlek), så större postrar → relativt tunnare list.
  */
-function HangerOverlay({ color, motifHeightCm }: { color: string; motifHeightCm: number }) {
+function HangerOverlay({ color, textureUrl, motifHeightCm }: { color: string; textureUrl: string | null; motifHeightCm: number }) {
   const isWhite = color.toLowerCase() === "#f5f5f2";
   // 21 mm = 2.1 cm fysisk listhöjd (Gelato-spec). Procent av motivets höjd.
   const slatPct = Math.max(0.8, (2.1 / Math.max(motifHeightCm, 1)) * 100);
@@ -64,7 +190,11 @@ function HangerOverlay({ color, motifHeightCm }: { color: string; motifHeightCm:
     right: "-2%",
     height: `${slatPct}%`,
     background: color,
-    backgroundImage: "linear-gradient(to bottom, rgba(255,255,255,0.22), rgba(255,255,255,0) 50%, rgba(0,0,0,0.28))",
+    backgroundImage: textureUrl
+      ? `linear-gradient(to bottom, rgba(255,255,255,0.18), rgba(255,255,255,0) 50%, rgba(0,0,0,0.28)), url(${textureUrl})`
+      : "linear-gradient(to bottom, rgba(255,255,255,0.22), rgba(255,255,255,0) 50%, rgba(0,0,0,0.28))",
+    backgroundSize: textureUrl ? "auto, cover" : undefined,
+    backgroundRepeat: textureUrl ? "repeat, no-repeat" : undefined,
     boxShadow: "0 4px 8px rgba(0,0,0,0.28)",
     border: isWhite ? "1px solid rgba(0,0,0,0.18)" : undefined,
   };
@@ -124,6 +254,7 @@ export function MapPreview({
   const frameRef = useRef<HTMLDivElement>(null);
   const [borderPx, setBorderPx] = useState(0);
   const [frameShortPx, setFrameShortPx] = useState(0);
+  const [frameOuter, setFrameOuter] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
 
   const {
     config,
@@ -183,6 +314,7 @@ export function MapPreview({
       const rect = el.getBoundingClientRect();
       const shortPx = Math.min(rect.width, rect.height);
       setFrameShortPx(shortPx);
+      setFrameOuter({ w: rect.width, h: rect.height });
       if (!frameColor || !sizeCm) {
         setBorderPx(0);
         return;
@@ -203,14 +335,19 @@ export function MapPreview({
   // preview-höjd (~720px). Formeln maxWidth = aspect * 720px funkar på
   // både mobil (smal skärm → 100% vinner) och desktop (h-[720px] container).
   const DESKTOP_MAX_H = 820;
+  const frameTextureUrl = textureForHex(frameColor);
+  const hangerTextureUrl = textureForHex(hangerColor);
   const frameStyle: React.CSSProperties = {
     aspectRatio: `${posterAspect}`,
     width: "100%",
     height: "auto",
     maxWidth: `min(100%, ${posterAspect * DESKTOP_MAX_H}px)`,
     background: posterBgColor,
+    // Border keeps layout space for the frame; visual frame is rendered via
+    // <FrameBorder> overlay (textured + mitred corners). Transparent border
+    // preserves print-area sizing without the old flat color band.
     borderStyle: frameColor ? "solid" : undefined,
-    borderColor: frameColor,
+    borderColor: "transparent",
     borderWidth: frameColor ? `${borderPx}px` : 0,
     padding: innerPadding,
     boxSizing: "border-box",
@@ -626,7 +763,16 @@ export function MapPreview({
             <AcrylicCornerOverlay frontWcm={frontW} frontHcm={frontH} zIndex={45} />
           </div>
         )}
-        {hangerColor && <HangerOverlay color={hangerColor} motifHeightCm={frontH} />}
+        {hangerColor && <HangerOverlay color={hangerColor} textureUrl={hangerTextureUrl} motifHeightCm={frontH} />}
+        {frameColor && borderPx > 0 && (
+          <FrameBorder
+            borderPx={borderPx}
+            outerW={frameOuter.w}
+            outerH={frameOuter.h}
+            textureUrl={frameTextureUrl}
+            fallbackColor={frameColor}
+          />
+        )}
       </div>
       {allLayers.some((l) => l.type === "map") && (
         <p className="text-[10px] text-muted-foreground">© Mapbox · © OpenStreetMap</p>
