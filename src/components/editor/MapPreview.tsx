@@ -40,6 +40,110 @@ function parseCm(size: string | null): { w: number; h: number } | null {
 // editor preview, admin thumbnail and print snapshot all share one source of
 // truth and stay pixel-identical.
 import { buildShapeClipPath, useShapeClip, type ClipShape } from "@/lib/shape-clip";
+import { textureForHex } from "@/lib/frame-textures";
+
+/**
+ * Realistisk träram med mitred (45°) hörn.
+ * Fyra trapets-sidor klipps via clip-path så ådringen löper längs varje list
+ * och möts i 45° i hörnen — som en riktig posterram (Gelato-stil).
+ */
+function FrameBorder({ borderPx, textureUrl, fallbackColor }: { borderPx: number; textureUrl: string | null; fallbackColor: string }) {
+  if (borderPx <= 0) return null;
+  const bp = borderPx;
+  const baseSide: React.CSSProperties = {
+    position: "absolute",
+    backgroundImage: textureUrl ? `url(${textureUrl})` : undefined,
+    backgroundColor: textureUrl ? undefined : fallbackColor,
+    backgroundSize: "cover",
+    backgroundRepeat: "no-repeat",
+  };
+  // Top: full width strip, mitred inward at bottom edge.
+  const topStyle: React.CSSProperties = {
+    ...baseSide,
+    top: -bp,
+    left: -bp,
+    right: -bp,
+    height: bp,
+    clipPath: `polygon(0 0, 100% 0, calc(100% - ${bp}px) 100%, ${bp}px 100%)`,
+  };
+  const bottomStyle: React.CSSProperties = {
+    ...baseSide,
+    bottom: -bp,
+    left: -bp,
+    right: -bp,
+    height: bp,
+    clipPath: `polygon(${bp}px 0, calc(100% - ${bp}px) 0, 100% 100%, 0 100%)`,
+  };
+  // Left + right: rotate grain 90° via backgroundSize swap (use a wrapper transform).
+  const sideTexBg: React.CSSProperties = textureUrl
+    ? {
+        backgroundImage: `url(${textureUrl})`,
+        backgroundSize: "cover",
+        backgroundRepeat: "no-repeat",
+        // Rotate grain vertical: transform inner element.
+      }
+    : { backgroundColor: fallbackColor };
+  const leftStyle: React.CSSProperties = {
+    position: "absolute",
+    top: -bp,
+    bottom: -bp,
+    left: -bp,
+    width: bp,
+    clipPath: `polygon(0 0, 100% ${bp}px, 100% calc(100% - ${bp}px), 0 100%)`,
+    overflow: "hidden",
+  };
+  const rightStyle: React.CSSProperties = {
+    position: "absolute",
+    top: -bp,
+    bottom: -bp,
+    right: -bp,
+    width: bp,
+    clipPath: `polygon(0 ${bp}px, 100% 0, 100% 100%, 0 calc(100% - ${bp}px))`,
+    overflow: "hidden",
+  };
+  // Subtle inner shadow + outer drop shadow for depth.
+  return (
+    <div className="pointer-events-none absolute inset-0" style={{ zIndex: 55 }} aria-hidden>
+      {/* Drop shadow behind the frame */}
+      <div
+        style={{
+          position: "absolute",
+          inset: -bp,
+          boxShadow: "0 8px 22px -6px rgba(0,0,0,0.32), 0 18px 40px -14px rgba(0,0,0,0.22)",
+          borderRadius: 1,
+        }}
+      />
+      <div style={topStyle} />
+      <div style={bottomStyle} />
+      <div style={leftStyle}>
+        <div style={{ ...sideTexBg, position: "absolute", width: "400%", height: "100%", top: 0, left: 0, transformOrigin: "top left", transform: `rotate(90deg) translateY(-${bp}px)` }} />
+      </div>
+      <div style={rightStyle}>
+        <div style={{ ...sideTexBg, position: "absolute", width: "400%", height: "100%", top: 0, left: 0, transformOrigin: "top left", transform: `rotate(90deg) translateY(-${bp}px)` }} />
+      </div>
+      {/* Soft 45° highlight overlay for depth (matches old gradient look) */}
+      <div
+        style={{
+          position: "absolute",
+          inset: -bp,
+          background:
+            "linear-gradient(135deg, rgba(255,255,255,0.14), rgba(255,255,255,0) 45%, rgba(0,0,0,0.18))",
+          mixBlendMode: "overlay",
+          pointerEvents: "none",
+        }}
+      />
+      {/* Inner shadow rim where frame meets print */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.25), inset 0 2px 6px -2px rgba(0,0,0,0.35)",
+          pointerEvents: "none",
+        }}
+      />
+    </div>
+  );
+}
 
 /**
  * Posterhängare: tunna trälister topp+botten + snöre.
