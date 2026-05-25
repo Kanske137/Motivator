@@ -44,101 +44,123 @@ import { textureForHex } from "@/lib/frame-textures";
 
 /**
  * Realistisk träram med mitred (45°) hörn.
- * Fyra trapets-sidor klipps via clip-path så ådringen löper längs varje list
- * och möts i 45° i hörnen — som en riktig posterram (Gelato-stil).
+ * Fyra trapets-sidor klipps via clip-path så hörnen möts i 45° — som en
+ * riktig posterram (Gelato-stil). Sidornas grain roteras 90° så ådringen
+ * löper längs varje list.
  */
-function FrameBorder({ borderPx, textureUrl, fallbackColor }: { borderPx: number; textureUrl: string | null; fallbackColor: string }) {
-  if (borderPx <= 0) return null;
+function FrameBorder({
+  borderPx,
+  outerW,
+  outerH,
+  textureUrl,
+  fallbackColor,
+}: {
+  borderPx: number;
+  outerW: number;
+  outerH: number;
+  textureUrl: string | null;
+  fallbackColor: string;
+}) {
+  if (borderPx <= 0 || outerW <= 0 || outerH <= 0) return null;
   const bp = borderPx;
-  const baseSide: React.CSSProperties = {
-    position: "absolute",
-    backgroundImage: textureUrl ? `url(${textureUrl})` : undefined,
-    backgroundColor: textureUrl ? undefined : fallbackColor,
-    backgroundSize: "cover",
-    backgroundRepeat: "no-repeat",
-  };
-  // Top: full width strip, mitred inward at bottom edge.
+  const bg: React.CSSProperties = textureUrl
+    ? { backgroundImage: `url(${textureUrl})`, backgroundSize: "cover", backgroundRepeat: "no-repeat" }
+    : { backgroundColor: fallbackColor };
+
+  // Top + bottom: grain naturally horizontal — texture orientation matches list direction.
   const topStyle: React.CSSProperties = {
-    ...baseSide,
+    ...bg,
+    position: "absolute",
     top: -bp,
     left: -bp,
-    right: -bp,
+    width: outerW,
     height: bp,
     clipPath: `polygon(0 0, 100% 0, calc(100% - ${bp}px) 100%, ${bp}px 100%)`,
   };
   const bottomStyle: React.CSSProperties = {
-    ...baseSide,
+    ...bg,
+    position: "absolute",
     bottom: -bp,
     left: -bp,
-    right: -bp,
+    width: outerW,
     height: bp,
     clipPath: `polygon(${bp}px 0, calc(100% - ${bp}px) 0, 100% 100%, 0 100%)`,
   };
-  // Left + right: rotate grain 90° via backgroundSize swap (use a wrapper transform).
-  const sideTexBg: React.CSSProperties = textureUrl
-    ? {
-        backgroundImage: `url(${textureUrl})`,
-        backgroundSize: "cover",
-        backgroundRepeat: "no-repeat",
-        // Rotate grain vertical: transform inner element.
-      }
-    : { backgroundColor: fallbackColor };
-  const leftStyle: React.CSSProperties = {
+
+  // Left + right sides: rotate texture 90° so grain runs vertically along the list.
+  // We render an inner <img>-sized div with dimensions (outerH × bp), rotated 90°,
+  // positioned to fill a (bp × outerH) strip via clip-path mitre.
+  const sideClipLeft = `polygon(0 0, 100% ${bp}px, 100% calc(100% - ${bp}px), 0 100%)`;
+  const sideClipRight = `polygon(0 ${bp}px, 100% 0, 100% 100%, 0 calc(100% - ${bp}px))`;
+
+  const sideInnerBg = (rotateDeg: number, translateX: number, translateY: number): React.CSSProperties => ({
+    ...bg,
     position: "absolute",
-    top: -bp,
-    bottom: -bp,
-    left: -bp,
-    width: bp,
-    clipPath: `polygon(0 0, 100% ${bp}px, 100% calc(100% - ${bp}px), 0 100%)`,
-    overflow: "hidden",
-  };
-  const rightStyle: React.CSSProperties = {
-    position: "absolute",
-    top: -bp,
-    bottom: -bp,
-    right: -bp,
-    width: bp,
-    clipPath: `polygon(0 ${bp}px, 100% 0, 100% 100%, 0 calc(100% - ${bp}px))`,
-    overflow: "hidden",
-  };
-  // Subtle inner shadow + outer drop shadow for depth.
+    width: outerH,
+    height: bp,
+    top: 0,
+    left: 0,
+    transformOrigin: "top left",
+    transform: `translate(${translateX}px, ${translateY}px) rotate(${rotateDeg}deg)`,
+  });
+
   return (
     <div className="pointer-events-none absolute inset-0" style={{ zIndex: 55 }} aria-hidden>
-      {/* Drop shadow behind the frame */}
+      {/* Drop shadow behind the frame (drawn first, below sides) */}
       <div
         style={{
           position: "absolute",
           inset: -bp,
           boxShadow: "0 8px 22px -6px rgba(0,0,0,0.32), 0 18px 40px -14px rgba(0,0,0,0.22)",
-          borderRadius: 1,
         }}
       />
       <div style={topStyle} />
       <div style={bottomStyle} />
-      <div style={leftStyle}>
-        <div style={{ ...sideTexBg, position: "absolute", width: "400%", height: "100%", top: 0, left: 0, transformOrigin: "top left", transform: `rotate(90deg) translateY(-${bp}px)` }} />
+      {/* Left strip */}
+      <div
+        style={{
+          position: "absolute",
+          top: -bp,
+          left: -bp,
+          width: bp,
+          height: outerH,
+          clipPath: sideClipLeft,
+          overflow: "hidden",
+        }}
+      >
+        {/* rotate(90) around (0,0) maps (x,y) -> (-y,x); translate by (bp, 0) places result in bp×outerH strip */}
+        <div style={sideInnerBg(90, bp, 0)} />
       </div>
-      <div style={rightStyle}>
-        <div style={{ ...sideTexBg, position: "absolute", width: "400%", height: "100%", top: 0, left: 0, transformOrigin: "top left", transform: `rotate(90deg) translateY(-${bp}px)` }} />
+      {/* Right strip */}
+      <div
+        style={{
+          position: "absolute",
+          top: -bp,
+          right: -bp,
+          width: bp,
+          height: outerH,
+          clipPath: sideClipRight,
+          overflow: "hidden",
+        }}
+      >
+        <div style={sideInnerBg(90, bp, 0)} />
       </div>
-      {/* Soft 45° highlight overlay for depth (matches old gradient look) */}
+      {/* Soft 45° highlight overlay for depth */}
       <div
         style={{
           position: "absolute",
           inset: -bp,
           background:
-            "linear-gradient(135deg, rgba(255,255,255,0.14), rgba(255,255,255,0) 45%, rgba(0,0,0,0.18))",
+            "linear-gradient(135deg, rgba(255,255,255,0.18), rgba(255,255,255,0) 45%, rgba(0,0,0,0.22))",
           mixBlendMode: "overlay",
-          pointerEvents: "none",
         }}
       />
-      {/* Inner shadow rim where frame meets print */}
+      {/* Inner shadow rim where frame meets the print */}
       <div
         style={{
           position: "absolute",
           inset: 0,
-          boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.25), inset 0 2px 6px -2px rgba(0,0,0,0.35)",
-          pointerEvents: "none",
+          boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.28), inset 0 2px 6px -2px rgba(0,0,0,0.38)",
         }}
       />
     </div>
