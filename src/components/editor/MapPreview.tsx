@@ -254,6 +254,7 @@ export function MapPreview({
   const frameRef = useRef<HTMLDivElement>(null);
   const [borderPx, setBorderPx] = useState(0);
   const [frameShortPx, setFrameShortPx] = useState(0);
+  const [frameOuter, setFrameOuter] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
 
   const {
     config,
@@ -313,6 +314,7 @@ export function MapPreview({
       const rect = el.getBoundingClientRect();
       const shortPx = Math.min(rect.width, rect.height);
       setFrameShortPx(shortPx);
+      setFrameOuter({ w: rect.width, h: rect.height });
       if (!frameColor || !sizeCm) {
         setBorderPx(0);
         return;
@@ -333,14 +335,19 @@ export function MapPreview({
   // preview-höjd (~720px). Formeln maxWidth = aspect * 720px funkar på
   // både mobil (smal skärm → 100% vinner) och desktop (h-[720px] container).
   const DESKTOP_MAX_H = 820;
+  const frameTextureUrl = textureForHex(frameColor);
+  const hangerTextureUrl = textureForHex(hangerColor);
   const frameStyle: React.CSSProperties = {
     aspectRatio: `${posterAspect}`,
     width: "100%",
     height: "auto",
     maxWidth: `min(100%, ${posterAspect * DESKTOP_MAX_H}px)`,
     background: posterBgColor,
+    // Border keeps layout space for the frame; visual frame is rendered via
+    // <FrameBorder> overlay (textured + mitred corners). Transparent border
+    // preserves print-area sizing without the old flat color band.
     borderStyle: frameColor ? "solid" : undefined,
-    borderColor: frameColor,
+    borderColor: "transparent",
     borderWidth: frameColor ? `${borderPx}px` : 0,
     padding: innerPadding,
     boxSizing: "border-box",
@@ -756,7 +763,16 @@ export function MapPreview({
             <AcrylicCornerOverlay frontWcm={frontW} frontHcm={frontH} zIndex={45} />
           </div>
         )}
-        {hangerColor && <HangerOverlay color={hangerColor} motifHeightCm={frontH} />}
+        {hangerColor && <HangerOverlay color={hangerColor} textureUrl={hangerTextureUrl} motifHeightCm={frontH} />}
+        {frameColor && borderPx > 0 && (
+          <FrameBorder
+            borderPx={borderPx}
+            outerW={frameOuter.w}
+            outerH={frameOuter.h}
+            textureUrl={frameTextureUrl}
+            fallbackColor={frameColor}
+          />
+        )}
       </div>
       {allLayers.some((l) => l.type === "map") && (
         <p className="text-[10px] text-muted-foreground">© Mapbox · © OpenStreetMap</p>
