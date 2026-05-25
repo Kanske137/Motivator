@@ -173,7 +173,7 @@ function FrameBorder({
  * Tjockleken skalas efter motivets verkliga höjd: Gelatos hängare har fast
  * 14 mm front (oavsett posterstorlek), så större postrar → relativt tunnare list.
  */
-function HangerOverlay({ color, motifHeightCm }: { color: string; motifHeightCm: number }) {
+function HangerOverlay({ color, textureUrl, motifHeightCm }: { color: string; textureUrl: string | null; motifHeightCm: number }) {
   const isWhite = color.toLowerCase() === "#f5f5f2";
   // 21 mm = 2.1 cm fysisk listhöjd (Gelato-spec). Procent av motivets höjd.
   const slatPct = Math.max(0.8, (2.1 / Math.max(motifHeightCm, 1)) * 100);
@@ -190,7 +190,11 @@ function HangerOverlay({ color, motifHeightCm }: { color: string; motifHeightCm:
     right: "-2%",
     height: `${slatPct}%`,
     background: color,
-    backgroundImage: "linear-gradient(to bottom, rgba(255,255,255,0.22), rgba(255,255,255,0) 50%, rgba(0,0,0,0.28))",
+    backgroundImage: textureUrl
+      ? `linear-gradient(to bottom, rgba(255,255,255,0.18), rgba(255,255,255,0) 50%, rgba(0,0,0,0.28)), url(${textureUrl})`
+      : "linear-gradient(to bottom, rgba(255,255,255,0.22), rgba(255,255,255,0) 50%, rgba(0,0,0,0.28))",
+    backgroundSize: textureUrl ? "auto, cover" : undefined,
+    backgroundRepeat: textureUrl ? "repeat, no-repeat" : undefined,
     boxShadow: "0 4px 8px rgba(0,0,0,0.28)",
     border: isWhite ? "1px solid rgba(0,0,0,0.18)" : undefined,
   };
