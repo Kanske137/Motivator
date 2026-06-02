@@ -249,6 +249,17 @@ interface EditorState {
   setLayerPhotoOffset: (id: string, x: number, y: number) => void;
   setLayerPhotoZoom: (id: string, zoom: number) => void;
 
+  // ---------- map icons (customer-placeable) ----------
+  /** Transient: when set, clicking on a map layer drops this icon at the
+   *  click point and deactivates the tool. */
+  activeIconTool: { iconId: string } | null;
+  setActiveIconTool: (tool: { iconId: string } | null) => void;
+  /** Transient: id of the currently-selected placed icon (for trash popover). */
+  selectedMapIcon: { layerId: string; iconId: string } | null;
+  setSelectedMapIcon: (sel: { layerId: string; iconId: string } | null) => void;
+  addMapIcon: (layerId: string, icon: MapIcon) => void;
+  removeMapIcon: (layerId: string, iconInstanceId: string) => void;
+
   // ---------- legacy globals (derived getters; mutators apply to first layer) ----------
   // These setters/getters keep older code (EditorPage cart payload, snapshot
   // pipeline, etc.) working unchanged while we migrate to per-layer everywhere.
