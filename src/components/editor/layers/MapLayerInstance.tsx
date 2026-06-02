@@ -17,6 +17,7 @@ interface Props {
   showLabels: boolean;
   interactive: boolean;
   clipPath?: string;
+  onMapReady?: (map: mapboxgl.Map | null) => void;
 }
 
 function applyLabelVisibility(map: mapboxgl.Map, show: boolean) {
