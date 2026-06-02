@@ -537,6 +537,7 @@ export function MapPreview({
             const effectiveShape = (pv?.shape ?? l.defaults.shape) as "rect" | "circle" | "heart" | "star";
             const offsetX = pv?.offsetX ?? 0;
             const offsetY = pv?.offsetY ?? 0;
+            const zoom = pv?.zoom ?? 1;
             const staticClip = shapeClipPath(effectiveShape);
             const src = photoAiResults[l.id] ?? photoSources[l.id]?.previewUrl ?? l.defaults.placeholderUrl ?? null;
             return (
@@ -556,6 +557,7 @@ export function MapPreview({
                     staticClipPath={clip}
                     offsetX={offsetX}
                     offsetY={offsetY}
+                    zoom={zoom}
                     draggable={!!src}
                   />
                 )}
