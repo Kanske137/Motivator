@@ -33,9 +33,14 @@ export interface MapIcon {
   id: string;
   /** Catalog id from `src/lib/map-icon-catalog.ts`. */
   iconId: string;
-  /** Position inside the map layer box, 0..100. */
-  xPct: number;
-  yPct: number;
+  /** Geographic anchor — icon sticks to this point on the map regardless of
+   *  pan/zoom. Required for newly placed icons. */
+  lng?: number;
+  lat?: number;
+  /** LEGACY layer-box position (0..100). Used as fallback when lng/lat is
+   *  missing and upgraded to lng/lat on first render. */
+  xPct?: number;
+  yPct?: number;
 }
 
 export interface MapLayerValue {
