@@ -967,9 +967,6 @@ function PhotoLayerView({
         touchAction: canPan ? "none" : undefined,
       }}
       onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
     >
       {src ? (
         fit === "contain" || !natural || renderW === 0 ? (
