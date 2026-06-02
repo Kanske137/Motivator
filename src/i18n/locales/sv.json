@@ -190,6 +190,9 @@
     "successWithErrors": "Mallen är raderad, men Shopify-radering hade fel",
     "error": "Kunde inte radera mallen"
   },
+  "admin": {
+    "photoPanLockHint": "Fotopan i kundeditorn styrs inte av låsen. Den fungerar när Anpassning är Fyll (cover) och bilden har beskärningsöverskott. Förflytta lager styr bara ✥-handtaget för hela bildbehållaren."
+  },
   "mapStyle": {
     "skandinavisk": "Skandinavisk",
     "midnatt": "Midnatt",
