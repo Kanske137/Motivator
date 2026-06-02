@@ -358,6 +358,7 @@ async function drawPhotoLayer(
   fit: "cover" | "contain",
   offsetX: number,
   offsetY: number,
+  zoom: number = 1,
 ): Promise<void> {
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const i = new Image();
@@ -377,11 +378,9 @@ async function drawPhotoLayer(
     else dw = rect.h * ar;
     ctx.drawImage(img, rect.x + (rect.w - dw) / 2, rect.y + (rect.h - dh) / 2, dw, dh);
   } else {
-    // Cover: pick the source-image rect that maps 1:1 to the layer rect.
-    // scale = max(layerW/imgW, layerH/imgH) — same as CSS object-fit: cover.
-    // Source crop in image pixels: sw = layerW/scale, sh = layerH/scale.
-    // Pan offsets are percent of LAYER size in editor → convert to source px.
-    const scale = Math.max(rect.w / img.width, rect.h / img.height);
+    // Cover + zoom: scale = cover-fit * zoom. sw/sh become smaller as we zoom in.
+    const safeZoom = Math.max(1, zoom || 1);
+    const scale = Math.max(rect.w / img.width, rect.h / img.height) * safeZoom;
     const sw = rect.w / scale;
     const sh = rect.h / scale;
     const overflowXPx = img.width - sw; // source pixels of horizontal overflow
