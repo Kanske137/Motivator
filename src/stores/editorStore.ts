@@ -62,6 +62,8 @@ export interface PhotoLayerValue {
    *  Range clamped to [-50, 50]. 0,0 = centered cover crop. */
   offsetX: number;
   offsetY: number;
+  /** Extra zoom factor on top of the cover-fit scale. 1 = cover, max 5. */
+  zoom: number;
 }
 
 export interface AiPhotoLayerValue {
@@ -69,6 +71,7 @@ export interface AiPhotoLayerValue {
   shape: PhotoShape;
   offsetX: number;
   offsetY: number;
+  zoom: number;
 }
 
 export type LayerValue = MapLayerValue | TextLayerValue | PhotoLayerValue | AiPhotoLayerValue;
