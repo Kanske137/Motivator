@@ -341,6 +341,9 @@ function MapTabs({
           heading={null}
         />
       </div>
+      <div className="pt-4 border-t">
+        <MapIconsSection layerId={l.id} />
+      </div>
     </div>
   );
 
