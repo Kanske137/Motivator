@@ -337,6 +337,7 @@ function hydrateLayerValues(
         shape: l.defaults.shape as PhotoShape,
         offsetX: 0,
         offsetY: 0,
+        zoom: 1,
       };
     } else if (l.type === "aiPhoto") {
       out[l.id] = {
@@ -344,6 +345,7 @@ function hydrateLayerValues(
         shape: l.defaults.shape as PhotoShape,
         offsetX: 0,
         offsetY: 0,
+        zoom: 1,
       };
     }
   }
