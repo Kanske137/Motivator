@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import type mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useEditorStore, type PhotoLayerValue } from "@/stores/editorStore";
 import type { TemplateLayer } from "@/lib/template-schema";
