@@ -111,6 +111,7 @@ export function MapLayerInstance({
       });
 
       mapRef.current = map;
+      onMapReady?.(map);
       setTimeout(() => map.resize(), 50);
       setTimeout(() => map.resize(), 250);
       setTimeout(() => map.resize(), 600);
@@ -118,6 +119,7 @@ export function MapLayerInstance({
     return () => {
       cancelled = true;
       if (reverseTimerRef.current) window.clearTimeout(reverseTimerRef.current);
+      onMapReady?.(null);
       mapRef.current?.remove();
       mapRef.current = null;
     };
