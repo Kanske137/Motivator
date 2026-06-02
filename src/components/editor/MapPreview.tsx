@@ -1068,6 +1068,24 @@ function PhotoLayerView({
 
   // canPan = cursor hint only; the actual gesture starts via measureBoundsNow.
   const canPan = fit !== "contain" && draggable;
+  const canZoom = fit !== "contain" && !!src;
+
+  // Wheel-zoom: attach a non-passive listener so we can preventDefault.
+  // React's synthetic onWheel is passive by default.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || !canZoom) return;
+    const onWheel = (ev: WheelEvent) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      // Use exponential scaling so each tick feels uniform.
+      const factor = Math.exp(-ev.deltaY * 0.0015);
+      const next = Math.max(1, Math.min(5, zoom * factor));
+      if (next !== zoom) setLayerPhotoZoom(layerId, next);
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [canZoom, zoom, layerId, setLayerPhotoZoom]);
 
   const measuredClip = box.w > 0 && box.h > 0 ? buildShapeClipPath(shape, box.w, box.h) : undefined;
   const clipPath = measuredClip ?? staticClipPath;
