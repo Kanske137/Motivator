@@ -335,6 +335,7 @@ function hydrateLayerValues(
         placeName: l.defaults.placeName ?? "",
         city: l.defaults.city,
         country: l.defaults.country,
+        icons: [],
       };
     } else if (l.type === "text") {
       out[l.id] = {
