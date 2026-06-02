@@ -466,6 +466,16 @@ export function MapPreview({
         {/* Loop all template layers in zIndex order */}
         {layers.map((l) => {
           const rect = layerToEditorRect(l);
+          // Only layers that actually need pointer interaction in the
+          // customer preview should catch clicks/drags. Otherwise an
+          // overlapping decorative layer (text/image, or a locked map) ends
+          // up blocking pan on the photo layer underneath. Text editing
+          // happens in ControlPanel; images are admin static; locked maps
+          // shouldn't intercept pan either. margin/line/shape already opt
+          // out further down.
+          const isInteractiveLayer =
+            (l.type === "photo" || l.type === "aiPhoto") ||
+            (l.type === "map" && !l.locks.position);
           const wrapStyle: React.CSSProperties = {
             position: "absolute",
             left: `${rect.left}%`,
@@ -473,6 +483,7 @@ export function MapPreview({
             width: `${rect.width}%`,
             height: `${rect.height}%`,
             zIndex: l.type === "margin" ? 40 : l.zIndex,
+            pointerEvents: isInteractiveLayer ? undefined : "none",
           };
           const movable =
             !l.locks.move &&
@@ -482,7 +493,7 @@ export function MapPreview({
               type="button"
               onPointerDown={(e) => onDragStart(l, e)}
               className="absolute w-7 h-7 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center text-[12px] cursor-move touch-none ring-2 ring-background"
-              style={{ top: -14, left: -14, zIndex: 39 }}
+              style={{ top: -14, left: -14, zIndex: 39, pointerEvents: "auto" }}
               aria-label="Flytta lager"
               title="Dra för att flytta lagret"
             >
