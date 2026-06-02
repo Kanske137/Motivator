@@ -14,6 +14,7 @@ import {
   getActiveMarginInsetsPct,
 } from "@/lib/layer-utils";
 import { AcrylicCornerOverlay } from "./AcrylicCornerOverlay";
+import { MapIconsOverlay } from "./MapIconsOverlay";
 
 interface Props {
   frameColor?: string;
