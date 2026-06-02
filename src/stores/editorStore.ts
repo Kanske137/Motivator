@@ -846,16 +846,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         };
       } else if (oldVal.kind === "photo" && fresh.kind === "photo" && newLayer.type === "photo") {
         const locks = newLayer.locks;
-        // Photo shape is layout-defining; only customer offset survives.
+        // Photo shape is layout-defining; only customer offset/zoom survives.
         layerValues[newId] = {
           ...fresh,
-          ...(!locks.move ? { offsetX: oldVal.offsetX, offsetY: oldVal.offsetY } : {}),
+          ...(!locks.move ? { offsetX: oldVal.offsetX, offsetY: oldVal.offsetY, zoom: oldVal.zoom } : {}),
         };
       } else if (oldVal.kind === "aiPhoto" && fresh.kind === "aiPhoto" && newLayer.type === "aiPhoto") {
         const locks = newLayer.locks;
         layerValues[newId] = {
           ...fresh,
-          ...(!locks.move ? { offsetX: oldVal.offsetX, offsetY: oldVal.offsetY } : {}),
+          ...(!locks.move ? { offsetX: oldVal.offsetX, offsetY: oldVal.offsetY, zoom: oldVal.zoom } : {}),
         };
       }
     }
