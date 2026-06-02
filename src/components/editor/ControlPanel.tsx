@@ -899,11 +899,8 @@ function MapIconsSection({ layerId }: { layerId: string }) {
                 width={22}
                 height={22}
                 viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
+                fill="currentColor"
+                stroke="none"
                 aria-hidden
               >
                 {getMapIcon(def.id)?.iconNode.map(([tag, attrs], i) => {
