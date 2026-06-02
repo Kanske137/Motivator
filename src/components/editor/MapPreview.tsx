@@ -906,10 +906,40 @@ function PhotoLayerView({
   const renderOffsetX = fit === "contain" ? 0 : Math.max(-maxX, Math.min(maxX, offsetX));
   const renderOffsetY = fit === "contain" ? 0 : Math.max(-maxY, Math.min(maxY, offsetY));
 
+  // Dev-only diagnostics — printed when key values change so we can verify
+  // pan eligibility for any uploaded image / layer geometry combo.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    // eslint-disable-next-line no-console
+    console.log("[PhotoLayerView]", layerId, {
+      hasSrc: !!src,
+      fit,
+      draggable,
+      box,
+      natural,
+      maxX: Math.round(maxX * 10) / 10,
+      maxY: Math.round(maxY * 10) / 10,
+      offsetX: Math.round(offsetX * 10) / 10,
+      offsetY: Math.round(offsetY * 10) / 10,
+    });
+  }, [layerId, src, fit, draggable, box, natural, maxX, maxY, offsetX, offsetY]);
+
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!draggable || fit === "contain") return;
-      if (maxX === 0 && maxY === 0) return;
+      if (!draggable || fit === "contain") {
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.log("[PhotoLayerView] pointerDown bail", layerId, { draggable, fit });
+        }
+        return;
+      }
+      if (maxX === 0 && maxY === 0) {
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.log("[PhotoLayerView] pointerDown bail (no overflow)", layerId, { maxX, maxY, box, natural });
+        }
+        return;
+      }
       const el = containerRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
@@ -924,7 +954,7 @@ function PhotoLayerView({
       el.setPointerCapture(e.pointerId);
       setDragging(true);
     },
-    [draggable, fit, offsetX, offsetY, maxX, maxY],
+    [draggable, fit, offsetX, offsetY, maxX, maxY, layerId, box, natural],
   );
 
   const onPointerMove = useCallback(
