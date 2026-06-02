@@ -541,6 +541,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         state.selectedMapIcon?.iconId === iconInstanceId ? null : state.selectedMapIcon,
     });
   },
+  replaceMapIcon: (layerId, iconInstanceId, patch) => {
+    const state = get();
+    const cur = state.layerValues[layerId];
+    if (!cur || cur.kind !== "map") return;
+    const icons = (cur.icons ?? []).map((i) =>
+      i.id === iconInstanceId ? { ...i, ...patch } : i,
+    );
+    const next: MapLayerValue = { ...cur, icons };
+    set({ layerValues: { ...state.layerValues, [layerId]: next } });
+  },
 
   setConfig: (config) => {
     const state = get();
