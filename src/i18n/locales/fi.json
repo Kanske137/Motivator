@@ -190,6 +190,9 @@
     "successWithErrors": "Malli poistettu, mutta Shopify-poistossa oli virheitä",
     "error": "Mallin poisto epäonnistui"
   },
+  "admin": {
+    "photoPanLockHint": "Kuvaa voi panoroida asiakaseditorissa lukituksista riippumatta. Se toimii, kun sovitus on Täytä (cover) ja kuvassa on rajausylitystä. Tason siirto ohjaa vain koko kuvakehyksen ✥-kahvaa."
+  },
   "mapStyle": {
     "skandinavisk": "Skandinaavinen",
     "midnatt": "Keskiyö",
