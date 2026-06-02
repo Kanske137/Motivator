@@ -959,14 +959,14 @@ function PhotoLayerView({
     const nW = img.naturalWidth;
     const nH = img.naturalHeight;
     if (!nW || !nH || rect.width === 0 || rect.height === 0) return boundsRef.current;
-    const scale = Math.max(rect.width / nW, rect.height / nH);
+    const scale = Math.max(rect.width / nW, rect.height / nH) * zoom;
     const rW = nW * scale;
     const rH = nH * scale;
     const mx = ((rW - rect.width) / rect.width) * 100 / 2;
     const my = ((rH - rect.height) / rect.height) * 100 / 2;
     if (!natural) setNatural({ w: nW, h: nH });
     return { maxX: Math.max(0, mx), maxY: Math.max(0, my) };
-  }, [natural]);
+  }, [natural, zoom]);
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
