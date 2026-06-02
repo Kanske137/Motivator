@@ -917,11 +917,14 @@ function PhotoLayerView({
 
   // Re-clamp current offset whenever bounds change. Skip while dragging and
   // skip until the image is measured — otherwise a transient state can wipe
-  // the user's pan back to (0,0).
+  // the user's pan back to (0,0). Also skip when bounds are 0 (no overflow
+  // measured yet) so we never overwrite a valid pan with (0,0) due to a
+  // transient remeasure.
   useEffect(() => {
     if (fit === "contain" || !draggable) return;
     if (draggingRef.current) return;
     if (!natural) return;
+    if (maxX === 0 && maxY === 0) return;
     const cx = Math.max(-maxX, Math.min(maxX, offsetX));
     const cy = Math.max(-maxY, Math.min(maxY, offsetY));
     if (cx !== offsetX || cy !== offsetY) {
