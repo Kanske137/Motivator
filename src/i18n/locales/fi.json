@@ -197,5 +197,33 @@
     "marinbla": "Merensininen",
     "varmbeige": "Lämmin Beige/Kerma",
     "skogsgron": "Syvä Metsänvihreä/Musta"
+  },
+  "mapIcons": {
+    "heading": "Kuvakkeet",
+    "subheading": "Lisää kuvakkeita karttaan",
+    "addToMap": "Sijoita napsauttamalla karttaa",
+    "search": "Etsi kuvake",
+    "showMore": "Näytä lisää kuvakkeita",
+    "showLess": "Näytä vähemmän kuvakkeita",
+    "delete": "Poista kuvake",
+    "select": "Valitse kuvake"
+  },
+  "mapIcon": {
+    "heart": "Sydän",
+    "home": "Koti",
+    "briefcase": "Työ",
+    "mapPin": "Sijainti",
+    "smile": "Hymiö",
+    "user": "Henkilö",
+    "star": "Tähti",
+    "building": "Rakennus",
+    "arrowRight": "Nuoli oikealle",
+    "arrowLeft": "Nuoli vasemmalle",
+    "arrowUp": "Nuoli ylös",
+    "arrowDown": "Nuoli alas",
+    "lifeBuoy": "Pelastusrengas",
+    "ball": "Pallo",
+    "camera": "Kamera",
+    "zap": "Salama"
   }
 }

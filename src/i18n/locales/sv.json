@@ -197,5 +197,33 @@
     "marinbla": "Marin Blå",
     "varmbeige": "Varm Beige/Cream",
     "skogsgron": "Djup Skogsgrön/Svart"
+  },
+  "mapIcons": {
+    "heading": "Ikoner",
+    "subheading": "Lägg till ikoner på kartan",
+    "addToMap": "Klicka för att placera på kartan",
+    "search": "Sök ikon",
+    "showMore": "Visa fler ikoner",
+    "showLess": "Visa färre ikoner",
+    "delete": "Radera ikon",
+    "select": "Markera ikon"
+  },
+  "mapIcon": {
+    "heart": "Hjärta",
+    "home": "Hem",
+    "briefcase": "Jobb",
+    "mapPin": "Plats",
+    "smile": "Smiley",
+    "user": "Person",
+    "star": "Stjärna",
+    "building": "Byggnad",
+    "arrowRight": "Pil höger",
+    "arrowLeft": "Pil vänster",
+    "arrowUp": "Pil upp",
+    "arrowDown": "Pil ner",
+    "lifeBuoy": "Livboj",
+    "ball": "Boll",
+    "camera": "Kamera",
+    "zap": "Blixt"
   }
 }

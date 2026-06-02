@@ -197,5 +197,33 @@
     "marinbla": "Marineblauw",
     "varmbeige": "Warm Beige/Crème",
     "skogsgron": "Diep Bosgroen/Zwart"
+  },
+  "mapIcons": {
+    "heading": "Iconen",
+    "subheading": "Voeg iconen toe aan de kaart",
+    "addToMap": "Klik om op de kaart te plaatsen",
+    "search": "Zoek icoon",
+    "showMore": "Toon meer iconen",
+    "showLess": "Toon minder iconen",
+    "delete": "Icoon verwijderen",
+    "select": "Icoon selecteren"
+  },
+  "mapIcon": {
+    "heart": "Hart",
+    "home": "Thuis",
+    "briefcase": "Werk",
+    "mapPin": "Locatie",
+    "smile": "Smiley",
+    "user": "Persoon",
+    "star": "Ster",
+    "building": "Gebouw",
+    "arrowRight": "Pijl rechts",
+    "arrowLeft": "Pijl links",
+    "arrowUp": "Pijl omhoog",
+    "arrowDown": "Pijl omlaag",
+    "lifeBuoy": "Reddingsboei",
+    "ball": "Bal",
+    "camera": "Camera",
+    "zap": "Bliksem"
   }
 }

@@ -197,5 +197,33 @@
     "marinbla": "Granatowy",
     "varmbeige": "Ciepły Beż/Krem",
     "skogsgron": "Głęboka Zieleń Leśna/Czarny"
+  },
+  "mapIcons": {
+    "heading": "Ikony",
+    "subheading": "Dodaj ikony do mapy",
+    "addToMap": "Kliknij, aby umieścić na mapie",
+    "search": "Szukaj ikony",
+    "showMore": "Pokaż więcej ikon",
+    "showLess": "Pokaż mniej ikon",
+    "delete": "Usuń ikonę",
+    "select": "Wybierz ikonę"
+  },
+  "mapIcon": {
+    "heart": "Serce",
+    "home": "Dom",
+    "briefcase": "Praca",
+    "mapPin": "Lokalizacja",
+    "smile": "Uśmiech",
+    "user": "Osoba",
+    "star": "Gwiazda",
+    "building": "Budynek",
+    "arrowRight": "Strzałka w prawo",
+    "arrowLeft": "Strzałka w lewo",
+    "arrowUp": "Strzałka w górę",
+    "arrowDown": "Strzałka w dół",
+    "lifeBuoy": "Koło ratunkowe",
+    "ball": "Piłka",
+    "camera": "Aparat",
+    "zap": "Błyskawica"
   }
 }

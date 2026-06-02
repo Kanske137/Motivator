@@ -26,6 +26,7 @@ import { effectiveLayerRect, clampLayerRect } from "@/lib/layer-utils";
 import type { TemplateLayer, Template } from "@/lib/template-schema";
 import { getAllLayouts, DEFAULT_LAYOUT_ID } from "@/lib/template-schema";
 import TemplateThumbnail from "@/components/admin/TemplateThumbnail";
+import { MAP_ICONS, MAP_ICON_INITIAL_COUNT, getMapIcon } from "@/lib/map-icon-catalog";
 
 /** Per-layer slider that scales a layer up/down while preserving aspect ratio.
  *  Shown in the customer editor for any layer where `locks.size === false`.
@@ -340,6 +341,9 @@ function MapTabs({
           value={(layerValues[l.id] as MapLayerValue | undefined) ?? null}
           heading={null}
         />
+      </div>
+      <div className="pt-4 border-t">
+        <MapIconsSection layerId={l.id} />
       </div>
     </div>
   );
@@ -829,6 +833,110 @@ function PhotoShapeSection({
         </>
       )}
       <LayerTransformControls layer={layer} />
+    </div>
+  );
+}
+
+// ---------------- map icons picker ----------------
+
+function MapIconsSection({ layerId }: { layerId: string }) {
+  const { t } = useTranslation();
+  const activeIconTool = useEditorStore((s) => s.activeIconTool);
+  const setActiveIconTool = useEditorStore((s) => s.setActiveIconTool);
+  const [query, setQuery] = useState("");
+  const [showAll, setShowAll] = useState(false);
+
+
+
+  const labelFor = (id: string, fallback: string) =>
+    t(`mapIcon.${id}`, { defaultValue: fallback });
+
+  const filtered = MAP_ICONS.filter((i) => {
+    const label = labelFor(i.id, i.fallbackLabel).toLowerCase();
+    return label.includes(query.trim().toLowerCase());
+  });
+  const visible = showAll || query ? filtered : filtered.slice(0, MAP_ICON_INITIAL_COUNT);
+
+  return (
+    <div className="space-y-3" data-layer-id={layerId}>
+      <div className="space-y-1">
+        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
+          {t("mapIcons.heading", { defaultValue: "Ikoner" })}
+        </Label>
+        <p className="text-xs text-muted-foreground">
+          {t("mapIcons.subheading", { defaultValue: "Lägg till ikoner på kartan" })}
+        </p>
+      </div>
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t("mapIcons.search", { defaultValue: "Sök ikon" })}
+          className="pl-8 h-9 text-sm"
+        />
+      </div>
+      <div className="grid grid-cols-4 gap-2">
+        {visible.map((def) => {
+          const isActive = activeIconTool?.iconId === def.id;
+          const label = labelFor(def.id, def.fallbackLabel);
+          return (
+            <button
+              key={def.id}
+              type="button"
+              onClick={() => setActiveIconTool(isActive ? null : { iconId: def.id })}
+              className={cn(
+                "flex flex-col items-center justify-center gap-1 aspect-square rounded-xl transition p-1.5",
+                isActive
+                  ? "bg-primary/10 ring-2 ring-primary"
+                  : "bg-background ring-1 ring-border hover:bg-accent/50",
+              )}
+              title={label}
+              aria-label={label}
+              aria-pressed={isActive}
+            >
+              <svg
+                width={22}
+                height={22}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                {getMapIcon(def.id)?.iconNode.map(([tag, attrs], i) => {
+                  const props = { key: i, ...(attrs as Record<string, unknown>) } as Record<string, unknown>;
+                  if (tag === "path") return <path {...props} />;
+                  if (tag === "circle") return <circle {...props} />;
+                  if (tag === "rect") return <rect {...props} />;
+                  if (tag === "line") return <line {...props} />;
+                  return null;
+                })}
+              </svg>
+              <span className="text-[10px] leading-tight text-center line-clamp-1">{label}</span>
+            </button>
+          );
+        })}
+      </div>
+      {!query && filtered.length > MAP_ICON_INITIAL_COUNT && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full text-xs"
+          onClick={() => setShowAll((s) => !s)}
+        >
+          {showAll
+            ? t("mapIcons.showLess", { defaultValue: "Visa färre ikoner" })
+            : t("mapIcons.showMore", { defaultValue: "Visa fler ikoner" })}
+        </Button>
+      )}
+      {activeIconTool && (
+        <p className="text-[11px] text-muted-foreground">
+          {t("mapIcons.addToMap", { defaultValue: "Klicka för att placera på kartan" })}
+        </p>
+      )}
     </div>
   );
 }

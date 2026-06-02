@@ -197,5 +197,33 @@
     "marinbla": "Marine Blue",
     "varmbeige": "Warm Beige/Cream",
     "skogsgron": "Deep Forest Green/Black"
+  },
+  "mapIcons": {
+    "heading": "Icons",
+    "subheading": "Add icons to the map",
+    "addToMap": "Click to place on the map",
+    "search": "Search icon",
+    "showMore": "Show more icons",
+    "showLess": "Show fewer icons",
+    "delete": "Delete icon",
+    "select": "Select icon"
+  },
+  "mapIcon": {
+    "heart": "Heart",
+    "home": "Home",
+    "briefcase": "Work",
+    "mapPin": "Location",
+    "smile": "Smiley",
+    "user": "Person",
+    "star": "Star",
+    "building": "Building",
+    "arrowRight": "Arrow right",
+    "arrowLeft": "Arrow left",
+    "arrowUp": "Arrow up",
+    "arrowDown": "Arrow down",
+    "lifeBuoy": "Life buoy",
+    "ball": "Ball",
+    "camera": "Camera",
+    "zap": "Bolt"
   }
 }

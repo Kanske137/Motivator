@@ -197,5 +197,33 @@
     "marinbla": "Marinblå",
     "varmbeige": "Varm Beige/Creme",
     "skogsgron": "Dyb Skovgrøn/Sort"
+  },
+  "mapIcons": {
+    "heading": "Ikoner",
+    "subheading": "Tilføj ikoner til kortet",
+    "addToMap": "Klik for at placere på kortet",
+    "search": "Søg ikon",
+    "showMore": "Vis flere ikoner",
+    "showLess": "Vis færre ikoner",
+    "delete": "Slet ikon",
+    "select": "Vælg ikon"
+  },
+  "mapIcon": {
+    "heart": "Hjerte",
+    "home": "Hjem",
+    "briefcase": "Arbejde",
+    "mapPin": "Sted",
+    "smile": "Smiley",
+    "user": "Person",
+    "star": "Stjerne",
+    "building": "Bygning",
+    "arrowRight": "Pil højre",
+    "arrowLeft": "Pil venstre",
+    "arrowUp": "Pil op",
+    "arrowDown": "Pil ned",
+    "lifeBuoy": "Redningskrans",
+    "ball": "Bold",
+    "camera": "Kamera",
+    "zap": "Lyn"
   }
 }
