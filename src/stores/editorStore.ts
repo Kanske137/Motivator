@@ -62,6 +62,8 @@ export interface PhotoLayerValue {
    *  Range clamped to [-50, 50]. 0,0 = centered cover crop. */
   offsetX: number;
   offsetY: number;
+  /** Extra zoom factor on top of the cover-fit scale. 1 = cover, max 5. */
+  zoom: number;
 }
 
 export interface AiPhotoLayerValue {
@@ -69,6 +71,7 @@ export interface AiPhotoLayerValue {
   shape: PhotoShape;
   offsetX: number;
   offsetY: number;
+  zoom: number;
 }
 
 export type LayerValue = MapLayerValue | TextLayerValue | PhotoLayerValue | AiPhotoLayerValue;
@@ -232,6 +235,7 @@ interface EditorState {
   setLayerTextVisible: (id: string, v: boolean) => void;
   setLayerPhotoShape: (id: string, s: PhotoShape) => void;
   setLayerPhotoOffset: (id: string, x: number, y: number) => void;
+  setLayerPhotoZoom: (id: string, zoom: number) => void;
 
   // ---------- legacy globals (derived getters; mutators apply to first layer) ----------
   // These setters/getters keep older code (EditorPage cart payload, snapshot
@@ -334,6 +338,7 @@ function hydrateLayerValues(
         shape: l.defaults.shape as PhotoShape,
         offsetX: 0,
         offsetY: 0,
+        zoom: 1,
       };
     } else if (l.type === "aiPhoto") {
       out[l.id] = {
@@ -341,6 +346,7 @@ function hydrateLayerValues(
         shape: l.defaults.shape as PhotoShape,
         offsetX: 0,
         offsetY: 0,
+        zoom: 1,
       };
     }
   }
@@ -841,16 +847,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         };
       } else if (oldVal.kind === "photo" && fresh.kind === "photo" && newLayer.type === "photo") {
         const locks = newLayer.locks;
-        // Photo shape is layout-defining; only customer offset survives.
+        // Photo shape is layout-defining; only customer offset/zoom survives.
         layerValues[newId] = {
           ...fresh,
-          ...(!locks.move ? { offsetX: oldVal.offsetX, offsetY: oldVal.offsetY } : {}),
+          ...(!locks.move ? { offsetX: oldVal.offsetX, offsetY: oldVal.offsetY, zoom: oldVal.zoom } : {}),
         };
       } else if (oldVal.kind === "aiPhoto" && fresh.kind === "aiPhoto" && newLayer.type === "aiPhoto") {
         const locks = newLayer.locks;
         layerValues[newId] = {
           ...fresh,
-          ...(!locks.move ? { offsetX: oldVal.offsetX, offsetY: oldVal.offsetY } : {}),
+          ...(!locks.move ? { offsetX: oldVal.offsetX, offsetY: oldVal.offsetY, zoom: oldVal.zoom } : {}),
         };
       }
     }
@@ -927,7 +933,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const layerValues = { ...state.layerValues };
     const v = layerValues[layerId];
     if (v && v.kind === "photo") {
-      layerValues[layerId] = { ...v, offsetX: 0, offsetY: 0 };
+      layerValues[layerId] = { ...v, offsetX: 0, offsetY: 0, zoom: 1 };
     }
     set({
       photoSources: nextSources,
@@ -1164,6 +1170,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // Clamp is performed at the call site (PhotoLayerView) where natural
     // image dimensions and container size are known. Store the raw value.
     updatePhoto(set, get, id, { offsetX: x, offsetY: y }),
+  setLayerPhotoZoom: (id, zoom) => {
+    const z = Math.max(1, Math.min(5, zoom));
+    updatePhoto(set, get, id, { zoom: z });
+  },
 
   // ---------- legacy globals → operate on first layer ----------
   setMapCenter: (c) => {
@@ -1300,11 +1310,16 @@ function setLayerOverrideText(set: SetFn, get: GetFn, id: string, raw: string) {
   set({ layerValues, ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues, config: state.config, layoutId: state.layoutId }) });
 }
 
-function updatePhoto(set: SetFn, get: GetFn, id: string, patch: Partial<PhotoLayerValue>) {
+function updatePhoto(
+  set: SetFn,
+  get: GetFn,
+  id: string,
+  patch: Partial<PhotoLayerValue> & Partial<AiPhotoLayerValue>,
+) {
   const state = get();
   const cur = state.layerValues[id];
-  if (!cur || cur.kind !== "photo") return;
-  const next: PhotoLayerValue = { ...cur, ...patch };
+  if (!cur || (cur.kind !== "photo" && cur.kind !== "aiPhoto")) return;
+  const next = { ...cur, ...patch } as LayerValue;
   const layerValues = { ...state.layerValues, [id]: next };
   set({ layerValues });
 }
@@ -1313,7 +1328,7 @@ function resetPhotoOffsets(values: Record<string, LayerValue>): Record<string, L
   const out: Record<string, LayerValue> = { ...values };
   for (const [id, v] of Object.entries(values)) {
     if (v.kind === "photo") {
-      out[id] = { ...v, offsetX: 0, offsetY: 0 };
+      out[id] = { ...v, offsetX: 0, offsetY: 0, zoom: 1 };
     }
   }
   return out;

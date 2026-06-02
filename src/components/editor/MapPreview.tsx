@@ -537,6 +537,7 @@ export function MapPreview({
             const effectiveShape = (pv?.shape ?? l.defaults.shape) as "rect" | "circle" | "heart" | "star";
             const offsetX = pv?.offsetX ?? 0;
             const offsetY = pv?.offsetY ?? 0;
+            const zoom = pv?.zoom ?? 1;
             const staticClip = shapeClipPath(effectiveShape);
             const src = photoAiResults[l.id] ?? photoSources[l.id]?.previewUrl ?? l.defaults.placeholderUrl ?? null;
             return (
@@ -556,6 +557,7 @@ export function MapPreview({
                     staticClipPath={clip}
                     offsetX={offsetX}
                     offsetY={offsetY}
+                    zoom={zoom}
                     draggable={!!src}
                   />
                 )}
@@ -597,6 +599,7 @@ export function MapPreview({
             const usingRefOrSwap = !!(aiResultUrl || activeRefUrl);
             const offsetX = usingRefOrSwap ? refFocalX : (av?.offsetX ?? 0);
             const offsetY = usingRefOrSwap ? refFocalY : (av?.offsetY ?? 0);
+            const zoom = av?.zoom ?? 1;
             // Only force `contain` for removeBackground (Nano Banana 2 doesn't
             // always honor target aspect ratio, and its pure-white padding
             // blends seamlessly into the layer). For human face-swap (Replicate
@@ -624,6 +627,7 @@ export function MapPreview({
                       staticClipPath={clip}
                       offsetX={offsetX}
                       offsetY={offsetY}
+                      zoom={zoom}
                       draggable={!!src && !usingRefOrSwap}
                     />
                   ) : (
@@ -825,6 +829,7 @@ interface PhotoLayerViewProps {
   staticClipPath?: string;
   offsetX: number;
   offsetY: number;
+  zoom: number;
   draggable: boolean;
 }
 
@@ -836,9 +841,11 @@ function PhotoLayerView({
   staticClipPath,
   offsetX,
   offsetY,
+  zoom,
   draggable,
 }: PhotoLayerViewProps) {
   const setLayerPhotoOffset = useEditorStore((s) => s.setLayerPhotoOffset);
+  const setLayerPhotoZoom = useEditorStore((s) => s.setLayerPhotoZoom);
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -872,7 +879,7 @@ function PhotoLayerView({
     if (fit === "contain" || !natural || box.w === 0 || box.h === 0) {
       return { maxX: 0, maxY: 0, renderW: box.w, renderH: box.h };
     }
-    const scale = Math.max(box.w / natural.w, box.h / natural.h);
+    const scale = Math.max(box.w / natural.w, box.h / natural.h) * zoom;
     const rW = natural.w * scale;
     const rH = natural.h * scale;
     const overflowXPct = ((rW - box.w) / box.w) * 100;
@@ -901,7 +908,7 @@ function PhotoLayerView({
       const nW = img.naturalWidth;
       const nH = img.naturalHeight;
       if (!nW || !nH || rect.width === 0 || rect.height === 0) return;
-      const scale = Math.max(rect.width / nW, rect.height / nH);
+      const scale = Math.max(rect.width / nW, rect.height / nH) * zoom;
       const rW = nW * scale;
       const rH = nH * scale;
       img.style.position = "absolute";
@@ -912,7 +919,7 @@ function PhotoLayerView({
       img.style.left = `${(rect.width - rW) / 2 + (x / 100) * rect.width}px`;
       img.style.top = `${(rect.height - rH) / 2 + (y / 100) * rect.height}px`;
     },
-    [fit],
+    [fit, zoom],
   );
 
   // Re-clamp current offset whenever bounds change. Skip while dragging and
@@ -952,14 +959,14 @@ function PhotoLayerView({
     const nW = img.naturalWidth;
     const nH = img.naturalHeight;
     if (!nW || !nH || rect.width === 0 || rect.height === 0) return boundsRef.current;
-    const scale = Math.max(rect.width / nW, rect.height / nH);
+    const scale = Math.max(rect.width / nW, rect.height / nH) * zoom;
     const rW = nW * scale;
     const rH = nH * scale;
     const mx = ((rW - rect.width) / rect.width) * 100 / 2;
     const my = ((rH - rect.height) / rect.height) * 100 / 2;
     if (!natural) setNatural({ w: nW, h: nH });
     return { maxX: Math.max(0, mx), maxY: Math.max(0, my) };
-  }, [natural]);
+  }, [natural, zoom]);
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
@@ -1061,6 +1068,24 @@ function PhotoLayerView({
 
   // canPan = cursor hint only; the actual gesture starts via measureBoundsNow.
   const canPan = fit !== "contain" && draggable;
+  const canZoom = fit !== "contain" && !!src;
+
+  // Wheel-zoom: attach a non-passive listener so we can preventDefault.
+  // React's synthetic onWheel is passive by default.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || !canZoom) return;
+    const onWheel = (ev: WheelEvent) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      // Use exponential scaling so each tick feels uniform.
+      const factor = Math.exp(-ev.deltaY * 0.0015);
+      const next = Math.max(1, Math.min(5, zoom * factor));
+      if (next !== zoom) setLayerPhotoZoom(layerId, next);
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [canZoom, zoom, layerId, setLayerPhotoZoom]);
 
   const measuredClip = box.w > 0 && box.h > 0 ? buildShapeClipPath(shape, box.w, box.h) : undefined;
   const clipPath = measuredClip ?? staticClipPath;

@@ -358,6 +358,7 @@ async function drawPhotoLayer(
   fit: "cover" | "contain",
   offsetX: number,
   offsetY: number,
+  zoom: number = 1,
 ): Promise<void> {
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const i = new Image();
@@ -377,11 +378,9 @@ async function drawPhotoLayer(
     else dw = rect.h * ar;
     ctx.drawImage(img, rect.x + (rect.w - dw) / 2, rect.y + (rect.h - dh) / 2, dw, dh);
   } else {
-    // Cover: pick the source-image rect that maps 1:1 to the layer rect.
-    // scale = max(layerW/imgW, layerH/imgH) — same as CSS object-fit: cover.
-    // Source crop in image pixels: sw = layerW/scale, sh = layerH/scale.
-    // Pan offsets are percent of LAYER size in editor → convert to source px.
-    const scale = Math.max(rect.w / img.width, rect.h / img.height);
+    // Cover + zoom: scale = cover-fit * zoom. sw/sh become smaller as we zoom in.
+    const safeZoom = Math.max(1, zoom || 1);
+    const scale = Math.max(rect.w / img.width, rect.h / img.height) * safeZoom;
     const sw = rect.w / scale;
     const sh = rect.h / scale;
     const overflowXPx = img.width - sw; // source pixels of horizontal overflow
@@ -698,8 +697,9 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
         const shape = pv?.shape ?? layer.defaults.shape;
         const offsetX = pv?.offsetX ?? 0;
         const offsetY = pv?.offsetY ?? 0;
+        const zoom = pv?.zoom ?? 1;
         try {
-          await drawPhotoLayer(ctx, rect, url, shape, layer.defaults.fit, offsetX, offsetY);
+          await drawPhotoLayer(ctx, rect, url, shape, layer.defaults.fit, offsetX, offsetY, zoom);
         } catch (e) {
           console.warn("[template-snapshot] photo layer failed", e);
         }
@@ -723,6 +723,7 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
         const usingRefOrSwap = !!(aiResultUrl || activeRefUrl);
         const offsetX = usingRefOrSwap ? activeRef?.focalX ?? 0 : av?.offsetX ?? 0;
         const offsetY = usingRefOrSwap ? activeRef?.focalY ?? 0 : av?.offsetY ?? 0;
+        const zoom = av?.zoom ?? 1;
         // Only force `contain` for removeBackground results (Nano Banana 2
         // may not perfectly match target aspect; its white padding blends in).
         // For human face-swap (Replicate preserves reference dimensions) and
@@ -735,7 +736,7 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
             ? "contain"
             : layer.defaults.fit;
         try {
-          await drawPhotoLayer(ctx, rect, url, shape, fit, offsetX, offsetY);
+          await drawPhotoLayer(ctx, rect, url, shape, fit, offsetX, offsetY, zoom);
         } catch (e) {
           console.warn("[template-snapshot] aiPhoto layer failed", e);
         }
