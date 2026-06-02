@@ -723,6 +723,7 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
         const usingRefOrSwap = !!(aiResultUrl || activeRefUrl);
         const offsetX = usingRefOrSwap ? activeRef?.focalX ?? 0 : av?.offsetX ?? 0;
         const offsetY = usingRefOrSwap ? activeRef?.focalY ?? 0 : av?.offsetY ?? 0;
+        const zoom = av?.zoom ?? 1;
         // Only force `contain` for removeBackground results (Nano Banana 2
         // may not perfectly match target aspect; its white padding blends in).
         // For human face-swap (Replicate preserves reference dimensions) and
@@ -735,7 +736,7 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
             ? "contain"
             : layer.defaults.fit;
         try {
-          await drawPhotoLayer(ctx, rect, url, shape, fit, offsetX, offsetY);
+          await drawPhotoLayer(ctx, rect, url, shape, fit, offsetX, offsetY, zoom);
         } catch (e) {
           console.warn("[template-snapshot] aiPhoto layer failed", e);
         }
