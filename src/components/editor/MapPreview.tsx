@@ -472,8 +472,7 @@ export function MapPreview({
           const isInteractiveLayer =
             l.type === "photo" ||
             l.type === "aiPhoto" ||
-            (l.type === "map" && !l.locks.position) ||
-            !l.locks.move;
+            (l.type === "map" && !l.locks.position);
           const wrapStyle: React.CSSProperties = {
             position: "absolute",
             left: `${rect.left}%`,
