@@ -1170,6 +1170,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // Clamp is performed at the call site (PhotoLayerView) where natural
     // image dimensions and container size are known. Store the raw value.
     updatePhoto(set, get, id, { offsetX: x, offsetY: y }),
+  setLayerPhotoZoom: (id, zoom) => {
+    const z = Math.max(1, Math.min(5, zoom));
+    updatePhoto(set, get, id, { zoom: z });
+  },
 
   // ---------- legacy globals → operate on first layer ----------
   setMapCenter: (c) => {
