@@ -509,6 +509,33 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   textFont: "Inter",
   textVisible: true,
 
+  // ---------- map icons transient state ----------
+  activeIconTool: null,
+  setActiveIconTool: (activeIconTool) => set({ activeIconTool }),
+  selectedMapIcon: null,
+  setSelectedMapIcon: (selectedMapIcon) => set({ selectedMapIcon }),
+  addMapIcon: (layerId, icon) => {
+    const state = get();
+    const cur = state.layerValues[layerId];
+    if (!cur || cur.kind !== "map") return;
+    const next: MapLayerValue = { ...cur, icons: [...(cur.icons ?? []), icon] };
+    set({ layerValues: { ...state.layerValues, [layerId]: next } });
+  },
+  removeMapIcon: (layerId, iconInstanceId) => {
+    const state = get();
+    const cur = state.layerValues[layerId];
+    if (!cur || cur.kind !== "map") return;
+    const next: MapLayerValue = {
+      ...cur,
+      icons: (cur.icons ?? []).filter((i) => i.id !== iconInstanceId),
+    };
+    set({
+      layerValues: { ...state.layerValues, [layerId]: next },
+      selectedMapIcon:
+        state.selectedMapIcon?.iconId === iconInstanceId ? null : state.selectedMapIcon,
+    });
+  },
+
   setConfig: (config) => {
     const state = get();
     const prevSize = state.size;
