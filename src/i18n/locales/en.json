@@ -190,6 +190,9 @@
     "successWithErrors": "Template deleted, but Shopify deletion had errors",
     "error": "Could not delete template"
   },
+  "admin": {
+    "photoPanLockHint": "Photo panning in the customer editor is not controlled by the locks. It works when Fit is Fill (cover) and the image has crop overflow. Move layer only controls the ✥ handle for the whole image container."
+  },
   "mapStyle": {
     "skandinavisk": "Scandinavian",
     "midnatt": "Midnight",
