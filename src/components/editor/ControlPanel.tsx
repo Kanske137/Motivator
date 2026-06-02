@@ -846,8 +846,7 @@ function MapIconsSection({ layerId }: { layerId: string }) {
   const [query, setQuery] = useState("");
   const [showAll, setShowAll] = useState(false);
 
-  // Lazy import to avoid circular deps.
-  const { MAP_ICONS, MAP_ICON_INITIAL_COUNT, getMapIcon } = require("@/lib/map-icon-catalog") as typeof import("@/lib/map-icon-catalog");
+
 
   const labelFor = (id: string, fallback: string) =>
     t(`mapIcon.${id}`, { defaultValue: fallback });
