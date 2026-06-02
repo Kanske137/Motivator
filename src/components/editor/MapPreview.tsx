@@ -836,6 +836,9 @@ function PhotoLayerView({
   const [dragging, setDragging] = useState(false);
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [box, setBox] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+  // True while user is actively dragging — used to suppress the re-clamp
+  // useEffect from racing the drag and writing stale (0,0) values back.
+  const draggingRef = useRef(false);
 
   // Track container size.
   useEffect(() => {
@@ -859,7 +862,7 @@ function PhotoLayerView({
   // Compute scaled image render size (cover) and max pan in percent of layer.
   const { maxX, maxY, renderW, renderH } = (() => {
     if (fit === "contain" || !natural || box.w === 0 || box.h === 0) {
-      return { maxX: 0, maxY: 0, renderW: 0, renderH: 0 };
+      return { maxX: 0, maxY: 0, renderW: box.w, renderH: box.h };
     }
     const scale = Math.max(box.w / natural.w, box.h / natural.h);
     const rW = natural.w * scale;
@@ -870,6 +873,7 @@ function PhotoLayerView({
   })();
 
   const dragStateRef = useRef<{
+    pointerId: number;
     startX: number;
     startY: number;
     baseX: number;
@@ -878,42 +882,63 @@ function PhotoLayerView({
     height: number;
   } | null>(null);
 
-  // Re-clamp current offset whenever bounds change (e.g. new image loaded).
-  // Skip the store writeback when the offset is read-only (admin focal on
-  // reference/swap images) — we just clamp inline for rendering instead.
+  // Re-clamp current offset whenever bounds change. Skip while dragging and
+  // skip until the image is measured — otherwise a transient state can wipe
+  // the user's pan back to (0,0).
   useEffect(() => {
     if (fit === "contain" || !draggable) return;
+    if (draggingRef.current) return;
+    if (!natural) return;
     const cx = Math.max(-maxX, Math.min(maxX, offsetX));
     const cy = Math.max(-maxY, Math.min(maxY, offsetY));
     if (cx !== offsetX || cy !== offsetY) {
       setLayerPhotoOffset(layerId, cx, cy);
     }
-  }, [maxX, maxY, fit, layerId, offsetX, offsetY, setLayerPhotoOffset, draggable]);
+  }, [maxX, maxY, fit, layerId, offsetX, offsetY, setLayerPhotoOffset, draggable, natural]);
 
-  // Clamped values used purely for rendering (covers both draggable and
-  // read-only focal cases — image never escapes its own bounds).
-  const renderOffsetX = fit === "contain" ? 0 : Math.max(-maxX, Math.min(maxX, offsetX));
-  const renderOffsetY = fit === "contain" ? 0 : Math.max(-maxY, Math.min(maxY, offsetY));
+  // Clamped values used purely for rendering.
+  const renderOffsetX = fit === "contain" || !natural ? 0 : Math.max(-maxX, Math.min(maxX, offsetX));
+  const renderOffsetY = fit === "contain" || !natural ? 0 : Math.max(-maxY, Math.min(maxY, offsetY));
 
-  // Keep latest bounds available to the window listeners without re-binding
-  // them on every render (which otherwise drops in-flight pointer events).
+  // Keep latest bounds available to window listeners without re-binding.
   const boundsRef = useRef({ maxX, maxY });
   useEffect(() => {
     boundsRef.current = { maxX, maxY };
   }, [maxX, maxY]);
 
+  // Live-measure bounds from the actual <img> in the DOM at pointer-down
+  // so React state lag doesn't block the gesture.
+  const measureBoundsNow = useCallback((): { maxX: number; maxY: number } => {
+    const el = containerRef.current;
+    const img = imgRef.current;
+    if (!el || !img) return boundsRef.current;
+    const rect = el.getBoundingClientRect();
+    const nW = img.naturalWidth;
+    const nH = img.naturalHeight;
+    if (!nW || !nH || rect.width === 0 || rect.height === 0) return boundsRef.current;
+    const scale = Math.max(rect.width / nW, rect.height / nH);
+    const rW = nW * scale;
+    const rH = nH * scale;
+    const mx = ((rW - rect.width) / rect.width) * 100 / 2;
+    const my = ((rH - rect.height) / rect.height) * 100 / 2;
+    if (!natural) setNatural({ w: nW, h: nH });
+    return { maxX: Math.max(0, mx), maxY: Math.max(0, my) };
+  }, [natural]);
+
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (!draggable || fit === "contain") return;
-      // If there is no overflow on either axis there's nothing to pan.
-      if (maxX === 0 && maxY === 0) return;
       const el = containerRef.current;
       if (!el) return;
-      // Stop the outer layer-move handler from also picking up this gesture.
+      const live = measureBoundsNow();
+      boundsRef.current = live;
+      // Nothing to pan → let event fall through to outer layer-move handler.
+      if (live.maxX === 0 && live.maxY === 0) return;
       e.preventDefault();
       e.stopPropagation();
       const rect = el.getBoundingClientRect();
       dragStateRef.current = {
+        pointerId: e.pointerId,
         startX: e.clientX,
         startY: e.clientY,
         baseX: offsetX,
@@ -921,41 +946,94 @@ function PhotoLayerView({
         width: rect.width,
         height: rect.height,
       };
+      try {
+        el.setPointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+      draggingRef.current = true;
       setDragging(true);
 
       const onMove = (ev: PointerEvent) => {
         const s = dragStateRef.current;
-        if (!s) return;
+        if (!s || ev.pointerId !== s.pointerId) return;
+        ev.preventDefault();
         const { maxX: mx, maxY: my } = boundsRef.current;
         const dxPct = ((ev.clientX - s.startX) / s.width) * 100;
         const dyPct = ((ev.clientY - s.startY) / s.height) * 100;
-        // Per-axis clamp: a locked axis just stays at 0, the other one still pans.
         const nextX = mx > 0 ? Math.max(-mx, Math.min(mx, s.baseX + dxPct)) : 0;
         const nextY = my > 0 ? Math.max(-my, Math.min(my, s.baseY + dyPct)) : 0;
         setLayerPhotoOffset(layerId, nextX, nextY);
       };
-      const onUp = () => {
+      const onUp = (ev: PointerEvent) => {
+        if (dragStateRef.current && ev.pointerId !== dragStateRef.current.pointerId) return;
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", onUp);
         window.removeEventListener("pointercancel", onUp);
+        window.removeEventListener("blur", onBlur);
+        try {
+          if (el.hasPointerCapture(ev.pointerId)) el.releasePointerCapture(ev.pointerId);
+        } catch {
+          /* ignore */
+        }
         dragStateRef.current = null;
+        draggingRef.current = false;
         setDragging(false);
       };
-      window.addEventListener("pointermove", onMove);
-      window.addEventListener("pointerup", onUp);
-      window.addEventListener("pointercancel", onUp);
+      const onBlur = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", onUp);
+        window.removeEventListener("blur", onBlur);
+        dragStateRef.current = null;
+        draggingRef.current = false;
+        setDragging(false);
+      };
+      window.addEventListener("pointermove", onMove, { passive: false });
+      window.addEventListener("pointerup", onUp, { passive: false });
+      window.addEventListener("pointercancel", onUp, { passive: false });
+      window.addEventListener("blur", onBlur);
     },
-    [draggable, fit, offsetX, offsetY, maxX, maxY, layerId, setLayerPhotoOffset],
+    [draggable, fit, offsetX, offsetY, layerId, setLayerPhotoOffset, measureBoundsNow],
   );
 
-  const canPan = fit !== "contain" && draggable && (maxX > 0 || maxY > 0);
+  // Cleanup any in-flight drag on unmount.
+  useEffect(() => {
+    return () => {
+      draggingRef.current = false;
+      dragStateRef.current = null;
+    };
+  }, []);
 
-  // Pixel-accurate clip path so heart/star/circle keep their natural 1:1
-  // aspect ratio inscribed inside the container's shortest side — even when
-  // the layer rect is non-square. Falls back to the (undefined) static clip
-  // for the very first paint before the ResizeObserver fires.
+  // canPan = cursor hint only; the actual gesture starts via measureBoundsNow.
+  const canPan = fit !== "contain" && draggable;
+
   const measuredClip = box.w > 0 && box.h > 0 ? buildShapeClipPath(shape, box.w, box.h) : undefined;
   const clipPath = measuredClip ?? staticClipPath;
+
+  // Single <img> kept mounted across the natural-unknown → known transition
+  // so the browser doesn't reload the bitmap mid-interaction.
+  const useCoverMath = fit !== "contain" && !!natural && box.w > 0 && box.h > 0;
+  const imgStyle: React.CSSProperties = useCoverMath
+    ? {
+        position: "absolute",
+        width: `${renderW}px`,
+        height: `${renderH}px`,
+        left: `${(box.w - renderW) / 2 + (renderOffsetX / 100) * box.w}px`,
+        top: `${(box.h - renderH) / 2 + (renderOffsetY / 100) * box.h}px`,
+        userSelect: "none",
+        pointerEvents: "none",
+        maxWidth: "none",
+      }
+    : {
+        position: "absolute",
+        inset: 0,
+        width: "100%",
+        height: "100%",
+        objectFit: fit === "contain" ? "contain" : "cover",
+        userSelect: "none",
+        pointerEvents: "none",
+      };
 
   return (
     <div
@@ -969,45 +1047,19 @@ function PhotoLayerView({
       onPointerDown={onPointerDown}
     >
       {src ? (
-        fit === "contain" || !natural || renderW === 0 ? (
-          <img
-            ref={imgRef}
-            src={src}
-            alt=""
-            onLoad={(e) => {
-              const i = e.currentTarget;
+        <img
+          ref={imgRef}
+          src={src}
+          alt=""
+          onLoad={(e) => {
+            const i = e.currentTarget;
+            if (i.naturalWidth && i.naturalHeight) {
               setNatural({ w: i.naturalWidth, h: i.naturalHeight });
-            }}
-            className={`absolute inset-0 w-full h-full ${fit === "contain" ? "object-contain" : "object-cover"}`}
-            style={{ userSelect: "none", pointerEvents: "none" }}
-            draggable={false}
-          />
-        ) : (
-          // Cover mode: render the image at its full scaled size and pan it
-          // within the container so the customer can reach the actual edges.
-          // offsetX/Y are percent of the layer (box) size; convert to pixels
-          // and add to the centered base position.
-          <img
-            ref={imgRef}
-            src={src}
-            alt=""
-            onLoad={(e) => {
-              const i = e.currentTarget;
-              setNatural({ w: i.naturalWidth, h: i.naturalHeight });
-            }}
-            style={{
-              position: "absolute",
-              width: `${renderW}px`,
-              height: `${renderH}px`,
-              left: `${(box.w - renderW) / 2 + (renderOffsetX / 100) * box.w}px`,
-              top: `${(box.h - renderH) / 2 + (renderOffsetY / 100) * box.h}px`,
-              userSelect: "none",
-              pointerEvents: "none",
-              maxWidth: "none",
-            }}
-            draggable={false}
-          />
-        )
+            }
+          }}
+          style={imgStyle}
+          draggable={false}
+        />
       ) : (
         <div
           className={`absolute inset-0 flex items-center justify-center bg-muted/40 text-[11px] text-muted-foreground text-center px-2${

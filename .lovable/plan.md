@@ -1,36 +1,42 @@
-## Felanalys
+## Mål
+Fixa fotopan i kundens editor (`/editor`) så att uppladdade foton går att dra/panna inuti fotolagret när bilden beskärs av `cover`, utan att påverka admin, kartor, textlager, uppladdning, AI-flöde, priser eller print/cart-pipeline.
 
-Jag har jämfört nuvarande kod med historiken där fotopan infördes/ändrades:
-
-- `b5ee826` införde kund-pan för fotolager och lät drag alltid skriva `offsetX/offsetY` när `fit="cover"`.
-- `48d28d7` lade till naturliga bildmått, pan-bounds och clampning så bilden inte kan dras utanför sin behållare.
-- `11a0d67` ändrade renderingen till att rita bilden i faktisk cover-storlek, vilket behövs för att editorn och print-snapshot ska matcha.
-- Nuvarande kod stoppar drag helt när `maxX === 0 && maxY === 0`, och all pan är beroende av att `ResizeObserver` + `naturalWidth/naturalHeight` hinner ge overflow. Det gör att panning upplevs som trasig när overflow blir 0, mycket liten, eller när pointer-händelser tappas vid rerender/capture.
+## Rotorsak jag vill åtgärda
+Nuvarande implementation väntar på att `naturalWidth/naturalHeight` + container-mått ska ge `maxX/maxY > 0`. Om dessa bounds blir `0`, om bilden först renderas via `object-cover`, eller om drag startar innan måtten är stabila, startas inget pan-drag alls. Det matchar symptomet: preview reagerar/uppdateras, men bilden står still.
 
 ## Plan
+1. **Gör fotopan oberoende av förhandsberäknade bounds vid pointer-down**
+   - Starta drag för uppladdade foton i `cover`-läge även om `maxX/maxY` ännu är `0`.
+   - Mät container och bild direkt i drag-start och/eller använd en säker fallback från den renderade bilden.
+   - Behåll regeln att axlar utan faktisk crop låses, men låt inte ett temporärt `0` blockera hela draget.
 
-1. **Behåll befintlig funktionalitet och ändra bara fotopan**
-   - Ingen ändring av mallar, admin-layout, uppladdning, AI-flöde, priser, textlager, kartor, ramrendering eller Shopify/Gelato-flöden.
-   - Fokus endast på `photo`-lagrets interaktion och matchande snapshot-rendering.
+2. **Flytta pan-matematiken till en liten, testbar helper**
+   - Skapa/uppdatera minimal helper som räknar cover-renderstorlek, overflow och clamp från:
+     - layer-boxens pixelstorlek
+     - bildens natural size
+     - offset i procent
+   - Använd samma helper i `PhotoLayerView` och snapshot-rendering om befintlig snapshot-matematik behöver matchas.
+   - Ingen ändring i hur `offsetX/offsetY` lagras: procent av fotolagrets storlek.
 
-2. **Gör pan-interaktionen robust igen i `MapPreview.tsx`**
-   - Låt pointer-down alltid starta drag för uppladdade foton i `cover`-läge.
-   - Lägg `preventDefault()` och `stopPropagation()` på fotodrag så drag inte krockar med layer-flytt, textlager eller scroll.
-   - Flytta drag tracking till `window`-baserade `pointermove/pointerup` under aktiv dragning, så drag inte tappas om React rerenderar medan offset uppdateras.
-   - Fortsätt clampa mot verkliga bildkanter när det finns overflow, så bilden aldrig kan lämna tomma ytor.
-   - Om en axel saknar overflow låses bara den axeln, inte hela draget.
+3. **Säkra event-hanteringen**
+   - Behåll `preventDefault()` och `stopPropagation()` på fotodrag.
+   - Använd `window`-baserade `pointermove/pointerup/pointercancel` med pointer-id och cleanup vid unmount/blur.
+   - Lägg `touch-action: none` när fotot är dragbart så mobil/iframe-scroll inte tar över.
 
-3. **Säkerställ att editorns visuella pan och print/cart-preview använder samma matematik**
-   - Behåll nuvarande cover-crop-princip: `scale = max(layerW/imgW, layerH/imgH)`.
-   - Säkerställ att `offsetX/offsetY` betyder samma sak i DOM-preview och `template-snapshot.ts`.
-   - Om en liten helper behövs för att undvika framtida regression skapas den minimalt och används bara av fotolager/snapshot.
+4. **Ta bort “nollställande” under aktiv dragning**
+   - Re-clamp-effekten ska inte skriva tillbaka `0,0` medan användaren drar om bounds tillfälligt rapporteras som `0`.
+   - Clamp ska ske när bild och container faktiskt är mätta, och per axel.
 
-4. **Lägg till en snäv regressionskontroll**
-   - Testa med en bred bild i ett stående fotolager: horisontell pan ska fungera.
-   - Testa med en stående bild i ett brett fotolager: vertikal pan ska fungera.
-   - Testa bild med samma aspekt som lagret: ingen falsk pan ska skapas eftersom inget är beskuret.
-   - Kontrollera att uppladdning, AI-stilresultat och cart-preview fortfarande läser samma `offsetX/offsetY`.
+5. **Verifiera snävt**
+   - Bred bild i stående fotolager: horisontell pan fungerar.
+   - Stående bild i brett fotolager: vertikal pan fungerar.
+   - Bild med samma aspekt: ingen falsk pan/inga tomma ytor.
+   - Kontrollera att preview använder lagrat `offsetX/offsetY` och att foton inte laddas om i loop under drag.
 
-## Förväntat resultat
+## Filer som berörs
+- `src/components/editor/MapPreview.tsx` — huvudfix för kundens fotopan.
+- Eventuellt en liten helper i `src/lib/...` om det behövs för att undvika duplicerad matte.
+- Eventuellt `src/lib/template-snapshot.ts` endast om jag hittar faktisk mismatch i snapshot-matematiken.
 
-Kunden ska kunna dra/panna uppladdade foton i fotolager igen när bilden faktiskt beskärs av `cover`, utan att vi ändrar hur andra lager, layoutval, admininställningar eller print-pipeline fungerar.
+## Avgränsning
+Jag kommer inte ändra admin-designern, ramrendering, textlager, kartlager, AI-generering, Shopify/Gelato-flöde eller språk/valuta.
