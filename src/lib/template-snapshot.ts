@@ -17,9 +17,10 @@ import { drawShapeOnCanvas, type ClipShape } from "./shape-clip";
 import { getMapboxToken, styleUrl } from "./mapbox";
 import type { Template, TemplateLayer, TextSpan } from "./template-schema";
 import { getActiveLayoutBlock } from "./template-schema";
-import type { LayerValue } from "@/stores/editorStore";
+import type { LayerValue, MapIcon } from "@/stores/editorStore";
 import { getActiveMarginInsetsPct, expandRectForRemovedMargin } from "./layer-utils";
 import { buildEffectiveTextWithSpans, type LinkedPlace } from "./text-typography";
+import { iconSvgString } from "./map-icon-catalog";
 
 export interface TemplateSnapshotInput {
   template: Template;
@@ -214,6 +215,43 @@ async function drawMapLayer(
     }
     if (container.parentNode) container.parentNode.removeChild(container);
   }
+}
+
+/** Rasterise an SVG string into an HTMLImageElement at the requested size. */
+function loadSvgAsImage(svg: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = (e) => reject(e);
+    img.src = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  });
+}
+
+/** Draw customer-placed icons on top of a map layer, clipped to its shape. */
+async function drawMapIcons(
+  ctx: CanvasRenderingContext2D,
+  rect: { x: number; y: number; w: number; h: number },
+  shape: string,
+  icons: MapIcon[],
+): Promise<void> {
+  if (!icons || icons.length === 0) return;
+  // Same proportion as editor preview — 6% of the layer's short side.
+  const sizePx = Math.max(8, Math.min(rect.w, rect.h) * 0.06);
+  ctx.save();
+  clipForShape(ctx, shape, rect.x, rect.y, rect.w, rect.h);
+  for (const ic of icons) {
+    const svg = iconSvgString(ic.iconId, "#111", 2);
+    if (!svg) continue;
+    try {
+      const img = await loadSvgAsImage(svg);
+      const cx = rect.x + (ic.xPct / 100) * rect.w;
+      const cy = rect.y + (ic.yPct / 100) * rect.h;
+      ctx.drawImage(img, cx - sizePx / 2, cy - sizePx / 2, sizePx, sizePx);
+    } catch (e) {
+      console.warn("[template-snapshot] icon draw failed", ic.iconId, e);
+    }
+  }
+  ctx.restore();
 }
 
 function drawTextLayer(
@@ -661,6 +699,8 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
       const showLabels = mv ? mv.showLabels : isLive ? input.liveShowLabels : layer.defaults.showLabels;
       const shape = mv ? mv.shape : isLive ? input.liveMapShape : layer.defaults.shape;
       await drawMapLayer(ctx, rect, { center, zoom, styleId, showLabels, shape });
+      const icons = (mv?.icons ?? []) as MapIcon[];
+      await drawMapIcons(ctx, rect, shape, icons);
     } else if (layer.type === "text") {
       const lv = input.layerValues?.[layer.id];
       const tv = lv && lv.kind === "text" ? lv : null;

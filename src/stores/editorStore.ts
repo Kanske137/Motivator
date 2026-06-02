@@ -28,6 +28,16 @@ interface ApplyPlaceArgs {
 
 export type MapShape = "rect" | "circle" | "heart" | "star";
 
+export interface MapIcon {
+  /** Stable per-icon uuid so React lists + selection state work. */
+  id: string;
+  /** Catalog id from `src/lib/map-icon-catalog.ts`. */
+  iconId: string;
+  /** Position inside the map layer box, 0..100. */
+  xPct: number;
+  yPct: number;
+}
+
 export interface MapLayerValue {
   kind: "map";
   center: [number, number];
@@ -38,6 +48,8 @@ export interface MapLayerValue {
   placeName: string;
   city?: string;
   country?: string;
+  /** Customer-placed icons (hearts, home, …). Always present (default []). */
+  icons: MapIcon[];
 }
 
 export interface TextLayerValue {
@@ -237,6 +249,17 @@ interface EditorState {
   setLayerPhotoOffset: (id: string, x: number, y: number) => void;
   setLayerPhotoZoom: (id: string, zoom: number) => void;
 
+  // ---------- map icons (customer-placeable) ----------
+  /** Transient: when set, clicking on a map layer drops this icon at the
+   *  click point and deactivates the tool. */
+  activeIconTool: { iconId: string } | null;
+  setActiveIconTool: (tool: { iconId: string } | null) => void;
+  /** Transient: id of the currently-selected placed icon (for trash popover). */
+  selectedMapIcon: { layerId: string; iconId: string } | null;
+  setSelectedMapIcon: (sel: { layerId: string; iconId: string } | null) => void;
+  addMapIcon: (layerId: string, icon: MapIcon) => void;
+  removeMapIcon: (layerId: string, iconInstanceId: string) => void;
+
   // ---------- legacy globals (derived getters; mutators apply to first layer) ----------
   // These setters/getters keep older code (EditorPage cart payload, snapshot
   // pipeline, etc.) working unchanged while we migrate to per-layer everywhere.
@@ -323,6 +346,7 @@ function hydrateLayerValues(
         placeName: l.defaults.placeName ?? "",
         city: l.defaults.city,
         country: l.defaults.country,
+        icons: [],
       };
     } else if (l.type === "text") {
       out[l.id] = {
@@ -484,6 +508,33 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   text: "",
   textFont: "Inter",
   textVisible: true,
+
+  // ---------- map icons transient state ----------
+  activeIconTool: null,
+  setActiveIconTool: (activeIconTool) => set({ activeIconTool }),
+  selectedMapIcon: null,
+  setSelectedMapIcon: (selectedMapIcon) => set({ selectedMapIcon }),
+  addMapIcon: (layerId, icon) => {
+    const state = get();
+    const cur = state.layerValues[layerId];
+    if (!cur || cur.kind !== "map") return;
+    const next: MapLayerValue = { ...cur, icons: [...(cur.icons ?? []), icon] };
+    set({ layerValues: { ...state.layerValues, [layerId]: next } });
+  },
+  removeMapIcon: (layerId, iconInstanceId) => {
+    const state = get();
+    const cur = state.layerValues[layerId];
+    if (!cur || cur.kind !== "map") return;
+    const next: MapLayerValue = {
+      ...cur,
+      icons: (cur.icons ?? []).filter((i) => i.id !== iconInstanceId),
+    };
+    set({
+      layerValues: { ...state.layerValues, [layerId]: next },
+      selectedMapIcon:
+        state.selectedMapIcon?.iconId === iconInstanceId ? null : state.selectedMapIcon,
+    });
+  },
 
   setConfig: (config) => {
     const state = get();
