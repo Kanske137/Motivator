@@ -28,6 +28,16 @@ interface ApplyPlaceArgs {
 
 export type MapShape = "rect" | "circle" | "heart" | "star";
 
+export interface MapIcon {
+  /** Stable per-icon uuid so React lists + selection state work. */
+  id: string;
+  /** Catalog id from `src/lib/map-icon-catalog.ts`. */
+  iconId: string;
+  /** Position inside the map layer box, 0..100. */
+  xPct: number;
+  yPct: number;
+}
+
 export interface MapLayerValue {
   kind: "map";
   center: [number, number];
@@ -38,6 +48,8 @@ export interface MapLayerValue {
   placeName: string;
   city?: string;
   country?: string;
+  /** Customer-placed icons (hearts, home, …). Always present (default []). */
+  icons: MapIcon[];
 }
 
 export interface TextLayerValue {
