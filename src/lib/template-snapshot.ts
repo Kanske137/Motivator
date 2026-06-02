@@ -697,8 +697,9 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
         const shape = pv?.shape ?? layer.defaults.shape;
         const offsetX = pv?.offsetX ?? 0;
         const offsetY = pv?.offsetY ?? 0;
+        const zoom = pv?.zoom ?? 1;
         try {
-          await drawPhotoLayer(ctx, rect, url, shape, layer.defaults.fit, offsetX, offsetY);
+          await drawPhotoLayer(ctx, rect, url, shape, layer.defaults.fit, offsetX, offsetY, zoom);
         } catch (e) {
           console.warn("[template-snapshot] photo layer failed", e);
         }
