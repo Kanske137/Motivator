@@ -1,9 +1,12 @@
 // Overlay rendered on top of a single map layer. Owns:
 //   - Cursor-following ghost icon when the customer has picked an icon from
 //     the ControlPanel picker (activeIconTool).
-//   - Placement on left-click within the layer's shape boundary.
-//   - Render of placed icons + click-to-select with a tiny trash popover.
+//   - Placement on left-click — anchors icon to a geographic point (lng/lat)
+//     using map.unproject so it sticks to the map under pan/zoom.
+//   - Render of placed icons re-projected via map.project on every move/zoom.
+//   - Click-to-select with a tiny trash popover for deletion.
 import { useEffect, useMemo, useRef, useState } from "react";
+import type mapboxgl from "mapbox-gl";
 import { Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useEditorStore, type MapIcon } from "@/stores/editorStore";
@@ -14,6 +17,8 @@ interface Props {
   layerId: string;
   shape: ClipShape;
   icons: MapIcon[];
+  /** Returns the Mapbox instance for THIS layer (or null while map mounting). */
+  getMap: () => mapboxgl.Map | null;
 }
 
 function IconSvg({ iconId, sizePx, color = "#111" }: { iconId: string; sizePx: number; color?: string }) {
@@ -43,7 +48,7 @@ function IconSvg({ iconId, sizePx, color = "#111" }: { iconId: string; sizePx: n
   );
 }
 
-export function MapIconsOverlay({ layerId, shape, icons }: Props) {
+export function MapIconsOverlay({ layerId, shape, icons, getMap }: Props) {
   const { t } = useTranslation();
   const activeIconTool = useEditorStore((s) => s.activeIconTool);
   const setActiveIconTool = useEditorStore((s) => s.setActiveIconTool);
@@ -51,10 +56,13 @@ export function MapIconsOverlay({ layerId, shape, icons }: Props) {
   const setSelectedMapIcon = useEditorStore((s) => s.setSelectedMapIcon);
   const addMapIcon = useEditorStore((s) => s.addMapIcon);
   const removeMapIcon = useEditorStore((s) => s.removeMapIcon);
+  const replaceMapIcon = useEditorStore((s) => s.replaceMapIcon);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
   const [cursor, setCursor] = useState<{ x: number; y: number; inside: boolean } | null>(null);
+  // Bumps every Mapbox move/zoom so we re-project placed icons.
+  const [, setMapTick] = useState(0);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -69,18 +77,59 @@ export function MapIconsOverlay({ layerId, shape, icons }: Props) {
     return () => ro.disconnect();
   }, []);
 
+  // Subscribe to map move/zoom so placed icons re-project. Re-subscribes when
+  // the map instance becomes available (polling once via short interval until
+  // ready, then attaches handlers).
+  useEffect(() => {
+    let cleanup: (() => void) | null = null;
+    let cancelled = false;
+    const attach = () => {
+      if (cancelled) return;
+      const map = getMap();
+      if (!map) {
+        // Retry briefly while the map mounts.
+        const t = window.setTimeout(attach, 120);
+        cleanup = () => window.clearTimeout(t);
+        return;
+      }
+      const onChange = () => setMapTick((n) => (n + 1) & 0xffff);
+      map.on("move", onChange);
+      map.on("zoom", onChange);
+      map.on("resize", onChange);
+      // Trigger one initial projection.
+      onChange();
+      cleanup = () => {
+        try {
+          map.off("move", onChange);
+          map.off("zoom", onChange);
+          map.off("resize", onChange);
+        } catch {
+          /* map already removed */
+        }
+      };
+    };
+    attach();
+    return () => {
+      cancelled = true;
+      cleanup?.();
+    };
+  }, [getMap]);
+
   const iconPx = useMemo(() => Math.max(16, Math.min(box.w, box.h) * 0.06), [box]);
   const ghostPx = Math.max(24, iconPx);
   const toolActive = !!activeIconTool;
 
-  // Close trash popover on outside-click (anywhere outside this layer overlay).
+  // Close trash popover on outside-mousedown. We mark our own popover button
+  // with data-map-icon-ui so the listener can ignore clicks on it.
   useEffect(() => {
     if (!selectedMapIcon || selectedMapIcon.layerId !== layerId) return;
     const onDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (target.closest('[data-map-icon-ui="1"]')) return;
       const el = containerRef.current;
-      if (el && !el.contains(e.target as Node)) {
-        setSelectedMapIcon(null);
-      }
+      if (el && el.contains(target)) return;
+      setSelectedMapIcon(null);
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
@@ -114,6 +163,7 @@ export function MapIconsOverlay({ layerId, shape, icons }: Props) {
 
   const onClickPlace = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!toolActive) return;
+    if (selectedMapIcon) return;
     if (e.button !== 0) return;
     const el = containerRef.current;
     if (!el) return;
@@ -123,24 +173,45 @@ export function MapIconsOverlay({ layerId, shape, icons }: Props) {
     if (!isPointInShape(shape, r.width, r.height, x, y)) return;
     e.preventDefault();
     e.stopPropagation();
-    const xPct = (x / r.width) * 100;
-    const yPct = (y / r.height) * 100;
+    const map = getMap();
+    if (!map) return;
+    const ll = map.unproject([x, y]);
     const id =
       (typeof crypto !== "undefined" && (crypto as { randomUUID?: () => string }).randomUUID?.()) ??
       `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    addMapIcon(layerId, { id, iconId: activeIconTool!.iconId, xPct, yPct });
+    addMapIcon(layerId, { id, iconId: activeIconTool!.iconId, lng: ll.lng, lat: ll.lat });
     setActiveIconTool(null);
     setCursor(null);
   };
+
+  // Compute pixel position for every placed icon. Upgrades legacy xPct/yPct
+  // icons to lng/lat on first projection.
+  const map = getMap();
+  const placed = icons.map((ic) => {
+    if (typeof ic.lng === "number" && typeof ic.lat === "number") {
+      if (!map) return { ic, px: null as { x: number; y: number } | null };
+      const p = map.project([ic.lng, ic.lat]);
+      return { ic, px: { x: p.x, y: p.y } };
+    }
+    // Legacy: derive from xPct/yPct using current box, then persist as lng/lat.
+    if (typeof ic.xPct === "number" && typeof ic.yPct === "number" && map && box.w && box.h) {
+      const x = (ic.xPct / 100) * box.w;
+      const y = (ic.yPct / 100) * box.h;
+      const ll = map.unproject([x, y]);
+      // Schedule upgrade outside render.
+      queueMicrotask(() => {
+        replaceMapIcon(layerId, ic.id, { lng: ll.lng, lat: ll.lat });
+      });
+      return { ic, px: { x, y } };
+    }
+    return { ic, px: null };
+  });
 
   return (
     <div
       ref={containerRef}
       className="absolute inset-0"
       style={{
-        // When tool active: own all pointer events on top of Mapbox so click
-        // lands here (and we stop propagation). When inactive: let map breathe;
-        // placed icons opt back in via pointer-events:auto on their <button>.
         pointerEvents: toolActive ? "auto" : "none",
         cursor: toolActive ? (cursor?.inside ? "crosshair" : "not-allowed") : undefined,
         zIndex: 30,
@@ -150,7 +221,8 @@ export function MapIconsOverlay({ layerId, shape, icons }: Props) {
       onClick={onClickPlace}
     >
       {/* Placed icons */}
-      {icons.map((ic) => {
+      {placed.map(({ ic, px }) => {
+        if (!px) return null;
         const isSelected =
           selectedMapIcon?.layerId === layerId && selectedMapIcon?.iconId === ic.id;
         return (
@@ -158,17 +230,19 @@ export function MapIconsOverlay({ layerId, shape, icons }: Props) {
             key={ic.id}
             className="absolute"
             style={{
-              left: `${ic.xPct}%`,
-              top: `${ic.yPct}%`,
+              left: px.x,
+              top: px.y,
               transform: "translate(-50%, -50%)",
               pointerEvents: "auto",
             }}
           >
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
+              data-map-icon-ui="1"
+              onPointerDown={(e) => {
                 if (toolActive) return;
+                e.preventDefault();
+                e.stopPropagation();
                 setSelectedMapIcon({ layerId, iconId: ic.id });
               }}
               className="block bg-transparent border-0 p-0 cursor-pointer"
@@ -180,9 +254,17 @@ export function MapIconsOverlay({ layerId, shape, icons }: Props) {
             {isSelected && (
               <button
                 type="button"
-                onClick={(e) => {
+                data-map-icon-ui="1"
+                onPointerDown={(e) => {
+                  // Use pointerdown so we win over the document mousedown
+                  // outside-listener race.
+                  e.preventDefault();
                   e.stopPropagation();
                   removeMapIcon(layerId, ic.id);
+                }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
                 }}
                 className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-destructive text-destructive-foreground shadow-lg flex items-center justify-center ring-2 ring-background"
                 style={{ pointerEvents: "auto" }}
