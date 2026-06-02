@@ -227,12 +227,37 @@ function loadSvgAsImage(svg: string): Promise<HTMLImageElement> {
   });
 }
 
+/** Project a geographic point to a pixel inside the given rect using the same
+ *  Web Mercator projection Mapbox uses at pitch=0/bearing=0 (always our
+ *  case). Mirrors what `map.project` would return in the editor. */
+function projectLngLatToRectPx(
+  lng: number,
+  lat: number,
+  center: [number, number],
+  zoom: number,
+  w: number,
+  h: number,
+): { x: number; y: number } {
+  const scale = 256 * Math.pow(2, zoom);
+  const merc = (lon: number, la: number) => {
+    const x = ((lon + 180) / 360) * scale;
+    const s = Math.sin((la * Math.PI) / 180);
+    const y = (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * scale;
+    return { x, y };
+  };
+  const c = merc(center[0], center[1]);
+  const p = merc(lng, lat);
+  return { x: w / 2 + (p.x - c.x), y: h / 2 + (p.y - c.y) };
+}
+
 /** Draw customer-placed icons on top of a map layer, clipped to its shape. */
 async function drawMapIcons(
   ctx: CanvasRenderingContext2D,
   rect: { x: number; y: number; w: number; h: number },
   shape: string,
   icons: MapIcon[],
+  center: [number, number],
+  zoom: number,
 ): Promise<void> {
   if (!icons || icons.length === 0) return;
   // Same proportion as editor preview — 6% of the layer's short side.
@@ -244,8 +269,18 @@ async function drawMapIcons(
     if (!svg) continue;
     try {
       const img = await loadSvgAsImage(svg);
-      const cx = rect.x + (ic.xPct / 100) * rect.w;
-      const cy = rect.y + (ic.yPct / 100) * rect.h;
+      let cx: number;
+      let cy: number;
+      if (typeof ic.lng === "number" && typeof ic.lat === "number") {
+        const p = projectLngLatToRectPx(ic.lng, ic.lat, center, zoom, rect.w, rect.h);
+        cx = rect.x + p.x;
+        cy = rect.y + p.y;
+      } else if (typeof ic.xPct === "number" && typeof ic.yPct === "number") {
+        cx = rect.x + (ic.xPct / 100) * rect.w;
+        cy = rect.y + (ic.yPct / 100) * rect.h;
+      } else {
+        continue;
+      }
       ctx.drawImage(img, cx - sizePx / 2, cy - sizePx / 2, sizePx, sizePx);
     } catch (e) {
       console.warn("[template-snapshot] icon draw failed", ic.iconId, e);
