@@ -932,7 +932,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const layerValues = { ...state.layerValues };
     const v = layerValues[layerId];
     if (v && v.kind === "photo") {
-      layerValues[layerId] = { ...v, offsetX: 0, offsetY: 0 };
+      layerValues[layerId] = { ...v, offsetX: 0, offsetY: 0, zoom: 1 };
     }
     set({
       photoSources: nextSources,
