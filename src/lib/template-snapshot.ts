@@ -735,7 +735,7 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
       const shape = mv ? mv.shape : isLive ? input.liveMapShape : layer.defaults.shape;
       await drawMapLayer(ctx, rect, { center, zoom, styleId, showLabels, shape });
       const icons = (mv?.icons ?? []) as MapIcon[];
-      await drawMapIcons(ctx, rect, shape, icons);
+      await drawMapIcons(ctx, rect, shape, icons, center, zoom);
     } else if (layer.type === "text") {
       const lv = input.layerValues?.[layer.id];
       const tv = lv && lv.kind === "text" ? lv : null;
