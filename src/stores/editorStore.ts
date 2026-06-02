@@ -840,17 +840,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             : {}),
         };
       } else if (oldVal.kind === "photo" && fresh.kind === "photo" && newLayer.type === "photo") {
-        const locks = newLayer.locks;
-        // Photo shape is layout-defining; only customer offset survives.
+        // Photo shape is layout-defining; pan offset is customer-owned and
+        // should always survive a layout switch when the destination layer
+        // is pan-able (fit: cover). `move` only controls the layer-position
+        // drag handle, not pan of the image inside the layer.
+        const carryOffset = newLayer.defaults.fit === "cover";
         layerValues[newId] = {
           ...fresh,
-          ...(!locks.move ? { offsetX: oldVal.offsetX, offsetY: oldVal.offsetY } : {}),
+          ...(carryOffset ? { offsetX: oldVal.offsetX, offsetY: oldVal.offsetY } : {}),
         };
       } else if (oldVal.kind === "aiPhoto" && fresh.kind === "aiPhoto" && newLayer.type === "aiPhoto") {
-        const locks = newLayer.locks;
+        const carryOffset = newLayer.defaults.fit === "cover";
         layerValues[newId] = {
           ...fresh,
-          ...(!locks.move ? { offsetX: oldVal.offsetX, offsetY: oldVal.offsetY } : {}),
+          ...(carryOffset ? { offsetX: oldVal.offsetX, offsetY: oldVal.offsetY } : {}),
         };
       }
     }
@@ -1303,8 +1306,14 @@ function setLayerOverrideText(set: SetFn, get: GetFn, id: string, raw: string) {
 function updatePhoto(set: SetFn, get: GetFn, id: string, patch: Partial<PhotoLayerValue>) {
   const state = get();
   const cur = state.layerValues[id];
-  if (!cur || cur.kind !== "photo") return;
-  const next: PhotoLayerValue = { ...cur, ...patch };
+  // If the layer value hasn't been hydrated yet (race after layout switch /
+  // first interaction), hydrate it on the fly instead of silently swallowing
+  // the update — otherwise photo pan offsets get lost.
+  const base: PhotoLayerValue =
+    cur && cur.kind === "photo"
+      ? cur
+      : { kind: "photo", shape: "rect", offsetX: 0, offsetY: 0 };
+  const next: PhotoLayerValue = { ...base, ...patch };
   const layerValues = { ...state.layerValues, [id]: next };
   set({ layerValues });
 }
