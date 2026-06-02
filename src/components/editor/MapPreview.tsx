@@ -599,6 +599,7 @@ export function MapPreview({
             const usingRefOrSwap = !!(aiResultUrl || activeRefUrl);
             const offsetX = usingRefOrSwap ? refFocalX : (av?.offsetX ?? 0);
             const offsetY = usingRefOrSwap ? refFocalY : (av?.offsetY ?? 0);
+            const zoom = av?.zoom ?? 1;
             // Only force `contain` for removeBackground (Nano Banana 2 doesn't
             // always honor target aspect ratio, and its pure-white padding
             // blends seamlessly into the layer). For human face-swap (Replicate
@@ -626,6 +627,7 @@ export function MapPreview({
                       staticClipPath={clip}
                       offsetX={offsetX}
                       offsetY={offsetY}
+                      zoom={zoom}
                       draggable={!!src && !usingRefOrSwap}
                     />
                   ) : (
