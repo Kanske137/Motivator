@@ -506,6 +506,7 @@ export function MapPreview({
             const effectiveCenter: [number, number] = mv?.center ?? [l.defaults.center[0]!, l.defaults.center[1]!];
             const effectiveZoom = mv?.zoom ?? l.defaults.zoom;
             const effectiveLabels = mv?.showLabels ?? l.defaults.showLabels;
+            const icons = mv?.icons ?? [];
             const staticClip = shapeClipPath(effectiveShape);
             return (
               <MapLayerSlot
@@ -513,7 +514,12 @@ export function MapPreview({
                 wrapStyle={wrapStyle}
                 shape={effectiveShape}
                 staticClip={staticClip}
-                overlay={moveHandle}
+                overlay={
+                  <>
+                    <MapIconsOverlay layerId={l.id} shape={effectiveShape} icons={icons} />
+                    {moveHandle}
+                  </>
+                }
               >
                 {(clip) => (
                   <MapLayerInstance
