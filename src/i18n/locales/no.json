@@ -190,9 +190,6 @@
     "successWithErrors": "Malen er slettet, men Shopify-slettingen hadde feil",
     "error": "Kunne ikke slette malen"
   },
-  "admin": {
-    "photoPanLockHint": "Bildepanorering i kundeditoren styres ikke av låsene. Den fungerer når Tilpasning er Fyll (cover) og bildet har beskjæringsoverskudd. Flytt lag styrer bare ✥-håndtaket for hele bildebeholderen."
-  },
   "mapStyle": {
     "skandinavisk": "Skandinavisk",
     "midnatt": "Midnatt",

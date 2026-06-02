@@ -190,9 +190,6 @@
     "successWithErrors": "Modello eliminato, ma l'eliminazione su Shopify ha avuto errori",
     "error": "Impossibile eliminare il modello"
   },
-  "admin": {
-    "photoPanLockHint": "Il pan della foto nell’editor cliente non è controllato dai blocchi. Funziona quando l’adattamento è Riempi (cover) e l’immagine ha eccedenza di ritaglio. Sposta livello controlla solo la maniglia ✥ dell’intero contenitore immagine."
-  },
   "mapStyle": {
     "skandinavisk": "Scandinavo",
     "midnatt": "Mezzanotte",

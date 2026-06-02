@@ -1,56 +1,78 @@
-## Vad jag ser i koden
+## Mål
+Byt ut dagens "platta färg"-ramar (Ek/Valnöt = brun rektangel) mot realistiska träramar **identiska med Gelatos produktbilder**, plus mitred corners, mjuk skugga, och tydligare posterhängare.
 
-I `brollopskarta`-mallens layout **Karta & Foto** ser fotolagret ut så här:
+## Var renderingen sker
+Två filer som ritar ramen — båda uppdateras synkat:
 
+1. **`src/components/editor/MapPreview.tsx`** — editor-live-preview. Ramen är `border` med solid `frameColor` (rad 206–214). Hängare = `HangerOverlay` (rad 50–102), redan trälist + snöre men utan trämönster.
+2. **`src/lib/mockup-composite.ts`** — komposit i scen-mockups. Ramen ritas som `ctx.fillStyle = frameColor` + diagonal gradient (rad 196–212). Hängare som rektanglar (rad 232–289).
+
+Print-snapshot (`template-snapshot.ts`) rörs INTE — Gelato lägger på den verkliga ramen i produktion.
+
+## Textur-källa: matcha Gelato exakt
+Steg innan kod-ändringar:
+1. **Hämta Gelatos faktiska produktbilder** via `code--fetch_website` på:
+   - `https://www.gelato.com/print-on-demand/products/wall-art/framed-posters` (eller den specifika ek/valnöt-produktsidan)
+2. Spara referensbilderna i `/tmp/gelato-refs/` för inspektion (zoom på en hörnpixel för ådringsstil).
+3. **Generera 4 sömlösa kakelbara texturer som matchar dessa referenser exakt** via `imagegen--edit_image` (premium-modell), med Gelato-bilden som referens-input och prompten: "Seamless tileable wood grain texture matching this Gelato product photo exactly — same wood species, same grain density, same hue, same matte finish, no shadows, no corners, pure repeatable texture, 1024×256":
+   - `src/assets/frame-textures/oak.webp` (ljus ek)
+   - `src/assets/frame-textures/walnut.webp` (mörk valnöt)
+   - `src/assets/frame-textures/white.webp` (vit lack, subtil korn)
+   - `src/assets/frame-textures/black.webp` (svart lack, subtil korn)
+4. **QA-steg**: Lägg Gelato-foto bredvid genererad textur. Om hue/ådring inte matchar — kör `imagegen--edit_image` igen med tydligare prompt tills de är visuellt identiska. Detta är ett uttryckligt krav från användaren.
+
+Bundlas som lokala Vite-assets (inte Shopify Files) — snabbare, ingen CORS, konsekvent med övriga mockup-scener.
+
+## Mitred corners
+Fyra trapets-sidor (topp/botten/vänster/höger) klippta med `clip-path: polygon(...)` så hörnen möts i 45°. Ådringen löper längs varje list (sidor roteras 90°).
+
+```text
+   ┌──────────────┐
+   │\            /│   Topp: kort sida = inner-bredd
+   │ \          / │   Sidor: roterad textur, kort sida = inner-höjd
+   │  \________/  │
+   │  /        \  │
+   │ /          \ │
+   │/____________\│
 ```
-photo  xPct=5  yPct=6  wPct=90  hPct=34
-defaults: { fit: "cover", shape: "rect" }
-locks: { move:true, position:true, content:false, ... }
-```
 
-Layoutytan är bred (90%) och låg (34%). När man laddar upp en porträttbild (524×744) blir cover-skalningen drivs av bredden → bilden får stor överhöjd → `maxY` borde bli ~90 % och vertikal pan borde fungera.
+**`MapPreview.tsx`:** Ersätt `borderStyle/Color/Width` med wrapper-`div` + fyra absolut-positionerade `<div>`:ar med `background-image: url(texture)` + `clip-path`. Sidornas inre wrapper roteras 90°.
 
-Det gör den inte. Två konkreta misstänkta orsaker finns redan i koden:
+**`mockup-composite.ts`:** Förhandsladda textur (`loadImage`-helpern finns). Rita fyra polygon-paths med `ctx.save() → ctx.beginPath() → polygon → clip() → drawImage(texture)`. Sidor får `ctx.translate + ctx.rotate(Math.PI/2)`. Behåll diagonal-gradient som ljus/skugga-overlay ovanpå texturen. Fallback till solid fill om texturen inte laddat (ingen blocking await).
 
-1. **`updatePhoto` returnerar tyst** om `state.layerValues[id]` inte är ett `photo`-värde — så alla `setLayerPhotoOffset` blir no-ops om värdet inte hann hydreras för den nya layouten (`editorStore.ts:1303–1310`).
-2. **Layout-byte slänger fotopan** — i `setLayoutId` är överlevnaden av `offsetX/offsetY` gated på `!locks.move` (`editorStore.ts:847`). I `karta-och-foto` är `locks.move = true`, så kund-pan resetas till 0 vid varje layout-byte. Semantiskt fel: `move` styr själva lagerflytt-handtaget, inte pan av bilden inuti lagret.
+## Skugga
+- DOM: `box-shadow: 0 6px 18px -4px rgba(0,0,0,0.25), 0 14px 30px -10px rgba(0,0,0,0.18)` på ram-wrappern.
+- Canvas: `ctx.shadowColor / shadowBlur / shadowOffsetY` innan ram-rektangeln ritas.
 
-Det finns också en tredje möjlighet jag inte kan utesluta utan att se runtime-värdena: att `box.h` mäts som 0 för fotolagret i just denna layout (t.ex. om `effectiveLayerRect` påverkas av margin-insets), vilket också skulle ge `maxY = 0` och därmed tyst blockerad pan.
+## Posterhängare
+Samma 4 trä-texturer återanvänds.
+- Listerna får `background-image: url(textureForHanger)` istället för solid `color`.
+- Behåll dagens topp/botten-ljusgradient ovanpå (3D-känsla).
+- Snöre: höj kontrast något (`rgba(40,30,20,0.9)` + 0.5px highlight) så det syns på ljus vägg.
+- Lägg till `box-shadow: 0 2px 6px rgba(0,0,0,0.18)` på lister i DOM-versionen.
+- Canvas: `ctx.createPattern(textureImg, "repeat")` som fillStyle för slats istället för solid `hangerColor`.
 
-## Plan
+## Filer som rörs / skapas
+1. **`src/assets/frame-textures/{oak,walnut,white,black}.webp`** — nya, genererade från Gelato-referenser.
+2. **`src/lib/frame-textures.ts`** (ny):
+   ```ts
+   export function textureForVariant(variant: string): { url: string; fallbackHex: string } | null
+   export function textureForHanger(variant: string): { url: string; fallbackHex: string } | null
+   export function preloadFrameTexture(url: string): Promise<HTMLImageElement> // cachad
+   ```
+3. **`src/components/editor/MapPreview.tsx`** — ny intern `FrameBorder`-komponent (4 mitred sidor + skugga). `HangerOverlay` får `textureUrl`-prop.
+4. **`src/lib/mockup-composite.ts`** — byt fill-baserad ram + slats mot texturerad mitred ram + pattern-fyllda slats. Behåll alla nuvarande effekter (gradient, mörkning, skugga).
 
-1. **Lägg till lättviktiga diagnos-loggar** i `PhotoLayerView` (`MapPreview.tsx`):
-   - Logga `{ layerId, src, fit, draggable, box, natural, maxX, maxY, canPan, offsetX, offsetY }` när värdena ändras.
-   - Logga vid `onPointerDown` om handlern returnerar tidigt (varför: `!draggable`, `fit==="contain"`, eller `maxX===0 && maxY===0`).
-   - Detta gör det möjligt att i nästa loop (med console-logs) direkt avgöra om problemet är mätning, store-skrivning eller pointer-blockering.
+## Vad som INTE ändras
+- Print-snapshot/Gelato print-fil.
+- 3D-canvas-preview (canvas-produkter har ingen ram).
+- Variantnamn, priser, översättningar.
+- `FrameOption.tsx` (väljaren).
 
-2. **Fixa store-svälja**: i `updatePhoto` (`editorStore.ts`):
-   - Om `cur` saknas eller har fel kind, hydrera ett tomt `photo`-värde i stället för att returnera tyst. Annars förlorar vi alla offset-uppdateringar i racet mellan layout-byte → upload → första drag.
-
-3. **Fixa layout-byte-carryover**: i `setLayoutId` (`editorStore.ts:842–848`):
-   - Bär över `offsetX/offsetY` så länge fotolagret faktiskt är pan-bart (`fit === "cover"`), oavsett `locks.move`. `move` ska bara styra lagerflytt-handtaget, inte foto-pan.
-   - Bär även över `photoSources[layerId]` / `photoAiResults[layerId]` när motsvarande nya lager finns — annars försvinner den uppladdade bilden vid layout-byte.
-
-4. **Förtydliga semantik i admin** (liten justering, ingen funktionsändring):
-   - I `LayerInspector` (eller motsvarande) för `photo`-lager: ändra tooltip/hjälptext för `move`-låset till "Lås lagerflytt (kundens fyrkant-handtag)" så det inte blandas ihop med pan inuti bilden. Pan styrs av `fit: cover` + att en uppladdad bild är större än ytan, inget separat lås.
-
-5. **Validering** (i build-läget, efter koden är ändrad):
-   - Öppna `/editor?handle=brollopskarta`, växla till **Karta & Foto**, ladda upp den bifogade porträttbilden.
-   - Bekräfta i console-loggarna att `maxY > 0` och att pointer-down inte bailar ut.
-   - Dra bilden i höjdled och bekräfta att `offsetY` uppdateras + att bilden faktiskt rör sig.
-   - Byt layout fram och tillbaka och bekräfta att den uppladdade bilden + dess pan-offset överlever.
-   - Snabbtest på `husposter` (annan layout med fotolager) för att verifiera att fixen inte är mall-specifik.
-   - När orsaken är bekräftad: ta bort/lämna kvar diagnos-loggarna bakom en `if (import.meta.env.DEV)`-flagga så de inte spammar i produktion.
-
-## Tekniska detaljer
-
-- Filer som kommer att ändras:
-  - `src/components/editor/MapPreview.tsx` — diagnos-loggar i `PhotoLayerView`.
-  - `src/stores/editorStore.ts` — `updatePhoto` no-op-fix + `setLayoutId` carryover-gating.
-  - Ev. `src/components/admin/LayerInspector.tsx` — tooltiptext för `move`-låset på `photo`.
-- Inga DB-migrationer.
-- Inga ändringar i print-pipeline eller mockup-composite — den läser `offsetX/offsetY` från samma store och kommer automatiskt få rätt värden när pan fungerar.
-
-## Svar på din andra fråga
-
-Det är troligen mall-specifikt just nu: layouten **Karta & Foto** har `locks.move = true` på fotolagret, vilket triggar carryover-buggen ovan. Mallar där fotolagret har `locks.move = false` (eller där man aldrig byter layout efter upload) påverkas inte på samma sätt — men `updatePhoto`-no-op:en är generell och kan slå överallt under race conditions, så vi fixar båda.
+## Acceptanskriterier
+- Ek/Valnöt-trämönstret i editorn matchar Gelatos produktbild **visuellt identiskt** (hue, ådring, finish).
+- Mitred corners (45° fog) syns tydligt.
+- Hängare visar trämönster + tydligt snöre.
+- Mjuk skugga bakom ramen.
+- Porträtt + landscape, alla storlekar, mobil + desktop.
+- Ingen Gelato-print-regression.

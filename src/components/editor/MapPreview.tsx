@@ -466,16 +466,6 @@ export function MapPreview({
         {/* Loop all template layers in zIndex order */}
         {layers.map((l) => {
           const rect = layerToEditorRect(l);
-          // Only layers that actually need pointer interaction in the
-          // customer preview should catch clicks/drags. Otherwise an
-          // overlapping decorative layer (text/image, or a locked map) ends
-          // up blocking pan on the photo layer underneath. Text editing
-          // happens in ControlPanel; images are admin static; locked maps
-          // shouldn't intercept pan either. margin/line/shape already opt
-          // out further down.
-          const isInteractiveLayer =
-            (l.type === "photo" || l.type === "aiPhoto") ||
-            (l.type === "map" && !l.locks.position);
           const wrapStyle: React.CSSProperties = {
             position: "absolute",
             left: `${rect.left}%`,
@@ -483,7 +473,6 @@ export function MapPreview({
             width: `${rect.width}%`,
             height: `${rect.height}%`,
             zIndex: l.type === "margin" ? 40 : l.zIndex,
-            pointerEvents: isInteractiveLayer ? undefined : "none",
           };
           const movable =
             !l.locks.move &&
@@ -493,7 +482,7 @@ export function MapPreview({
               type="button"
               onPointerDown={(e) => onDragStart(l, e)}
               className="absolute w-7 h-7 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center text-[12px] cursor-move touch-none ring-2 ring-background"
-              style={{ top: -14, left: -14, zIndex: 39, pointerEvents: "auto" }}
+              style={{ top: -14, left: -14, zIndex: 39 }}
               aria-label="Flytta lager"
               title="Dra för att flytta lagret"
             >
@@ -881,7 +870,6 @@ function PhotoLayerView({
   })();
 
   const dragStateRef = useRef<{
-    pointerId: number;
     startX: number;
     startY: number;
     baseX: number;
@@ -889,13 +877,6 @@ function PhotoLayerView({
     width: number;
     height: number;
   } | null>(null);
-  const cleanupDragRef = useRef<(() => void) | null>(null);
-
-  useEffect(() => {
-    return () => {
-      cleanupDragRef.current?.();
-    };
-  }, []);
 
   // Re-clamp current offset whenever bounds change (e.g. new image loaded).
   // Skip the store writeback when the offset is read-only (admin focal on
@@ -914,48 +895,14 @@ function PhotoLayerView({
   const renderOffsetX = fit === "contain" ? 0 : Math.max(-maxX, Math.min(maxX, offsetX));
   const renderOffsetY = fit === "contain" ? 0 : Math.max(-maxY, Math.min(maxY, offsetY));
 
-  // Dev-only diagnostics — printed when key values change so we can verify
-  // pan eligibility for any uploaded image / layer geometry combo.
-  useEffect(() => {
-    if (!import.meta.env.DEV) return;
-    // eslint-disable-next-line no-console
-    console.log("[PhotoLayerView]", layerId, {
-      hasSrc: !!src,
-      fit,
-      draggable,
-      box,
-      natural,
-      maxX: Math.round(maxX * 10) / 10,
-      maxY: Math.round(maxY * 10) / 10,
-      offsetX: Math.round(offsetX * 10) / 10,
-      offsetY: Math.round(offsetY * 10) / 10,
-    });
-  }, [layerId, src, fit, draggable, box, natural, maxX, maxY, offsetX, offsetY]);
-
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!draggable || fit === "contain") {
-        if (import.meta.env.DEV) {
-          // eslint-disable-next-line no-console
-          console.log("[PhotoLayerView] pointerDown bail", layerId, { draggable, fit });
-        }
-        return;
-      }
-      if (maxX === 0 && maxY === 0) {
-        if (import.meta.env.DEV) {
-          // eslint-disable-next-line no-console
-          console.log("[PhotoLayerView] pointerDown bail (no overflow)", layerId, { maxX, maxY, box, natural });
-        }
-        return;
-      }
+      if (!draggable || fit === "contain") return;
+      if (maxX === 0 && maxY === 0) return;
       const el = containerRef.current;
       if (!el) return;
-      e.preventDefault();
-      e.stopPropagation();
       const rect = el.getBoundingClientRect();
-      const pointerId = e.pointerId;
       dragStateRef.current = {
-        pointerId,
         startX: e.clientX,
         startY: e.clientY,
         baseX: offsetX,
@@ -963,48 +910,30 @@ function PhotoLayerView({
         width: rect.width,
         height: rect.height,
       };
-      cleanupDragRef.current?.();
-      const cleanup = () => {
-        window.removeEventListener("pointermove", onWindowMove);
-        window.removeEventListener("pointerup", onWindowEnd);
-        window.removeEventListener("pointercancel", onWindowEnd);
-        window.removeEventListener("blur", cleanup);
-        if (el.hasPointerCapture(pointerId)) el.releasePointerCapture(pointerId);
-        dragStateRef.current = null;
-        cleanupDragRef.current = null;
-        setDragging(false);
-      };
-      const onWindowMove = (ev: PointerEvent) => {
-        const s = dragStateRef.current;
-        if (!s || s.pointerId !== ev.pointerId) return;
-        ev.preventDefault();
-        const dxPct = ((ev.clientX - s.startX) / s.width) * 100;
-        const dyPct = ((ev.clientY - s.startY) / s.height) * 100;
-        const nextX = Math.max(-maxX, Math.min(maxX, s.baseX + dxPct));
-        const nextY = Math.max(-maxY, Math.min(maxY, s.baseY + dyPct));
-        setLayerPhotoOffset(layerId, nextX, nextY);
-      };
-      const onWindowEnd = (ev: PointerEvent) => {
-        if (dragStateRef.current?.pointerId !== ev.pointerId) return;
-        ev.preventDefault();
-        cleanup();
-      };
-      cleanupDragRef.current = cleanup;
-      el.setPointerCapture(pointerId);
+      el.setPointerCapture(e.pointerId);
       setDragging(true);
-      window.addEventListener("pointermove", onWindowMove, { passive: false });
-      window.addEventListener("pointerup", onWindowEnd, { passive: false });
-      window.addEventListener("pointercancel", onWindowEnd, { passive: false });
-      window.addEventListener("blur", cleanup);
     },
-    [draggable, fit, offsetX, offsetY, maxX, maxY, layerId, box, natural, setLayerPhotoOffset],
+    [draggable, fit, offsetX, offsetY, maxX, maxY],
+  );
+
+  const onPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const s = dragStateRef.current;
+      if (!s) return;
+      const dxPct = ((e.clientX - s.startX) / s.width) * 100;
+      const dyPct = ((e.clientY - s.startY) / s.height) * 100;
+      const nextX = Math.max(-maxX, Math.min(maxX, s.baseX + dxPct));
+      const nextY = Math.max(-maxY, Math.min(maxY, s.baseY + dyPct));
+      setLayerPhotoOffset(layerId, nextX, nextY);
+    },
+    [layerId, setLayerPhotoOffset, maxX, maxY],
   );
 
   const onPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (dragStateRef.current?.pointerId !== e.pointerId) return;
-    e.preventDefault();
-    e.stopPropagation();
-    cleanupDragRef.current?.();
+    const el = containerRef.current;
+    if (el && el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+    dragStateRef.current = null;
+    setDragging(false);
   }, []);
 
   const canPan = fit !== "contain" && draggable && (maxX > 0 || maxY > 0);
@@ -1026,6 +955,7 @@ function PhotoLayerView({
         touchAction: canPan ? "none" : undefined,
       }}
       onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
     >
