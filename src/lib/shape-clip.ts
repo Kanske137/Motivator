@@ -195,3 +195,55 @@ export function drawShapeOnCanvas(
   }
   ctx.clip();
 }
+
+/**
+ * Hit-test: returns true when (px, py) lies inside `shape` drawn into a
+ * `w × h` host rect. Heart/star use the same path as buildShapeClipPath /
+ * drawShapeOnCanvas so the result matches the visible clip pixel-for-pixel.
+ */
+export function isPointInShape(
+  shape: ClipShape,
+  w: number,
+  h: number,
+  px: number,
+  py: number,
+): boolean {
+  if (w <= 0 || h <= 0) return false;
+  if (shape === "rect") return px >= 0 && py >= 0 && px <= w && py <= h;
+  if (shape === "circle") {
+    const r = Math.min(w, h) / 2;
+    const cx = w / 2;
+    const cy = h / 2;
+    const dx = px - cx;
+    const dy = py - cy;
+    return dx * dx + dy * dy <= r * r;
+  }
+  // heart / star — build a Path2D from the same SVG path string used for
+  // CSS clip-path, then ask an offscreen 2D context to point-test it.
+  const s = Math.min(w, h);
+  const ox = (w - s) / 2;
+  const oy = (h - s) / 2;
+  const d = shape === "heart" ? heartSvgPath(ox, oy, s) : starSvgPath(ox, oy, s);
+  try {
+    const path = new Path2D(d);
+    const ctx = getHitTestCtx();
+    if (!ctx) return true;
+    return ctx.isPointInPath(path, px, py);
+  } catch {
+    return true;
+  }
+}
+
+let _hitCtx: CanvasRenderingContext2D | null | undefined;
+function getHitTestCtx(): CanvasRenderingContext2D | null {
+  if (_hitCtx !== undefined) return _hitCtx;
+  try {
+    const c = document.createElement("canvas");
+    c.width = 1;
+    c.height = 1;
+    _hitCtx = c.getContext("2d");
+  } catch {
+    _hitCtx = null;
+  }
+  return _hitCtx;
+}
