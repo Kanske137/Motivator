@@ -908,7 +908,7 @@ function PhotoLayerView({
       const nW = img.naturalWidth;
       const nH = img.naturalHeight;
       if (!nW || !nH || rect.width === 0 || rect.height === 0) return;
-      const scale = Math.max(rect.width / nW, rect.height / nH);
+      const scale = Math.max(rect.width / nW, rect.height / nH) * zoom;
       const rW = nW * scale;
       const rH = nH * scale;
       img.style.position = "absolute";
@@ -919,7 +919,7 @@ function PhotoLayerView({
       img.style.left = `${(rect.width - rW) / 2 + (x / 100) * rect.width}px`;
       img.style.top = `${(rect.height - rH) / 2 + (y / 100) * rect.height}px`;
     },
-    [fit],
+    [fit, zoom],
   );
 
   // Re-clamp current offset whenever bounds change. Skip while dragging and
