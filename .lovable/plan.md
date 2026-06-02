@@ -1,147 +1,96 @@
 ## Mål
-Tillåt kunden att placera ikoner (hjärta, hus, stjärna m.fl.) ovanpå ett kartlager — synliga i editorn, cart-thumbnail och Gelato-tryckfil. Ikonerna har fast storlek (oberoende av kartans zoom), respekterar lagrets form (heart/star/circle), och kan raderas via en liten papperskorgsknapp.
+1. **Bugg:** Klick på papperskorgs-knappen tar bort knappen (avmarkerar) men raderar inte själva ikonen. Fixa så att ikonen faktiskt försvinner.
+2. **Geo-ankring:** Ikoner ska bindas till en geografisk punkt (lng/lat) på kartan i stället för till lagrets bounding-box. När kunden pannar/zoomar kartan ska ikonen följa med kartans punkt, men ikonens **pixelstorlek** ska förbli konstant (som idag).
 
-## Datamodell
+---
 
+## Del 1 — Trash-buggen
+
+Trolig orsak: `onClickPlace` på overlay-containern triggas av bubbling när trash-knappen klickas, eller den globala `mousedown`-listenern nollställer `selectedMapIcon` innan React hinner köra `removeMapIcon` (state-race). Symptomen ("trash försvinner, ikon kvar") matchar att `setSelectedMapIcon(null)` körs medan `removeMapIcon` av någon anledning inte sker.
+
+Åtgärder i `src/components/editor/MapIconsOverlay.tsx`:
+- Byt trash-knappens handler från `onClick` till `onPointerDown` (fyrar före document-`mousedown`-listenern) och anropa `e.preventDefault()` + `e.stopPropagation()` där.
+- Lägg även `onPointerDown` på ikon-knappen som sätter `selectedMapIcon` (samma anledning — undvik race med outside-listenern).
+- I `onClickPlace` (containerns onClick): early-return även om `selectedMapIcon` är satt — placering ska aldrig kunna ske ovanpå en existerande markerad ikon utan att den först avmarkeras.
+- I outside-`mousedown`-effekten: ignorera om `e.target` är inom någon `.map-icon-popover` (datasel/klass på trash-wrappern) — säkrare än enbart `containerRef.contains`.
+
+Verifiering: klicka på en placerad ikon → trash dyker upp → klicka trash → ikon + trash försvinner direkt.
+
+---
+
+## Del 2 — Geo-ankra ikoner
+
+### Datamodell
 `src/stores/editorStore.ts`:
-
 ```ts
 export interface MapIcon {
-  id: string;          // uuid
-  iconId: string;      // t.ex. "heart"
-  xPct: number;        // 0..100, position inom kartlagrets box
-  yPct: number;        // 0..100
-}
-
-interface MapLayerValue {
-  ...
-  icons: MapIcon[];    // default []
+  id: string;
+  iconId: string;
+  lng: number;     // NY — primär anchor
+  lat: number;     // NY — primär anchor
+  xPct?: number;   // LEGACY — behållen för bakåtkomp, ignoreras om lng/lat finns
+  yPct?: number;
 }
 ```
+`addMapIcon` tar nu `{ id, iconId, lng, lat }`.
 
-Nya actions:
-- `addMapIcon(layerId, icon)` — push + clamp inom shape (om utanför → no-op)
-- `removeMapIcon(layerId, iconId)`
-- `moveMapIcon(layerId, iconId, xPct, yPct)` (drag-stöd, valfritt i v1)
+### Placering (editorn)
+För att projicera mus → lng/lat behöver overlay åtkomst till Mapbox-instansen.
 
-Ny transient state (ej persisterad i `layerValues`, ligger i store):
-- `activeIconTool: { iconId: string } | null` — sätts när användaren klickar en ikon i panelen, nollställs vid ESC eller efter placering (vi kör "place-one-then-deactivate" — enklast och matchar Mapiful).
-- `selectedMapIconId: { layerId, iconId } | null` — vald ikon på kartan (för papperskorgs-popover).
+`src/components/editor/layers/MapLayerInstance.tsx`:
+- Lägg till valfri prop `onMapReady?: (map: mapboxgl.Map | null) => void`. Anropa med map vid load och med `null` vid unmount.
 
-## Ikonkatalog
+`src/components/editor/MapPreview.tsx`:
+- Håll en `Map<layerId, mapboxgl.Map>` i en `useRef`. Skicka `onMapReady` ner till varje `MapLayerInstance`.
+- Skicka ner samma map-ref-getter till `MapIconsOverlay` som ny prop `getMap: () => mapboxgl.Map | null`.
 
-`src/lib/map-icon-catalog.ts` (ny):
-- Använd lucide-react (finns redan): Heart, Home, Briefcase, MapPin, Smile, User, Star, Building2, ArrowRight, ArrowLeft, ArrowUp, ArrowDown, LifeBuoy, Goal, Camera, Zap (matchar Mapiful-bilden + lite extra).
-- Export `MAP_ICONS: Array<{ id, label, Component }>` + helper `iconSvgString(id, color)` som returnerar en serialiserad SVG (24x24 viewBox) för rastrering på canvas i `template-snapshot`. Vi extraherar `iconNode` från lucide eller renderar via `renderToStaticMarkup` av `<IconComponent>`.
+`src/components/editor/MapIconsOverlay.tsx`:
+- **Placering**: vid klick, gör `map.unproject([x, y])` → `{lng, lat}` och anropa `addMapIcon(layerId, { id, iconId, lng, lat })`.
+- **Render**: räkna varje ikons pixelposition via `map.project([lng, lat])`. Subscriba på `map.on('move' | 'zoom' | 'rotate', forceUpdate)` så positionerna re-projiceras under pan/zoom.
+- **Bakåtkomp**: om `lng/lat` saknas men `xPct/yPct` finns, konvertera EN gång vid första render via `map.unproject([xPct/100*w, yPct/100*h])` och kalla `replaceMapIcon` för att uppgradera datan.
+- **Ghost-cursor**: ingen förändring — använder fortfarande musens råa x/y.
+- **Shape-clip**: oförändrad — `isPointInShape` använder fortfarande pixelkoordinater (kvar både för ghost och för placeringsvalidering).
+- Storleken (`iconPx`) räknas precis som idag baserat på lagrets bounding-box (oberoende av zoom).
 
-Ikonen ritas alltid med `currentColor = #111` (samma som textens fontColor-default — kan göras konfigurerbar i framtiden men inte i denna iteration).
-
-## Storlek
-
-Fast storlek i `mm`: `ICON_SIZE_MM = 8` (≈ matchar Mapiful). Konverteras till px både på skärm (via `frontPxPerMm` som redan finns för text) och på print-canvas (via `pxPerCm` i snapshot). Detta gör att storleken är oberoende av kartans interna zoom — det är layer-storleken som styr.
-
-## Editor-panel
-
-`src/components/editor/ControlPanel.tsx` (`MapTabs.renderForLayer`):
-
-Lägg till en ny sektion under map style:
-
-```tsx
-<div className="pt-4 border-t">
-  <MapIconsSection layer={l} value={...} />
-</div>
-```
-
-Ny komponent `MapIconsSection`:
-- Header "Ikoner" + body-text (nya i18n-nycklar i `sv.json`: `mapIcons.heading`, `mapIcons.subheading`, `mapIcons.addToMap`, `mapIcons.search`, `mapIcons.showMore`, `mapIcons.delete`; översätt till alla 11 språk).
-- Sökruta (Input) som filtrerar `MAP_ICONS` på `label` (svensk i18n via t-nycklar `mapIcon.<id>`).
-- 4-kolumns grid med kvadratiska knappar (samma stil som bifogad bild). Aktivt val har ring/`bg-primary/10`.
-- Klick på en knapp → `setActiveIconTool({ iconId })`. Klick igen på samma → avaktivera.
-- "Visa fler ikoner"-toggle som expanderar listan från 16 → alla.
-
-## Placering & cursor-preview
-
-`src/components/editor/MapPreview.tsx`, inom `MapLayerSlot`:
-
-1. När `activeIconTool` är satt OCH muspekaren är inom lagret OCH inom shape → rendera en absolut-positionerad lucide-ikon (storlek `iconPx`) vid musens position, `pointer-events: none`, opacity 0.7. Använd ny helper `isPointInShape(shape, w, h, x, y)` i `src/lib/shape-clip.ts`:
+### Snapshot/print
+`src/lib/template-snapshot.ts` `drawMapIcons`:
+- Behöver projicera lng/lat → pixel inom `rect` med samma center/zoom som map-bilden ritades med. Tillsätt en ren Web-Mercator-helper (Mapbox använder standard slippy projection vid pitch=0/bearing=0, vilket alltid är vårt fall):
 
 ```ts
-export function isPointInShape(shape, w, h, x, y): boolean
-```
-
-Implementerad via:
-- `rect`: alltid sant
-- `circle`: `(x-cx)² + (y-cy)² ≤ r²`
-- `heart`/`star`: bygg en `Path2D` av samma path-string som `buildShapeClipPath` och använd ett offscreen `CanvasRenderingContext2D.isPointInPath`. Cacha Path2D per shape+size i en `useMemo`.
-
-2. Cursor: `cursor: crosshair` när tool aktivt och inom shape, annars default.
-
-3. `onPointerDown` (vänsterklick) inom shape → `addMapIcon(layerId, { id: uuid, iconId, xPct, yPct })`, `setActiveIconTool(null)`. Klick utanför shape → ignorera (men ev. avaktivera om utanför lagret helt).
-
-## Rendera ikoner i editor
-
-I `MapLayerSlot` rendera efter map-tilen, före text-overlays:
-
-```tsx
-<div style={{ clipPath }} className="absolute inset-0 pointer-events-none">
-  {icons.map(icon => (
-    <button
-      key={icon.id}
-      onClick={(e) => { e.stopPropagation(); setSelectedMapIconId({layerId, iconId}); }}
-      className="absolute pointer-events-auto"
-      style={{ left: `${icon.xPct}%`, top: `${icon.yPct}%`, width: iconPx, height: iconPx, transform: 'translate(-50%, -50%)' }}
-    >
-      <Icon ... size={iconPx} />
-    </button>
-  ))}
-</div>
-```
-
-När `selectedMapIconId` matchar → rendera en liten popover ovanför ikonen med en Trash2-knapp (i18n: `mapIcons.delete`). Klick utanför avmarkerar (klick på preview-bakgrunden).
-
-## Snapshot/print
-
-`src/lib/template-snapshot.ts` (`drawMapLayer` eller direkt i map-blocket runt rad 663):
-
-Efter map-bilden är ritad (inom shape-clip):
-```ts
-for (const icon of mv.icons ?? []) {
-  const sizePx = ICON_SIZE_MM * (rect.w / frontMm.w);   // skala mot lagrets bredd
-  const svg = iconSvgString(icon.iconId, "#111");
-  const img = await loadSvgAsImage(svg, sizePx, sizePx);
-  ctx.drawImage(img, rect.x + rect.w*icon.xPct/100 - sizePx/2, rect.y + rect.h*icon.yPct/100 - sizePx/2, sizePx, sizePx);
+function projectToLayerPx(lng, lat, center, zoom, w, h) {
+  const scale = 256 * Math.pow(2, zoom);
+  const merc = (lon, la) => {
+    const x = (lon + 180) / 360 * scale;
+    const s = Math.sin(la * Math.PI / 180);
+    const y = (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * scale;
+    return { x, y };
+  };
+  const c = merc(center[0], center[1]);
+  const p = merc(lng, lat);
+  return { x: w / 2 + (p.x - c.x), y: h / 2 + (p.y - c.y) };
 }
 ```
 
-Ny helper `loadSvgAsImage(svg, w, h): Promise<HTMLImageElement>` som wrapper för `new Image() + data:image/svg+xml;base64,...`. Shape-clip är redan satt så ikoner utanför formen klipps automatiskt (matchar editorn).
+- Signaturen för `drawMapIcons` utökas med `center: [number,number]` och `zoom: number`. Anropssidan i map-blocket skickar `mv.center` / `mv.zoom`.
+- Fallback för legacy `xPct/yPct` om `lng/lat` saknas (samma kod som idag).
+- Klippningen mot shape (`clipForShape`) behålls — ikoner som hamnar utanför formen klipps automatiskt, exakt som i editorn.
 
-## Cart-preview & tryckfil
-
-Inga separata ändringar — `template-snapshot.ts` används av både `renderTemplateSnapshot` (thumbnail) och `getPrintFileUrl`/Gelato-pipeline. Eftersom `icons` ligger i `MapLayerValue` skickas de automatiskt via `layerValues` till snapshot.
-
-`EditorPage.handleAddToCart` properties: inget extra behövs eftersom `_design_id` + servrarens print-pipeline läser samma `layerValues`.
+---
 
 ## Filer som ändras
-
-- `src/stores/editorStore.ts` — `MapIcon`, fält i `MapLayerValue`, actions, transient state, init/reset till `icons: []`.
-- `src/lib/shape-clip.ts` — `isPointInShape`.
-- `src/lib/map-icon-catalog.ts` — ny.
-- `src/components/editor/ControlPanel.tsx` — `MapIconsSection` + rendera den i `MapTabs`.
-- `src/components/editor/MapPreview.tsx` — cursor-preview, klickplacering, render av placerade ikoner, papperskorgs-popover.
-- `src/lib/template-snapshot.ts` — `drawMapIcons` i map-blocket.
-- `src/i18n/locales/*.json` — nya nycklar (`mapIcons.*` + `mapIcon.<id>`-etiketter) i alla 11 språk.
+- `src/stores/editorStore.ts` — `MapIcon` med `lng/lat`, ev. ny `replaceMapIcon`-helper för legacy-uppgradering.
+- `src/components/editor/layers/MapLayerInstance.tsx` — `onMapReady`-prop.
+- `src/components/editor/MapPreview.tsx` — håll map-instanser per lager, skicka getter till overlay + onMapReady till instance.
+- `src/components/editor/MapIconsOverlay.tsx` — pointerdown-fix för trash, geo-projektion via map-instans, prenumeration på move/zoom.
+- `src/lib/template-snapshot.ts` — Web Mercator-projektion i `drawMapIcons`, ny signatur med center/zoom.
 
 ## Avgränsning
-
-- Endast karta får ikoner (inte foto/AI-foto/text-lager).
-- En färg (#111). Ingen färgväljare i v1.
-- Ingen drag-and-drop av redan placerade ikoner i v1 — bara placera + radera. (Lätt att addera senare via `moveMapIcon`.)
-- Ingen rotation/skalning av enskild ikon.
-- Inga ändringar i admin-designer, mockup, pricing, Shopify, Gelato-SKU, auth, secrets.
+- Ingen ändring i admin, pricing, Shopify, Gelato, auth eller i18n.
+- Ingen drag-and-drop av placerade ikoner (kvarhålls för framtida iteration).
+- Pitch/bearing förblir 0 (befintligt beteende) — annars skulle Web-Mercator-formeln behöva matchas mot Mapbox transform.
 
 ## Verifiering
-
-1. `/editor?handle=brollopskarta&type=poster` → ny "Ikoner"-sektion under map style. Klicka hjärtikon → cursor blir crosshair, hjärta följer musen endast inom karta + endast inom heart-shape (testa med heart-shape karta att ikon-preview döljs när muspekaren är i hjärtformens "luft"). Klick → ikon placeras, tool avaktiveras.
-2. Klick på placerad ikon → liten papperskorgsknapp visas, klick raderar.
-3. Storleken är konstant när man scroll-zoomar kartan.
-4. Lägg i varukorg → `_preview_image` visar ikonerna. Inspektera `_print_file_url` → ikonerna finns i tryckfilen på rätt position.
+1. Placera en ikon, klicka den, klicka trash → ikon försvinner direkt.
+2. Placera en ikon på t.ex. Eiffeltornet, panorera kartan → ikonen "klistrar" på tornet.
+3. Scroll-zooma in/ut → ikonens pixelstorlek är konstant, men dess kartposition håller sig på tornet.
+4. Lägg i varukorg → `_preview_image` och `_print_file_url` visar ikonen exakt på tornets position.
