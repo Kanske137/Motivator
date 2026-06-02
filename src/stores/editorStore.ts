@@ -264,6 +264,7 @@ interface EditorState {
   setSelectedMapIcon: (sel: { layerId: string; iconId: string } | null) => void;
   addMapIcon: (layerId: string, icon: MapIcon) => void;
   removeMapIcon: (layerId: string, iconInstanceId: string) => void;
+  replaceMapIcon: (layerId: string, iconInstanceId: string, patch: Partial<MapIcon>) => void;
 
   // ---------- legacy globals (derived getters; mutators apply to first layer) ----------
   // These setters/getters keep older code (EditorPage cart payload, snapshot
