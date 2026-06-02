@@ -190,6 +190,9 @@
     "successWithErrors": "Vorlage gelöscht, aber Shopify-Löschung hatte Fehler",
     "error": "Vorlage konnte nicht gelöscht werden"
   },
+  "admin": {
+    "photoPanLockHint": "Foto-Panning im Kundeneditor wird nicht durch die Sperren gesteuert. Es funktioniert, wenn Anpassung auf Füllen (cover) steht und das Bild Beschnitt-Überstand hat. Ebene verschieben steuert nur den ✥-Griff für den gesamten Bildcontainer."
+  },
   "mapStyle": {
     "skandinavisk": "Skandinavisch",
     "midnatt": "Mitternacht",

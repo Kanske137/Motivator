@@ -190,6 +190,9 @@
     "successWithErrors": "Sjabloon verwijderd, maar Shopify-verwijdering had fouten",
     "error": "Kan het sjabloon niet verwijderen"
   },
+  "admin": {
+    "photoPanLockHint": "Foto-pannen in de klanteditor wordt niet door de vergrendelingen geregeld. Het werkt wanneer Passing op Vullen (cover) staat en de afbeelding uitsnede-overloop heeft. Laag verplaatsen bestuurt alleen de ✥-greep voor de hele afbeeldingscontainer."
+  },
   "mapStyle": {
     "skandinavisk": "Scandinavisch",
     "midnatt": "Middernacht",

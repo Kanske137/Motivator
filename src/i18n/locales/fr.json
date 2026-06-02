@@ -190,6 +190,9 @@
     "successWithErrors": "Modèle supprimé, mais la suppression Shopify a échoué partiellement",
     "error": "Impossible de supprimer le modèle"
   },
+  "admin": {
+    "photoPanLockHint": "Le panoramique photo dans l’éditeur client n’est pas contrôlé par les verrous. Il fonctionne lorsque l’ajustement est Remplir (cover) et que l’image déborde pour le recadrage. Déplacer le calque contrôle uniquement la poignée ✥ de tout le conteneur d’image."
+  },
   "mapStyle": {
     "skandinavisk": "Scandinave",
     "midnatt": "Minuit",

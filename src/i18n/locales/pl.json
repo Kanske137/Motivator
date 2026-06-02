@@ -190,6 +190,9 @@
     "successWithErrors": "Szablon usunięty, ale usunięcie w Shopify miało błędy",
     "error": "Nie można usunąć szablonu"
   },
+  "admin": {
+    "photoPanLockHint": "Przesuwanie zdjęcia w edytorze klienta nie jest kontrolowane przez blokady. Działa, gdy dopasowanie to Wypełnij (cover), a obraz ma nadmiar kadrowania. Przenieś warstwę steruje tylko uchwytem ✥ dla całego kontenera obrazu."
+  },
   "mapStyle": {
     "skandinavisk": "Skandynawski",
     "midnatt": "Północ",

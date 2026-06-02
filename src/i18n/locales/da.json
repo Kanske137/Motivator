@@ -190,6 +190,9 @@
     "successWithErrors": "Skabelonen er slettet, men Shopify-sletning havde fejl",
     "error": "Kunne ikke slette skabelonen"
   },
+  "admin": {
+    "photoPanLockHint": "Billedpanorering i kundeditoren styres ikke af låsene. Den fungerer, når Tilpasning er Fyld (cover), og billedet har beskæringsoverskud. Flyt lag styrer kun ✥-håndtaget for hele billedbeholderen."
+  },
   "mapStyle": {
     "skandinavisk": "Skandinavisk",
     "midnatt": "Midnat",

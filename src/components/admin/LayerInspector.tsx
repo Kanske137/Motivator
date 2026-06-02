@@ -5,6 +5,7 @@
 //   - Map: search a default place (geocoding) → updates center/zoom +
 //     placeName/city/country, AND auto-builds text for any linked text layers.
 import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { ProductConfig } from "@/lib/product-config";
@@ -61,6 +62,8 @@ const LOCK_LABELS: Array<{ key: keyof LayerLocks; label: string }> = [
 ];
 
 export default function LayerInspector({ config, layer, allLayers, onChange, onLayersChange }: Props) {
+  const { t } = useTranslation();
+
   if (!layer) {
     return (
       <p className="text-xs text-muted-foreground py-4 text-center">
@@ -471,6 +474,11 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
           <p className="text-xs text-muted-foreground">
             Olåsta egenskaper kan kunden ändra i editorn.
           </p>
+          {layer.type === "photo" && (
+            <p className="text-xs text-muted-foreground">
+              {t("admin.photoPanLockHint")}
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-2 pt-2">
             {LOCK_LABELS.map(({ key, label }) => (
               <label key={key} className="flex items-center justify-between gap-2 text-sm">

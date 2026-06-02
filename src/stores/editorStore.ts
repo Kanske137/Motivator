@@ -1306,13 +1306,19 @@ function setLayerOverrideText(set: SetFn, get: GetFn, id: string, raw: string) {
 function updatePhoto(set: SetFn, get: GetFn, id: string, patch: Partial<PhotoLayerValue>) {
   const state = get();
   const cur = state.layerValues[id];
+  const layout = state.template
+    ? getActiveLayoutBlock(state.template, state.config?.product_type, state.layoutId)[state.orientation]
+    : null;
+  const layer = layout?.layers.find((l) => l.id === id && l.type === "photo") as
+    | Extract<TemplateLayer, { type: "photo" }>
+    | undefined;
   // If the layer value hasn't been hydrated yet (race after layout switch /
   // first interaction), hydrate it on the fly instead of silently swallowing
   // the update — otherwise photo pan offsets get lost.
   const base: PhotoLayerValue =
     cur && cur.kind === "photo"
       ? cur
-      : { kind: "photo", shape: "rect", offsetX: 0, offsetY: 0 };
+      : { kind: "photo", shape: (layer?.defaults.shape ?? "rect") as PhotoShape, offsetX: 0, offsetY: 0 };
   const next: PhotoLayerValue = { ...base, ...patch };
   const layerValues = { ...state.layerValues, [id]: next };
   set({ layerValues });
