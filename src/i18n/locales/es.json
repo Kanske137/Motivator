@@ -190,6 +190,9 @@
     "successWithErrors": "Plantilla eliminada, pero la eliminación en Shopify tuvo errores",
     "error": "No se pudo eliminar la plantilla"
   },
+  "admin": {
+    "photoPanLockHint": "El paneo de fotos en el editor del cliente no lo controlan los bloqueos. Funciona cuando el ajuste es Rellenar (cover) y la imagen tiene excedente de recorte. Mover capa solo controla el tirador ✥ de todo el contenedor de imagen."
+  },
   "mapStyle": {
     "skandinavisk": "Escandinavo",
     "midnatt": "Medianoche",
