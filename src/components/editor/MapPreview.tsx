@@ -889,7 +889,19 @@ function PhotoLayerView({
     baseY: number;
     width: number;
     height: number;
+    nextX: number;
+    nextY: number;
   } | null>(null);
+
+  const applyImagePosition = useCallback(
+    (x: number, y: number) => {
+      const img = imgRef.current;
+      if (!img || fit === "contain" || !natural || box.w === 0 || box.h === 0) return;
+      img.style.left = `${(box.w - renderW) / 2 + (x / 100) * box.w}px`;
+      img.style.top = `${(box.h - renderH) / 2 + (y / 100) * box.h}px`;
+    },
+    [fit, natural, box.w, box.h, renderW, renderH],
+  );
 
   // Re-clamp current offset whenever bounds change. Skip while dragging and
   // skip until the image is measured — otherwise a transient state can wipe
@@ -954,6 +966,8 @@ function PhotoLayerView({
         baseY: offsetY,
         width: rect.width,
         height: rect.height,
+        nextX: offsetX,
+        nextY: offsetY,
       };
       try {
         el.setPointerCapture(e.pointerId);
@@ -972,10 +986,13 @@ function PhotoLayerView({
         const dyPct = ((ev.clientY - s.startY) / s.height) * 100;
         const nextX = mx > 0 ? Math.max(-mx, Math.min(mx, s.baseX + dxPct)) : 0;
         const nextY = my > 0 ? Math.max(-my, Math.min(my, s.baseY + dyPct)) : 0;
-        setLayerPhotoOffset(layerId, nextX, nextY);
+        s.nextX = nextX;
+        s.nextY = nextY;
+        applyImagePosition(nextX, nextY);
       };
       const onUp = (ev: PointerEvent) => {
-        if (dragStateRef.current && ev.pointerId !== dragStateRef.current.pointerId) return;
+        const s = dragStateRef.current;
+        if (s && ev.pointerId !== s.pointerId) return;
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", onUp);
         window.removeEventListener("pointercancel", onUp);
@@ -988,6 +1005,7 @@ function PhotoLayerView({
         dragStateRef.current = null;
         draggingRef.current = false;
         setDragging(false);
+        if (s) setLayerPhotoOffset(layerId, s.nextX, s.nextY);
       };
       const onBlur = () => {
         window.removeEventListener("pointermove", onMove);
