@@ -1,42 +1,44 @@
-## Mål
-Fixa fotopan i kundens editor (`/editor`) så att uppladdade foton går att dra/panna inuti fotolagret när bilden beskärs av `cover`, utan att påverka admin, kartor, textlager, uppladdning, AI-flöde, priser eller print/cart-pipeline.
+## Problemet jag ser
 
-## Rotorsak jag vill åtgärda
-Nuvarande implementation väntar på att `naturalWidth/naturalHeight` + container-mått ska ge `maxX/maxY > 0`. Om dessa bounds blir `0`, om bilden först renderas via `object-cover`, eller om drag startar innan måtten är stabila, startas inget pan-drag alls. Det matchar symptomet: preview reagerar/uppdateras, men bilden står still.
+Du har rätt: karta-pan och foto-pan använder helt olika teknik.
+
+- **Kartan fungerar** eftersom Mapbox sköter drag direkt i sin egen canvas och skriver tillbaka till app-state först efter `moveend`.
+- **Fotot fungerar inte stabilt** eftersom draget skriver `setLayerPhotoOffset(...)` på varje `pointermove`, vilket triggar React/store-uppdateringar, mockup/preview-omrenderingar och ny layoutmätning medan fingret/musen fortfarande drar.
+- I tidigare kod fanns dessutom en viktig skyddsmekanism: låsta/icke-interaktiva lager fick `pointerEvents: none`, så de inte kunde ligga ovanpå och stjäla drag från fotot. Den spärren är borta i nuvarande fil.
 
 ## Plan
-1. **Gör fotopan oberoende av förhandsberäknade bounds vid pointer-down**
-   - Starta drag för uppladdade foton i `cover`-läge även om `maxX/maxY` ännu är `0`.
-   - Mät container och bild direkt i drag-start och/eller använd en säker fallback från den renderade bilden.
-   - Behåll regeln att axlar utan faktisk crop låses, men låt inte ett temporärt `0` blockera hela draget.
 
-2. **Flytta pan-matematiken till en liten, testbar helper**
-   - Skapa/uppdatera minimal helper som räknar cover-renderstorlek, overflow och clamp från:
-     - layer-boxens pixelstorlek
-     - bildens natural size
-     - offset i procent
-   - Använd samma helper i `PhotoLayerView` och snapshot-rendering om befintlig snapshot-matematik behöver matchas.
-   - Ingen ändring i hur `offsetX/offsetY` lagras: procent av fotolagrets storlek.
+1. **Återställ pointer-event-skyddet runt lager**
+   - I `MapPreview.tsx` ska bara verkligt interaktiva lager få fånga pointer events:
+     - `photo` / `aiPhoto` när de har bild och får pannas
+     - `map` när position inte är låst
+     - move-handle om lagerflytt är upplåst
+   - Låsta text-, bild-, dekor-, marginal- och form-lager ska inte kunna blockera foto-pan.
 
-3. **Säkra event-hanteringen**
-   - Behåll `preventDefault()` och `stopPropagation()` på fotodrag.
-   - Använd `window`-baserade `pointermove/pointerup/pointercancel` med pointer-id och cleanup vid unmount/blur.
-   - Lägg `touch-action: none` när fotot är dragbart så mobil/iframe-scroll inte tar över.
+2. **Gör foto-pan imperativ under själva draget, som kartan**
+   - Vid `pointerdown`: mät box + bild, starta drag och stoppa propagation.
+   - Under `pointermove`: uppdatera endast bildens DOM-position direkt via `style.transform/left/top`, utan att skriva till Zustand/store varje pixel.
+   - Vid `pointerup`: skriv slutlig `offsetX/offsetY` till store en gång.
+   - Detta ska stoppa att mockup-galleriet/förhandsgranskningsbilder laddas om mitt i draget.
 
-4. **Ta bort “nollställande” under aktiv dragning**
-   - Re-clamp-effekten ska inte skriva tillbaka `0,0` medan användaren drar om bounds tillfälligt rapporteras som `0`.
-   - Clamp ska ske när bild och container faktiskt är mätta, och per axel.
+3. **Behåll exakt samma datamodell och print-output**
+   - `offsetX/offsetY` fortsätter lagras som procent av fotolagret.
+   - `template-snapshot.ts`, cart, Gelato/print och admin-designern lämnas orörda om ingen faktisk mismatch hittas.
 
-5. **Verifiera snävt**
-   - Bred bild i stående fotolager: horisontell pan fungerar.
-   - Stående bild i brett fotolager: vertikal pan fungerar.
-   - Bild med samma aspekt: ingen falsk pan/inga tomma ytor.
-   - Kontrollera att preview använder lagrat `offsetX/offsetY` och att foton inte laddas om i loop under drag.
+4. **Lägg in tillfälliga diagnostik-loggar endast om första fixen inte kan verifieras direkt**
+   - Logga `pointerdown`, `maxX/maxY`, aktivt lager och slut-offset.
+   - Ta bort loggarna när orsaken är bekräftad.
 
-## Filer som berörs
-- `src/components/editor/MapPreview.tsx` — huvudfix för kundens fotopan.
-- Eventuellt en liten helper i `src/lib/...` om det behövs för att undvika duplicerad matte.
-- Eventuellt `src/lib/template-snapshot.ts` endast om jag hittar faktisk mismatch i snapshot-matematiken.
+5. **Verifiering i preview**
+   - Öppna `/editor?handle=personlig-fototavla&type=poster`.
+   - Ladda/testa med ett foto i annan aspekt än fotolagret.
+   - Dra i fotot och kontrollera att bilden faktiskt rör sig utan att mockup-previewn laddar om under själva draget.
+   - Kontrollera att karta-pan fortfarande fungerar på `/editor?handle=brollopskarta&type=poster`.
+
+## Filer att ändra
+
+- `src/components/editor/MapPreview.tsx` — huvudfixen.
 
 ## Avgränsning
-Jag kommer inte ändra admin-designern, ramrendering, textlager, kartlager, AI-generering, Shopify/Gelato-flöde eller språk/valuta.
+
+Jag ändrar inte admin-designern, textlagerlogik, kartlogik, uploadflöde, AI, mockups, priser eller print/cart-pipeline.
