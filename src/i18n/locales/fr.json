@@ -101,7 +101,7 @@
     "uploadHint": "JPG, PNG, WebP · max 25 Mo",
     "swap": "Changer l'image",
     "altUploaded": "Image téléchargée",
-    "tipCrop": "Faites glisser l'image pour choisir le cadrage.",
+    "tipCrop": "Faites glisser l'image pour choisir le cadrage. Faites défiler pour zoomer — pincez sur mobile.",
     "errorOnlyImages": "Seuls les fichiers image sont pris en charge",
     "errorTooLarge": "Image trop volumineuse",
     "errorTooLargeHint": "Max 25 Mo. Compressez et réessayez.",

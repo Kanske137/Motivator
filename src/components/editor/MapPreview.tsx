@@ -1089,6 +1089,12 @@ function PhotoLayerView({
   const canPan = fit !== "contain" && draggable;
   const canZoom = fit !== "contain" && !!src;
 
+  // Keep latest zoom available without re-binding listeners.
+  const zoomRef = useRef(zoom);
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+
   // Wheel-zoom: attach a non-passive listener so we can preventDefault.
   // React's synthetic onWheel is passive by default.
   useEffect(() => {
@@ -1099,12 +1105,69 @@ function PhotoLayerView({
       ev.stopPropagation();
       // Use exponential scaling so each tick feels uniform.
       const factor = Math.exp(-ev.deltaY * 0.0015);
-      const next = Math.max(1, Math.min(5, zoom * factor));
-      if (next !== zoom) setLayerPhotoZoom(layerId, next);
+      const next = Math.max(1, Math.min(5, zoomRef.current * factor));
+      if (next !== zoomRef.current) setLayerPhotoZoom(layerId, next);
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, [canZoom, zoom, layerId, setLayerPhotoZoom]);
+  }, [canZoom, layerId, setLayerPhotoZoom]);
+
+  // Pinch-to-zoom (mobile/touch). Tracks two simultaneous touch pointers on
+  // the container and updates zoom based on finger-distance ratio. When the
+  // second finger lands we also abort any single-finger pan drag in progress
+  // so the gestures don't fight each other.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || !canZoom) return;
+    const pointers = new Map<number, { x: number; y: number }>();
+    let pinch: { startDist: number; startZoom: number } | null = null;
+    const distance = () => {
+      const pts = Array.from(pointers.values());
+      if (pts.length < 2) return 0;
+      const dx = pts[0]!.x - pts[1]!.x;
+      const dy = pts[0]!.y - pts[1]!.y;
+      return Math.hypot(dx, dy);
+    };
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType !== "touch") return;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 2) {
+        pinch = { startDist: Math.max(1, distance()), startZoom: zoomRef.current };
+        // Cancel an in-flight pan so the two gestures don't fight.
+        if (dragStateRef.current) {
+          dragStateRef.current = null;
+          draggingRef.current = false;
+          setDragging(false);
+        }
+      }
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!pointers.has(e.pointerId)) return;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinch && pointers.size >= 2) {
+        e.preventDefault();
+        const d = distance();
+        if (d <= 0) return;
+        const next = Math.max(1, Math.min(5, pinch.startZoom * (d / pinch.startDist)));
+        setLayerPhotoZoom(layerId, next);
+      }
+    };
+    const onUp = (e: PointerEvent) => {
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2) pinch = null;
+    };
+    el.addEventListener("pointerdown", onDown);
+    window.addEventListener("pointermove", onMove, { passive: false });
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      el.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [canZoom, layerId, setLayerPhotoZoom]);
+
 
   const measuredClip = box.w > 0 && box.h > 0 ? buildShapeClipPath(shape, box.w, box.h) : undefined;
   const clipPath = measuredClip ?? staticClipPath;
@@ -1140,7 +1203,7 @@ function PhotoLayerView({
       style={{
         clipPath,
         cursor: canPan ? (dragging ? "grabbing" : "grab") : "default",
-        touchAction: canPan ? "none" : undefined,
+        touchAction: canPan || canZoom ? "none" : undefined,
       }}
       onPointerDown={onPointerDown}
     >

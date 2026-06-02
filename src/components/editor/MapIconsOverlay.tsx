@@ -29,11 +29,8 @@ function IconSvg({ iconId, sizePx, color = "#111" }: { iconId: string; sizePx: n
       width={sizePx}
       height={sizePx}
       viewBox="0 0 24 24"
-      fill="none"
-      stroke={color}
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      fill={color}
+      stroke="none"
       aria-hidden
     >
       {def.iconNode.map(([tag, attrs], i) => {

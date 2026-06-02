@@ -101,7 +101,7 @@
     "uploadHint": "JPG, PNG, WebP · maks 25 MB",
     "swap": "Skift billede",
     "altUploaded": "Uploadet billede",
-    "tipCrop": "Træk i billedet for at vælge udsnit inden for rammen.",
+    "tipCrop": "Træk i billedet for at vælge udsnit. Scroll for at zoome — knib på mobil.",
     "errorOnlyImages": "Kun billedfiler understøttes",
     "errorTooLarge": "Billedet er for stort",
     "errorTooLargeHint": "Maks 25 MB. Komprimér og prøv igen.",

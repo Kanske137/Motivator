@@ -265,7 +265,7 @@ async function drawMapIcons(
   ctx.save();
   clipForShape(ctx, shape, rect.x, rect.y, rect.w, rect.h);
   for (const ic of icons) {
-    const svg = iconSvgString(ic.iconId, "#111", 2);
+    const svg = iconSvgString(ic.iconId, "#111");
     if (!svg) continue;
     try {
       const img = await loadSvgAsImage(svg);

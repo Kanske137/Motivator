@@ -101,7 +101,7 @@
     "uploadHint": "JPG, PNG, WebP · max 25 MB",
     "swap": "Byt bild",
     "altUploaded": "Uppladdad bild",
-    "tipCrop": "Dra i bilden för att välja utsnitt inom ramen.",
+    "tipCrop": "Dra i bilden för att välja utsnitt. Scrolla för att zooma — nyp ihop på mobil.",
     "errorOnlyImages": "Endast bildfiler stöds",
     "errorTooLarge": "Bilden är för stor",
     "errorTooLargeHint": "Max 25 MB. Komprimera och försök igen.",

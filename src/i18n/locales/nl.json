@@ -101,7 +101,7 @@
     "uploadHint": "JPG, PNG, WebP · max 25 MB",
     "swap": "Afbeelding wisselen",
     "altUploaded": "Geüploade afbeelding",
-    "tipCrop": "Sleep de afbeelding om de uitsnede binnen de lijst te kiezen.",
+    "tipCrop": "Sleep de afbeelding om de uitsnede te kiezen. Scroll om te zoomen — knijp op mobiel.",
     "errorOnlyImages": "Alleen afbeeldingsbestanden worden ondersteund",
     "errorTooLarge": "Afbeelding te groot",
     "errorTooLargeHint": "Max 25 MB. Comprimeer en probeer opnieuw.",
