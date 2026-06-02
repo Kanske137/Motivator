@@ -895,12 +895,25 @@ function PhotoLayerView({
 
   const applyImagePosition = useCallback(
     (x: number, y: number) => {
+      const el = containerRef.current;
       const img = imgRef.current;
-      if (!img || fit === "contain" || !natural || box.w === 0 || box.h === 0) return;
-      img.style.left = `${(box.w - renderW) / 2 + (x / 100) * box.w}px`;
-      img.style.top = `${(box.h - renderH) / 2 + (y / 100) * box.h}px`;
+      if (!el || !img || fit === "contain") return;
+      const rect = el.getBoundingClientRect();
+      const nW = img.naturalWidth;
+      const nH = img.naturalHeight;
+      if (!nW || !nH || rect.width === 0 || rect.height === 0) return;
+      const scale = Math.max(rect.width / nW, rect.height / nH);
+      const rW = nW * scale;
+      const rH = nH * scale;
+      img.style.position = "absolute";
+      img.style.width = `${rW}px`;
+      img.style.height = `${rH}px`;
+      img.style.maxWidth = "none";
+      img.style.objectFit = "fill";
+      img.style.left = `${(rect.width - rW) / 2 + (x / 100) * rect.width}px`;
+      img.style.top = `${(rect.height - rH) / 2 + (y / 100) * rect.height}px`;
     },
-    [fit, natural, box.w, box.h, renderW, renderH],
+    [fit],
   );
 
   // Re-clamp current offset whenever bounds change. Skip while dragging and
@@ -1021,7 +1034,7 @@ function PhotoLayerView({
       window.addEventListener("pointercancel", onUp, { passive: false });
       window.addEventListener("blur", onBlur);
     },
-    [draggable, fit, offsetX, offsetY, layerId, setLayerPhotoOffset, measureBoundsNow],
+    [draggable, fit, offsetX, offsetY, layerId, setLayerPhotoOffset, measureBoundsNow, applyImagePosition],
   );
 
   // Cleanup any in-flight drag on unmount.
