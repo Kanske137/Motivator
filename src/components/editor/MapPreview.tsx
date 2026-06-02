@@ -1017,10 +1017,22 @@ function PhotoLayerView({
         } catch {
           /* ignore */
         }
+        const finalX = s ? s.nextX : 0;
+        const finalY = s ? s.nextY : 0;
         dragStateRef.current = null;
-        draggingRef.current = false;
         setDragging(false);
-        if (s) setLayerPhotoOffset(layerId, s.nextX, s.nextY);
+        if (s) {
+          // Commit to store, then keep the imperative DOM position pinned
+          // for one frame so any re-render in between doesn't snap back.
+          setLayerPhotoOffset(layerId, finalX, finalY);
+          applyImagePosition(finalX, finalY);
+          requestAnimationFrame(() => {
+            applyImagePosition(finalX, finalY);
+            draggingRef.current = false;
+          });
+        } else {
+          draggingRef.current = false;
+        }
       };
       const onBlur = () => {
         window.removeEventListener("pointermove", onMove);
