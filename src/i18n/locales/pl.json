@@ -101,7 +101,7 @@
     "uploadHint": "JPG, PNG, WebP · maks. 25 MB",
     "swap": "Zmień zdjęcie",
     "altUploaded": "Przesłane zdjęcie",
-    "tipCrop": "Przeciągnij zdjęcie, aby wybrać kadr w ramie.",
+    "tipCrop": "Przeciągnij zdjęcie, aby wybrać kadr. Przewijaj, aby przybliżyć — uszczypnij na telefonie.",
     "errorOnlyImages": "Obsługiwane są tylko pliki obrazów",
     "errorTooLarge": "Zdjęcie za duże",
     "errorTooLargeHint": "Maks. 25 MB. Skompresuj i spróbuj ponownie.",

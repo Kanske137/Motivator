@@ -101,7 +101,7 @@
     "uploadHint": "JPG, PNG, WebP · enint. 25 MB",
     "swap": "Vaihda kuva",
     "altUploaded": "Ladattu kuva",
-    "tipCrop": "Vedä kuvaa valitaksesi rajauksen kehyksen sisällä.",
+    "tipCrop": "Vedä kuvaa valitaksesi rajauksen. Vieritä zoomataksesi — nipistä mobiilissa.",
     "errorOnlyImages": "Vain kuvatiedostot tuetaan",
     "errorTooLarge": "Kuva on liian suuri",
     "errorTooLargeHint": "Enint. 25 MB. Pakkaa ja yritä uudelleen.",

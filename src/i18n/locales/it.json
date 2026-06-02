@@ -101,7 +101,7 @@
     "uploadHint": "JPG, PNG, WebP · max 25 MB",
     "swap": "Cambia immagine",
     "altUploaded": "Immagine caricata",
-    "tipCrop": "Trascina l'immagine per scegliere il ritaglio entro la cornice.",
+    "tipCrop": "Trascina l'immagine per scegliere il ritaglio. Scorri per zoomare — pizzica sul cellulare.",
     "errorOnlyImages": "Sono supportati solo file immagine",
     "errorTooLarge": "Immagine troppo grande",
     "errorTooLargeHint": "Max 25 MB. Comprimi e riprova.",

@@ -101,7 +101,7 @@
     "uploadHint": "JPG, PNG, WebP · max. 25 MB",
     "swap": "Bild wechseln",
     "altUploaded": "Hochgeladenes Bild",
-    "tipCrop": "Ziehe das Bild, um den Ausschnitt zu wählen.",
+    "tipCrop": "Ziehe das Bild, um den Ausschnitt zu wählen. Scrollen zum Zoomen — auf dem Handy zusammenkneifen.",
     "errorOnlyImages": "Es werden nur Bilddateien unterstützt",
     "errorTooLarge": "Bild zu groß",
     "errorTooLargeHint": "Max. 25 MB. Komprimiere und versuche es erneut.",

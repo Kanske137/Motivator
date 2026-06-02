@@ -101,7 +101,7 @@
     "uploadHint": "JPG, PNG, WebP · máx. 25 MB",
     "swap": "Cambiar imagen",
     "altUploaded": "Imagen subida",
-    "tipCrop": "Arrastra la imagen para elegir el encuadre dentro del marco.",
+    "tipCrop": "Arrastra la imagen para elegir el encuadre. Desplázate para hacer zoom — pellizca en el móvil.",
     "errorOnlyImages": "Solo se admiten archivos de imagen",
     "errorTooLarge": "Imagen demasiado grande",
     "errorTooLargeHint": "Máx. 25 MB. Comprime y reintenta.",

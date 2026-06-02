@@ -101,7 +101,7 @@
     "uploadHint": "JPG, PNG, WebP · max 25 MB",
     "swap": "Swap image",
     "altUploaded": "Uploaded image",
-    "tipCrop": "Drag the image to choose the crop within the frame.",
+    "tipCrop": "Drag the image to choose the crop. Scroll to zoom — pinch on mobile.",
     "errorOnlyImages": "Only image files are supported",
     "errorTooLarge": "Image too large",
     "errorTooLargeHint": "Max 25 MB. Compress and try again.",
