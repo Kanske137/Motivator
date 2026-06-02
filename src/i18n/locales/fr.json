@@ -197,5 +197,33 @@
     "marinbla": "Bleu Marin",
     "varmbeige": "Beige Chaud/Crème",
     "skogsgron": "Vert Forêt Profond/Noir"
+  },
+  "mapIcons": {
+    "heading": "Icônes",
+    "subheading": "Ajouter des icônes à la carte",
+    "addToMap": "Cliquez pour placer sur la carte",
+    "search": "Rechercher une icône",
+    "showMore": "Afficher plus d'icônes",
+    "showLess": "Afficher moins d'icônes",
+    "delete": "Supprimer l'icône",
+    "select": "Sélectionner l'icône"
+  },
+  "mapIcon": {
+    "heart": "Cœur",
+    "home": "Maison",
+    "briefcase": "Travail",
+    "mapPin": "Lieu",
+    "smile": "Smiley",
+    "user": "Personne",
+    "star": "Étoile",
+    "building": "Bâtiment",
+    "arrowRight": "Flèche droite",
+    "arrowLeft": "Flèche gauche",
+    "arrowUp": "Flèche haut",
+    "arrowDown": "Flèche bas",
+    "lifeBuoy": "Bouée",
+    "ball": "Ballon",
+    "camera": "Appareil photo",
+    "zap": "Éclair"
   }
 }

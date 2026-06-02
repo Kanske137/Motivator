@@ -197,5 +197,33 @@
     "marinbla": "Azul Marino",
     "varmbeige": "Beige Cálido/Crema",
     "skogsgron": "Verde Bosque Profundo/Negro"
+  },
+  "mapIcons": {
+    "heading": "Iconos",
+    "subheading": "Añadir iconos al mapa",
+    "addToMap": "Haz clic para colocar en el mapa",
+    "search": "Buscar icono",
+    "showMore": "Mostrar más iconos",
+    "showLess": "Mostrar menos iconos",
+    "delete": "Eliminar icono",
+    "select": "Seleccionar icono"
+  },
+  "mapIcon": {
+    "heart": "Corazón",
+    "home": "Casa",
+    "briefcase": "Trabajo",
+    "mapPin": "Ubicación",
+    "smile": "Sonrisa",
+    "user": "Persona",
+    "star": "Estrella",
+    "building": "Edificio",
+    "arrowRight": "Flecha derecha",
+    "arrowLeft": "Flecha izquierda",
+    "arrowUp": "Flecha arriba",
+    "arrowDown": "Flecha abajo",
+    "lifeBuoy": "Salvavidas",
+    "ball": "Balón",
+    "camera": "Cámara",
+    "zap": "Rayo"
   }
 }
