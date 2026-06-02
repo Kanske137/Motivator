@@ -47,6 +47,7 @@ export function MapLayerInstance({
   showLabels,
   interactive,
   clipPath,
+  onMapReady,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
