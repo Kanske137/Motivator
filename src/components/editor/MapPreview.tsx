@@ -829,6 +829,7 @@ interface PhotoLayerViewProps {
   staticClipPath?: string;
   offsetX: number;
   offsetY: number;
+  zoom: number;
   draggable: boolean;
 }
 
@@ -840,9 +841,11 @@ function PhotoLayerView({
   staticClipPath,
   offsetX,
   offsetY,
+  zoom,
   draggable,
 }: PhotoLayerViewProps) {
   const setLayerPhotoOffset = useEditorStore((s) => s.setLayerPhotoOffset);
+  const setLayerPhotoZoom = useEditorStore((s) => s.setLayerPhotoZoom);
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const [dragging, setDragging] = useState(false);
