@@ -895,12 +895,23 @@ function PhotoLayerView({
   const renderOffsetX = fit === "contain" ? 0 : Math.max(-maxX, Math.min(maxX, offsetX));
   const renderOffsetY = fit === "contain" ? 0 : Math.max(-maxY, Math.min(maxY, offsetY));
 
+  // Keep latest bounds available to the window listeners without re-binding
+  // them on every render (which otherwise drops in-flight pointer events).
+  const boundsRef = useRef({ maxX, maxY });
+  useEffect(() => {
+    boundsRef.current = { maxX, maxY };
+  }, [maxX, maxY]);
+
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (!draggable || fit === "contain") return;
+      // If there is no overflow on either axis there's nothing to pan.
       if (maxX === 0 && maxY === 0) return;
       const el = containerRef.current;
       if (!el) return;
+      // Stop the outer layer-move handler from also picking up this gesture.
+      e.preventDefault();
+      e.stopPropagation();
       const rect = el.getBoundingClientRect();
       dragStateRef.current = {
         startX: e.clientX,
@@ -910,31 +921,32 @@ function PhotoLayerView({
         width: rect.width,
         height: rect.height,
       };
-      el.setPointerCapture(e.pointerId);
       setDragging(true);
-    },
-    [draggable, fit, offsetX, offsetY, maxX, maxY],
-  );
 
-  const onPointerMove = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      const s = dragStateRef.current;
-      if (!s) return;
-      const dxPct = ((e.clientX - s.startX) / s.width) * 100;
-      const dyPct = ((e.clientY - s.startY) / s.height) * 100;
-      const nextX = Math.max(-maxX, Math.min(maxX, s.baseX + dxPct));
-      const nextY = Math.max(-maxY, Math.min(maxY, s.baseY + dyPct));
-      setLayerPhotoOffset(layerId, nextX, nextY);
+      const onMove = (ev: PointerEvent) => {
+        const s = dragStateRef.current;
+        if (!s) return;
+        const { maxX: mx, maxY: my } = boundsRef.current;
+        const dxPct = ((ev.clientX - s.startX) / s.width) * 100;
+        const dyPct = ((ev.clientY - s.startY) / s.height) * 100;
+        // Per-axis clamp: a locked axis just stays at 0, the other one still pans.
+        const nextX = mx > 0 ? Math.max(-mx, Math.min(mx, s.baseX + dxPct)) : 0;
+        const nextY = my > 0 ? Math.max(-my, Math.min(my, s.baseY + dyPct)) : 0;
+        setLayerPhotoOffset(layerId, nextX, nextY);
+      };
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", onUp);
+        dragStateRef.current = null;
+        setDragging(false);
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onUp);
     },
-    [layerId, setLayerPhotoOffset, maxX, maxY],
+    [draggable, fit, offsetX, offsetY, maxX, maxY, layerId, setLayerPhotoOffset],
   );
-
-  const onPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    const el = containerRef.current;
-    if (el && el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
-    dragStateRef.current = null;
-    setDragging(false);
-  }, []);
 
   const canPan = fit !== "contain" && draggable && (maxX > 0 || maxY > 0);
 
@@ -955,9 +967,6 @@ function PhotoLayerView({
         touchAction: canPan ? "none" : undefined,
       }}
       onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
     >
       {src ? (
         fit === "contain" || !natural || renderW === 0 ? (
