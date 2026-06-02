@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import type mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useEditorStore, type PhotoLayerValue } from "@/stores/editorStore";
 import type { TemplateLayer } from "@/lib/template-schema";
@@ -253,6 +254,9 @@ export function MapPreview({
   layersIncludeWrap = false,
 }: Props) {
   const frameRef = useRef<HTMLDivElement>(null);
+  /** Per-layer Mapbox instance refs, populated by `MapLayerInstance` via
+   *  `onMapReady`. Used by `MapIconsOverlay` to project geo-anchored icons. */
+  const mapInstances = useRef<Record<string, mapboxgl.Map | null>>({});
   const [borderPx, setBorderPx] = useState(0);
   const [frameShortPx, setFrameShortPx] = useState(0);
   const [frameOuter, setFrameOuter] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
@@ -517,7 +521,12 @@ export function MapPreview({
                 staticClip={staticClip}
                 overlay={
                   <>
-                    <MapIconsOverlay layerId={l.id} shape={effectiveShape} icons={icons} />
+                    <MapIconsOverlay
+                      layerId={l.id}
+                      shape={effectiveShape}
+                      icons={icons}
+                      getMap={() => mapInstances.current[l.id] ?? null}
+                    />
                     {moveHandle}
                   </>
                 }
@@ -532,6 +541,9 @@ export function MapPreview({
                     showLabels={effectiveLabels}
                     interactive={!l.locks.position}
                     clipPath={clip}
+                    onMapReady={(m) => {
+                      mapInstances.current[l.id] = m;
+                    }}
                   />
                 )}
               </MapLayerSlot>

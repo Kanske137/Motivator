@@ -17,6 +17,7 @@ interface Props {
   showLabels: boolean;
   interactive: boolean;
   clipPath?: string;
+  onMapReady?: (map: mapboxgl.Map | null) => void;
 }
 
 function applyLabelVisibility(map: mapboxgl.Map, show: boolean) {
@@ -46,6 +47,7 @@ export function MapLayerInstance({
   showLabels,
   interactive,
   clipPath,
+  onMapReady,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -109,6 +111,7 @@ export function MapLayerInstance({
       });
 
       mapRef.current = map;
+      onMapReady?.(map);
       setTimeout(() => map.resize(), 50);
       setTimeout(() => map.resize(), 250);
       setTimeout(() => map.resize(), 600);
@@ -116,6 +119,7 @@ export function MapLayerInstance({
     return () => {
       cancelled = true;
       if (reverseTimerRef.current) window.clearTimeout(reverseTimerRef.current);
+      onMapReady?.(null);
       mapRef.current?.remove();
       mapRef.current = null;
     };

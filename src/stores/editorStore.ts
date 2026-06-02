@@ -33,9 +33,14 @@ export interface MapIcon {
   id: string;
   /** Catalog id from `src/lib/map-icon-catalog.ts`. */
   iconId: string;
-  /** Position inside the map layer box, 0..100. */
-  xPct: number;
-  yPct: number;
+  /** Geographic anchor — icon sticks to this point on the map regardless of
+   *  pan/zoom. Required for newly placed icons. */
+  lng?: number;
+  lat?: number;
+  /** LEGACY layer-box position (0..100). Used as fallback when lng/lat is
+   *  missing and upgraded to lng/lat on first render. */
+  xPct?: number;
+  yPct?: number;
 }
 
 export interface MapLayerValue {
@@ -259,6 +264,7 @@ interface EditorState {
   setSelectedMapIcon: (sel: { layerId: string; iconId: string } | null) => void;
   addMapIcon: (layerId: string, icon: MapIcon) => void;
   removeMapIcon: (layerId: string, iconInstanceId: string) => void;
+  replaceMapIcon: (layerId: string, iconInstanceId: string, patch: Partial<MapIcon>) => void;
 
   // ---------- legacy globals (derived getters; mutators apply to first layer) ----------
   // These setters/getters keep older code (EditorPage cart payload, snapshot
@@ -534,6 +540,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedMapIcon:
         state.selectedMapIcon?.iconId === iconInstanceId ? null : state.selectedMapIcon,
     });
+  },
+  replaceMapIcon: (layerId, iconInstanceId, patch) => {
+    const state = get();
+    const cur = state.layerValues[layerId];
+    if (!cur || cur.kind !== "map") return;
+    const icons = (cur.icons ?? []).map((i) =>
+      i.id === iconInstanceId ? { ...i, ...patch } : i,
+    );
+    const next: MapLayerValue = { ...cur, icons };
+    set({ layerValues: { ...state.layerValues, [layerId]: next } });
   },
 
   setConfig: (config) => {
