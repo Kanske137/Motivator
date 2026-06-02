@@ -1318,7 +1318,7 @@ function resetPhotoOffsets(values: Record<string, LayerValue>): Record<string, L
   const out: Record<string, LayerValue> = { ...values };
   for (const [id, v] of Object.entries(values)) {
     if (v.kind === "photo") {
-      out[id] = { ...v, offsetX: 0, offsetY: 0 };
+      out[id] = { ...v, offsetX: 0, offsetY: 0, zoom: 1 };
     }
   }
   return out;
