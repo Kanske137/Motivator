@@ -466,6 +466,13 @@ export function MapPreview({
         {/* Loop all template layers in zIndex order */}
         {layers.map((l) => {
           const rect = layerToEditorRect(l);
+          // Only layers that actually need pointer interaction in the
+          // customer preview should catch clicks/drags. Otherwise an
+          // overlapping locked text/image/decor layer can block photo pan.
+          const isInteractiveLayer =
+            l.type === "photo" ||
+            l.type === "aiPhoto" ||
+            (l.type === "map" && !l.locks.position);
           const wrapStyle: React.CSSProperties = {
             position: "absolute",
             left: `${rect.left}%`,
@@ -473,6 +480,7 @@ export function MapPreview({
             width: `${rect.width}%`,
             height: `${rect.height}%`,
             zIndex: l.type === "margin" ? 40 : l.zIndex,
+            pointerEvents: isInteractiveLayer ? undefined : "none",
           };
           const movable =
             !l.locks.move &&
@@ -482,7 +490,7 @@ export function MapPreview({
               type="button"
               onPointerDown={(e) => onDragStart(l, e)}
               className="absolute w-7 h-7 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center text-[12px] cursor-move touch-none ring-2 ring-background"
-              style={{ top: -14, left: -14, zIndex: 39 }}
+              style={{ top: -14, left: -14, zIndex: 39, pointerEvents: "auto" }}
               aria-label="Flytta lager"
               title="Dra för att flytta lagret"
             >
@@ -880,7 +888,32 @@ function PhotoLayerView({
     baseY: number;
     width: number;
     height: number;
+    nextX: number;
+    nextY: number;
   } | null>(null);
+
+  const applyImagePosition = useCallback(
+    (x: number, y: number) => {
+      const el = containerRef.current;
+      const img = imgRef.current;
+      if (!el || !img || fit === "contain") return;
+      const rect = el.getBoundingClientRect();
+      const nW = img.naturalWidth;
+      const nH = img.naturalHeight;
+      if (!nW || !nH || rect.width === 0 || rect.height === 0) return;
+      const scale = Math.max(rect.width / nW, rect.height / nH);
+      const rW = nW * scale;
+      const rH = nH * scale;
+      img.style.position = "absolute";
+      img.style.width = `${rW}px`;
+      img.style.height = `${rH}px`;
+      img.style.maxWidth = "none";
+      img.style.objectFit = "fill";
+      img.style.left = `${(rect.width - rW) / 2 + (x / 100) * rect.width}px`;
+      img.style.top = `${(rect.height - rH) / 2 + (y / 100) * rect.height}px`;
+    },
+    [fit],
+  );
 
   // Re-clamp current offset whenever bounds change. Skip while dragging and
   // skip until the image is measured — otherwise a transient state can wipe
@@ -945,6 +978,8 @@ function PhotoLayerView({
         baseY: offsetY,
         width: rect.width,
         height: rect.height,
+        nextX: offsetX,
+        nextY: offsetY,
       };
       try {
         el.setPointerCapture(e.pointerId);
@@ -963,10 +998,13 @@ function PhotoLayerView({
         const dyPct = ((ev.clientY - s.startY) / s.height) * 100;
         const nextX = mx > 0 ? Math.max(-mx, Math.min(mx, s.baseX + dxPct)) : 0;
         const nextY = my > 0 ? Math.max(-my, Math.min(my, s.baseY + dyPct)) : 0;
-        setLayerPhotoOffset(layerId, nextX, nextY);
+        s.nextX = nextX;
+        s.nextY = nextY;
+        applyImagePosition(nextX, nextY);
       };
       const onUp = (ev: PointerEvent) => {
-        if (dragStateRef.current && ev.pointerId !== dragStateRef.current.pointerId) return;
+        const s = dragStateRef.current;
+        if (s && ev.pointerId !== s.pointerId) return;
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", onUp);
         window.removeEventListener("pointercancel", onUp);
@@ -979,6 +1017,7 @@ function PhotoLayerView({
         dragStateRef.current = null;
         draggingRef.current = false;
         setDragging(false);
+        if (s) setLayerPhotoOffset(layerId, s.nextX, s.nextY);
       };
       const onBlur = () => {
         window.removeEventListener("pointermove", onMove);
@@ -994,7 +1033,7 @@ function PhotoLayerView({
       window.addEventListener("pointercancel", onUp, { passive: false });
       window.addEventListener("blur", onBlur);
     },
-    [draggable, fit, offsetX, offsetY, layerId, setLayerPhotoOffset, measureBoundsNow],
+    [draggable, fit, offsetX, offsetY, layerId, setLayerPhotoOffset, measureBoundsNow, applyImagePosition],
   );
 
   // Cleanup any in-flight drag on unmount.
