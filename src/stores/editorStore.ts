@@ -235,6 +235,7 @@ interface EditorState {
   setLayerTextVisible: (id: string, v: boolean) => void;
   setLayerPhotoShape: (id: string, s: PhotoShape) => void;
   setLayerPhotoOffset: (id: string, x: number, y: number) => void;
+  setLayerPhotoZoom: (id: string, zoom: number) => void;
 
   // ---------- legacy globals (derived getters; mutators apply to first layer) ----------
   // These setters/getters keep older code (EditorPage cart payload, snapshot
