@@ -521,7 +521,12 @@ export function MapPreview({
                 staticClip={staticClip}
                 overlay={
                   <>
-                    <MapIconsOverlay layerId={l.id} shape={effectiveShape} icons={icons} />
+                    <MapIconsOverlay
+                      layerId={l.id}
+                      shape={effectiveShape}
+                      icons={icons}
+                      getMap={() => mapInstances.current[l.id] ?? null}
+                    />
                     {moveHandle}
                   </>
                 }
@@ -536,6 +541,9 @@ export function MapPreview({
                     showLabels={effectiveLabels}
                     interactive={!l.locks.position}
                     clipPath={clip}
+                    onMapReady={(m) => {
+                      mapInstances.current[l.id] = m;
+                    }}
                   />
                 )}
               </MapLayerSlot>
