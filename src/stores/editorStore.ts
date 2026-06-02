@@ -1310,11 +1310,16 @@ function setLayerOverrideText(set: SetFn, get: GetFn, id: string, raw: string) {
   set({ layerValues, ...mirrorLegacy({ template: state.template, orientation: state.orientation, layerValues, config: state.config, layoutId: state.layoutId }) });
 }
 
-function updatePhoto(set: SetFn, get: GetFn, id: string, patch: Partial<PhotoLayerValue>) {
+function updatePhoto(
+  set: SetFn,
+  get: GetFn,
+  id: string,
+  patch: Partial<PhotoLayerValue> & Partial<AiPhotoLayerValue>,
+) {
   const state = get();
   const cur = state.layerValues[id];
-  if (!cur || cur.kind !== "photo") return;
-  const next: PhotoLayerValue = { ...cur, ...patch };
+  if (!cur || (cur.kind !== "photo" && cur.kind !== "aiPhoto")) return;
+  const next = { ...cur, ...patch } as LayerValue;
   const layerValues = { ...state.layerValues, [id]: next };
   set({ layerValues });
 }
