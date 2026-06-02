@@ -879,7 +879,7 @@ function PhotoLayerView({
     if (fit === "contain" || !natural || box.w === 0 || box.h === 0) {
       return { maxX: 0, maxY: 0, renderW: box.w, renderH: box.h };
     }
-    const scale = Math.max(box.w / natural.w, box.h / natural.h);
+    const scale = Math.max(box.w / natural.w, box.h / natural.h) * zoom;
     const rW = natural.w * scale;
     const rH = natural.h * scale;
     const overflowXPct = ((rW - box.w) / box.w) * 100;
