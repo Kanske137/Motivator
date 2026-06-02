@@ -17,9 +17,10 @@ import { drawShapeOnCanvas, type ClipShape } from "./shape-clip";
 import { getMapboxToken, styleUrl } from "./mapbox";
 import type { Template, TemplateLayer, TextSpan } from "./template-schema";
 import { getActiveLayoutBlock } from "./template-schema";
-import type { LayerValue } from "@/stores/editorStore";
+import type { LayerValue, MapIcon } from "@/stores/editorStore";
 import { getActiveMarginInsetsPct, expandRectForRemovedMargin } from "./layer-utils";
 import { buildEffectiveTextWithSpans, type LinkedPlace } from "./text-typography";
+import { iconSvgString } from "./map-icon-catalog";
 
 export interface TemplateSnapshotInput {
   template: Template;
