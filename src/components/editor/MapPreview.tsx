@@ -254,6 +254,9 @@ export function MapPreview({
   layersIncludeWrap = false,
 }: Props) {
   const frameRef = useRef<HTMLDivElement>(null);
+  /** Per-layer Mapbox instance refs, populated by `MapLayerInstance` via
+   *  `onMapReady`. Used by `MapIconsOverlay` to project geo-anchored icons. */
+  const mapInstances = useRef<Record<string, mapboxgl.Map | null>>({});
   const [borderPx, setBorderPx] = useState(0);
   const [frameShortPx, setFrameShortPx] = useState(0);
   const [frameOuter, setFrameOuter] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
