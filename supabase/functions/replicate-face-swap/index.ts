@@ -414,7 +414,35 @@ async function callNanoBanana(params: {
   };
 }
 
-// ---------- Route 2: pet face/identity transfer (cats + dogs) ----------
+// ---------- Route 2a: human face/identity transfer (Nano Banana 2) ----------
+// Same multi-image edit pattern as pet, but the admin's free-text prompt
+// (`layer.defaults.swapPrompt`) is the primary instruction describing WHAT
+// to take from the customer's photo and how to place it onto the reference.
+async function runHumanSwap(params: {
+  referenceImageUrl: string;
+  faceImageUrl: string;
+  adminPrompt: string;
+}) {
+  const artistInstruction = params.adminPrompt?.trim() ||
+    "Take the person's face and head from image #2 and place it onto the person in image #1. Preserve the customer's facial identity from image #2 (features, eye color, skin tone, age, expression).";
+
+  const promptText = [
+    `You are editing image #1. Image #2 is a reference photo provided by the customer.`,
+    `Follow the artist's instruction below precisely — it describes exactly what to take from image #2 and how to place it into image #1. Everything in image #1 that the instruction does not explicitly change must stay identical (composition, framing, lighting, art style, background, props, clothing, pose, camera angle, aspect ratio).`,
+    ``,
+    `Artist instruction:`,
+    artistInstruction,
+    ``,
+    `Return ONE single edited image (NOT a collage, NOT side-by-side, NOT a before/after comparison). Output must have the same aspect ratio as image #1.`,
+  ].join("\n");
+
+  return callNanoBanana({
+    promptText,
+    imageUrls: [params.referenceImageUrl, params.faceImageUrl],
+  });
+}
+
+// ---------- Route 2b: pet face/identity transfer (cats + dogs) ----------
 async function runPetSwap(params: {
   referenceImageUrl: string;
   faceImageUrl: string;
@@ -584,10 +612,10 @@ Deno.serve(async (req) => {
     }
 
     const route =
-      subjectKind === "human" ? "human-replicate"
+      subjectKind === "human" ? "human-nano-banana"
       : subjectKind === "pet" ? "pet-nano-banana"
       : "remove-bg-nano-banana";
-    const modelUsed = subjectKind === "human" ? FACE_SWAP_MODEL_NAME : ANIMAL_MODEL;
+    const modelUsed = ANIMAL_MODEL;
 
     console.log(
       `[face-swap] start route=${route} model=${modelUsed} ` +
@@ -606,10 +634,10 @@ Deno.serve(async (req) => {
 
     const result =
       subjectKind === "human"
-        ? await runReplicateFaceSwap({
+        ? await runHumanSwap({
             referenceImageUrl: referenceImageUrl!,
             faceImageUrl,
-            designId,
+            adminPrompt: prompt,
           })
         : subjectKind === "pet"
         ? await runPetSwap({
@@ -624,6 +652,7 @@ Deno.serve(async (req) => {
             styleLabel: removeBackgroundStyleLabel,
             targetAspectRatio,
           });
+
 
     if (!result.ok) return result.response;
 

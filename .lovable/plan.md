@@ -1,96 +1,57 @@
 ## Mål
-1. **Bugg:** Klick på papperskorgs-knappen tar bort knappen (avmarkerar) men raderar inte själva ikonen. Fixa så att ikonen faktiskt försvinner.
-2. **Geo-ankring:** Ikoner ska bindas till en geografisk punkt (lng/lat) på kartan i stället för till lagrets bounding-box. När kunden pannar/zoomar kartan ska ikonen följa med kartans punkt, men ikonens **pixelstorlek** ska förbli konstant (som idag).
+Ersätt Replicate `cdingram/face-swap` med Nano Banana 2 (`google/gemini-3.1-flash-image-preview`) för `subjectKind === "human"`. Admin-promptens fritext (`layer.defaults.swapPrompt`) blir den primära instruktionen som beskriver exakt vad som ska bytas ut — på samma sätt som för `pet`. Pet + removeBackground rörs inte.
 
----
+## Ändringar
 
-## Del 1 — Trash-buggen
+### 1. `supabase/functions/replicate-face-swap/index.ts`
 
-Trolig orsak: `onClickPlace` på overlay-containern triggas av bubbling när trash-knappen klickas, eller den globala `mousedown`-listenern nollställer `selectedMapIcon` innan React hinner köra `removeMapIcon` (state-race). Symptomen ("trash försvinner, ikon kvar") matchar att `setSelectedMapIcon(null)` körs medan `removeMapIcon` av någon anledning inte sker.
+Lägg till `runHumanSwap` (parallell till `runPetSwap`) som anropar Nano Banana 2 via befintliga `callNanoBanana`. Prompten är medvetet **minimal scaffold + admin-prompt i centrum**:
 
-Åtgärder i `src/components/editor/MapIconsOverlay.tsx`:
-- Byt trash-knappens handler från `onClick` till `onPointerDown` (fyrar före document-`mousedown`-listenern) och anropa `e.preventDefault()` + `e.stopPropagation()` där.
-- Lägg även `onPointerDown` på ikon-knappen som sätter `selectedMapIcon` (samma anledning — undvik race med outside-listenern).
-- I `onClickPlace` (containerns onClick): early-return även om `selectedMapIcon` är satt — placering ska aldrig kunna ske ovanpå en existerande markerad ikon utan att den först avmarkeras.
-- I outside-`mousedown`-effekten: ignorera om `e.target` är inom någon `.map-icon-popover` (datasel/klass på trash-wrappern) — säkrare än enbart `containerRef.contains`.
-
-Verifiering: klicka på en placerad ikon → trash dyker upp → klicka trash → ikon + trash försvinner direkt.
-
----
-
-## Del 2 — Geo-ankra ikoner
-
-### Datamodell
-`src/stores/editorStore.ts`:
-```ts
-export interface MapIcon {
-  id: string;
-  iconId: string;
-  lng: number;     // NY — primär anchor
-  lat: number;     // NY — primär anchor
-  xPct?: number;   // LEGACY — behållen för bakåtkomp, ignoreras om lng/lat finns
-  yPct?: number;
-}
 ```
-`addMapIcon` tar nu `{ id, iconId, lng, lat }`.
+You are editing image #1. Image #2 is a reference photo provided by the customer.
 
-### Placering (editorn)
-För att projicera mus → lng/lat behöver overlay åtkomst till Mapbox-instansen.
+Follow the artist's instruction below precisely — it describes exactly what
+to take from image #2 and how to place it into image #1. Everything in
+image #1 that the instruction does not explicitly change must stay
+identical (composition, framing, lighting, art style, background, props,
+clothing, pose, camera angle, aspect ratio).
 
-`src/components/editor/layers/MapLayerInstance.tsx`:
-- Lägg till valfri prop `onMapReady?: (map: mapboxgl.Map | null) => void`. Anropa med map vid load och med `null` vid unmount.
+Artist instruction:
+<layer.defaults.swapPrompt>
 
-`src/components/editor/MapPreview.tsx`:
-- Håll en `Map<layerId, mapboxgl.Map>` i en `useRef`. Skicka `onMapReady` ner till varje `MapLayerInstance`.
-- Skicka ner samma map-ref-getter till `MapIconsOverlay` som ny prop `getMap: () => mapboxgl.Map | null`.
-
-`src/components/editor/MapIconsOverlay.tsx`:
-- **Placering**: vid klick, gör `map.unproject([x, y])` → `{lng, lat}` och anropa `addMapIcon(layerId, { id, iconId, lng, lat })`.
-- **Render**: räkna varje ikons pixelposition via `map.project([lng, lat])`. Subscriba på `map.on('move' | 'zoom' | 'rotate', forceUpdate)` så positionerna re-projiceras under pan/zoom.
-- **Bakåtkomp**: om `lng/lat` saknas men `xPct/yPct` finns, konvertera EN gång vid första render via `map.unproject([xPct/100*w, yPct/100*h])` och kalla `replaceMapIcon` för att uppgradera datan.
-- **Ghost-cursor**: ingen förändring — använder fortfarande musens råa x/y.
-- **Shape-clip**: oförändrad — `isPointInShape` använder fortfarande pixelkoordinater (kvar både för ghost och för placeringsvalidering).
-- Storleken (`iconPx`) räknas precis som idag baserat på lagrets bounding-box (oberoende av zoom).
-
-### Snapshot/print
-`src/lib/template-snapshot.ts` `drawMapIcons`:
-- Behöver projicera lng/lat → pixel inom `rect` med samma center/zoom som map-bilden ritades med. Tillsätt en ren Web-Mercator-helper (Mapbox använder standard slippy projection vid pitch=0/bearing=0, vilket alltid är vårt fall):
-
-```ts
-function projectToLayerPx(lng, lat, center, zoom, w, h) {
-  const scale = 256 * Math.pow(2, zoom);
-  const merc = (lon, la) => {
-    const x = (lon + 180) / 360 * scale;
-    const s = Math.sin(la * Math.PI / 180);
-    const y = (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * scale;
-    return { x, y };
-  };
-  const c = merc(center[0], center[1]);
-  const p = merc(lng, lat);
-  return { x: w / 2 + (p.x - c.x), y: h / 2 + (p.y - c.y) };
-}
+Return ONE single edited image (NOT a collage, NOT side-by-side, NOT a
+before/after comparison). Output must have the same aspect ratio as image #1.
 ```
 
-- Signaturen för `drawMapIcons` utökas med `center: [number,number]` och `zoom: number`. Anropssidan i map-blocket skickar `mv.center` / `mv.zoom`.
-- Fallback för legacy `xPct/yPct` om `lng/lat` saknas (samma kod som idag).
-- Klippningen mot shape (`clipForShape`) behålls — ikoner som hamnar utanför formen klipps automatiskt, exakt som i editorn.
+Bilderna skickas i samma ordning som idag (`[referenceImageUrl, faceImageUrl]`) så befintliga prompter som refererar `input_image_1` / `input_image_2` fortsätter funka.
 
----
+Routing i `Deno.serve`:
+```ts
+subjectKind === "human" ? runHumanSwap(...)   // ← nytt
+                        : runPetSwap(...)
+                        : runRemoveBackground(...)
+```
+`route`-loggvärde: `human-nano-banana`. `modelUsed` blir `ANIMAL_MODEL` (Nano Banana 2) även för human.
 
-## Filer som ändras
-- `src/stores/editorStore.ts` — `MapIcon` med `lng/lat`, ev. ny `replaceMapIcon`-helper för legacy-uppgradering.
-- `src/components/editor/layers/MapLayerInstance.tsx` — `onMapReady`-prop.
-- `src/components/editor/MapPreview.tsx` — håll map-instanser per lager, skicka getter till overlay + onMapReady till instance.
-- `src/components/editor/MapIconsOverlay.tsx` — pointerdown-fix för trash, geo-projektion via map-instans, prenumeration på move/zoom.
-- `src/lib/template-snapshot.ts` — Web Mercator-projektion i `drawMapIcons`, ny signatur med center/zoom.
+`runReplicateFaceSwap` + Replicate-konstanterna får ligga kvar oanvända som snabb rollback (säg till om du vill ha dem borttagna).
 
-## Avgränsning
-- Ingen ändring i admin, pricing, Shopify, Gelato, auth eller i18n.
-- Ingen drag-and-drop av placerade ikoner (kvarhålls för framtida iteration).
-- Pitch/bearing förblir 0 (befintligt beteende) — annars skulle Web-Mercator-formeln behöva matchas mot Mapbox transform.
+### 2. `src/lib/ai-photo-prompts.ts`
+Uppdatera `DEFAULT_AI_PHOTO_PROMPTS.human` så default-texten i admin-inspectorn matchar den nya modellen och betonar att admin själv beskriver vad som ska bytas:
+
+> "Take the person's face and head from image #2 and place it onto the person in image #1. Keep image #1's hair style, outfit, accessories, lighting, pose, background and art style exactly. Preserve the customer's facial identity from image #2: facial features, eye color, skin tone, age, expression."
+
+Befintliga mallar berörs inte — de har redan en sparad `swapPrompt` i DB.
+
+### 3. `src/components/editor/AiPhotoSection.tsx`
+Justera `expectedSeconds` för human från 8 → 18 (matchar pet, eftersom Nano Banana 2 är långsammare än cdingram). Inget annat klient-API ändras.
+
+## Påverkan
+- Inga ändringar i klient-API, response-shape, cache-nycklar, storage-upload eller frontend-flöde i övrigt.
+- Pet + removeBackground oförändrade.
+- `REPLICATE_API_TOKEN`-secret rörs inte (används fortfarande av `replicate-style`).
+- Retry/backoff (4s + 8s) gäller nu även human — en förbättring.
 
 ## Verifiering
-1. Placera en ikon, klicka den, klicka trash → ikon försvinner direkt.
-2. Placera en ikon på t.ex. Eiffeltornet, panorera kartan → ikonen "klistrar" på tornet.
-3. Scroll-zooma in/ut → ikonens pixelstorlek är konstant, men dess kartposition håller sig på tornet.
-4. Lägg i varukorg → `_preview_image` och `_print_file_url` visar ikonen exakt på tornets position.
+1. Deploya `replicate-face-swap`.
+2. `curl_edge_functions` med human-payload (referensbild + ansiktsbild + admin-prompt) → bekräfta `route=human-nano-banana`, lyckad upload till `print-files`.
+3. Test i editor på en befintlig human-mall: skapa AI-bild → ansiktet i kundens bild ska sitta på personen från referensbilden, övrigt oförändrat.

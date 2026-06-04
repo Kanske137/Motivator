@@ -160,9 +160,9 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
 
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState<string | null>(null);
-  // Different models have very different latencies. cdingram/face-swap is
-  // fast (~8s), Nano Banana flows take longer (~18s) and may retry.
-  const expectedSeconds = subjectKind === "human" ? 8 : 18;
+  // All three routes now run through Nano Banana 2 — expect ~18s end-to-end
+  // including potential retry backoff.
+  const expectedSeconds = 18;
 
   // Hash the face photo whenever it changes.
   useEffect(() => {
