@@ -612,10 +612,10 @@ Deno.serve(async (req) => {
     }
 
     const route =
-      subjectKind === "human" ? "human-replicate"
+      subjectKind === "human" ? "human-nano-banana"
       : subjectKind === "pet" ? "pet-nano-banana"
       : "remove-bg-nano-banana";
-    const modelUsed = subjectKind === "human" ? FACE_SWAP_MODEL_NAME : ANIMAL_MODEL;
+    const modelUsed = ANIMAL_MODEL;
 
     console.log(
       `[face-swap] start route=${route} model=${modelUsed} ` +
@@ -634,10 +634,10 @@ Deno.serve(async (req) => {
 
     const result =
       subjectKind === "human"
-        ? await runReplicateFaceSwap({
+        ? await runHumanSwap({
             referenceImageUrl: referenceImageUrl!,
             faceImageUrl,
-            designId,
+            adminPrompt: prompt,
           })
         : subjectKind === "pet"
         ? await runPetSwap({
@@ -652,6 +652,7 @@ Deno.serve(async (req) => {
             styleLabel: removeBackgroundStyleLabel,
             targetAspectRatio,
           });
+
 
     if (!result.ok) return result.response;
 
