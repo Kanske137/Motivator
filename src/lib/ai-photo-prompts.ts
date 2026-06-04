@@ -16,7 +16,7 @@ import type { AiPhotoSubjectKind } from "./template-schema";
 
 export const DEFAULT_AI_PHOTO_PROMPTS: Record<AiPhotoSubjectKind, string> = {
   human:
-    "Take the person's face from input_image_2 and place it onto the person in input_image_1. Keep input_image_1's hair, outfit, accessories, lighting, pose and background exactly. The final person must have the face from input_image_2, not from input_image_1.",
+    "Take the person's face and head from image #2 and place it onto the person in image #1. Keep image #1's hair style, outfit, accessories, lighting, pose, background, art style and composition exactly. Preserve the customer's facial identity from image #2: facial features, eye color, skin tone, age and natural expression. Blend skin tones and lighting so the swapped face looks like it belongs in image #1.",
   pet:
     "Take the pet's face from input_image_2 and place it onto the pet in input_image_1. Keep input_image_1's body, fur, costume, pose and background exactly. The final pet must have the unique markings, fur color/pattern, breed traits and identity from input_image_2 — not from input_image_1.",
   removeBackground:
