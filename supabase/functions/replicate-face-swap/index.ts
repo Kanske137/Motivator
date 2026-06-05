@@ -632,6 +632,18 @@ Deno.serve(async (req) => {
         ? body.targetAspectRatio
         : null;
 
+    const backdropColor: string | null =
+      typeof body?.backdropColor === "string" &&
+      /^#([0-9a-fA-F]{6})$/.test(body.backdropColor)
+        ? body.backdropColor.toUpperCase()
+        : null;
+    const fillFrame: boolean =
+      typeof body?.fillFrame === "boolean" ? body.fillFrame : true;
+    const preserveSubjectColors: boolean =
+      typeof body?.preserveSubjectColors === "boolean"
+        ? body.preserveSubjectColors
+        : true;
+
     const result =
       subjectKind === "human"
         ? await runHumanSwap({
@@ -651,6 +663,10 @@ Deno.serve(async (req) => {
             stylePrompt: removeBackgroundStylePrompt,
             styleLabel: removeBackgroundStyleLabel,
             targetAspectRatio,
+            backdropColor,
+            fillFrame,
+            preserveSubjectColors,
+            designId,
           });
 
 
