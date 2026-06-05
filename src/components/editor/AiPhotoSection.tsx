@@ -295,6 +295,9 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
           removeBackgroundStylePrompt: selectedPreset?.prompt ?? null,
           removeBackgroundStyleLabel: selectedPreset?.label ?? null,
           targetAspectRatio,
+          backdropColor: layer.defaults.backdropColor ?? null,
+          fillFrame: layer.defaults.fillFrame ?? null,
+          preserveSubjectColors: layer.defaults.preserveSubjectColors ?? null,
         },
       });
       if (error) throw error;
