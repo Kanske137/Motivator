@@ -1,79 +1,40 @@
-# Plan: Stabilare removeBackground (bakgrund, position, färg)
+## Mål
+Byta AI-modell **endast** för `runRemoveBackground` i `supabase/functions/replicate-face-swap/index.ts` från `google/gemini-3.1-flash-image-preview` (preview, instabil) → `google/gemini-2.5-flash-image` (Nano Banana 1, stabil). Human face-swap och pet ska fortsätta köra på 3.1.
 
 ## Bakgrund
+Edge-loggar visar att de flesta 400-fel (`Provider returned error` / `provider_unavailable`) kommer från preview-modellens instabilitet. Akvarell lyckas oftare för att dess prompt är mer positiv. Lösningen är inte fler retries — det är att lyfta bort `removeBackground` från preview-modellen.
 
-`runRemoveBackground` i `supabase/functions/replicate-face-swap/index.ts` (rad 475–568) bygger en lång prompt där **steg 2** hårdkodar "PURE WHITE #FFFFFF backdrop" och **steg 5** tvingar "FILL THE FRAME 90–95%" — vilket aktivt skalar om och flyttar subjektet. `adminPromptLine` ligger sist och kan därför inte överstyra detta. Det är troligen huvudorsaken till att bilen flyttas/zoomas och att bakgrundsfärgen ibland avviker (modellen försöker väga ihop motstridiga instruktioner).
+## Ändringar (en fil)
 
-Idag är allt hårdkodade strängar i edge-funktionen — varken backdrop-färg eller fill-frame går att styra per mall.
+`supabase/functions/replicate-face-swap/index.ts`:
 
-## Mål
+1. **Lägg till en andra modell-konstant** vid sidan av `ANIMAL_MODEL` (rad 52):
+   ```ts
+   const ANIMAL_MODEL = "google/gemini-3.1-flash-image-preview"; // human + pet
+   const REMOVEBG_MODEL = "google/gemini-2.5-flash-image";        // stabil Nano Banana 1
+   ```
 
-- Subjektet behåller uppladdad position, storlek och proportioner.
-- Bakgrunden blir exakt den färg admin anger per mall (default vit, bakåtkompatibelt).
-- Subjektets grundfärg/nyans bevaras även när konststil läggs på (stilen = ytbehandling).
-- Vi kan se exakt vilken prompt modellen får för en given körning.
+2. **Använd `REMOVEBG_MODEL` i `runRemoveBackground`** — på raden där modellnamnet skickas in i gateway-anropet (rad ~256 där `model: ANIMAL_MODEL` byggs in i request-body:n). Det görs via en parameter eller en lokal variabel beroende på hur `callAiGateway` är strukturerad; om hjälparen tar modellen som argument räcker det att skicka in `REMOVEBG_MODEL` från `runRemoveBackground`.
 
-## Ändringar
+3. **Uppdatera `modelUsed` i start-loggen** (rad 650) så loggraden säger sanning per route:
+   ```ts
+   const modelUsed = subjectKind === "removeBackground" ? REMOVEBG_MODEL : ANIMAL_MODEL;
+   ```
 
-### 1. Schema: nya, valfria fält på aiPhoto-lagret
-Fil: `src/lib/template-schema.ts` (`aiPhotoDefaultsSchema`)
+4. **Uppdatera kommentarsblocken** överst (rad 9, 15–16, 49) så det framgår att removeBackground går på 2.5-flash-image medan human/pet ligger kvar på 3.1.
 
-Lägg till tre nya valfria fält (alla bakåtkompatibla — om de saknas faller vi tillbaka på dagens beteende):
+## Det som INTE rör sig
+- `runHumanSwap` och `runPetSwap` — fortsätter på `ANIMAL_MODEL` (3.1).
+- Replicate `cdingram/face-swap`-konstanterna (död kod, men ingår inte i denna ändring).
+- Prompt-text, request-body shape (`messages` + `modalities: ["image","text"]` är identiskt mellan 2.5 och 3.1), retry-logik, klientkod, schema, cache-nycklar.
 
-- `backdropColor?: string` — hex, t.ex. `#FFFFFF`. Default = `#FFFFFF`.
-- `fillFrame?: boolean` — om `false` instrueras modellen att bevara subjektets ursprungliga position och storlek istället för att skala upp till 90–95%. Default = `true` för att inte ändra befintliga mallar.
-- `preserveSubjectColors?: boolean` — när `true` läggs en stark färgbevarande instruktion in **tidigt** i prompten. Default = `true`.
+## Risk
+Mycket låg. Body-shapen är gemensam för Nano Banana 1 och 2. Kvalitetsmässigt är 2.5-flash-image väl beprövad; trade-off är att den är marginellt mindre "smart" på komplexa stil-prompts än preview-modellen — men för removeBackground (bakgrund bort + ytstil på subjektet) är det inget problem.
 
-### 2. Admin-UI: exponera fälten
-Fil: `src/components/admin/LayerInspector.tsx` (sektionen för `aiPhoto` när `subjectKind === "removeBackground"`):
+## Verifiering efter deploy
+1. Skapa bilposter i varje stil (Linjeart, Skiss, Olja, Vintage poster, Akvarell).
+2. Hämta edge-loggar — bekräfta att `[face-swap] start … model=google/gemini-2.5-flash-image` skrivs för `route=remove-bg-nano-banana`, medan ev. human/pet-anrop fortfarande loggar `gemini-3.1-flash-image-preview`.
+3. Bekräfta att 400 `upstream_error`-frekvensen sjunker markant.
 
-- Färgväljare för `backdropColor`.
-- Toggle "Fyll ramen (skala upp subjektet)" → `fillFrame`.
-- Toggle "Bevara subjektets originalfärger" → `preserveSubjectColors`.
-
-### 3. Klient skickar fälten vidare
-Fil: `src/components/editor/AiPhotoSection.tsx` — utöka `supabase.functions.invoke("replicate-face-swap", { body: ... })` med `backdropColor`, `fillFrame`, `preserveSubjectColors` från `layer.defaults`.
-
-### 4. Edge-funktion: parametrisera prompten
-Fil: `supabase/functions/replicate-face-swap/index.ts`
-
-a) `Deno.serve` (rad 570+): läs de tre nya fälten från `body`, validera och skicka in i `runRemoveBackground`.
-
-b) `runRemoveBackground` (rad 475–568):
-- **Steg 2 (backdrop)**: använd `params.backdropColor ?? "#FFFFFF"`. Om färgen ≠ vit, skriv om instruktionen så den anger den exakta hex-färgen och tar bort referenser till "pure white web page" (annars motsäger sig prompten själv).
-- **Steg 5 (fill frame)**: om `params.fillFrame === false`, ersätt hela `fadeInstruction` med en "PRESERVE EXACT FRAMING"-instruktion: subjektets position, skala, rotation och beskärning i utdata ska vara identiska med inmatningen — endast bakgrunden bytas ut. Annars: behåll dagens text.
-- **Ny tidig identitets-/färginstruktion** (placeras som steg 1.5, före backdrop): om `preserveSubjectColors !== false`, lägg in en explicit regel: "Preserve the subject's original colors, hue, saturation and material/paint tone exactly as in the input. Any artistic style mentioned below is a surface treatment only and must NOT shift the subject's base colors." Denna kommer alltså tidigt och inte sist.
-- **Flytta `adminPromptLine` tidigare**: lägg den direkt efter identitets-/färginstruktionen (före backdrop och fill-instruktionerna) så admin kan överstyra defaultbeteendet utan att hamna sist i kön. `styleBlock` ligger kvar i nuvarande position.
-- **Aspect-instruktionen** måste också bli villkorlig: när `fillFrame === false` ska den inte säga "scaled up to fill"; den ska bara ange aspect.
-
-c) **Logga den faktiska prompten**: precis före `callNanoBanana(...)` lägg till `console.log("[runRemoveBackground] prompt", { designIdOrLayer, length: promptText.length, promptText })`. Lägg också till en logg-rad för `params` (utan bilden) så det är enkelt att läsa körningen i edge-loggarna.
-
-### 5. Verifiering
-
-- Deploya `replicate-face-swap`.
-- Kör en testkörning från preview på bilposter-mallen med (a) default-värden, (b) `fillFrame=false`, (c) `backdropColor="#0F172A"`. Läs edge-loggarna och bekräfta att den loggade prompten matchar konfigurationen och att resultatet bevarar position/färg enligt önskemål.
-
-## Tekniska detaljer
-
-**Promptordning efter ändring** (alla `Boolean`-filtrerade):
-1. `Edit the input photo:`
-2. Isolera subjekt (oförändrad)
-3. **NY**: Preserve subject base colors (om `preserveSubjectColors`)
-4. **FLYTTAD**: `adminPromptLine` (admin har nu hög prioritet)
-5. Backdrop (parametriserad med `backdropColor`)
-6. `ringInstruction` (oförändrad logik)
-7. `edgeInstruction` (oförändrad)
-8. `fadeInstruction` ELLER ny "preserve framing" (beroende på `fillFrame`)
-9. Identitetsraden ("Keep subject identity…")
-10. `styleBlock`
-11. `aspectInstruction` (villkorlig variant när `fillFrame=false`)
-
-**Bakåtkompatibilitet**: alla nya fält är optional med defaults som motsvarar dagens beteende, så befintliga mallar fortsätter rendera identiskt tills admin aktivt ändrar något.
-
-**Inga ändringar i**: `pricing.ts`, `print-pipeline.ts`, cache-nycklar (resultatet cachas redan per `(face, style)` och påverkas inte av nya prompt-fält — vill du att backdrop-färgsbyte ska ge ny cache-slot lägger vi till det, men det är inte föreslaget här).
-
-## Frågor jag vill svara på i förväg (från ditt meddelande)
-
-- **Var hämtas styleBlock/adminPromptLine?** Båda byggs lokalt i `runRemoveBackground` (rad 492–506) av `params.stylePrompt` (kommer från `aiStyles`-preset, valt av kund) respektive `params.adminPrompt` (kommer från `aiPhoto`-lagrets `swapPrompt`).
-- **Hårdkodat?** Ja: "#FFFFFF" och "90-95%" är fasta strängar i rad 510, 513–518, 549, 554. Inget kommer från config.
-- **Vad händer om adminPromptLine flyttas tidigare?** Generativa modeller ger tidigare instruktioner högre vikt vid konflikt. Att flytta admin-raden uppåt (tillsammans med att göra fill-frame valfri) bör ge admin reell kontroll utan att vi måste skriva om hela scaffolden per mall.
+## Filer som påverkas
+- `supabase/functions/replicate-face-swap/index.ts` (en fil, ~5 raders effektiv ändring + kommentarsuppdatering)
