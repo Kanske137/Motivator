@@ -46,10 +46,17 @@ const FACE_SWAP_MODEL_VERSION =
   "cdingram/face-swap:d1d6ea8c8be89d664a07a457526f7128109dee7030fdac424788d762c71ed111";
 const FACE_SWAP_MODEL_NAME = "cdingram/face-swap";
 
-// Lovable AI Gateway — Nano Banana 2 (Gemini 3.1 Flash Image).
+// Lovable AI Gateway models.
 // Free of extra API keys: uses the auto-provisioned LOVABLE_API_KEY.
+//   ANIMAL_MODEL   — Nano Banana 2 preview, used for human + pet identity edits.
+//   REMOVEBG_MODEL — Stable Nano Banana 1, used for removeBackground. The
+//                    3.1 preview model returns frequent upstream_error 400s on
+//                    the long negative-heavy removeBackground prompts; 2.5
+//                    accepts the same request body shape with much higher
+//                    reliability.
 const AI_GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const ANIMAL_MODEL = "google/gemini-3.1-flash-image-preview";
+const REMOVEBG_MODEL = "google/gemini-2.5-flash-image";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
