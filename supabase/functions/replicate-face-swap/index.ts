@@ -361,6 +361,7 @@ async function callNanoBananaOnce(params: {
 async function callNanoBanana(params: {
   promptText: string;
   imageUrls: string[];
+  model?: string;
 }): Promise<{ ok: true; bytes: Uint8Array; contentType: string; outputUrl: string }
   | { ok: false; response: Response }> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -373,6 +374,8 @@ async function callNanoBanana(params: {
       ),
     };
   }
+
+  const model = params.model ?? ANIMAL_MODEL;
 
   // Backoff schedule between retries (ms). Total worst-case extra latency: 12s.
   const BACKOFF_MS = [4000, 8000];
@@ -387,6 +390,7 @@ async function callNanoBanana(params: {
       promptText: params.promptText,
       imageUrls: params.imageUrls,
       apiKey: LOVABLE_API_KEY,
+      model,
     });
 
     if (result.ok) {
