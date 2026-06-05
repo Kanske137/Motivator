@@ -46,17 +46,10 @@ const FACE_SWAP_MODEL_VERSION =
   "cdingram/face-swap:d1d6ea8c8be89d664a07a457526f7128109dee7030fdac424788d762c71ed111";
 const FACE_SWAP_MODEL_NAME = "cdingram/face-swap";
 
-// Lovable AI Gateway models.
+// Lovable AI Gateway — Nano Banana 2 (Gemini 3.1 Flash Image).
 // Free of extra API keys: uses the auto-provisioned LOVABLE_API_KEY.
-//   ANIMAL_MODEL   — Nano Banana 2 preview, used for human + pet identity edits.
-//   REMOVEBG_MODEL — Stable Nano Banana 1, used for removeBackground. The
-//                    3.1 preview model returns frequent upstream_error 400s on
-//                    the long negative-heavy removeBackground prompts; 2.5
-//                    accepts the same request body shape with much higher
-//                    reliability.
 const AI_GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const ANIMAL_MODEL = "google/gemini-3.1-flash-image-preview";
-const REMOVEBG_MODEL = "google/gemini-2.5-flash-image";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -242,7 +235,6 @@ async function callNanoBananaOnce(params: {
   promptText: string;
   imageUrls: string[];
   apiKey: string;
-  model: string;
 }): Promise<
   | { ok: true; bytes: Uint8Array; contentType: string; outputUrl: string }
   | { ok: false; retriable: boolean; status: number; reason: string; userMessage: string }
@@ -261,7 +253,7 @@ async function callNanoBananaOnce(params: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: params.model,
+      model: ANIMAL_MODEL,
       modalities: ["image", "text"],
       messages: [{ role: "user", content }],
     }),
@@ -361,7 +353,6 @@ async function callNanoBananaOnce(params: {
 async function callNanoBanana(params: {
   promptText: string;
   imageUrls: string[];
-  model?: string;
 }): Promise<{ ok: true; bytes: Uint8Array; contentType: string; outputUrl: string }
   | { ok: false; response: Response }> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -374,8 +365,6 @@ async function callNanoBanana(params: {
       ),
     };
   }
-
-  const model = params.model ?? ANIMAL_MODEL;
 
   // Backoff schedule between retries (ms). Total worst-case extra latency: 12s.
   const BACKOFF_MS = [4000, 8000];
@@ -390,7 +379,6 @@ async function callNanoBanana(params: {
       promptText: params.promptText,
       imageUrls: params.imageUrls,
       apiKey: LOVABLE_API_KEY,
-      model,
     });
 
     if (result.ok) {
@@ -608,7 +596,6 @@ async function runRemoveBackground(params: {
   return callNanoBanana({
     promptText,
     imageUrls: [params.faceImageUrl],
-    model: REMOVEBG_MODEL,
   });
 }
 
@@ -660,7 +647,7 @@ Deno.serve(async (req) => {
       subjectKind === "human" ? "human-nano-banana"
       : subjectKind === "pet" ? "pet-nano-banana"
       : "remove-bg-nano-banana";
-    const modelUsed = subjectKind === "removeBackground" ? REMOVEBG_MODEL : ANIMAL_MODEL;
+    const modelUsed = ANIMAL_MODEL;
 
     console.log(
       `[face-swap] start route=${route} model=${modelUsed} ` +
