@@ -242,6 +242,7 @@ async function callNanoBananaOnce(params: {
   promptText: string;
   imageUrls: string[];
   apiKey: string;
+  model: string;
 }): Promise<
   | { ok: true; bytes: Uint8Array; contentType: string; outputUrl: string }
   | { ok: false; retriable: boolean; status: number; reason: string; userMessage: string }
@@ -260,7 +261,7 @@ async function callNanoBananaOnce(params: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: ANIMAL_MODEL,
+      model: params.model,
       modalities: ["image", "text"],
       messages: [{ role: "user", content }],
     }),
