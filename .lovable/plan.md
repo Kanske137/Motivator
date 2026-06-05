@@ -1,57 +1,79 @@
+# Plan: Stabilare removeBackground (bakgrund, position, färg)
+
+## Bakgrund
+
+`runRemoveBackground` i `supabase/functions/replicate-face-swap/index.ts` (rad 475–568) bygger en lång prompt där **steg 2** hårdkodar "PURE WHITE #FFFFFF backdrop" och **steg 5** tvingar "FILL THE FRAME 90–95%" — vilket aktivt skalar om och flyttar subjektet. `adminPromptLine` ligger sist och kan därför inte överstyra detta. Det är troligen huvudorsaken till att bilen flyttas/zoomas och att bakgrundsfärgen ibland avviker (modellen försöker väga ihop motstridiga instruktioner).
+
+Idag är allt hårdkodade strängar i edge-funktionen — varken backdrop-färg eller fill-frame går att styra per mall.
+
 ## Mål
-Ersätt Replicate `cdingram/face-swap` med Nano Banana 2 (`google/gemini-3.1-flash-image-preview`) för `subjectKind === "human"`. Admin-promptens fritext (`layer.defaults.swapPrompt`) blir den primära instruktionen som beskriver exakt vad som ska bytas ut — på samma sätt som för `pet`. Pet + removeBackground rörs inte.
+
+- Subjektet behåller uppladdad position, storlek och proportioner.
+- Bakgrunden blir exakt den färg admin anger per mall (default vit, bakåtkompatibelt).
+- Subjektets grundfärg/nyans bevaras även när konststil läggs på (stilen = ytbehandling).
+- Vi kan se exakt vilken prompt modellen får för en given körning.
 
 ## Ändringar
 
-### 1. `supabase/functions/replicate-face-swap/index.ts`
+### 1. Schema: nya, valfria fält på aiPhoto-lagret
+Fil: `src/lib/template-schema.ts` (`aiPhotoDefaultsSchema`)
 
-Lägg till `runHumanSwap` (parallell till `runPetSwap`) som anropar Nano Banana 2 via befintliga `callNanoBanana`. Prompten är medvetet **minimal scaffold + admin-prompt i centrum**:
+Lägg till tre nya valfria fält (alla bakåtkompatibla — om de saknas faller vi tillbaka på dagens beteende):
 
-```
-You are editing image #1. Image #2 is a reference photo provided by the customer.
+- `backdropColor?: string` — hex, t.ex. `#FFFFFF`. Default = `#FFFFFF`.
+- `fillFrame?: boolean` — om `false` instrueras modellen att bevara subjektets ursprungliga position och storlek istället för att skala upp till 90–95%. Default = `true` för att inte ändra befintliga mallar.
+- `preserveSubjectColors?: boolean` — när `true` läggs en stark färgbevarande instruktion in **tidigt** i prompten. Default = `true`.
 
-Follow the artist's instruction below precisely — it describes exactly what
-to take from image #2 and how to place it into image #1. Everything in
-image #1 that the instruction does not explicitly change must stay
-identical (composition, framing, lighting, art style, background, props,
-clothing, pose, camera angle, aspect ratio).
+### 2. Admin-UI: exponera fälten
+Fil: `src/components/admin/LayerInspector.tsx` (sektionen för `aiPhoto` när `subjectKind === "removeBackground"`):
 
-Artist instruction:
-<layer.defaults.swapPrompt>
+- Färgväljare för `backdropColor`.
+- Toggle "Fyll ramen (skala upp subjektet)" → `fillFrame`.
+- Toggle "Bevara subjektets originalfärger" → `preserveSubjectColors`.
 
-Return ONE single edited image (NOT a collage, NOT side-by-side, NOT a
-before/after comparison). Output must have the same aspect ratio as image #1.
-```
+### 3. Klient skickar fälten vidare
+Fil: `src/components/editor/AiPhotoSection.tsx` — utöka `supabase.functions.invoke("replicate-face-swap", { body: ... })` med `backdropColor`, `fillFrame`, `preserveSubjectColors` från `layer.defaults`.
 
-Bilderna skickas i samma ordning som idag (`[referenceImageUrl, faceImageUrl]`) så befintliga prompter som refererar `input_image_1` / `input_image_2` fortsätter funka.
+### 4. Edge-funktion: parametrisera prompten
+Fil: `supabase/functions/replicate-face-swap/index.ts`
 
-Routing i `Deno.serve`:
-```ts
-subjectKind === "human" ? runHumanSwap(...)   // ← nytt
-                        : runPetSwap(...)
-                        : runRemoveBackground(...)
-```
-`route`-loggvärde: `human-nano-banana`. `modelUsed` blir `ANIMAL_MODEL` (Nano Banana 2) även för human.
+a) `Deno.serve` (rad 570+): läs de tre nya fälten från `body`, validera och skicka in i `runRemoveBackground`.
 
-`runReplicateFaceSwap` + Replicate-konstanterna får ligga kvar oanvända som snabb rollback (säg till om du vill ha dem borttagna).
+b) `runRemoveBackground` (rad 475–568):
+- **Steg 2 (backdrop)**: använd `params.backdropColor ?? "#FFFFFF"`. Om färgen ≠ vit, skriv om instruktionen så den anger den exakta hex-färgen och tar bort referenser till "pure white web page" (annars motsäger sig prompten själv).
+- **Steg 5 (fill frame)**: om `params.fillFrame === false`, ersätt hela `fadeInstruction` med en "PRESERVE EXACT FRAMING"-instruktion: subjektets position, skala, rotation och beskärning i utdata ska vara identiska med inmatningen — endast bakgrunden bytas ut. Annars: behåll dagens text.
+- **Ny tidig identitets-/färginstruktion** (placeras som steg 1.5, före backdrop): om `preserveSubjectColors !== false`, lägg in en explicit regel: "Preserve the subject's original colors, hue, saturation and material/paint tone exactly as in the input. Any artistic style mentioned below is a surface treatment only and must NOT shift the subject's base colors." Denna kommer alltså tidigt och inte sist.
+- **Flytta `adminPromptLine` tidigare**: lägg den direkt efter identitets-/färginstruktionen (före backdrop och fill-instruktionerna) så admin kan överstyra defaultbeteendet utan att hamna sist i kön. `styleBlock` ligger kvar i nuvarande position.
+- **Aspect-instruktionen** måste också bli villkorlig: när `fillFrame === false` ska den inte säga "scaled up to fill"; den ska bara ange aspect.
 
-### 2. `src/lib/ai-photo-prompts.ts`
-Uppdatera `DEFAULT_AI_PHOTO_PROMPTS.human` så default-texten i admin-inspectorn matchar den nya modellen och betonar att admin själv beskriver vad som ska bytas:
+c) **Logga den faktiska prompten**: precis före `callNanoBanana(...)` lägg till `console.log("[runRemoveBackground] prompt", { designIdOrLayer, length: promptText.length, promptText })`. Lägg också till en logg-rad för `params` (utan bilden) så det är enkelt att läsa körningen i edge-loggarna.
 
-> "Take the person's face and head from image #2 and place it onto the person in image #1. Keep image #1's hair style, outfit, accessories, lighting, pose, background and art style exactly. Preserve the customer's facial identity from image #2: facial features, eye color, skin tone, age, expression."
+### 5. Verifiering
 
-Befintliga mallar berörs inte — de har redan en sparad `swapPrompt` i DB.
+- Deploya `replicate-face-swap`.
+- Kör en testkörning från preview på bilposter-mallen med (a) default-värden, (b) `fillFrame=false`, (c) `backdropColor="#0F172A"`. Läs edge-loggarna och bekräfta att den loggade prompten matchar konfigurationen och att resultatet bevarar position/färg enligt önskemål.
 
-### 3. `src/components/editor/AiPhotoSection.tsx`
-Justera `expectedSeconds` för human från 8 → 18 (matchar pet, eftersom Nano Banana 2 är långsammare än cdingram). Inget annat klient-API ändras.
+## Tekniska detaljer
 
-## Påverkan
-- Inga ändringar i klient-API, response-shape, cache-nycklar, storage-upload eller frontend-flöde i övrigt.
-- Pet + removeBackground oförändrade.
-- `REPLICATE_API_TOKEN`-secret rörs inte (används fortfarande av `replicate-style`).
-- Retry/backoff (4s + 8s) gäller nu även human — en förbättring.
+**Promptordning efter ändring** (alla `Boolean`-filtrerade):
+1. `Edit the input photo:`
+2. Isolera subjekt (oförändrad)
+3. **NY**: Preserve subject base colors (om `preserveSubjectColors`)
+4. **FLYTTAD**: `adminPromptLine` (admin har nu hög prioritet)
+5. Backdrop (parametriserad med `backdropColor`)
+6. `ringInstruction` (oförändrad logik)
+7. `edgeInstruction` (oförändrad)
+8. `fadeInstruction` ELLER ny "preserve framing" (beroende på `fillFrame`)
+9. Identitetsraden ("Keep subject identity…")
+10. `styleBlock`
+11. `aspectInstruction` (villkorlig variant när `fillFrame=false`)
 
-## Verifiering
-1. Deploya `replicate-face-swap`.
-2. `curl_edge_functions` med human-payload (referensbild + ansiktsbild + admin-prompt) → bekräfta `route=human-nano-banana`, lyckad upload till `print-files`.
-3. Test i editor på en befintlig human-mall: skapa AI-bild → ansiktet i kundens bild ska sitta på personen från referensbilden, övrigt oförändrat.
+**Bakåtkompatibilitet**: alla nya fält är optional med defaults som motsvarar dagens beteende, så befintliga mallar fortsätter rendera identiskt tills admin aktivt ändrar något.
+
+**Inga ändringar i**: `pricing.ts`, `print-pipeline.ts`, cache-nycklar (resultatet cachas redan per `(face, style)` och påverkas inte av nya prompt-fält — vill du att backdrop-färgsbyte ska ge ny cache-slot lägger vi till det, men det är inte föreslaget här).
+
+## Frågor jag vill svara på i förväg (från ditt meddelande)
+
+- **Var hämtas styleBlock/adminPromptLine?** Båda byggs lokalt i `runRemoveBackground` (rad 492–506) av `params.stylePrompt` (kommer från `aiStyles`-preset, valt av kund) respektive `params.adminPrompt` (kommer från `aiPhoto`-lagrets `swapPrompt`).
+- **Hårdkodat?** Ja: "#FFFFFF" och "90-95%" är fasta strängar i rad 510, 513–518, 549, 554. Inget kommer från config.
+- **Vad händer om adminPromptLine flyttas tidigare?** Generativa modeller ger tidigare instruktioner högre vikt vid konflikt. Att flytta admin-raden uppåt (tillsammans med att göra fill-frame valfri) bör ge admin reell kontroll utan att vi måste skriva om hela scaffolden per mall.
