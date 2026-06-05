@@ -511,7 +511,7 @@ async function runRemoveBackground(params: {
         `Apply the following artistic style to THE SUBJECT itself (not to the background):`,
         params.stylePrompt.trim(),
         isWatercolorStyle
-          ? `IMPORTANT: regardless of the style above, the background must remain the configured backdrop with the colorful watercolor dot ring described below. Do NOT bring back the original photo background. Do NOT extend the style into the background — only the subject is restyled.`
+          ? `IMPORTANT: regardless of the style above, the background must remain the configured backdrop with the organic, asymmetric watercolor splatter described below — NEVER arranged as a ring, circle, halo or border. Do NOT bring back the original photo background. Do NOT extend the style into the background — only the subject is restyled.`
           : `IMPORTANT: the background must remain the configured backdrop with NOTHING on it — no watercolor dots, no paint splatters, no droplets, no pigment flecks, no colored marks of any kind. Do NOT bring back the original photo background. Do NOT extend the style into the background — only the subject is restyled. The chosen style is NOT watercolor, so the decorative dot/splatter ring must be completely omitted.`,
       ].join("\n")
     : "";
