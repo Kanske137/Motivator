@@ -660,7 +660,7 @@ Deno.serve(async (req) => {
       subjectKind === "human" ? "human-nano-banana"
       : subjectKind === "pet" ? "pet-nano-banana"
       : "remove-bg-nano-banana";
-    const modelUsed = ANIMAL_MODEL;
+    const modelUsed = subjectKind === "removeBackground" ? REMOVEBG_MODEL : ANIMAL_MODEL;
 
     console.log(
       `[face-swap] start route=${route} model=${modelUsed} ` +
