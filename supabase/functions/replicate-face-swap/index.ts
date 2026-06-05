@@ -478,6 +478,10 @@ async function runRemoveBackground(params: {
   stylePrompt: string | null;
   styleLabel: string | null;
   targetAspectRatio: number | null;
+  backdropColor: string | null;
+  fillFrame: boolean;
+  preserveSubjectColors: boolean;
+  designId: string;
 }) {
   // Detect whether the chosen AI style is a watercolor style. The colorful
   // dot/splatter ring is ONLY appropriate for watercolor — for any other
@@ -489,10 +493,17 @@ async function runRemoveBackground(params: {
     !params.stylePrompt?.trim() || // default (no style picked) = watercolor dots
     /water\s*colou?r|akvarell|aquarelle/.test(styleHaystack);
 
+  const backdropHex = params.backdropColor ?? "#FFFFFF";
+  const backdropIsWhite = backdropHex.toUpperCase() === "#FFFFFF";
+
   const adminPromptLine = params.adminPrompt?.trim()
     ? (isWatercolorStyle
-        ? `Additional artist guidance for the dot/splatter color tones and density: ${params.adminPrompt.trim()}`
-        : `Additional artist guidance (apply only where compatible with the chosen style — do NOT use it as an excuse to add watercolor dots or splatters): ${params.adminPrompt.trim()}`)
+        ? `HIGH-PRIORITY artist guidance for the dot/splatter color tones and density (this overrides any conflicting default below): ${params.adminPrompt.trim()}`
+        : `HIGH-PRIORITY artist guidance (this overrides any conflicting default below — apply only where compatible with the chosen style, do NOT use it as an excuse to add watercolor dots or splatters): ${params.adminPrompt.trim()}`)
+    : "";
+
+  const preserveColorsLine = params.preserveSubjectColors
+    ? `PRESERVE SUBJECT COLORS — keep the subject's original colors, hue, saturation, paint/material tone and lighting exactly as in the input photo. Any artistic style applied later is a SURFACE TREATMENT only and must NOT shift the subject's base colors (e.g. a red car must stay the same red, skin tone must stay the same).`
     : "";
 
   const styleBlock = params.stylePrompt?.trim()
@@ -500,26 +511,33 @@ async function runRemoveBackground(params: {
         `Apply the following artistic style to THE SUBJECT itself (not to the background):`,
         params.stylePrompt.trim(),
         isWatercolorStyle
-          ? `IMPORTANT: regardless of the style above, the background must remain a clean white backdrop with the colorful watercolor dot ring described below. Do NOT bring back the original photo background. Do NOT extend the style into the background — only the subject is restyled.`
-          : `IMPORTANT: the background must remain a clean PURE WHITE backdrop (#FFFFFF) with NOTHING on it — no watercolor dots, no paint splatters, no droplets, no pigment flecks, no colored marks of any kind. Do NOT bring back the original photo background. Do NOT extend the style into the background — only the subject is restyled. The chosen style is NOT watercolor, so the decorative dot/splatter ring must be completely omitted.`,
+          ? `IMPORTANT: regardless of the style above, the background must remain the configured backdrop with the colorful watercolor dot ring described below. Do NOT bring back the original photo background. Do NOT extend the style into the background — only the subject is restyled.`
+          : `IMPORTANT: the background must remain the configured backdrop with NOTHING on it — no watercolor dots, no paint splatters, no droplets, no pigment flecks, no colored marks of any kind. Do NOT bring back the original photo background. Do NOT extend the style into the background — only the subject is restyled. The chosen style is NOT watercolor, so the decorative dot/splatter ring must be completely omitted.`,
       ].join("\n")
     : "";
 
+  // Step 2 — backdrop instruction parameterised by hex color.
+  const backdropInstruction = backdropIsWhite
+    ? `2. Place the subject on a backdrop that is PURE WHITE — exact RGB (255,255,255) / hex #FFFFFF. The background must be perfectly neutral white with ZERO tint: no cream, no beige, no ivory, no off-white, no warm/cool cast, no subtle gradient, no paper texture, no vignette, no shadow halo around the subject. The pure-white backdrop must extend cleanly all the way to all four edges of the output image.`
+    : `2. Place the subject on a backdrop that is exactly the solid color ${backdropHex}. The backdrop must be perfectly flat and uniform — no gradient, no texture, no vignette, no shadow halo around the subject — and must extend cleanly to all four edges of the output image. Do not introduce any other color in the background.`;
+
+  const surroundColorPhrase = backdropIsWhite ? "pure white (#FFFFFF)" : `the backdrop color ${backdropHex}`;
+
   const ringInstruction = isWatercolorStyle
     ? `3. Around the subject (never covering the face/body), add a soft, artistic ring of small colorful watercolor dots and gentle paint splatters. Default tones: warm earthy colors (amber, rust, soft brown, hint of pink). The dots should feel hand-painted, varied in size, with some small splatter accents — playful but tasteful.`
-    : `3. Do NOT add any watercolor dots, paint splatters, droplets, pigment flecks, colored marks or decorative ring around the subject. The area surrounding the subject must be completely empty pure white (#FFFFFF). The dot/splatter decoration is reserved exclusively for the watercolor style and must be entirely omitted for the chosen style.`;
+    : `3. Do NOT add any watercolor dots, paint splatters, droplets, pigment flecks, colored marks or decorative ring around the subject. The area surrounding the subject must be completely empty ${surroundColorPhrase}. The dot/splatter decoration is reserved exclusively for the watercolor style and must be entirely omitted for the chosen style.`;
 
   const edgeInstruction = isWatercolorStyle
-    ? `4. CRITICAL EDGE TREATMENT — applies to the ENTIRE silhouette on ALL FOUR sides equally (TOP of head/hair, BOTTOM at chin/shoulders/torso/legs, LEFT side of face/ear/shoulder/arm, RIGHT side of face/ear/shoulder/arm — every single outer edge without exception, no side may be left sharp): the subject must NOT have a hard, clean cut-out silhouette against the white background ANYWHERE. The full perimeter of the subject should softly dissolve and feather into loose watercolor washes, gentle pigment bleeds, wispy translucent edges, and a few stray paint droplets that flow organically into the surrounding pure-white space. The fade must be visibly symmetrical: top, bottom, left and right edges of the subject must each dissolve with the same softness — do not leave one side (e.g. the bottom or one shoulder) sharp while another fades. Keep ONLY the face, eyes and central features crisp and in focus — everything from roughly the shoulders/upper-torso outward should progressively soften into the white on EVERY side. Absolutely no sharp masking artifacts, no visible cut-out outline, no crisp silhouette line, no halo or fringe of off-white pixels around the subject.`
-    : `4. CRITICAL EDGE TREATMENT — applies to the ENTIRE silhouette on ALL FOUR sides equally (TOP of head/hair, BOTTOM at chin/shoulders/torso/legs, LEFT side of face/ear/shoulder/arm, RIGHT side of face/ear/shoulder/arm — every single outer edge without exception, no side may be left sharp): the subject must NOT have a hard, clean cut-out silhouette against the white background ANYWHERE on any of the four sides. The full perimeter must softly feather and fade into the surrounding pure-white space using ONLY techniques native to the chosen style (e.g. softened pencil strokes for sketch, dissolving line-work for line-art, loose brushstrokes for painting styles) — NEVER by adding watercolor washes, paint splatters or colored droplets. The fade must be visibly symmetrical: top, bottom, left and right edges of the subject must each dissolve with the same softness — do not leave one side (e.g. the bottom or one shoulder) sharp while another fades. Keep ONLY the face, eyes and central features crisp and in focus — everything outward from there must progressively soften toward the white on EVERY side. Absolutely no sharp masking artifacts, no visible cut-out outline, no crisp silhouette line, no halo or fringe of off-white pixels around the subject.`;
+    ? `4. CRITICAL EDGE TREATMENT — applies to the ENTIRE silhouette on ALL FOUR sides equally: the subject must NOT have a hard, clean cut-out silhouette against the backdrop. The full perimeter should softly dissolve and feather into loose watercolor washes, gentle pigment bleeds, wispy translucent edges, and a few stray paint droplets that flow organically into the surrounding ${surroundColorPhrase}. The fade must be visibly symmetrical on top, bottom, left and right. Keep the face, eyes and central features crisp. No sharp masking artifacts, no visible cut-out outline, no halo or fringe of off-color pixels around the subject.`
+    : `4. CRITICAL EDGE TREATMENT — applies to the ENTIRE silhouette on ALL FOUR sides equally: the subject must NOT have a hard, clean cut-out silhouette against the backdrop. The full perimeter must softly feather and fade into the surrounding ${surroundColorPhrase} using ONLY techniques native to the chosen style (e.g. softened pencil strokes for sketch, dissolving line-work for line-art, loose brushstrokes for painting styles) — NEVER by adding watercolor washes, paint splatters or colored droplets. The fade must be visibly symmetrical on all four sides. Keep the face, eyes and central features crisp. No sharp masking artifacts, no visible cut-out outline, no halo or fringe of off-color pixels around the subject.`;
 
-  const fadeInstruction = isWatercolorStyle
-    ? `5. FILL THE FRAME — the subject must be SCALED UP to fill as much of the output image as possible while keeping the soft watercolor feathered edge intact on all four sides. Aim for the subject (including its dissolving watercolor halo) to occupy roughly 90-95% of the output canvas, leaving only a thin (~2-5%) sliver of pure white (#FFFFFF) at the very outer edge for a clean transition into the surrounding white page. DO NOT leave large empty white margins around the subject — no big "vignette in a sea of white". The watercolor dots and splatters should fade from full intensity at the subject down to nothing within that thin outer sliver, with no hard splatters touching or bleeding off any of the four edges. The fade dissipation must be visibly symmetrical on top, bottom, left and right.`
-    : `5. FILL THE FRAME — the subject must be SCALED UP to fill as much of the output image as possible while keeping a soft style-native feathered edge on all four sides. Aim for the subject to occupy roughly 90-95% of the output canvas, leaving only a thin (~2-5%) sliver of pure white (#FFFFFF) at the very outer edge for a clean transition into the surrounding white page. DO NOT leave large empty white margins around the subject — no big "vignette in a sea of white". Nothing should touch or bleed off any of the four edges, and the soft fade from styled subject into pure white must look symmetrical on top, bottom, left and right.`;
+  // Step 5 — framing. Either "fill the frame" (legacy) OR "preserve framing".
+  const framingInstruction = params.fillFrame
+    ? (isWatercolorStyle
+        ? `5. FILL THE FRAME — the subject must be SCALED UP to fill as much of the output image as possible while keeping the soft watercolor feathered edge intact on all four sides. Aim for the subject (including its dissolving watercolor halo) to occupy roughly 90-95% of the output canvas, leaving only a thin (~2-5%) sliver of ${surroundColorPhrase} at the very outer edge. DO NOT leave large empty backdrop margins around the subject. The watercolor dots should fade from full intensity at the subject down to nothing within that thin outer sliver, with no hard splatters touching or bleeding off any of the four edges.`
+        : `5. FILL THE FRAME — the subject must be SCALED UP to fill as much of the output image as possible while keeping a soft style-native feathered edge on all four sides. Aim for the subject to occupy roughly 90-95% of the output canvas, leaving only a thin (~2-5%) sliver of ${surroundColorPhrase} at the very outer edge. DO NOT leave large empty backdrop margins around the subject. Nothing should touch or bleed off any of the four edges, and the soft fade from styled subject into the backdrop must look symmetrical on all four sides.`)
+    : `5. PRESERVE EXACT FRAMING — the subject must keep the SAME position, scale, rotation, perspective and crop as it has in the input photo. Do NOT zoom in, zoom out, re-center, re-crop, rotate, mirror or otherwise re-frame the subject. The only thing that changes from input to output is the background (replaced with the configured backdrop) and, where applicable, the surface treatment from the chosen art style. Empty backdrop margins around the subject are EXPECTED and CORRECT — do not try to fill them by enlarging the subject.`;
 
-  // Map a numeric aspect ratio to the closest common ratio label that Nano
-  // Banana 2 understands well. The model respects these labels much better
-  // than arbitrary decimals like "0.7142".
   function aspectLabel(ar: number): string {
     const candidates: Array<{ label: string; value: number }> = [
       { label: "1:1", value: 1 },
@@ -536,30 +554,44 @@ async function runRemoveBackground(params: {
     let bestDiff = Math.abs(ar - best.value);
     for (const c of candidates) {
       const d = Math.abs(ar - c.value);
-      if (d < bestDiff) {
-        best = c;
-        bestDiff = d;
-      }
+      if (d < bestDiff) { best = c; bestDiff = d; }
     }
     return best.label;
   }
 
   const aspectInstruction = params.targetAspectRatio && params.targetAspectRatio > 0
-    ? `Return ONE single edited image with an output aspect ratio of approximately ${aspectLabel(params.targetAspectRatio)} (width:height ≈ ${params.targetAspectRatio.toFixed(3)}). The whole subject (full vehicle, full body, full silhouette — nothing cropped) must be visible, and it must be SCALED UP to fill the output frame as much as possible while leaving only a thin (~2-5%) sliver of pure white at the outer edge for the soft fade. DO NOT add big empty white margins on any side just to match the aspect — instead, make the subject as large as it can be inside the frame. Never stretch or distort the subject; preserve its natural proportions. No collage, no side-by-side, no before/after comparison.`
-    : `Return ONE single edited image with the same aspect ratio as the input. The subject must fill the frame as much as possible (only a thin ~2-5% white sliver at the outer edge for the soft fade). No collage, no side-by-side, no before/after comparison.`;
+    ? (params.fillFrame
+        ? `Return ONE single edited image with an output aspect ratio of approximately ${aspectLabel(params.targetAspectRatio)} (width:height ≈ ${params.targetAspectRatio.toFixed(3)}). The whole subject must be visible and SCALED UP to fill the output frame as much as possible. Never stretch or distort the subject. No collage, no side-by-side, no before/after comparison.`
+        : `Return ONE single edited image with an output aspect ratio of approximately ${aspectLabel(params.targetAspectRatio)} (width:height ≈ ${params.targetAspectRatio.toFixed(3)}). Keep the subject's original position and scale from the input — do NOT enlarge it to fill the new aspect ratio; simply extend the backdrop as needed. No collage, no side-by-side.`)
+    : (params.fillFrame
+        ? `Return ONE single edited image with the same aspect ratio as the input. The subject must fill the frame as much as possible. No collage, no side-by-side, no before/after comparison.`
+        : `Return ONE single edited image with the same aspect ratio as the input. Keep the subject's original position and scale. No collage, no side-by-side.`);
 
   const promptText = [
     `Edit the input photo:`,
-    `1. Isolate the main subject (a person or a pet) and COMPLETELY REMOVE the original background.`,
-    `2. Place the subject on a backdrop that is PURE WHITE — exact RGB (255,255,255) / hex #FFFFFF. The background must be perfectly neutral white with ZERO tint: no cream, no beige, no ivory, no off-white, no warm/cool cast, no subtle gradient, no paper texture, no vignette, no shadow halo around the subject. The pure-white backdrop must extend cleanly all the way to all four edges of the output image so the boundary between the artwork and a surrounding white web page becomes invisible. If you generate any tint at all, it is wrong. The white must match a blank web page background exactly so it blends seamlessly with a #FFFFFF web layout.`,
+    `1. Isolate the main subject (a person, pet or vehicle) and COMPLETELY REMOVE the original background.`,
+    preserveColorsLine,
+    adminPromptLine,
+    backdropInstruction,
     ringInstruction,
     edgeInstruction,
-    fadeInstruction,
+    framingInstruction,
     `6. Keep the subject's identity, face, eyes, fur/skin and proportions exactly as in the input photo unless an artistic style is specified below.`,
     styleBlock,
-    adminPromptLine,
     aspectInstruction,
   ].filter(Boolean).join("\n");
+
+  console.log("[runRemoveBackground] config", {
+    designId: params.designId,
+    backdropHex,
+    fillFrame: params.fillFrame,
+    preserveSubjectColors: params.preserveSubjectColors,
+    isWatercolorStyle,
+    styleLabel: params.styleLabel,
+    targetAspectRatio: params.targetAspectRatio,
+    promptLength: promptText.length,
+  });
+  console.log("[runRemoveBackground] promptText\n" + promptText);
 
   return callNanoBanana({
     promptText,
@@ -632,6 +664,18 @@ Deno.serve(async (req) => {
         ? body.targetAspectRatio
         : null;
 
+    const backdropColor: string | null =
+      typeof body?.backdropColor === "string" &&
+      /^#([0-9a-fA-F]{6})$/.test(body.backdropColor)
+        ? body.backdropColor.toUpperCase()
+        : null;
+    const fillFrame: boolean =
+      typeof body?.fillFrame === "boolean" ? body.fillFrame : true;
+    const preserveSubjectColors: boolean =
+      typeof body?.preserveSubjectColors === "boolean"
+        ? body.preserveSubjectColors
+        : true;
+
     const result =
       subjectKind === "human"
         ? await runHumanSwap({
@@ -651,6 +695,10 @@ Deno.serve(async (req) => {
             stylePrompt: removeBackgroundStylePrompt,
             styleLabel: removeBackgroundStyleLabel,
             targetAspectRatio,
+            backdropColor,
+            fillFrame,
+            preserveSubjectColors,
+            designId,
           });
 
 

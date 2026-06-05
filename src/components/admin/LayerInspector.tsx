@@ -786,11 +786,60 @@ function AiPhotoDefaultsSection({
       )}
 
       {isRemoveBg && (
-        <p className="rounded-md bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">
-          Referensbild behövs inte. Kunden ser de AI-stilar du markerat som
-          "enabled" i AI-stilar-sektionen — vald stil läggs på själva motivet
-          medan bakgrunden alltid är borttagen.
-        </p>
+        <>
+          <p className="rounded-md bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">
+            Referensbild behövs inte. Kunden ser de AI-stilar du markerat som
+            "enabled" i AI-stilar-sektionen — vald stil läggs på själva motivet
+            medan bakgrunden alltid är borttagen.
+          </p>
+          <Field label="Bakgrundsfärg (hex)">
+            <div className="flex gap-2 items-center">
+              <Input
+                type="color"
+                value={layer.defaults.backdropColor ?? "#FFFFFF"}
+                onChange={(e) =>
+                  updateDefaults({ backdropColor: e.target.value.toUpperCase() })
+                }
+                className="h-9 w-14 p-1"
+              />
+              <Input
+                value={layer.defaults.backdropColor ?? "#FFFFFF"}
+                onChange={(e) => {
+                  const v = e.target.value.trim();
+                  if (/^#([0-9a-fA-F]{6})$/.test(v)) {
+                    updateDefaults({ backdropColor: v.toUpperCase() });
+                  }
+                }}
+                placeholder="#FFFFFF"
+                className="h-9 text-xs flex-1"
+              />
+            </div>
+          </Field>
+          <div className="flex items-center justify-between rounded-md border bg-muted/30 px-3 py-2">
+            <div className="space-y-0.5">
+              <Label className="text-xs">Fyll ramen (skala upp motivet)</Label>
+              <p className="text-[10px] text-muted-foreground">
+                Av = behåll kundens uppladdade position och storlek.
+              </p>
+            </div>
+            <Switch
+              checked={layer.defaults.fillFrame !== false}
+              onCheckedChange={(v) => updateDefaults({ fillFrame: v })}
+            />
+          </div>
+          <div className="flex items-center justify-between rounded-md border bg-muted/30 px-3 py-2">
+            <div className="space-y-0.5">
+              <Label className="text-xs">Bevara motivets originalfärger</Label>
+              <p className="text-[10px] text-muted-foreground">
+                Konststilen blir då bara en ytbehandling — bilens lack/hudton ändras inte.
+              </p>
+            </div>
+            <Switch
+              checked={layer.defaults.preserveSubjectColors !== false}
+              onCheckedChange={(v) => updateDefaults({ preserveSubjectColors: v })}
+            />
+          </div>
+        </>
       )}
 
       <Field label="Form">

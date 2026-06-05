@@ -146,6 +146,17 @@ export const aiPhotoDefaultsSchema = z.object({
   /** Helps admin pick a sensible default prompt; also forwarded to the
    *  edge function so it can pick the best swap-mode for animals vs humans. */
   subjectKind: aiPhotoSubjectKindSchema.default("human"),
+  /** removeBackground only: backdrop color sent to the model.
+   *  Default = white (#FFFFFF) to preserve legacy behaviour. */
+  backdropColor: z.string().regex(/^#([0-9a-fA-F]{6})$/).optional(),
+  /** removeBackground only: when false, instruct the model to preserve the
+   *  subject's original framing/scale/position instead of scaling it up to
+   *  fill 90-95% of the output. Default = true (legacy behaviour). */
+  fillFrame: z.boolean().optional(),
+  /** removeBackground only: when true (default) inject an early, high-priority
+   *  instruction to preserve the subject's original colors/hue so applied art
+   *  styles act as a surface treatment only. */
+  preserveSubjectColors: z.boolean().optional(),
 });
 export type AiPhotoDefaults = z.infer<typeof aiPhotoDefaultsSchema>;
 
