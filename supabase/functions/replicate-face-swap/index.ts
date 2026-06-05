@@ -608,6 +608,7 @@ async function runRemoveBackground(params: {
   return callNanoBanana({
     promptText,
     imageUrls: [params.faceImageUrl],
+    model: REMOVEBG_MODEL,
   });
 }
 
