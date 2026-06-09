@@ -175,10 +175,96 @@ Shopifys `/cart/add.js` kan inte sätta line-item bild, så cart visar produktbi
 
 ---
 
+## Steg 7 — Orderbekräftelse-mejlet visar designens preview (KRÄVS)
+
+Shopifys standard `Order confirmation`-mejl visar produktbilden från Shopify, inte den personliga design kunden faktiskt beställde. Editorn skickar redan med `_preview_image`-property (samma URL som cart-thumbnailen) — vi behöver bara säga åt mejl-templaten att läsa den.
+
+> `_`-prefixet gör att property:n redan automatiskt döljs i kundens egen property-lista (default-templaten har `property_first_char != '_'`), så vi behöver bara byta `<img>`-rader.
+
+### 7.1 Öppna mejl-templaten
+1. **Settings** (kugghjul) → **Notifications** → **Customer notifications** → **Order confirmation** → **Edit code**
+2. Klicka i kodrutan och tryck **Cmd/Ctrl + F** för Find & Replace.
+
+### 7.2 Patch — samma mönster på flera ställen
+Standardtemplaten har 4 olika bild-rendering-patterns (`line`, `child_line`, `component`, `parent_line_item`). De förekommer både i legacy-spåret (`subtotal_line_items`) och i nya delivery-agreements-spåret. **Använd Find All** i Shopifys editor — varje block ska bytas på alla träffar.
+
+#### Block 1 — `line` (huvudprodukten)
+**Hitta:**
+```liquid
+<img src="{{ line | img_url: 'compact_cropped' }}" align="left" width="60" height="60" class="order-list__product-image"/>
+```
+**Ersätt med:**
+```liquid
+{%- assign _preview = line.properties._preview_image -%}
+{% if _preview != blank %}
+  <img src="{{ _preview }}" align="left" width="60" height="60" class="order-list__product-image"/>
+{% else %}
+  <img src="{{ line | img_url: 'compact_cropped' }}" align="left" width="60" height="60" class="order-list__product-image"/>
+{% endif %}
+```
+
+#### Block 2 — `child_line` (under-rader, t.ex. bundles)
+**Hitta:**
+```liquid
+<img src="{{ child_line | img_url: 'compact_cropped' }}" align="left" width="40" height="40" class="order-list__product-image small"/>
+```
+**Ersätt med:**
+```liquid
+{%- assign _preview = child_line.properties._preview_image -%}
+{% if _preview != blank %}
+  <img src="{{ _preview }}" align="left" width="40" height="40" class="order-list__product-image small"/>
+{% else %}
+  <img src="{{ child_line | img_url: 'compact_cropped' }}" align="left" width="40" height="40" class="order-list__product-image small"/>
+{% endif %}
+```
+
+#### Block 3 — `parent_line_item` (gruppvy)
+**Hitta:**
+```liquid
+<img src="{{ parent_line_item | img_url: 'compact_cropped' }}" align="left" width="60" height="60" class="order-list__product-image"/>
+```
+**Ersätt med:**
+```liquid
+{%- assign _preview = parent_line_item.properties._preview_image -%}
+{% if _preview != blank %}
+  <img src="{{ _preview }}" align="left" width="60" height="60" class="order-list__product-image"/>
+{% else %}
+  <img src="{{ parent_line_item | img_url: 'compact_cropped' }}" align="left" width="60" height="60" class="order-list__product-image"/>
+{% endif %}
+```
+
+#### Block 4 — `component` (komponenter i bundles)
+**Hitta:**
+```liquid
+<img src="{{ component | img_url: 'compact_cropped' }}" align="left" width="40" height="40" class="order-list__product-image"/>
+```
+**Ersätt med:**
+```liquid
+{%- assign _preview = component.properties._preview_image -%}
+{% if _preview != blank %}
+  <img src="{{ _preview }}" align="left" width="40" height="40" class="order-list__product-image"/>
+{% else %}
+  <img src="{{ component | img_url: 'compact_cropped' }}" align="left" width="40" height="40" class="order-list__product-image"/>
+{% endif %}
+```
+
+### 7.3 Spara & testa
+1. Klicka **Save** uppe till höger.
+2. Shopifys **Preview**-knapp använder dummy-data utan properties → previewbilden där visar fortfarande default. Det är förväntat.
+3. Gör en riktig testorder via **Bogus Gateway** med en personlig design.
+4. Kolla det riktiga mejlet → tavla-previewen ska nu visas istället för standardproduktbilden.
+
+### 7.4 Fallback-beteende
+- Saknas `_preview_image` (gammal order, vanlig produkt utan editor) → faller automatiskt tillbaka på Shopifys produktbild. Inget kan gå sönder.
+- Vill du senare göra samma sak för **Shipping confirmation** / **Refund**-mejl, kopiera samma 4 block till respektive template.
+
+---
+
 ## Felsökning
 
 - **Editor visas inte / ser ut som vanlig produktsida** → template inte tilldelad. Gå tillbaka till Steg 3.
 - **Editor laddar men "Lägg i varukorg" gör inget** → öppna browser DevTools → Console → leta efter fel. Skicka skärmdump.
 - **Order betalas men Gelato får inget** → öppna edge function-loggar för `shopify-order-webhook`. Om du ser `missing_print_file_url` betyder det att klienten inte hann skicka med tryckfilen — be kunden göra om designen och testa igen. Om problemet kvarstår systematiskt: skicka logg-utdraget i chatten.
 - **Cart-thumbnail visar fortfarande produktbilden** → Steg 6 är inte klart, eller fel template-fil. Sök i temat efter `item.image` och tillämpa snippet på alla cart-rendering-platser.
+- **Orderbekräftelse-mejlet visar fortfarande default-produktbild** → Steg 7 ej klart eller fel template-spår. Sök i Order confirmation-templaten efter alla `| img_url:` och tillämpa motsvarande block (1–4) på alla träffar. Verifiera att kunden faktiskt fick `_preview_image` på line item:t — kolla ordern i Admin → varje line item ska visa `_preview_image: https://…cart-previews/…jpg` i Properties.
 ```
