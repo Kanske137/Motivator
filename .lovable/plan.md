@@ -1,79 +1,67 @@
-# Plan: Stabilare removeBackground (bakgrund, position, färg)
+# Plan: Personlig design-preview i orderbekräftelse-mejl
 
 ## Bakgrund
+- Editorn skickar redan med line-item-property `_preview_image` (publik URL från `cart-previews`-bucket, samma bild som kunden ser i cart-thumbnailen).
+- Shopifys default Order confirmation-template ignorerar property:n och visar standard-produktbilden.
+- **Ingen kodändring i Lovable-projektet** — endast Liquid-edits i Shopify Admin (`Settings → Notifications → Order confirmation → Edit code`) + en dokumentationsuppdatering i `SHOPIFY_SETUP.md`.
 
-`runRemoveBackground` i `supabase/functions/replicate-face-swap/index.ts` (rad 475–568) bygger en lång prompt där **steg 2** hårdkodar "PURE WHITE #FFFFFF backdrop" och **steg 5** tvingar "FILL THE FRAME 90–95%" — vilket aktivt skalar om och flyttar subjektet. `adminPromptLine` ligger sist och kan därför inte överstyra detta. Det är troligen huvudorsaken till att bilen flyttas/zoomas och att bakgrundsfärgen ibland avviker (modellen försöker väga ihop motstridiga instruktioner).
+## Mönstret vi använder överallt
+Innan varje befintlig `<img>` introducerar vi `{% assign preview = ... %}` som plockar property:n, sedan villkor på `preview`:
 
-Idag är allt hårdkodade strängar i edge-funktionen — varken backdrop-färg eller fill-frame går att styra per mall.
+```liquid
+{%- assign preview = line.properties._preview_image -%}
+{% if preview != blank %}
+  <img src="{{ preview }}" align="left" width="60" height="60" class="order-list__product-image"/>
+{% elsif line.image %}
+  <img src="{{ line | img_url: 'compact_cropped' }}" align="left" width="60" height="60" class="order-list__product-image"/>
+{% endif %}
+```
 
-## Mål
+Variabelnamn beror på loopen — `line`, `child_line`, `component`, `parent_line_item` eller `line_item_group`. För grupper letar vi i `parent_line_item.properties._preview_image` först.
 
-- Subjektet behåller uppladdad position, storlek och proportioner.
-- Bakgrunden blir exakt den färg admin anger per mall (default vit, bakåtkompatibelt).
-- Subjektets grundfärg/nyans bevaras även när konststil läggs på (stilen = ytbehandling).
-- Vi kan se exakt vilken prompt modellen får för en given körning.
+## Ställen att ändra (exakta rader i din uppladdade fil)
 
-## Ändringar
+### A. Legacy `subtotal_line_items`-loop
+- **Rad 363-366** och **rad 373-376** — `line.image` → använd `line.properties._preview_image` först, fallback till `line | img_url`.
+- **Rad 451-454** (child_line) → `child_line.properties._preview_image` med fallback.
+- **Rad 607-610** (child_line, andra varianten) → samma.
 
-### 1. Schema: nya, valfria fält på aiPhoto-lagret
-Fil: `src/lib/template-schema.ts` (`aiPhotoDefaultsSchema`)
+### B. `line_item_groups` (bundles / parent items)
+- **Rad 691-696** — kolla `parent_line_item.properties._preview_image`, sen `line_item_group.parent_sales_line_item.properties._preview_image`, fallback till befintliga bilder.
+- **Rad 806-808** (component) → `component.properties._preview_image` med fallback.
+- **Rad 920-922** (component) → samma.
 
-Lägg till tre nya valfria fält (alla bakåtkompatibla — om de saknas faller vi tillbaka på dagens beteende):
+### C. Moderna `delivery_agreement`-spåret (det som troligen körs idag)
+- **Rad 1053-1056** och **rad 1063-1066** → `line.properties._preview_image` med fallback.
+- **Rad 1141-1144** (child_line) → samma.
+- **Rad 1297-1300** (child_line, andra varianten) → samma.
+- **Rad 1379-1384** (parent_line_item / line_item_group inom delivery_agreement) → samma logik som B.
 
-- `backdropColor?: string` — hex, t.ex. `#FFFFFF`. Default = `#FFFFFF`.
-- `fillFrame?: boolean` — om `false` instrueras modellen att bevara subjektets ursprungliga position och storlek istället för att skala upp till 90–95%. Default = `true` för att inte ändra befintliga mallar.
-- `preserveSubjectColors?: boolean` — när `true` läggs en stark färgbevarande instruktion in **tidigt** i prompten. Default = `true`.
+### D. Dölj tekniska `_`-prefix-properties i mejlet
+I property-loopen runt **rad 494-495** (och motsvarande rad ~1184-1185):
+```liquid
+{% for property in line.properties %}
+  {%- assign first_char = property.first | slice: 0 -%}
+  {%- unless first_char == '_' -%}
+    {{ property.first }}: {{ property.last }}
+  {%- endunless -%}
+{% endfor %}
+```
+Detta gömmer `_preview_image`, `_print_file_url`, `_design_id` etc. från kunden men de finns kvar i ordern.
 
-### 2. Admin-UI: exponera fälten
-Fil: `src/components/admin/LayerInspector.tsx` (sektionen för `aiPhoto` när `subjectKind === "removeBackground"`):
+## Leveranssätt
+1. **Uppdatera `SHOPIFY_SETUP.md`** med nytt **Steg 7 — Orderbekräftelse-mejl visar designens preview**. Innehåller:
+   - Var i Admin man hittar templaten
+   - Sök-och-ersätt-mönstret (universal snippet)
+   - Lista över alla ~10 ställen att patcha (med rad-hänvisningar som referens men sökstrings-baserat så det fungerar även om Shopify uppdaterar standard-templaten)
+   - Tips att gömma `_`-properties
+2. **Klistra in i chatten åt dig**: ett färdigt unified diff / sök-ersätt-set du kan applicera direkt i Shopify code editor (jag listar varje block: "Hitta detta → Ersätt med detta").
+3. **Test-instruktion**: gör en testorder via Bogus Gateway, kolla att mejlet visar tavla-previewen istället för default-produktbilden.
 
-- Färgväljare för `backdropColor`.
-- Toggle "Fyll ramen (skala upp subjektet)" → `fillFrame`.
-- Toggle "Bevara subjektets originalfärger" → `preserveSubjectColors`.
+## Det jag INTE rör
+- Ingen ändring i Lovable-koden (`useCartSync.ts`, `upload-preview.ts`, edge functions) — `_preview_image` skickas redan korrekt.
+- Inga andra Shopify-mejl (Shipping confirmation, Refund, etc.) — kan göras i samma stil senare om du vill.
+- Inga ändringar på Gelato-flödet (`_print_file_url` är opåverkat).
 
-### 3. Klient skickar fälten vidare
-Fil: `src/components/editor/AiPhotoSection.tsx` — utöka `supabase.functions.invoke("replicate-face-swap", { body: ... })` med `backdropColor`, `fillFrame`, `preserveSubjectColors` från `layer.defaults`.
-
-### 4. Edge-funktion: parametrisera prompten
-Fil: `supabase/functions/replicate-face-swap/index.ts`
-
-a) `Deno.serve` (rad 570+): läs de tre nya fälten från `body`, validera och skicka in i `runRemoveBackground`.
-
-b) `runRemoveBackground` (rad 475–568):
-- **Steg 2 (backdrop)**: använd `params.backdropColor ?? "#FFFFFF"`. Om färgen ≠ vit, skriv om instruktionen så den anger den exakta hex-färgen och tar bort referenser till "pure white web page" (annars motsäger sig prompten själv).
-- **Steg 5 (fill frame)**: om `params.fillFrame === false`, ersätt hela `fadeInstruction` med en "PRESERVE EXACT FRAMING"-instruktion: subjektets position, skala, rotation och beskärning i utdata ska vara identiska med inmatningen — endast bakgrunden bytas ut. Annars: behåll dagens text.
-- **Ny tidig identitets-/färginstruktion** (placeras som steg 1.5, före backdrop): om `preserveSubjectColors !== false`, lägg in en explicit regel: "Preserve the subject's original colors, hue, saturation and material/paint tone exactly as in the input. Any artistic style mentioned below is a surface treatment only and must NOT shift the subject's base colors." Denna kommer alltså tidigt och inte sist.
-- **Flytta `adminPromptLine` tidigare**: lägg den direkt efter identitets-/färginstruktionen (före backdrop och fill-instruktionerna) så admin kan överstyra defaultbeteendet utan att hamna sist i kön. `styleBlock` ligger kvar i nuvarande position.
-- **Aspect-instruktionen** måste också bli villkorlig: när `fillFrame === false` ska den inte säga "scaled up to fill"; den ska bara ange aspect.
-
-c) **Logga den faktiska prompten**: precis före `callNanoBanana(...)` lägg till `console.log("[runRemoveBackground] prompt", { designIdOrLayer, length: promptText.length, promptText })`. Lägg också till en logg-rad för `params` (utan bilden) så det är enkelt att läsa körningen i edge-loggarna.
-
-### 5. Verifiering
-
-- Deploya `replicate-face-swap`.
-- Kör en testkörning från preview på bilposter-mallen med (a) default-värden, (b) `fillFrame=false`, (c) `backdropColor="#0F172A"`. Läs edge-loggarna och bekräfta att den loggade prompten matchar konfigurationen och att resultatet bevarar position/färg enligt önskemål.
-
-## Tekniska detaljer
-
-**Promptordning efter ändring** (alla `Boolean`-filtrerade):
-1. `Edit the input photo:`
-2. Isolera subjekt (oförändrad)
-3. **NY**: Preserve subject base colors (om `preserveSubjectColors`)
-4. **FLYTTAD**: `adminPromptLine` (admin har nu hög prioritet)
-5. Backdrop (parametriserad med `backdropColor`)
-6. `ringInstruction` (oförändrad logik)
-7. `edgeInstruction` (oförändrad)
-8. `fadeInstruction` ELLER ny "preserve framing" (beroende på `fillFrame`)
-9. Identitetsraden ("Keep subject identity…")
-10. `styleBlock`
-11. `aspectInstruction` (villkorlig variant när `fillFrame=false`)
-
-**Bakåtkompatibilitet**: alla nya fält är optional med defaults som motsvarar dagens beteende, så befintliga mallar fortsätter rendera identiskt tills admin aktivt ändrar något.
-
-**Inga ändringar i**: `pricing.ts`, `print-pipeline.ts`, cache-nycklar (resultatet cachas redan per `(face, style)` och påverkas inte av nya prompt-fält — vill du att backdrop-färgsbyte ska ge ny cache-slot lägger vi till det, men det är inte föreslaget här).
-
-## Frågor jag vill svara på i förväg (från ditt meddelande)
-
-- **Var hämtas styleBlock/adminPromptLine?** Båda byggs lokalt i `runRemoveBackground` (rad 492–506) av `params.stylePrompt` (kommer från `aiStyles`-preset, valt av kund) respektive `params.adminPrompt` (kommer från `aiPhoto`-lagrets `swapPrompt`).
-- **Hårdkodat?** Ja: "#FFFFFF" och "90-95%" är fasta strängar i rad 510, 513–518, 549, 554. Inget kommer från config.
-- **Vad händer om adminPromptLine flyttas tidigare?** Generativa modeller ger tidigare instruktioner högre vikt vid konflikt. Att flytta admin-raden uppåt (tillsammans med att göra fill-frame valfri) bör ge admin reell kontroll utan att vi måste skriva om hela scaffolden per mall.
+## Risk
+- Låg. Vi lägger till villkor *innan* befintliga `<img>`-rader → om `_preview_image` saknas (gamla ordrar, vanliga produkter utan editor) faller den tillbaka på dagens beteende.
