@@ -1,67 +1,70 @@
-# Plan: Personlig design-preview i orderbekräftelse-mejl
+## Mål
+Lägg på en global blockerande overlay (ljus blur + minimal centrerad spinner/procent/stage-text) över hela editorn så fort en AI-process pågår — oavsett vilken sektion som startat den (AI-stil på foto, face-swap, object-swap, remove-background, m.fl.). Overlayen ersätter den lokala `AiProgress` i panelen så länge den är aktiv, och på mobil stängs den öppna bottom-sheet/drawern automatiskt så kunden ser själva editorn under tiden.
 
-## Bakgrund
-- Editorn skickar redan med line-item-property `_preview_image` (publik URL från `cart-previews`-bucket, samma bild som kunden ser i cart-thumbnailen).
-- Shopifys default Order confirmation-template ignorerar property:n och visar standard-produktbilden.
-- **Ingen kodändring i Lovable-projektet** — endast Liquid-edits i Shopify Admin (`Settings → Notifications → Order confirmation → Edit code`) + en dokumentationsuppdatering i `SHOPIFY_SETUP.md`.
+## Användarupplevelse
+- En AI-knapp trycks → overlay tonas in över hela editor-shellen inom 100 ms.
+- All interaktion blockeras: panel, flikar i `NavRail`, preview, sticky CTA. `Esc` och bakåt-swipe stängs av medan overlay är aktiv.
+- Mobil: om bottom-sheet (`Drawer` i `EditorShell`) är öppen → stäng den automatiskt vid start, så preview syns bakom blur.
+- Lokal `AiProgress` i panelen göms när overlay är aktiv (en `isAnyAiBusy`-flagga).
+- När processen är klar (success/fel) tonas overlay ut, panelen återgår till normal.
 
-## Mönstret vi använder överallt
-Innan varje befintlig `<img>` introducerar vi `{% assign preview = ... %}` som plockar property:n, sedan villkor på `preview`:
+## Teknisk lösning
 
-```liquid
-{%- assign preview = line.properties._preview_image -%}
-{% if preview != blank %}
-  <img src="{{ preview }}" align="left" width="60" height="60" class="order-list__product-image"/>
-{% elsif line.image %}
-  <img src="{{ line | img_url: 'compact_cropped' }}" align="left" width="60" height="60" class="order-list__product-image"/>
-{% endif %}
+### 1. Ny global store: `src/stores/aiBusyStore.ts` (Zustand)
+Spårar pågående AI-processer från valfri sektion. Multipla samtidiga jobb hanteras via Map (id → state); overlay visas om Map.size > 0.
+
+```ts
+type AiJob = { id: string; label: string; stage: string | null; expectedSeconds: number; startedAt: number };
+state: { jobs: Record<string, AiJob> }
+actions: startAiJob(id, {label, expectedSeconds}), updateAiJobStage(id, stage), endAiJob(id)
+selectors: useIsAnyAiBusy(), usePrimaryAiJob() // det jobb som visas i overlay (senast startat)
 ```
 
-Variabelnamn beror på loopen — `line`, `child_line`, `component`, `parent_line_item` eller `line_item_group`. För grupper letar vi i `parent_line_item.properties._preview_image` först.
+### 2. Ny komponent: `src/components/editor/AiBusyOverlay.tsx`
+- Fixed `inset-0`, `z-[60]` (över Drawer som är z-50), `bg-background/40 backdrop-blur-md`.
+- Centrerat minimal-kort: liten `Loader2`-spinner + label + `XX %` + liten stage-rad under.
+- Procent beräknas time-based (samma ramp-logik som dagens `AiProgress`: 90 % vid `expectedSeconds`, snap till 100 % vid stäng, fade out 300 ms).
+- `role="status"`, `aria-live="polite"`, `aria-busy="true"` på editorroten.
+- Pointer-events blockas i hela overlayen (inga klick går igenom).
+- Renderas en gång globalt i `EditorShell`; läser från `aiBusyStore`.
 
-## Ställen att ändra (exakta rader i din uppladdade fil)
+### 3. Frysning av editorn
+I `EditorShell.tsx`:
+- Lyssna på `useIsAnyAiBusy()`.
+- När busy: lägg `pointer-events-none select-none` + `aria-hidden="true"` på `.editor-body`-wrappern + sticky CTA-wrappern (overlayen själv ligger utanför).
+- När busy: om `mobileOpen === true` → `setMobileOpen(false)` (useEffect på busy-flaggan).
+- Förhindra Drawer-öppning: i `onSelectMobile` ignorera klick om busy (defensivt — flikarna är ändå pointer-events-none).
 
-### A. Legacy `subtotal_line_items`-loop
-- **Rad 363-366** och **rad 373-376** — `line.image` → använd `line.properties._preview_image` först, fallback till `line | img_url`.
-- **Rad 451-454** (child_line) → `child_line.properties._preview_image` med fallback.
-- **Rad 607-610** (child_line, andra varianten) → samma.
+### 4. Wire-up i existerande sektioner
+Tre platser där AI-jobb körs idag — samtliga ska byta från endast lokal `setBusyId/setStage` till att även anropa `startAiJob/updateAiJobStage/endAiJob`:
 
-### B. `line_item_groups` (bundles / parent items)
-- **Rad 691-696** — kolla `parent_line_item.properties._preview_image`, sen `line_item_group.parent_sales_line_item.properties._preview_image`, fallback till befintliga bilder.
-- **Rad 806-808** (component) → `component.properties._preview_image` med fallback.
-- **Rad 920-922** (component) → samma.
+- `src/components/editor/AiStyleSection.tsx` (`applyStyle`) — `id = "ai-style:${layerId}"`, label = `t("ai.creatingImage")`, expectedSeconds = 12.
+- `src/components/editor/AiPhotoSection.tsx` (huvudflödet runt rad 231–304) — id beroende på preset-typ (face-swap / object-swap / remove-bg / style), label hämtas från befintliga i18n-nycklar, expectedSeconds matchar befintliga värden (typ 25–40 s för face-swap).
+- Eventuella andra ställen där `<AiProgress active=...>` används — sök och uppdatera (rg visar bara de två sektionerna idag).
 
-### C. Moderna `delivery_agreement`-spåret (det som troligen körs idag)
-- **Rad 1053-1056** och **rad 1063-1066** → `line.properties._preview_image` med fallback.
-- **Rad 1141-1144** (child_line) → samma.
-- **Rad 1297-1300** (child_line, andra varianten) → samma.
-- **Rad 1379-1384** (parent_line_item / line_item_group inom delivery_agreement) → samma logik som B.
+Den lokala `<AiProgress>` i panelerna behålls i koden men renderas villkorat: `{!isAnyAiBusy && <AiProgress ... />}` så den gömts medan overlayen visas, och fungerar som fallback om overlay-rendering någon gång skulle hoppas över.
 
-### D. Dölj tekniska `_`-prefix-properties i mejlet
-I property-loopen runt **rad 494-495** (och motsvarande rad ~1184-1185):
-```liquid
-{% for property in line.properties %}
-  {%- assign first_char = property.first | slice: 0 -%}
-  {%- unless first_char == '_' -%}
-    {{ property.first }}: {{ property.last }}
-  {%- endunless -%}
-{% endfor %}
-```
-Detta gömmer `_preview_image`, `_print_file_url`, `_design_id` etc. från kunden men de finns kvar i ordern.
+### 5. i18n
+Nya nycklar i `src/i18n/locales/sv.json` (källa), översatta till `en/de/no/da/fi/fr/es/it/nl/pl`:
+- `ai.overlay.title` → "Skapar din bild"
+- `ai.overlay.subtitle` → "Det här tar bara en stund …"
+- (Stage-texter återanvänds från befintliga `ai.stagePrep`, `ai.stageUpload`, `ai.stageCreate`, `ai.stageFetch`.)
 
-## Leveranssätt
-1. **Uppdatera `SHOPIFY_SETUP.md`** med nytt **Steg 7 — Orderbekräftelse-mejl visar designens preview**. Innehåller:
-   - Var i Admin man hittar templaten
-   - Sök-och-ersätt-mönstret (universal snippet)
-   - Lista över alla ~10 ställen att patcha (med rad-hänvisningar som referens men sökstrings-baserat så det fungerar även om Shopify uppdaterar standard-templaten)
-   - Tips att gömma `_`-properties
-2. **Klistra in i chatten åt dig**: ett färdigt unified diff / sök-ersätt-set du kan applicera direkt i Shopify code editor (jag listar varje block: "Hitta detta → Ersätt med detta").
-3. **Test-instruktion**: gör en testorder via Bogus Gateway, kolla att mejlet visar tavla-previewen istället för default-produktbilden.
+### 6. Edge-fall
+- Om ett jobb felar (`catch`) körs `endAiJob(id)` i `finally` → overlay stängs alltid.
+- Om sidan unmountas mitt i: `endAiJob` triggas i en cleanup-effect.
+- Flera samtidiga jobb (osannolikt men möjligt om kunden hinner trycka snabbt på två lager): overlay visar det senast startade; alla räknas i Map.size så overlayen ligger kvar tills alla är klara.
 
-## Det jag INTE rör
-- Ingen ändring i Lovable-koden (`useCartSync.ts`, `upload-preview.ts`, edge functions) — `_preview_image` skickas redan korrekt.
-- Inga andra Shopify-mejl (Shipping confirmation, Refund, etc.) — kan göras i samma stil senare om du vill.
-- Inga ändringar på Gelato-flödet (`_print_file_url` är opåverkat).
+## Påverkade filer
+- `src/stores/aiBusyStore.ts` (ny)
+- `src/components/editor/AiBusyOverlay.tsx` (ny)
+- `src/components/editor/EditorShell.tsx` (overlay-mount, pointer-events-frysning, auto-close Drawer)
+- `src/components/editor/AiStyleSection.tsx` (wire-up + gömma lokal AiProgress)
+- `src/components/editor/AiPhotoSection.tsx` (wire-up + gömma lokal AiProgress)
+- `src/i18n/locales/{sv,en,de,no,da,fi,fr,es,it,nl,pl}.json` (nya nycklar för overlay-titel)
 
-## Risk
-- Låg. Vi lägger till villkor *innan* befintliga `<img>`-rader → om `_preview_image` saknas (gamla ordrar, vanliga produkter utan editor) faller den tillbaka på dagens beteende.
+## Ej i scope
+- Ingen ändring av edge-funktionerna (`replicate-style`, `replicate-face-swap`).
+- Ingen ändring av cache-/upload-logik.
+- Inga visuella ändringar utanför AI-flödet.
+- Den lokala `AiProgress`-komponenten ändras inte — den göms bara villkorat.

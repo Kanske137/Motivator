@@ -125,7 +125,11 @@
     "stageUpload": "Subiendo tu imagen…",
     "stageCreate": "Creando tu imagen…",
     "stageFetch": "Obteniendo resultado…",
-    "noResult": "El servicio no devolvió ninguna imagen"
+    "noResult": "El servicio no devolvió ninguna imagen",
+    "overlay": {
+      "title": "Creando tu imagen",
+      "subtitle": "Solo tomará un momento …"
+    }
   },
   "aiPhoto": {
     "yourImage": "Tu imagen",

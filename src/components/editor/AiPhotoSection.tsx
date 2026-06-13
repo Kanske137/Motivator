@@ -20,6 +20,7 @@ import { Loader2, Sparkles, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useEditorStore } from "@/stores/editorStore";
+import { useAiBusyStore } from "@/stores/aiBusyStore";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadCartPreview } from "@/lib/upload-preview";
 import { hashFile } from "@/lib/ai-cache-storage";
@@ -229,6 +230,9 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
     }
     setBusy(true);
     setStage(t("ai.stagePrep"));
+    const jobId = `ai-photo:${layer.id}`;
+    const { startAiJob, updateAiJobStage, endAiJob } = useAiBusyStore.getState();
+    startAiJob(jobId, { label: t("ai.creatingImage"), expectedSeconds, stage: t("ai.stagePrep") });
     try {
       const hash = await ensureHash();
       const cacheRefSlot = refSlotFor(subjectKind, refUrl, selectedStyleId);
@@ -242,6 +246,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         }
       }
       setStage(t("ai.stageUpload"));
+      updateAiJobStage(jobId, t("ai.stageUpload"));
       const faceImageUrl = await ensureUploadedUrl();
       if (!faceImageUrl) return;
       const designId = `swap-${(crypto as { randomUUID?: () => string }).randomUUID?.() ?? Date.now()}`;
@@ -284,6 +289,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
       }
 
       setStage(t("ai.stageCreate"));
+      updateAiJobStage(jobId, t("ai.stageCreate"));
       const { data, error } = await supabase.functions.invoke("replicate-face-swap", {
         body: {
           referenceImageUrl: refUrl,
@@ -302,6 +308,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
       });
       if (error) throw error;
       setStage(t("ai.stageFetch"));
+      updateAiJobStage(jobId, t("ai.stageFetch"));
       const payload = data as {
         printFileUrl?: string;
         error?: string;
@@ -335,6 +342,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
     } finally {
       setBusy(false);
       setStage(null);
+      endAiJob(jobId);
     }
   };
 

@@ -125,7 +125,11 @@
     "stageUpload": "Ladataan kuvaasi…",
     "stageCreate": "Luodaan kuvaasi…",
     "stageFetch": "Haetaan tulosta…",
-    "noResult": "Palvelu ei palauttanut kuvaa"
+    "noResult": "Palvelu ei palauttanut kuvaa",
+    "overlay": {
+      "title": "Luodaan kuvaasi",
+      "subtitle": "Tämä kestää vain hetken …"
+    }
   },
   "aiPhoto": {
     "yourImage": "Kuvasi",

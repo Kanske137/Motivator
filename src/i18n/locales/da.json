@@ -125,7 +125,11 @@
     "stageUpload": "Uploader dit billede…",
     "stageCreate": "Skaber dit billede…",
     "stageFetch": "Henter resultat…",
-    "noResult": "Tjenesten returnerede intet billede"
+    "noResult": "Tjenesten returnerede intet billede",
+    "overlay": {
+      "title": "Opretter dit billede",
+      "subtitle": "Dette tager kun et øjeblik …"
+    }
   },
   "aiPhoto": {
     "yourImage": "Dit billede",

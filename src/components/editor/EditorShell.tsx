@@ -7,6 +7,8 @@ import { ControlPanel, useAvailableSections, type SectionId } from "./ControlPan
 import type { ProductConfig, ProductType } from "@/lib/product-config";
 import { cn } from "@/lib/utils";
 import { postEditorResize } from "@/lib/iframe-resize";
+import { AiBusyOverlay } from "./AiBusyOverlay";
+import { useIsAnyAiBusy } from "@/stores/aiBusyStore";
 
 interface Props {
   configs: ProductConfig[];
@@ -22,6 +24,7 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
   const sections = useAvailableSections();
   const [activeId, setActiveId] = useState<SectionId | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const isAiBusy = useIsAnyAiBusy();
 
   useEffect(() => {
     if (sections.length === 0) {
@@ -42,7 +45,14 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
     return () => cancelAnimationFrame(r1);
   }, [activeId]);
 
+  // Stäng mobil bottom-sheet automatiskt så fort en AI-process startar,
+  // så kunden ser editorn/förhandsvisningen under blur-overlayen.
+  useEffect(() => {
+    if (isAiBusy && mobileOpen) setMobileOpen(false);
+  }, [isAiBusy, mobileOpen]);
+
   const onSelectMobile = (id: SectionId) => {
+    if (isAiBusy) return;
     setActiveId(id);
     setMobileOpen(true);
   };
@@ -62,6 +72,13 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
 
   return (
     <div className="editor-root flex flex-col">
+      <div
+        className={cn(
+          "flex flex-col",
+          isAiBusy && "pointer-events-none select-none",
+        )}
+        aria-hidden={isAiBusy || undefined}
+      >
       {/* Desktop layout — innehållsdriven höjd utan intern scroll. */}
       <div className="editor-body hidden lg:flex items-stretch min-h-[1100px]">
         <NavRail
@@ -100,7 +117,7 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
       <div className="shrink-0">{cta}</div>
 
       {/* Mobil bottom sheet — overlay utanför .editor-root */}
-      <Drawer open={mobileOpen} onOpenChange={setMobileOpen}>
+      <Drawer open={mobileOpen && !isAiBusy} onOpenChange={(o) => !isAiBusy && setMobileOpen(o)}>
         <DrawerContent className={cn("lg:hidden max-h-[85vh] focus:outline-none")}>
           <div className="flex items-center justify-between px-5 pt-2 pb-3">
             <DrawerTitle className="font-serif-display text-xl font-semibold">{activeLabel}</DrawerTitle>
@@ -116,6 +133,10 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
           <div className="px-5 pb-6 overflow-y-auto">{sectionContent}</div>
         </DrawerContent>
       </Drawer>
+      </div>
+
+      {/* Global AI-busy overlay — utanför pointer-events-none wrappern */}
+      <AiBusyOverlay />
     </div>
   );
 }
