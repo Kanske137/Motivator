@@ -111,8 +111,11 @@ export function AiStyleSection({ presets, layerId }: Props) {
       return;
     }
 
+    const jobId = `ai-style:${layerId}:${preset.id}`;
+    const { startAiJob, updateAiJobStage, endAiJob } = useAiBusyStore.getState();
     setBusyId(preset.id);
     setStage("Förbereder din bild…");
+    startAiJob(jobId, { label: t("ai.creatingImage"), expectedSeconds: 12, stage: "Förbereder din bild…" });
     try {
       // Resolve a stable cache key first (the hash) — never the upload URL.
       const hash = await ensurePhotoHash();
@@ -127,16 +130,19 @@ export function AiStyleSection({ presets, layerId }: Props) {
 
       // Cache miss → ensure the photo is uploaded so Replicate can fetch it.
       setStage("Laddar upp din bild…");
+      updateAiJobStage(jobId, "Laddar upp din bild…");
       const imageUrl = await ensureUploadedPhotoUrl();
       if (!imageUrl) return;
 
       const designId = (crypto as any)?.randomUUID?.() ?? `${Date.now()}`;
       setStage("Skapar din bild…");
+      updateAiJobStage(jobId, "Skapar din bild…");
       const { data, error } = await supabase.functions.invoke("replicate-style", {
         body: { imageUrl, prompt: preset.prompt, designId },
       });
       if (error) throw error;
       setStage("Hämtar resultat…");
+      updateAiJobStage(jobId, "Hämtar resultat…");
       const printFileUrl = (data as { printFileUrl?: string })?.printFileUrl;
       if (!printFileUrl) throw new Error("Tjänsten returnerade ingen bild");
       setAiPrintFileUrlFor(layerId, printFileUrl);
@@ -149,6 +155,7 @@ export function AiStyleSection({ presets, layerId }: Props) {
     } finally {
       setBusyId(null);
       setStage(null);
+      endAiJob(jobId);
     }
   };
 
