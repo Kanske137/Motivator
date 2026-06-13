@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import { Loader2, Sparkles, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEditorStore } from "@/stores/editorStore";
+import { useAiBusyStore, useIsAnyAiBusy } from "@/stores/aiBusyStore";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadCartPreview } from "@/lib/upload-preview";
 import { hashFile } from "@/lib/ai-cache-storage";
