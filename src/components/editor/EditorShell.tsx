@@ -72,6 +72,13 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
 
   return (
     <div className="editor-root flex flex-col">
+      <div
+        className={cn(
+          "contents",
+          isAiBusy && "[&_*]:!pointer-events-none",
+        )}
+        aria-hidden={isAiBusy || undefined}
+      >
       {/* Desktop layout — innehållsdriven höjd utan intern scroll. */}
       <div className="editor-body hidden lg:flex items-stretch min-h-[1100px]">
         <NavRail
@@ -110,7 +117,7 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
       <div className="shrink-0">{cta}</div>
 
       {/* Mobil bottom sheet — overlay utanför .editor-root */}
-      <Drawer open={mobileOpen} onOpenChange={setMobileOpen}>
+      <Drawer open={mobileOpen && !isAiBusy} onOpenChange={(o) => !isAiBusy && setMobileOpen(o)}>
         <DrawerContent className={cn("lg:hidden max-h-[85vh] focus:outline-none")}>
           <div className="flex items-center justify-between px-5 pt-2 pb-3">
             <DrawerTitle className="font-serif-display text-xl font-semibold">{activeLabel}</DrawerTitle>
@@ -126,6 +133,10 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
           <div className="px-5 pb-6 overflow-y-auto">{sectionContent}</div>
         </DrawerContent>
       </Drawer>
+      </div>
+
+      {/* Global AI-busy overlay — utanför pointer-events-none wrappern */}
+      <AiBusyOverlay />
     </div>
   );
 }
