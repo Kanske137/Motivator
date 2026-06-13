@@ -74,8 +74,8 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
     <div className="editor-root flex flex-col">
       <div
         className={cn(
-          "contents",
-          isAiBusy && "[&_*]:!pointer-events-none",
+          "flex flex-col",
+          isAiBusy && "pointer-events-none select-none",
         )}
         aria-hidden={isAiBusy || undefined}
       >
