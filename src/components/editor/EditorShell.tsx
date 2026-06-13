@@ -7,6 +7,8 @@ import { ControlPanel, useAvailableSections, type SectionId } from "./ControlPan
 import type { ProductConfig, ProductType } from "@/lib/product-config";
 import { cn } from "@/lib/utils";
 import { postEditorResize } from "@/lib/iframe-resize";
+import { AiBusyOverlay } from "./AiBusyOverlay";
+import { useIsAnyAiBusy } from "@/stores/aiBusyStore";
 
 interface Props {
   configs: ProductConfig[];
@@ -22,6 +24,7 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
   const sections = useAvailableSections();
   const [activeId, setActiveId] = useState<SectionId | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const isAiBusy = useIsAnyAiBusy();
 
   useEffect(() => {
     if (sections.length === 0) {
@@ -42,7 +45,14 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
     return () => cancelAnimationFrame(r1);
   }, [activeId]);
 
+  // Stäng mobil bottom-sheet automatiskt så fort en AI-process startar,
+  // så kunden ser editorn/förhandsvisningen under blur-overlayen.
+  useEffect(() => {
+    if (isAiBusy && mobileOpen) setMobileOpen(false);
+  }, [isAiBusy, mobileOpen]);
+
   const onSelectMobile = (id: SectionId) => {
+    if (isAiBusy) return;
     setActiveId(id);
     setMobileOpen(true);
   };
