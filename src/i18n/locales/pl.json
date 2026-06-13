@@ -125,7 +125,11 @@
     "stageUpload": "Przesyłanie zdjęcia…",
     "stageCreate": "Tworzenie obrazu…",
     "stageFetch": "Pobieranie wyniku…",
-    "noResult": "Usługa nie zwróciła obrazu"
+    "noResult": "Usługa nie zwróciła obrazu",
+    "overlay": {
+      "title": "Tworzenie obrazu",
+      "subtitle": "To zajmie tylko chwilę …"
+    }
   },
   "aiPhoto": {
     "yourImage": "Twoje zdjęcie",

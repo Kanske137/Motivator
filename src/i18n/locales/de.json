@@ -125,7 +125,11 @@
     "stageUpload": "Bild wird hochgeladen…",
     "stageCreate": "Bild wird erstellt…",
     "stageFetch": "Ergebnis wird geladen…",
-    "noResult": "Der Dienst hat kein Bild zurückgegeben"
+    "noResult": "Der Dienst hat kein Bild zurückgegeben",
+    "overlay": {
+      "title": "Bild wird erstellt",
+      "subtitle": "Das dauert nur einen Moment …"
+    }
   },
   "aiPhoto": {
     "yourImage": "Dein Bild",

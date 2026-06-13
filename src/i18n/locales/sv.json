@@ -125,7 +125,11 @@
     "stageUpload": "Laddar upp din bild…",
     "stageCreate": "Skapar din bild…",
     "stageFetch": "Hämtar resultat…",
-    "noResult": "Tjänsten returnerade ingen bild"
+    "noResult": "Tjänsten returnerade ingen bild",
+    "overlay": {
+      "title": "Skapar din bild",
+      "subtitle": "Det här tar bara en stund …"
+    }
   },
   "aiPhoto": {
     "yourImage": "Din bild",

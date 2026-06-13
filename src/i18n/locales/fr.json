@@ -125,7 +125,11 @@
     "stageUpload": "Téléchargement de votre image…",
     "stageCreate": "Création de votre image…",
     "stageFetch": "Récupération du résultat…",
-    "noResult": "Le service n'a renvoyé aucune image"
+    "noResult": "Le service n'a renvoyé aucune image",
+    "overlay": {
+      "title": "Création de votre image",
+      "subtitle": "Cela ne prend qu'un instant …"
+    }
   },
   "aiPhoto": {
     "yourImage": "Votre image",

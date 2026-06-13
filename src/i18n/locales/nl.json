@@ -125,7 +125,11 @@
     "stageUpload": "Je afbeelding uploaden…",
     "stageCreate": "Je afbeelding maken…",
     "stageFetch": "Resultaat ophalen…",
-    "noResult": "De service heeft geen afbeelding teruggegeven"
+    "noResult": "De service heeft geen afbeelding teruggegeven",
+    "overlay": {
+      "title": "Je afbeelding maken",
+      "subtitle": "Dit duurt maar even …"
+    }
   },
   "aiPhoto": {
     "yourImage": "Jouw afbeelding",
