@@ -157,6 +157,29 @@ export const aiPhotoDefaultsSchema = z.object({
    *  instruction to preserve the subject's original colors/hue so applied art
    *  styles act as a surface treatment only. */
   preserveSubjectColors: z.boolean().optional(),
+  /** OPTIONAL multi-face mode. Strictly additive: when `enabled !== true`
+   *  the layer behaves EXACTLY like a single-face aiPhoto (same UI, same
+   *  edge function, same cache, same render). When enabled the customer
+   *  uploads one portrait per slot and the new `multi-face-swap` edge
+   *  function runs Nano Banana 2 with reference + N portraits in a single
+   *  call. The result is written to the same `aiPhotoResults[layerId]`
+   *  store field so preview/snapshot/print/cart pipelines stay unchanged.
+   *  Pre-existing templates without this field are unaffected. */
+  multiFaceSwap: z
+    .object({
+      enabled: z.boolean(),
+      slots: z
+        .array(
+          z.object({
+            id: z.string().min(1),
+            label: z.string().min(1),
+            position: z.string().min(1),
+          }),
+        )
+        .min(2)
+        .max(4),
+    })
+    .optional(),
 });
 export type AiPhotoDefaults = z.infer<typeof aiPhotoDefaultsSchema>;
 
