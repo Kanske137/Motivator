@@ -229,5 +229,12 @@
     "ball": "Piłka",
     "camera": "Aparat",
     "zap": "Błyskawica"
+  },
+  "multiFace": {
+    "uploadFor": "Prześlij twarz – {{label}}",
+    "create": "Utwórz obraz",
+    "recreate": "Utwórz ponownie",
+    "creating": "Tworzenie…",
+    "allRequired": "Prześlij portret dla każdej twarzy, aby kontynuować."
   }
 }

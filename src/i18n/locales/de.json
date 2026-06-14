@@ -229,5 +229,12 @@
     "ball": "Ball",
     "camera": "Kamera",
     "zap": "Blitz"
+  },
+  "multiFace": {
+    "uploadFor": "Gesicht hochladen – {{label}}",
+    "create": "Bild erstellen",
+    "recreate": "Erneut erstellen",
+    "creating": "Wird erstellt…",
+    "allRequired": "Lade ein Porträt für jedes Gesicht hoch, um fortzufahren."
   }
 }

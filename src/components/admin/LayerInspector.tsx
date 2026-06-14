@@ -885,6 +885,8 @@ function AiPhotoDefaultsSection({
           bevaras (kläder, frisyr, miljö).
         </p>
       )}
+
+      <MultiFaceInspector layer={layer} onChange={onChange} />
     </div>
   );
 }

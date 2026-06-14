@@ -229,5 +229,12 @@
     "ball": "Ball",
     "camera": "Camera",
     "zap": "Bolt"
+  },
+  "multiFace": {
+    "uploadFor": "Upload face – {{label}}",
+    "create": "Create image",
+    "recreate": "Create again",
+    "creating": "Creating…",
+    "allRequired": "Upload one portrait for each face to continue."
   }
 }

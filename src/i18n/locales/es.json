@@ -229,5 +229,12 @@
     "ball": "Balón",
     "camera": "Cámara",
     "zap": "Rayo"
+  },
+  "multiFace": {
+    "uploadFor": "Sube la cara – {{label}}",
+    "create": "Crear imagen",
+    "recreate": "Crear de nuevo",
+    "creating": "Creando…",
+    "allRequired": "Sube un retrato por cada rostro para continuar."
   }
 }

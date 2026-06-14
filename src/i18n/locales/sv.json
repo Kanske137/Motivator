@@ -229,5 +229,12 @@
     "ball": "Boll",
     "camera": "Kamera",
     "zap": "Blixt"
+  },
+  "multiFace": {
+    "uploadFor": "Ladda upp ansikte – {{label}}",
+    "create": "Skapa bild",
+    "recreate": "Skapa igen",
+    "creating": "Skapar…",
+    "allRequired": "Ladda upp ett porträtt för varje ansikte för att fortsätta."
   }
 }

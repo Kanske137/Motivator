@@ -229,5 +229,12 @@
     "ball": "Ballon",
     "camera": "Appareil photo",
     "zap": "Éclair"
+  },
+  "multiFace": {
+    "uploadFor": "Téléverser le visage – {{label}}",
+    "create": "Créer l’image",
+    "recreate": "Créer à nouveau",
+    "creating": "Création…",
+    "allRequired": "Téléversez un portrait pour chaque visage pour continuer."
   }
 }
