@@ -26,3 +26,20 @@ export const DEFAULT_AI_PHOTO_PROMPTS: Record<AiPhotoSubjectKind, string> = {
 export function defaultPromptFor(kind: AiPhotoSubjectKind): string {
   return DEFAULT_AI_PHOTO_PROMPTS[kind];
 }
+
+// ---------- Multi-face swap default prompt ----------
+//
+// Used by the OPTIONAL multi-face mode (`aiPhoto.defaults.multiFaceSwap`).
+// The placeholder `{{SLOTS}}` is replaced server-side with one line per slot
+// in the form:
+//   - The person at the {position} position becomes the face in image {N}
+//
+// The admin can freely edit this prompt in the MultiFaceInspector; only the
+// `{{SLOTS}}` token is mechanically expanded by the edge function.
+export const DEFAULT_MULTI_FACE_PROMPT = `You are given several images. Image 1 is the reference artwork to preserve exactly: composition, painting/photo style, clothing, accessories, pose, background, lighting and framing. The remaining images are customer face photos.
+
+Re-render image 1 as the same artwork, but replace each depicted person with the matching customer face according to these mappings:
+{{SLOTS}}
+
+Preserve each customer's facial identity and likeness faithfully (features, eye color, skin tone, age, natural expression). Keep the depicted people clearly distinct — never blend, mirror or swap them. Keep EVERYTHING ELSE in the artwork unchanged. Render each likeness naturally within the artwork's style. Return ONE single edited image with the same aspect ratio as image 1 — not a collage, not side-by-side, not a comparison.`;
+
