@@ -254,6 +254,17 @@ interface EditorState {
     referenceImageUrl: string,
   ) => string | null;
 
+  // ---------- multi-face (OPTIONAL) ----------
+  setMultiFacePortrait: (
+    layerId: string,
+    slotId: string,
+    file: File | null,
+    previewUrl: string | null,
+  ) => void;
+  setMultiFacePortraitHash: (layerId: string, slotId: string, hash: string) => void;
+  setMultiFacePortraitUploadedUrl: (layerId: string, slotId: string, url: string) => void;
+  clearMultiFacePortraits: (layerId: string) => void;
+
   // Per-layer setters
   setLayerMapCenter: (id: string, c: [number, number]) => void;
   setLayerMapZoom: (id: string, z: number) => void;
