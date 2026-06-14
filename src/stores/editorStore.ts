@@ -105,6 +105,16 @@ export interface AiPhotoSource {
   uploadedUrl: string | null;
 }
 
+/** Per-slot customer portrait for the OPTIONAL multi-face mode. Mirrors the
+ *  shape of `AiPhotoSource` — uploaded lazily to cart-previews and hashed
+ *  for caching. */
+export interface MultiFacePortrait {
+  file: File;
+  previewUrl: string;
+  hash: string | null;
+  uploadedUrl: string | null;
+}
+
 /** Per-photo-layer customer state. Each `photo` layer in the template has
  *  its own uploaded file + AI state, so multi-photo templates show
  *  independent images per behållare. */
