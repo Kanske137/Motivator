@@ -181,6 +181,11 @@ interface EditorState {
   /** Persistent face-swap cache keyed by `${faceHash}|${refUrl}|${layerId}`. */
   faceSwapCache: Record<string, FaceSwapCacheEntry>;
 
+  /** Customer-uploaded portraits per aiPhoto layer per slot id, for the
+   *  OPTIONAL multi-face mode. Strictly additive — does not affect any
+   *  existing single-face behavior. */
+  multiFacePortraits: Record<string, Record<string, MultiFacePortrait>>;
+
   // ---------- setters ----------
   setConfig: (c: ProductConfig) => void;
   setPosterBgColor: (c: string) => void;
