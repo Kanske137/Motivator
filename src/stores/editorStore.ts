@@ -1307,6 +1307,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ multiFacePortraits: next, aiPhotoResults: results });
   },
 
+  setLayerMapCenter: (id, c) => updateMap(set, get, id, { center: c }),
   setLayerMapZoom: (id, z) => updateMap(set, get, id, { zoom: z }),
   setLayerMapStyle: (id, s) => updateMap(set, get, id, { styleId: s }),
   setLayerMapShape: (id, s) => updateMap(set, get, id, { shape: s }),
