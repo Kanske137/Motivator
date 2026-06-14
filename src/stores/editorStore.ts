@@ -1243,7 +1243,70 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     return entry?.url ?? null;
   },
 
-  setLayerMapCenter: (id, c) => updateMap(set, get, id, { center: c }),
+  // ---------- multi-face (OPTIONAL) ----------
+  setMultiFacePortrait: (layerId, slotId, file, previewUrl) => {
+    const cur = get().multiFacePortraits;
+    const layerMap = { ...(cur[layerId] ?? {}) };
+    const prev = layerMap[slotId];
+    if (prev?.previewUrl?.startsWith("blob:") && prev.previewUrl !== previewUrl) {
+      try { URL.revokeObjectURL(prev.previewUrl); } catch { /* noop */ }
+    }
+    if (!file || !previewUrl) {
+      delete layerMap[slotId];
+    } else {
+      layerMap[slotId] = { file, previewUrl, hash: null, uploadedUrl: null };
+    }
+    const nextLayers = { ...cur };
+    if (Object.keys(layerMap).length === 0) {
+      delete nextLayers[layerId];
+    } else {
+      nextLayers[layerId] = layerMap;
+    }
+    // New portrait on any slot → drop the cached aggregated result for the
+    // layer so the customer's next "Skapa" re-runs with the fresh inputs.
+    const results = { ...get().aiPhotoResults };
+    delete results[layerId];
+    set({ multiFacePortraits: nextLayers, aiPhotoResults: results });
+  },
+  setMultiFacePortraitHash: (layerId, slotId, hash) => {
+    const cur = get().multiFacePortraits;
+    const layerMap = cur[layerId];
+    const entry = layerMap?.[slotId];
+    if (!entry || entry.hash === hash) return;
+    set({
+      multiFacePortraits: {
+        ...cur,
+        [layerId]: { ...layerMap, [slotId]: { ...entry, hash } },
+      },
+    });
+  },
+  setMultiFacePortraitUploadedUrl: (layerId, slotId, url) => {
+    const cur = get().multiFacePortraits;
+    const layerMap = cur[layerId];
+    const entry = layerMap?.[slotId];
+    if (!entry) return;
+    set({
+      multiFacePortraits: {
+        ...cur,
+        [layerId]: { ...layerMap, [slotId]: { ...entry, uploadedUrl: url } },
+      },
+    });
+  },
+  clearMultiFacePortraits: (layerId) => {
+    const cur = get().multiFacePortraits;
+    if (!cur[layerId]) return;
+    for (const entry of Object.values(cur[layerId])) {
+      if (entry.previewUrl?.startsWith("blob:")) {
+        try { URL.revokeObjectURL(entry.previewUrl); } catch { /* noop */ }
+      }
+    }
+    const next = { ...cur };
+    delete next[layerId];
+    const results = { ...get().aiPhotoResults };
+    delete results[layerId];
+    set({ multiFacePortraits: next, aiPhotoResults: results });
+  },
+
   setLayerMapZoom: (id, z) => updateMap(set, get, id, { zoom: z }),
   setLayerMapStyle: (id, s) => updateMap(set, get, id, { styleId: s }),
   setLayerMapShape: (id, s) => updateMap(set, get, id, { shape: s }),
