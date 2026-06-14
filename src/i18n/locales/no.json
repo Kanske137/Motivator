@@ -229,5 +229,12 @@
     "ball": "Ball",
     "camera": "Kamera",
     "zap": "Lyn"
+  },
+  "multiFace": {
+    "uploadFor": "Last opp ansikt – {{label}}",
+    "create": "Lag bilde",
+    "recreate": "Lag igjen",
+    "creating": "Lager…",
+    "allRequired": "Last opp et portrett for hvert ansikt for å fortsette."
   }
 }

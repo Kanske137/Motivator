@@ -229,5 +229,12 @@
     "ball": "Bal",
     "camera": "Camera",
     "zap": "Bliksem"
+  },
+  "multiFace": {
+    "uploadFor": "Upload gezicht – {{label}}",
+    "create": "Afbeelding maken",
+    "recreate": "Opnieuw maken",
+    "creating": "Bezig met maken…",
+    "allRequired": "Upload een portret voor elk gezicht om door te gaan."
   }
 }

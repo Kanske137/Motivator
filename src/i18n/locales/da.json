@@ -229,5 +229,12 @@
     "ball": "Bold",
     "camera": "Kamera",
     "zap": "Lyn"
+  },
+  "multiFace": {
+    "uploadFor": "Upload ansigt – {{label}}",
+    "create": "Skab billede",
+    "recreate": "Skab igen",
+    "creating": "Skaber…",
+    "allRequired": "Upload et portræt for hvert ansigt for at fortsætte."
   }
 }

@@ -229,5 +229,12 @@
     "ball": "Pallo",
     "camera": "Kamera",
     "zap": "Salama"
+  },
+  "multiFace": {
+    "uploadFor": "Lataa kasvot – {{label}}",
+    "create": "Luo kuva",
+    "recreate": "Luo uudelleen",
+    "creating": "Luodaan…",
+    "allRequired": "Lataa muotokuva jokaiselle kasvolle jatkaaksesi."
   }
 }

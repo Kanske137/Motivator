@@ -229,5 +229,12 @@
     "ball": "Palla",
     "camera": "Fotocamera",
     "zap": "Fulmine"
+  },
+  "multiFace": {
+    "uploadFor": "Carica il volto – {{label}}",
+    "create": "Crea immagine",
+    "recreate": "Crea di nuovo",
+    "creating": "Creazione…",
+    "allRequired": "Carica un ritratto per ogni volto per continuare."
   }
 }
