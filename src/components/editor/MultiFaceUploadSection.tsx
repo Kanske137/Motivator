@@ -51,10 +51,31 @@ export function MultiFaceUploadSection({ layer, heading }: Props) {
   const { t } = useTranslation();
   const cfg = layer.defaults.multiFaceSwap;
   const slots = cfg?.slots ?? [];
-  const refUrl =
-    layer.defaults.referenceImageUrl ??
-    layer.defaults.referenceImages?.[0]?.url ??
-    null;
+
+  // Resolve admin-configured reference subjects — mirrors AiPhotoSection so
+  // the customer can pick among multiple references (e.g. portrait/landscape
+  // variants or alternative scenes), exactly like the single-face flow.
+  const allReferenceImages = (() => {
+    const list = layer.defaults.referenceImages ?? [];
+    if (list.length > 0) return list;
+    if (layer.defaults.referenceImageUrl) {
+      return [{ id: "legacy", url: layer.defaults.referenceImageUrl, label: undefined, orientation: "any" as const }];
+    }
+    return [];
+  })();
+  const editorOrientation = useEditorStore((s) => s.orientation);
+  const referenceImages = allReferenceImages.filter((r) => {
+    const o = (r as { orientation?: string }).orientation ?? "any";
+    return o === "any" || o === editorOrientation;
+  });
+  const showSubjectPicker = referenceImages.length >= 2;
+
+  const aiPhotoSelectedRefUrl = useEditorStore((s) => s.aiPhotoSelectedRefUrl);
+  const setAiPhotoSelectedRef = useEditorStore((s) => s.setAiPhotoSelectedRef);
+  const selectedRefUrlFromStore = aiPhotoSelectedRefUrl[layer.id] ?? null;
+  const selectedRef =
+    referenceImages.find((r) => r.url === selectedRefUrlFromStore) ?? referenceImages[0] ?? null;
+  const refUrl = selectedRef?.url ?? layer.defaults.referenceImageUrl ?? null;
 
   const portraitsAll = useEditorStore((s) => s.multiFacePortraits);
   const setMultiFacePortrait = useEditorStore((s) => s.setMultiFacePortrait);
@@ -67,13 +88,38 @@ export function MultiFaceUploadSection({ layer, heading }: Props) {
   const result = aiPhotoResults[layer.id] ?? null;
 
   const [busy, setBusy] = useState(false);
-  // Multi-face on Nano Banana takes a bit longer than single-face — empirically
-  // ~25s for 2 portraits, more with retries.
   const expectedSeconds = 30;
 
-  // Per-slot local cache of cached-result URLs to avoid recomputation. Stored
-  // in a ref so it doesn't trigger re-renders.
   const cacheRef = useRef<Record<string, MultiFaceCacheEntry>>(loadMultiFaceCache());
+
+  // Heal selection when references or orientation change.
+  useEffect(() => {
+    if (referenceImages.length === 0) return;
+    const stored = aiPhotoSelectedRefUrl[layer.id];
+    if (!stored || !referenceImages.some((r) => r.url === stored)) {
+      setAiPhotoSelectedRef(layer.id, referenceImages[0].url);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layer.id, editorOrientation, referenceImages.map((r) => r.url).join("|")]);
+
+  // When the selected reference changes, swap the displayed result to the
+  // cached one for the new (refUrl, portraits) combination — or clear it so
+  // the customer can re-tap "Skapa" against the new reference.
+  useEffect(() => {
+    if (!refUrl) return;
+    const hashEntries = slots
+      .map((s) => ({ slotId: s.id, hash: layerPortraits[s.id]?.hash ?? "" }))
+      .filter((e) => e.hash);
+    if (hashEntries.length !== slots.length) return;
+    const key = makeMultiFaceKey(layer.id, refUrl, hashEntries);
+    const cached = cacheRef.current[key];
+    if (cached?.url) {
+      if (result !== cached.url) setAiPhotoResult(layer.id, cached.url);
+    } else if (result) {
+      setAiPhotoResult(layer.id, null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refUrl]);
 
   // Lazy-hash newly uploaded portraits.
   useEffect(() => {
@@ -250,6 +296,37 @@ export function MultiFaceUploadSection({ layer, heading }: Props) {
 
       {!refUrl && (
         <p className="text-xs text-destructive">{t("aiPhoto.notConfigured")}</p>
+      )}
+
+      {showSubjectPicker && (
+        <div className="space-y-2">
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
+            {t("aiPhoto.chooseSubject")}
+          </Label>
+          <div className="grid grid-cols-3 gap-2">
+            {referenceImages.map((r) => {
+              const isActive = (selectedRef?.url ?? null) === r.url;
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => setAiPhotoSelectedRef(layer.id, r.url)}
+                  className={cn(
+                    "relative aspect-square rounded-xl overflow-hidden ring-1 ring-border bg-muted transition hover:-translate-y-0.5",
+                    isActive && "ring-2 ring-primary",
+                  )}
+                >
+                  <img src={r.url} alt={r.label ?? ""} className="w-full h-full object-cover" />
+                  {r.label && (
+                    <span className="absolute bottom-0 inset-x-0 bg-background/85 backdrop-blur-sm text-[10px] py-1 text-center font-medium">
+                      {r.label}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       )}
 
       <div className="grid grid-cols-1 gap-3">
