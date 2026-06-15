@@ -199,8 +199,13 @@ export default function EditorPage() {
   // Detta undviker omladdning/spinner vid produkttyp-byte i konsoliderade mallar.
   useEffect(() => {
     if (configs.length === 0) return;
-    const active = resolveConfigForHandle(configs, handleParam, typeParam) ?? configs[0];
-    if (active) setConfig(active);
+    const active = resolveConfigForHandle(configs, handleParam, typeParam);
+    if (active) {
+      setNotFound(false);
+      setConfig(active);
+    } else {
+      setNotFound(true);
+    }
   }, [configs, handleParam, typeParam, setConfig]);
 
   const onProductChange = (newHandle: string, newType?: import("@/lib/product-config").ProductType) => {
