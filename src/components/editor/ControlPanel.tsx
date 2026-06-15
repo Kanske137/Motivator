@@ -20,6 +20,7 @@ import { PhotoUploadSection } from "./PhotoUploadSection";
 import { AiStyleSection } from "./AiStyleSection";
 import { AiPhotoSection } from "./AiPhotoSection";
 import { MultiFaceUploadSection } from "./MultiFaceUploadSection";
+import { LayersSection } from "./LayersSection";
 import { Loader2, Search } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -207,6 +208,8 @@ export function ControlPanel({ configs, activeHandle, activeProductType, onProdu
   const productType = config.product_type ?? null;
 
   switch (sectionId) {
+    case "lager":
+      return <LayersSection />;
     case "bild":
       return (
         <PhotoLayersControls
