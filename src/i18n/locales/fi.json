@@ -36,7 +36,8 @@
     "text": "Teksti",
     "format": "Muoto",
     "aiStyle": "AI-tyyli",
-    "style": "Tyyli"
+    "style": "Tyyli",
+    "layers": "Tasot"
   },
   "format": {
     "backgroundColor": "Taustaväri",
@@ -240,5 +241,25 @@
     "recreate": "Luo uudelleen",
     "creating": "Luodaan…",
     "allRequired": "Lataa muotokuva jokaiselle kasvolle jatkaaksesi."
+  },
+  "layers": {
+    "intro": "Lisää tasoja rakentaaksesi designisi vapaasti — kuva, kartta, teksti ja koristeet.",
+    "add": "Lisää taso",
+    "addTitle": "Valitse tasotyyppi",
+    "add.photo": "Kuva",
+    "add.aiPhoto": "AI-kuva",
+    "add.map": "Kartta",
+    "add.text": "Teksti",
+    "add.shape": "Muoto",
+    "add.line": "Viiva",
+    "add.margin": "Marginaali",
+    "listTitle": "Tasoni",
+    "empty": "Ei tasoja vielä. Aloita painamalla \"Lisää taso\".",
+    "added": "Taso lisätty",
+    "maxReached": "Enintään {{max}} tasoa",
+    "moveUp": "Siirrä ylös",
+    "moveDown": "Siirrä alas",
+    "delete": "Poista taso",
+    "deleteDisabledTpl": "Mallin tasoja ei voi poistaa"
   }
 }

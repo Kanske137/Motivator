@@ -36,7 +36,8 @@
     "text": "Testo",
     "format": "Formato",
     "aiStyle": "Stile IA",
-    "style": "Stile"
+    "style": "Stile",
+    "layers": "Livelli"
   },
   "format": {
     "backgroundColor": "Colore di sfondo",
@@ -240,5 +241,25 @@
     "recreate": "Crea di nuovo",
     "creating": "Creazione…",
     "allRequired": "Carica un ritratto per ogni volto per continuare."
+  },
+  "layers": {
+    "intro": "Aggiungi livelli per creare il tuo design liberamente — immagine, mappa, testo e decorazione.",
+    "add": "Aggiungi livello",
+    "addTitle": "Scegli tipo di livello",
+    "add.photo": "Foto",
+    "add.aiPhoto": "Foto AI",
+    "add.map": "Mappa",
+    "add.text": "Testo",
+    "add.shape": "Forma",
+    "add.line": "Linea",
+    "add.margin": "Margine",
+    "listTitle": "I miei livelli",
+    "empty": "Nessun livello ancora. Tocca \"Aggiungi livello\" per iniziare.",
+    "added": "Livello aggiunto",
+    "maxReached": "Max {{max}} livelli",
+    "moveUp": "Sposta su",
+    "moveDown": "Sposta giù",
+    "delete": "Elimina livello",
+    "deleteDisabledTpl": "I livelli del modello non possono essere eliminati"
   }
 }

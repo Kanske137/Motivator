@@ -36,7 +36,8 @@
     "text": "Text",
     "format": "Format",
     "aiStyle": "AI-stil",
-    "style": "Stil"
+    "style": "Stil",
+    "layers": "Lager"
   },
   "format": {
     "backgroundColor": "Bakgrundsfärg",
@@ -240,5 +241,25 @@
     "recreate": "Skapa igen",
     "creating": "Skapar…",
     "allRequired": "Ladda upp ett porträtt för varje ansikte för att fortsätta."
+  },
+  "layers": {
+    "intro": "Lägg till lager för att bygga din design fritt — bild, karta, text och dekor.",
+    "add": "Lägg till lager",
+    "addTitle": "Välj lagertyp",
+    "add.photo": "Bild",
+    "add.aiPhoto": "AI-bild",
+    "add.map": "Karta",
+    "add.text": "Text",
+    "add.shape": "Form",
+    "add.line": "Linje",
+    "add.margin": "Marginal",
+    "listTitle": "Mina lager",
+    "empty": "Inga lager ännu. Tryck på \"Lägg till lager\" för att börja.",
+    "added": "Lager tillagt",
+    "maxReached": "Max {{max}} lager",
+    "moveUp": "Flytta upp",
+    "moveDown": "Flytta ner",
+    "delete": "Ta bort lager",
+    "deleteDisabledTpl": "Mallens egna lager kan inte tas bort"
   }
 }
