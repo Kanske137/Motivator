@@ -364,6 +364,15 @@ export default function EditorPage() {
     });
   };
 
+  if (!loading && notFound) {
+    return (
+      <div className="min-h-[400px] flex flex-col items-center justify-center bg-background gap-2 p-6 text-center">
+        <h2 className="text-lg font-semibold">{t("editorError.templateNotFoundTitle")}</h2>
+        <p className="text-sm text-muted-foreground max-w-md">{t("editorError.templateNotFoundBody")}</p>
+      </div>
+    );
+  }
+
   if (loading || !config) {
     return (
       <div className="min-h-[400px] flex items-center justify-center bg-background">
@@ -371,6 +380,7 @@ export default function EditorPage() {
       </div>
     );
   }
+
 
   const previewNode = (
     <MapPreview
