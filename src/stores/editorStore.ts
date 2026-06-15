@@ -1514,6 +1514,63 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     delete layerTransforms[id];
     set({ template: nextTemplate, layerValues, layerTransforms });
   },
+  setLayerVisible: (id, visible) => {
+    const next = { ...get().hiddenLayerIds };
+    if (visible) delete next[id];
+    else next[id] = true;
+    set({ hiddenLayerIds: next });
+  },
+  isLayerHidden: (id) => Boolean(get().hiddenLayerIds[id]),
+  reorderLayers: (orderedIds) => {
+    const state = get();
+    const tpl = state.template;
+    const config = state.config;
+    if (!tpl || !config) return;
+    const nextTemplate = mutateActiveLayoutBlock(
+      tpl,
+      config.product_type,
+      state.layoutId,
+      state.orientation,
+      (layers) => {
+        // orderedIds är TOPP-först (= högst zIndex först). Tilldela jämna
+        // steg så det finns gap för framtida insert.
+        const total = orderedIds.length;
+        const byId = new Map(layers.map((l) => [l.id, l] as const));
+        return layers.map((l) => {
+          const idx = orderedIds.indexOf(l.id);
+          if (idx === -1) return l;
+          const newZ = (total - idx) * 10;
+          return { ...l, zIndex: newZ };
+        });
+      },
+    );
+    set({ template: nextTemplate });
+  },
+  hasDesignContent: () => {
+    const state = get();
+    const layers = state.templateLayers();
+    if (layers.length === 0) return false;
+    for (const layer of layers) {
+      if (state.hiddenLayerIds[layer.id]) continue;
+      const v = state.layerValues[layer.id];
+      if (layer.type === "photo") {
+        const src = state.photoSources[layer.id];
+        if (src?.previewUrl || src?.uploadedUrl) return true;
+      } else if (layer.type === "aiPhoto") {
+        if (state.aiPhotoResults[layer.id]) return true;
+        const src = state.aiPhotoSources[layer.id];
+        if (src?.previewUrl || src?.uploadedUrl) return true;
+      } else if (layer.type === "map") {
+        if (v && v.kind === "map" && v.placeName) return true;
+      } else if (layer.type === "text") {
+        if (v && v.kind === "text") {
+          const eff = v.overrideText ?? v.text;
+          if (eff && eff.trim().length > 0) return true;
+        }
+      }
+    }
+    return false;
+  },
   moveLayerZ: (id, direction) => {
     const state = get();
     const tpl = state.template;
