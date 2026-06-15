@@ -292,6 +292,14 @@ interface EditorState {
   removeMapIcon: (layerId: string, iconInstanceId: string) => void;
   replaceMapIcon: (layerId: string, iconInstanceId: string, patch: Partial<MapIcon>) => void;
 
+  // ---------- freeform (kund-tillagda lager i "fri mall"-läge) ----------
+  /** Lägg till ett kund-skapat lager i det aktiva layout-blocket. */
+  addCustomLayer: (type: import("@/lib/freeform-layers").FreeformLayerType) => string | null;
+  /** Ta bort ett (typiskt kund-tillagt) lager. Funkar även för admin-lager. */
+  removeCustomLayer: (id: string) => void;
+  /** Flytta ett lager upp/ner i z-stack (1 = upp, -1 = ner). */
+  moveLayerZ: (id: string, direction: 1 | -1) => void;
+
   // ---------- legacy globals (derived getters; mutators apply to first layer) ----------
   // These setters/getters keep older code (EditorPage cart payload, snapshot
   // pipeline, etc.) working unchanged while we migrate to per-layer everywhere.
