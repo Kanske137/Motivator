@@ -451,6 +451,43 @@ export function MapPreview({
     [layerTransforms, setLayerTransform],
   );
 
+  // Resize-handler för custom shape/line-lager (nedre högra hörnet). För
+  // linjer låser vi kortsidan så bara längden ändras.
+  const onResizeStart = useCallback(
+    (l: TemplateLayer, e: React.PointerEvent<Element>) => {
+      const frame = frameRef.current;
+      if (!frame) return;
+      e.preventDefault();
+      e.stopPropagation();
+      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+      const rect = frame.getBoundingClientRect();
+      const eff = effectiveLayerRect(l, layerTransforms);
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startW = eff.wPct;
+      const startH = eff.hPct;
+      const lineOrient =
+        l.type === "line" ? (l.defaults.orientation as "horizontal" | "vertical") : null;
+      const onMove = (ev: PointerEvent) => {
+        const dxPct = ((ev.clientX - startX) / rect.width) * 100;
+        const dyPct = ((ev.clientY - startY) / rect.height) * 100;
+        let nw = startW + dxPct;
+        let nh = startH + dyPct;
+        if (lineOrient === "horizontal") nh = startH; // bara längden ändras
+        if (lineOrient === "vertical") nw = startW;
+        const c = clampLayerRect({ xPct: eff.xPct, yPct: eff.yPct, wPct: nw, hPct: nh });
+        setLayerTransform(l.id, c);
+      };
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    },
+    [layerTransforms, setLayerTransform],
+  );
+
   const isWrap = wrapCm > 0;
   // Visual marker for the synlig front zone — always reflects wrapCm regardless
   // of whether layers are anchored to front or full-area.
