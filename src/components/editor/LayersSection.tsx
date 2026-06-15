@@ -238,7 +238,7 @@ export function LayersSection() {
       <p className="text-sm text-muted-foreground">{t("layers.intro")}</p>
 
       <Popover open={onboardingOpen} onOpenChange={(o) => !o && dismissOnboarding()}>
-        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <Sheet open={sheetOpen} onOpenChange={(o) => { setSheetOpen(o); if (o) dismissOnboarding(); }}>
           <PopoverTrigger asChild>
             <SheetTrigger asChild>
               <Button className="w-full" size="lg">
