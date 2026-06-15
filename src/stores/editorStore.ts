@@ -1440,7 +1440,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   // ---------- freeform actions ----------
-  addCustomLayer: (type) => {
+  addCustomLayer: (type, opts) => {
     const state = get();
     const tpl = state.template;
     const config = state.config;
@@ -1450,6 +1450,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       zIndex: nextTopZIndex(block.layers),
       defaultFont: tpl.productOptions?.allowedFonts?.[0] ?? undefined,
       defaultMapStyleId: tpl.productOptions?.mapStyles?.[0]?.id ?? undefined,
+      shapeKind: opts?.shapeKind,
+      lineOrientation: opts?.lineOrientation,
     });
     const nextTemplate = mutateActiveLayoutBlock(
       tpl,
