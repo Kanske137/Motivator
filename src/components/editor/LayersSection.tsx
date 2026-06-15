@@ -69,7 +69,11 @@ const MAX_LAYERS = 12;
 
 export function LayersSection() {
   const { t } = useTranslation();
-  const layers = useEditorStore((s) => s.templateLayers());
+  // OBS: hämta FUNKTIONEN i selectorn (stabil ref) och anropa i render.
+  // `useEditorStore((s) => s.templateLayers())` triggar Zustands
+  // "getSnapshot should be cached"-loop → editor kraschar (vit sida).
+  const templateLayers = useEditorStore((s) => s.templateLayers);
+  const layers = templateLayers();
   const addCustomLayer = useEditorStore((s) => s.addCustomLayer);
   const removeCustomLayer = useEditorStore((s) => s.removeCustomLayer);
   const moveLayerZ = useEditorStore((s) => s.moveLayerZ);
@@ -131,9 +135,28 @@ export function LayersSection() {
           </span>
         </div>
         {ordered.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4 text-center">
-            {t("layers.empty")}
-          </p>
+          <div className="py-4 space-y-3">
+            <p className="text-sm text-muted-foreground text-center">
+              {t("layers.empty")}
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {(["photo", "map", "text"] as const).map((type) => {
+                const meta = TYPE_META[type];
+                const Icon = meta.icon;
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => onAdd(type)}
+                    className="flex flex-col items-center gap-1.5 p-3 rounded-lg border bg-background hover:bg-accent transition"
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span className="text-xs font-medium">{t(meta.labelKey)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         ) : (
           <ul className="space-y-1.5">
             {ordered.map((layer, idx) => {
