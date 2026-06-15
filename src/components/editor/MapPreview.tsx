@@ -514,10 +514,13 @@ export function MapPreview({
           // Only layers that actually need pointer interaction in the
           // customer preview should catch clicks/drags. Otherwise an
           // overlapping locked text/image/decor layer can block photo pan.
+          // Kund-tillagda shape/line ska kunna flyttas + resizas i previewen.
+          const isCustomDecor = isCustomLayerId(l.id) && (l.type === "shape" || l.type === "line");
           const isInteractiveLayer =
             l.type === "photo" ||
             l.type === "aiPhoto" ||
-            (l.type === "map" && !l.locks.position);
+            (l.type === "map" && !l.locks.position) ||
+            isCustomDecor;
           const wrapStyle: React.CSSProperties = {
             position: "absolute",
             left: `${rect.left}%`,
@@ -529,7 +532,8 @@ export function MapPreview({
           };
           const movable =
             !l.locks.move &&
-            (l.type === "map" || l.type === "photo" || l.type === "aiPhoto" || l.type === "text" || l.type === "image");
+            (l.type === "map" || l.type === "photo" || l.type === "aiPhoto" || l.type === "text" || l.type === "image" || isCustomDecor);
+          const resizable = isCustomDecor && !l.locks.move;
           const moveHandle = movable ? (
             <button
               type="button"
@@ -540,6 +544,18 @@ export function MapPreview({
               title="Dra för att flytta lagret"
             >
               ✥
+            </button>
+          ) : null;
+          const resizeHandle = resizable ? (
+            <button
+              type="button"
+              onPointerDown={(e) => onResizeStart(l, e)}
+              className="absolute w-6 h-6 rounded-md bg-primary text-primary-foreground shadow-lg flex items-center justify-center text-[10px] cursor-nwse-resize touch-none ring-2 ring-background"
+              style={{ bottom: -12, right: -12, zIndex: 39, pointerEvents: "auto" }}
+              aria-label="Ändra storlek"
+              title="Dra för att ändra storlek"
+            >
+              ⤡
             </button>
           ) : null;
 
