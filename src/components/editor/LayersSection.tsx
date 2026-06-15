@@ -35,13 +35,13 @@ const TYPE_META: Record<
   FreeformLayerType,
   { icon: LucideIcon; labelKey: string }
 > = {
-  photo: { icon: ImageIcon, labelKey: "layers.add.photo" },
-  aiPhoto: { icon: Sparkles, labelKey: "layers.add.aiPhoto" },
-  map: { icon: MapPin, labelKey: "layers.add.map" },
-  text: { icon: Type, labelKey: "layers.add.text" },
-  shape: { icon: Frame, labelKey: "layers.add.shape" },
-  line: { icon: Minus, labelKey: "layers.add.line" },
-  margin: { icon: Square, labelKey: "layers.add.margin" },
+  photo: { icon: ImageIcon, labelKey: "layers.addPhoto" },
+  aiPhoto: { icon: Sparkles, labelKey: "layers.addAiPhoto" },
+  map: { icon: MapPin, labelKey: "layers.addMap" },
+  text: { icon: Type, labelKey: "layers.addText" },
+  shape: { icon: Frame, labelKey: "layers.addShape" },
+  line: { icon: Minus, labelKey: "layers.addLine" },
+  margin: { icon: Square, labelKey: "layers.addMargin" },
 };
 
 const ADD_ORDER: FreeformLayerType[] = [
