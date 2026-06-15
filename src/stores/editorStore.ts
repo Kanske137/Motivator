@@ -1507,7 +1507,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const tpl = state.template;
     const config = state.config;
     if (!tpl || !config) return;
-    const { mutateActiveLayoutBlock } = require("@/lib/freeform-layers") as typeof import("@/lib/freeform-layers");
     const nextTemplate = mutateActiveLayoutBlock(
       tpl,
       config.product_type,
