@@ -142,6 +142,9 @@ function SortableLayerRow({
       </button>
       <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
       <span className="flex-1 text-sm truncate">{layer.name}</span>
+      {isCustom && (layer.type === "shape" || layer.type === "line") && (
+        <LayerQuickSettings layer={layer} />
+      )}
       <Button
         type="button"
         size="icon"
