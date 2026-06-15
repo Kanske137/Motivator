@@ -1,4 +1,8 @@
 {
+  "editorError": {
+    "templateNotFoundTitle": "Malen ble ikke funnet",
+    "templateNotFoundBody": "Vi fant ingen mal for dette produktet. Kontakt support hvis problemet vedvarer."
+  },
   "common": {
     "addToCart": "Legg i handlekurv",
     "loading": "Laster…",

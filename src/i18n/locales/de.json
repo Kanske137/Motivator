@@ -1,4 +1,8 @@
 {
+  "editorError": {
+    "templateNotFoundTitle": "Vorlage nicht gefunden",
+    "templateNotFoundBody": "Wir konnten keine Vorlage für dieses Produkt finden. Bitte kontaktiere den Support, falls das Problem weiterhin besteht."
+  },
   "common": {
     "addToCart": "In den Warenkorb",
     "loading": "Lädt…",

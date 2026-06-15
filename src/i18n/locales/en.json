@@ -1,4 +1,8 @@
 {
+  "editorError": {
+    "templateNotFoundTitle": "Template not found",
+    "templateNotFoundBody": "We couldn't find a template for this product. Please contact support if the problem persists."
+  },
   "common": {
     "addToCart": "Add to cart",
     "loading": "Loading…",

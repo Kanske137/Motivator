@@ -1,4 +1,8 @@
 {
+  "editorError": {
+    "templateNotFoundTitle": "Sjabloon niet gevonden",
+    "templateNotFoundBody": "We konden geen sjabloon vinden voor dit product. Neem contact op met support als het probleem aanhoudt."
+  },
   "common": {
     "addToCart": "In winkelwagen",
     "loading": "Laden…",

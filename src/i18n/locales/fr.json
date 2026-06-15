@@ -1,4 +1,8 @@
 {
+  "editorError": {
+    "templateNotFoundTitle": "Modèle introuvable",
+    "templateNotFoundBody": "Nous n'avons pas trouvé de modèle pour ce produit. Contactez le support si le problème persiste."
+  },
   "common": {
     "addToCart": "Ajouter au panier",
     "loading": "Chargement…",

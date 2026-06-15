@@ -1,4 +1,8 @@
 {
+  "editorError": {
+    "templateNotFoundTitle": "Skabelonen kunne ikke findes",
+    "templateNotFoundBody": "Vi kunne ikke finde en skabelon til dette produkt. Kontakt support, hvis problemet fortsætter."
+  },
   "common": {
     "addToCart": "Læg i kurv",
     "loading": "Indlæser…",
