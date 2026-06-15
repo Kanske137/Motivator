@@ -1555,7 +1555,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const v = state.layerValues[layer.id];
       if (layer.type === "photo") {
         const src = state.photoSources[layer.id];
-        if (src?.previewUrl || src?.uploadedUrl) return true;
+        if (src?.previewUrl || src?.originalUrl) return true;
       } else if (layer.type === "aiPhoto") {
         if (state.aiPhotoResults[layer.id]) return true;
         const src = state.aiPhotoSources[layer.id];
