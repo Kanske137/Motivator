@@ -298,12 +298,23 @@ interface EditorState {
   replaceMapIcon: (layerId: string, iconInstanceId: string, patch: Partial<MapIcon>) => void;
 
   // ---------- freeform (kund-tillagda lager i "fri mall"-läge) ----------
+  /** Map of layer-id → true för lager som kunden valt att dölja. Respekteras
+   *  av preview + print (filtreras innan snapshot/print-fil byggs). */
+  hiddenLayerIds: Record<string, true>;
   /** Lägg till ett kund-skapat lager i det aktiva layout-blocket. */
   addCustomLayer: (type: import("@/lib/freeform-layers").FreeformLayerType) => string | null;
   /** Ta bort ett (typiskt kund-tillagt) lager. Funkar även för admin-lager. */
   removeCustomLayer: (id: string) => void;
   /** Flytta ett lager upp/ner i z-stack (1 = upp, -1 = ner). */
   moveLayerZ: (id: string, direction: 1 | -1) => void;
+  /** Sätt synlighet för ett lager (true = visa, false = dölj). */
+  setLayerVisible: (id: string, visible: boolean) => void;
+  /** Är lagret dolt? */
+  isLayerHidden: (id: string) => boolean;
+  /** Skriv om zIndex enligt orderedIds (TOPP-först = högst zIndex). */
+  reorderLayers: (orderedIds: string[]) => void;
+  /** True om fri mall har minst en designkälla med riktigt innehåll. */
+  hasDesignContent: () => boolean;
 
   // ---------- legacy globals (derived getters; mutators apply to first layer) ----------
   // These setters/getters keep older code (EditorPage cart payload, snapshot
