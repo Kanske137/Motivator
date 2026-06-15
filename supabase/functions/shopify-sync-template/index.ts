@@ -802,6 +802,33 @@ Deno.serve(async (req) => {
           },
         });
 
+        // Skriv custom.template_slug-metafält så theme-snippeten kan koppla
+        // Shopify-produkten till rätt mall även om handle/titel byts manuellt
+        // i Shopify Admin. Tyst miss-failed (loggas) — sync ska inte falla.
+        try {
+          const metaRes = await shopifyAdmin<{
+            metafieldsSet: { userErrors: { message: string; field?: string[] }[] };
+          }>(METAFIELDS_SET, {
+            metafields: [
+              {
+                ownerId: productId,
+                namespace: "custom",
+                key: "template_slug",
+                type: "single_line_text_field",
+                value: cfg.shopify_handle,
+              },
+            ],
+          });
+          if (metaRes.metafieldsSet.userErrors.length) {
+            console.warn(
+              "[sync] metafieldsSet warnings:",
+              metaRes.metafieldsSet.userErrors.map((e) => e.message).join("; "),
+            );
+          }
+        } catch (e) {
+          console.warn("[sync] metafieldsSet failed:", (e as Error).message);
+        }
+
         // Variants/options/SKU are ALWAYS source-of-truth from Lovable.
         await syncProductOptions(productId, existing, group);
 
