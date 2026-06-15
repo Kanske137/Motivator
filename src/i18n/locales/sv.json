@@ -168,7 +168,9 @@
     "added": "Lagt till i varukorgen",
     "prepareFailed": "Kunde inte förbereda tryckfil",
     "variantUnavailable": "Den här kombinationen är inte tillgänglig i butiken ännu",
-    "variantUnavailableHint": "{{size}} · {{variant}} hittades inte för {{handle}}."
+    "variantUnavailableHint": "{{size}} · {{variant}} hittades inte för {{handle}}.",
+    "freeformEmpty": "Lägg till något i din design först",
+    "freeformEmptyHint": "Lägg till minst en bild, karta eller text innan du går till kassan."
   },
   "scene": {
     "livingroom": "Vardagsrum",
