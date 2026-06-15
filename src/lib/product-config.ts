@@ -70,6 +70,10 @@ export interface ProductConfig {
   is_consolidated?: boolean;
   /** Vilka produkttyper mallen säljer. Tomt för icke-konsoliderade mallar. */
   enabled_product_types?: ProductType[];
+  /** "Fri mall": kunden bygger själv genom att lägga till lager i editorn.
+   *  Aktiverar "Lager"-fliken i NavRail. Mallens egna lager (om några)
+   *  fungerar som startläge för kunden. Default = false. */
+  is_freeform?: boolean;
 }
 
 /** Mappar legacy "kind"-strängar (poster/posters/canvas/...) till `ProductType`. */
