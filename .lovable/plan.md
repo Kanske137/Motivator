@@ -1,49 +1,56 @@
-## Tillägg till "Fri mall"-editorn
+## Mål
+I "fri mall"-läget ska kunden kunna:
+1. Välja **vilken form** som läggs till (rektangel, oval, rundad, dubbel ram, hörn).
+2. Välja **riktning på linje** (horisontell/vertikal) — och byta efteråt.
+3. **Flytta och resiza** form- och linjelager direkt i previewen.
 
-Fyra fokuserade förbättringar till `LayersSection` + en validering på CTA.
+Inget annat beteende rörs — texter, bilder, karta, AI-bild, margin och admin-låsta lager fungerar exakt som idag.
 
-### 1. Drag-reorder (ersätt upp/ner-knappar)
-- Lägg till `@dnd-kit/core` + `@dnd-kit/sortable` (om de inte redan finns; annars använd HTML5 native drag).
-- Wrappa `<ul>` i `LayersSection.tsx` med `DndContext` + `SortableContext` (vertikal). Varje rad blir en `useSortable`-item med drag-handle (grip-ikon) till vänster.
-- Vid drop: räkna om `zIndex` (överst i listan = högst zIndex). Anropa ny store-action `reorderLayers(orderedIds: string[])` som muterar via `mutateActiveLayoutBlock` och skriver tillbaka zIndex sekventiellt.
-- Behåll upp/ner-knapparna som `sr-only` keyboard-fallback? Nej — ersätt helt, men gör drag-handle keyboard-aktiverbar (dnd-kit har inbyggt stöd via `KeyboardSensor`).
+## Ändringar
 
-### 2. Visibility-toggle
-- Alla `TemplateLayer`-instanser har redan en valfri `visible: boolean`-egenskap (default true). Verifieras vid implementation.
-- Lägg till en ögon-ikon (Eye / EyeOff) i raden, mellan namn och delete-knappen.
-- Ny store-action `setLayerVisible(id, visible)` som muterar layern i aktivt layout-block. Renderpipen (`StaticLayers`, snapshot, print) respekterar redan `visible === false` → dölj då.
-- Dolda lager visas i listan med `opacity-50` så det är tydligt.
-- Detta gäller både template-lager OCH custom-lager (i motsats till delete som bara funkar på custom).
+### 1. Val av form vid skapande (`LayersSection.tsx`)
+När kunden väljer "Form" i bottensheeten öppnas ett extra steg i samma sheet med 5 ikon-knappar (Rektangel / Oval / Rundade hörn / Dubbel ram / Hörn). Klick → skapar lagret med rätt `defaults.kind`.
 
-### 3. Onboarding-tooltip
-- Första gången kunden öppnar "Lager"-fliken på en fri mall: visa en popover/tooltip ankrad mot "Lägg till lager"-knappen med kort text (i18n: `layers.onboarding.title` + `layers.onboarding.body` + "Förstått"-knapp).
-- Persistens: `localStorage.setItem("freeform-onboarding-seen", "1")` när användaren stänger den. Läs vid mount; visa bara om saknas och `is_freeform === true`.
-- Komponent: shadcn `Popover` öppen som default, stängs på klick. Inga ändringar i editorStore.
+Tillägg i `createFreeformLayer` (`src/lib/freeform-layers.ts`): acceptera valfri `shapeKind`-parameter, default fortfarande `frame-rect` (bakåtkompatibelt).
 
-### 4. Validering: blockera "Lägg i varukorg" vid saknad designkälla
-- Definition av "saknad designkälla" på fri mall:
-  - 0 lager totalt, ELLER
-  - Ingen av lagren har ett "innehåll" (photo utan uploadedUrl, map utan placeName, text med tom sträng, AI-photo utan resultat). Form/line/margin räknas inte som designkälla.
-- Lägg en selector i `editorStore`: `hasDesignContent(): boolean`.
-- I `EditorPage.tsx`:
-  - Beräkna `const canAddToCart = !config.is_freeform || hasDesignContent()`.
-  - Skicka `disabled={!canAddToCart}` till `StickyCta` (lägg till prop om den saknas).
-  - Vid klick på disabled CTA: visa `toast.error(t("cartAdd.freeformEmpty"))` med hint "Lägg till minst en bild, karta eller text".
-- För icke-fria mallar: ingen ändring (befintliga validering oförändrad).
+För linje samma mönster: i sheeten visas två val (Horisontell / Vertikal) innan lagret skapas. `createFreeformLayer("line", { lineOrientation })`.
 
-### i18n-nycklar (sv som källa, översätt till en/de/no/da/fi/fr/es/it/nl/pl)
-- `layers.dragHandle` ("Dra för att ändra ordning")
-- `layers.toggleVisible` / `layers.toggleHidden`
-- `layers.onboarding.title` / `layers.onboarding.body` / `layers.onboarding.dismiss`
-- `cartAdd.freeformEmpty` / `cartAdd.freeformEmptyHint`
+### 2. Per-lager mini-inspector (ny: `LayerQuickSettings.tsx`)
+Liten popover-knapp (kugghjul-ikon) i varje rad i `LayersSection` — visas endast för custom shape/line-lager. Innehåll:
+- **Shape**: 5 form-knappar (byter `defaults.kind`), färgväljare, tjocklek-slider (`strokeMm`, 0.5–6).
+- **Line**: orientering-toggle (horisontell/vertikal), färg, tjocklek (`thicknessMm`).
 
-### Filer som ändras
-- `src/components/editor/LayersSection.tsx` — drag-reorder, visibility-toggle, onboarding-popover
-- `src/stores/editorStore.ts` — `reorderLayers`, `setLayerVisible`, `hasDesignContent`
-- `src/components/editor/StickyCta.tsx` — ny `disabled`-prop (om saknas)
-- `src/pages/EditorPage.tsx` — koppla validering till CTA
-- 11 × `src/i18n/locales/*.json` — nya nycklar
-- `package.json` — `@dnd-kit/core` + `@dnd-kit/sortable` (om ej redan installerade)
+Skriver via befintlig `mutateActiveLayoutBlock` genom ny store-action `updateLayerDefaults(id, partial)`.
 
-### Inget rörs
-- `freeform-layers.ts`-factory, print-pipeline, template-schema, DB/migrations, Shopify-sync, övriga sektioner i ControlPanel.
+### 3. Move + resize i kundpreview (`MapPreview.tsx`)
+Utöka `movable`-villkoret (rad 492-494) så `shape` och `line` också är dragbara när `!l.locks.move`. Sätt `pointerEvents: 'auto'` för dessa via `isInteractiveLayer`-utvidgningen så grip-knappen fungerar (utan att blockera bakomliggande klick — wrappern behåller `pointer-events:none`, bara handtag och resize-grepp är klickbara).
+
+**Resize-handtag** (nytt, scope: shape + line custom-lager): en liten kvadrat i nedre högra hörnet (likt move-knappen som finns idag). Pointer-drag → uppdaterar `wPct`/`hPct` via samma `setLayerTransform` + `clampLayerRect`. För linjer låses kortsidan (height för horisontell, width för vertikal) så bara längden ändras.
+
+### 4. Store (`editorStore.ts`)
+- Ny: `updateLayerDefaults(id, partial)` — typad union per lagertyp, ren shallow-merge av `defaults`.
+- Befintligt `setLayerTransform` används oförändrat för move/resize.
+
+### 5. i18n (`sv.json` källa + 10 språk)
+Nya nycklar:
+```
+layers.shape.pickTitle, layers.shape.rect/oval/rounded/double/corners
+layers.line.pickTitle, layers.line.horizontal/vertical
+layers.settings (kugghjul-tooltip)
+layers.stroke, layers.color, layers.thickness
+```
+
+## Tekniska detaljer
+
+- `template-schema.ts` rörs **inte** — alla fält finns redan (`kind`, `orientation`, `strokeMm`, `thicknessMm`, `color`).
+- Print/snapshot-pipeline rörs **inte** — lagren skrivs tillbaka via `mutateActiveLayoutBlock` precis som dagens add/remove.
+- Admin-låsta (template) shape/line-lager påverkas inte: `locks.move`/`locks.size` respekteras; quick-settings visas bara för `isCustomLayerId`.
+- Drag-reorder, visibility-toggle, onboarding och CTA-validering från förra ronden lämnas orörda.
+
+## Filer
+- `src/components/editor/LayersSection.tsx` (utöka sheet-flöde, ny quick-settings popover per rad)
+- `src/components/editor/LayerQuickSettings.tsx` (ny)
+- `src/components/editor/MapPreview.tsx` (movable + nytt resize-handtag)
+- `src/lib/freeform-layers.ts` (acceptera `shapeKind`/`lineOrientation`)
+- `src/stores/editorStore.ts` (ny `updateLayerDefaults`)
+- `src/i18n/locales/*.json` (11 filer, nya nycklar)
