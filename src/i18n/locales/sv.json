@@ -270,6 +270,23 @@
       "title": "Skapa fritt",
       "body": "Lägg till bilder, karta, text och dekor. Dra för att ändra ordning, tryck på ögat för att dölja, och papperskorgen för att ta bort.",
       "dismiss": "Förstått"
-    }
+    },
+    "shape": {
+      "pickTitle": "Välj form",
+      "rect": "Rektangel",
+      "oval": "Oval",
+      "rounded": "Rundade hörn",
+      "double": "Dubbel ram",
+      "corners": "Hörnmotiv"
+    },
+    "line": {
+      "pickTitle": "Välj riktning",
+      "horizontal": "Horisontell",
+      "vertical": "Vertikal"
+    },
+    "settings": "Inställningar",
+    "color": "Färg",
+    "thickness": "Tjocklek",
+    "resizeHandle": "Dra för att ändra storlek"
   }
 }

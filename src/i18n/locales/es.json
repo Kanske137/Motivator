@@ -270,6 +270,23 @@
       "title": "Crea libremente",
       "body": "Añade imágenes, mapa, texto y decoración. Arrastra para reordenar, toca el ojo para ocultar y la papelera para eliminar.",
       "dismiss": "Entendido"
-    }
+    },
+    "shape": {
+      "pickTitle": "Elegir forma",
+      "rect": "Rectángulo",
+      "oval": "Óvalo",
+      "rounded": "Redondeado",
+      "double": "Doble marco",
+      "corners": "Esquinas"
+    },
+    "line": {
+      "pickTitle": "Elegir dirección",
+      "horizontal": "Horizontal",
+      "vertical": "Vertical"
+    },
+    "settings": "Ajustes",
+    "color": "Color",
+    "thickness": "Grosor",
+    "resizeHandle": "Arrastra para redimensionar"
   }
 }

@@ -16,6 +16,7 @@ import {
 } from "@/lib/layer-utils";
 import { AcrylicCornerOverlay } from "./AcrylicCornerOverlay";
 import { MapIconsOverlay } from "./MapIconsOverlay";
+import { isCustomLayerId } from "@/lib/freeform-layers";
 
 interface Props {
   frameColor?: string;
@@ -451,6 +452,43 @@ export function MapPreview({
     [layerTransforms, setLayerTransform],
   );
 
+  // Resize-handler för custom shape/line-lager (nedre högra hörnet). För
+  // linjer låser vi kortsidan så bara längden ändras.
+  const onResizeStart = useCallback(
+    (l: TemplateLayer, e: React.PointerEvent<Element>) => {
+      const frame = frameRef.current;
+      if (!frame) return;
+      e.preventDefault();
+      e.stopPropagation();
+      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+      const rect = frame.getBoundingClientRect();
+      const eff = effectiveLayerRect(l, layerTransforms);
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startW = eff.wPct;
+      const startH = eff.hPct;
+      const lineOrient =
+        l.type === "line" ? (l.defaults.orientation as "horizontal" | "vertical") : null;
+      const onMove = (ev: PointerEvent) => {
+        const dxPct = ((ev.clientX - startX) / rect.width) * 100;
+        const dyPct = ((ev.clientY - startY) / rect.height) * 100;
+        let nw = startW + dxPct;
+        let nh = startH + dyPct;
+        if (lineOrient === "horizontal") nh = startH; // bara längden ändras
+        if (lineOrient === "vertical") nw = startW;
+        const c = clampLayerRect({ xPct: eff.xPct, yPct: eff.yPct, wPct: nw, hPct: nh });
+        setLayerTransform(l.id, c);
+      };
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    },
+    [layerTransforms, setLayerTransform],
+  );
+
   const isWrap = wrapCm > 0;
   // Visual marker for the synlig front zone — always reflects wrapCm regardless
   // of whether layers are anchored to front or full-area.
@@ -476,10 +514,13 @@ export function MapPreview({
           // Only layers that actually need pointer interaction in the
           // customer preview should catch clicks/drags. Otherwise an
           // overlapping locked text/image/decor layer can block photo pan.
+          // Kund-tillagda shape/line ska kunna flyttas + resizas i previewen.
+          const isCustomDecor = isCustomLayerId(l.id) && (l.type === "shape" || l.type === "line");
           const isInteractiveLayer =
             l.type === "photo" ||
             l.type === "aiPhoto" ||
-            (l.type === "map" && !l.locks.position);
+            (l.type === "map" && !l.locks.position) ||
+            isCustomDecor;
           const wrapStyle: React.CSSProperties = {
             position: "absolute",
             left: `${rect.left}%`,
@@ -491,7 +532,8 @@ export function MapPreview({
           };
           const movable =
             !l.locks.move &&
-            (l.type === "map" || l.type === "photo" || l.type === "aiPhoto" || l.type === "text" || l.type === "image");
+            (l.type === "map" || l.type === "photo" || l.type === "aiPhoto" || l.type === "text" || l.type === "image" || isCustomDecor);
+          const resizable = isCustomDecor && !l.locks.move;
           const moveHandle = movable ? (
             <button
               type="button"
@@ -502,6 +544,18 @@ export function MapPreview({
               title="Dra för att flytta lagret"
             >
               ✥
+            </button>
+          ) : null;
+          const resizeHandle = resizable ? (
+            <button
+              type="button"
+              onPointerDown={(e) => onResizeStart(l, e)}
+              className="absolute w-6 h-6 rounded-md bg-primary text-primary-foreground shadow-lg flex items-center justify-center text-[10px] cursor-nwse-resize touch-none ring-2 ring-background"
+              style={{ bottom: -12, right: -12, zIndex: 39, pointerEvents: "auto" }}
+              aria-label="Ändra storlek"
+              title="Dra för att ändra storlek"
+            >
+              ⤡
             </button>
           ) : null;
 
@@ -721,11 +775,16 @@ export function MapPreview({
           }
 
           if (l.type === "line") {
-            // Customer never interacts with lines (admin-locked) — let clicks
-            // pass through the wrapper to layers underneath.
+            // Kund-tillagda linjer kan flyttas/resizas — admin-låsta linjer
+            // släpper klick igenom till lager under.
+            const style = isCustomDecor
+              ? wrapStyle
+              : { ...wrapStyle, pointerEvents: "none" as const };
             return (
-              <div key={l.id} style={{ ...wrapStyle, pointerEvents: "none" }}>
+              <div key={l.id} style={style}>
                 <LineLayerView layer={l} thicknessPx={lineThicknessPxFromCanvas(l, frameShortPx)} />
+                {moveHandle}
+                {resizeHandle}
               </div>
             );
           }
@@ -743,10 +802,14 @@ export function MapPreview({
           }
 
           if (l.type === "shape") {
-            // Admin-only decoration — never blocks customer interaction.
+            const style = isCustomDecor
+              ? wrapStyle
+              : { ...wrapStyle, pointerEvents: "none" as const };
             return (
-              <div key={l.id} style={{ ...wrapStyle, pointerEvents: "none" }}>
+              <div key={l.id} style={style}>
                 <ShapeLayerView layer={l} canvasShortPx={frameShortPx} />
+                {moveHandle}
+                {resizeHandle}
               </div>
             );
           }

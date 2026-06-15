@@ -302,7 +302,12 @@ interface EditorState {
    *  av preview + print (filtreras innan snapshot/print-fil byggs). */
   hiddenLayerIds: Record<string, true>;
   /** Lägg till ett kund-skapat lager i det aktiva layout-blocket. */
-  addCustomLayer: (type: import("@/lib/freeform-layers").FreeformLayerType) => string | null;
+  addCustomLayer: (
+    type: import("@/lib/freeform-layers").FreeformLayerType,
+    opts?: { shapeKind?: import("@/lib/template-schema").ShapeKind; lineOrientation?: "horizontal" | "vertical" },
+  ) => string | null;
+  /** Patcha en del av ett kund-lagers `defaults` (typ-säkert per lagertyp). */
+  updateLayerDefaults: (id: string, patch: Record<string, unknown>) => void;
   /** Ta bort ett (typiskt kund-tillagt) lager. Funkar även för admin-lager. */
   removeCustomLayer: (id: string) => void;
   /** Flytta ett lager upp/ner i z-stack (1 = upp, -1 = ner). */
@@ -1435,7 +1440,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   // ---------- freeform actions ----------
-  addCustomLayer: (type) => {
+  addCustomLayer: (type, opts) => {
     const state = get();
     const tpl = state.template;
     const config = state.config;
@@ -1445,6 +1450,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       zIndex: nextTopZIndex(block.layers),
       defaultFont: tpl.productOptions?.allowedFonts?.[0] ?? undefined,
       defaultMapStyleId: tpl.productOptions?.mapStyles?.[0]?.id ?? undefined,
+      shapeKind: opts?.shapeKind,
+      lineOrientation: opts?.lineOrientation,
     });
     const nextTemplate = mutateActiveLayoutBlock(
       tpl,
@@ -1523,6 +1530,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ hiddenLayerIds: next });
   },
   isLayerHidden: (id) => Boolean(get().hiddenLayerIds[id]),
+  updateLayerDefaults: (id, patch) => {
+    const state = get();
+    const tpl = state.template;
+    const config = state.config;
+    if (!tpl || !config) return;
+    const nextTemplate = mutateActiveLayoutBlock(
+      tpl,
+      config.product_type,
+      state.layoutId,
+      state.orientation,
+      (layers) =>
+        layers.map((l) =>
+          l.id === id
+            ? ({ ...l, defaults: { ...(l as { defaults: object }).defaults, ...patch } } as typeof l)
+            : l,
+        ),
+    );
+    set({ template: nextTemplate });
+  },
   reorderLayers: (orderedIds) => {
     const state = get();
     const tpl = state.template;

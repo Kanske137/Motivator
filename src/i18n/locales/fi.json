@@ -270,6 +270,23 @@
       "title": "Luo vapaasti",
       "body": "Lisää kuvia, kartta, tekstiä ja koristeita. Vedä järjestääksesi, napauta silmää piilottaaksesi ja roskakoria poistaaksesi.",
       "dismiss": "Selvä"
-    }
+    },
+    "shape": {
+      "pickTitle": "Valitse muoto",
+      "rect": "Suorakulmio",
+      "oval": "Soikio",
+      "rounded": "Pyöristetty",
+      "double": "Kaksoiskehys",
+      "corners": "Kulmat"
+    },
+    "line": {
+      "pickTitle": "Valitse suunta",
+      "horizontal": "Vaaka",
+      "vertical": "Pysty"
+    },
+    "settings": "Asetukset",
+    "color": "Väri",
+    "thickness": "Paksuus",
+    "resizeHandle": "Vedä muuttaaksesi kokoa"
   }
 }
