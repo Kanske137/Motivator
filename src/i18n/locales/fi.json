@@ -246,13 +246,6 @@
     "intro": "Lisää tasoja rakentaaksesi designisi vapaasti — kuva, kartta, teksti ja koristeet.",
     "add": "Lisää taso",
     "addTitle": "Valitse tasotyyppi",
-    "add.photo": "Kuva",
-    "add.aiPhoto": "AI-kuva",
-    "add.map": "Kartta",
-    "add.text": "Teksti",
-    "add.shape": "Muoto",
-    "add.line": "Viiva",
-    "add.margin": "Marginaali",
     "listTitle": "Tasoni",
     "empty": "Ei tasoja vielä. Aloita painamalla \"Lisää taso\".",
     "added": "Taso lisätty",
@@ -260,6 +253,13 @@
     "moveUp": "Siirrä ylös",
     "moveDown": "Siirrä alas",
     "delete": "Poista taso",
-    "deleteDisabledTpl": "Mallin tasoja ei voi poistaa"
+    "deleteDisabledTpl": "Mallin tasoja ei voi poistaa",
+    "addPhoto": "Kuva",
+    "addAiPhoto": "AI-kuva",
+    "addMap": "Kartta",
+    "addText": "Teksti",
+    "addShape": "Muoto",
+    "addLine": "Viiva",
+    "addMargin": "Marginaali"
   }
 }

@@ -246,13 +246,6 @@
     "intro": "Añade capas para construir tu diseño libremente — imagen, mapa, texto y decoración.",
     "add": "Añadir capa",
     "addTitle": "Elegir tipo de capa",
-    "add.photo": "Foto",
-    "add.aiPhoto": "Foto IA",
-    "add.map": "Mapa",
-    "add.text": "Texto",
-    "add.shape": "Forma",
-    "add.line": "Línea",
-    "add.margin": "Margen",
     "listTitle": "Mis capas",
     "empty": "Aún no hay capas. Pulsa \"Añadir capa\" para empezar.",
     "added": "Capa añadida",
@@ -260,6 +253,13 @@
     "moveUp": "Subir",
     "moveDown": "Bajar",
     "delete": "Eliminar capa",
-    "deleteDisabledTpl": "Las capas de la plantilla no se pueden eliminar"
+    "deleteDisabledTpl": "Las capas de la plantilla no se pueden eliminar",
+    "addPhoto": "Foto",
+    "addAiPhoto": "Foto IA",
+    "addMap": "Mapa",
+    "addText": "Texto",
+    "addShape": "Forma",
+    "addLine": "Línea",
+    "addMargin": "Margen"
   }
 }

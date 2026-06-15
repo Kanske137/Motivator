@@ -246,13 +246,6 @@
     "intro": "Lägg till lager för att bygga din design fritt — bild, karta, text och dekor.",
     "add": "Lägg till lager",
     "addTitle": "Välj lagertyp",
-    "add.photo": "Bild",
-    "add.aiPhoto": "AI-bild",
-    "add.map": "Karta",
-    "add.text": "Text",
-    "add.shape": "Form",
-    "add.line": "Linje",
-    "add.margin": "Marginal",
     "listTitle": "Mina lager",
     "empty": "Inga lager ännu. Tryck på \"Lägg till lager\" för att börja.",
     "added": "Lager tillagt",
@@ -260,6 +253,13 @@
     "moveUp": "Flytta upp",
     "moveDown": "Flytta ner",
     "delete": "Ta bort lager",
-    "deleteDisabledTpl": "Mallens egna lager kan inte tas bort"
+    "deleteDisabledTpl": "Mallens egna lager kan inte tas bort",
+    "addPhoto": "Bild",
+    "addAiPhoto": "AI-bild",
+    "addMap": "Karta",
+    "addText": "Text",
+    "addShape": "Form",
+    "addLine": "Linje",
+    "addMargin": "Marginal"
   }
 }

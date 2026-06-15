@@ -246,13 +246,6 @@
     "intro": "Ajoutez des calques pour créer votre design librement — image, carte, texte et décoration.",
     "add": "Ajouter un calque",
     "addTitle": "Choisir le type de calque",
-    "add.photo": "Photo",
-    "add.aiPhoto": "Photo IA",
-    "add.map": "Carte",
-    "add.text": "Texte",
-    "add.shape": "Forme",
-    "add.line": "Ligne",
-    "add.margin": "Marge",
     "listTitle": "Mes calques",
     "empty": "Aucun calque pour le moment. Appuyez sur \"Ajouter un calque\".",
     "added": "Calque ajouté",
@@ -260,6 +253,13 @@
     "moveUp": "Monter",
     "moveDown": "Descendre",
     "delete": "Supprimer le calque",
-    "deleteDisabledTpl": "Les calques du modèle ne peuvent pas être supprimés"
+    "deleteDisabledTpl": "Les calques du modèle ne peuvent pas être supprimés",
+    "addPhoto": "Photo",
+    "addAiPhoto": "Photo IA",
+    "addMap": "Carte",
+    "addText": "Texte",
+    "addShape": "Forme",
+    "addLine": "Ligne",
+    "addMargin": "Marge"
   }
 }

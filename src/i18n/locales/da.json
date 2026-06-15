@@ -246,13 +246,6 @@
     "intro": "Tilføj lag for at bygge dit design frit — billede, kort, tekst og dekoration.",
     "add": "Tilføj lag",
     "addTitle": "Vælg lagtype",
-    "add.photo": "Billede",
-    "add.aiPhoto": "AI-billede",
-    "add.map": "Kort",
-    "add.text": "Tekst",
-    "add.shape": "Form",
-    "add.line": "Linje",
-    "add.margin": "Margen",
     "listTitle": "Mine lag",
     "empty": "Ingen lag endnu. Tryk \"Tilføj lag\" for at starte.",
     "added": "Lag tilføjet",
@@ -260,6 +253,13 @@
     "moveUp": "Flyt op",
     "moveDown": "Flyt ned",
     "delete": "Slet lag",
-    "deleteDisabledTpl": "Skabelonens lag kan ikke slettes"
+    "deleteDisabledTpl": "Skabelonens lag kan ikke slettes",
+    "addPhoto": "Billede",
+    "addAiPhoto": "AI-billede",
+    "addMap": "Kort",
+    "addText": "Tekst",
+    "addShape": "Form",
+    "addLine": "Linje",
+    "addMargin": "Margen"
   }
 }

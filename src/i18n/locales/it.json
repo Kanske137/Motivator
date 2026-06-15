@@ -246,13 +246,6 @@
     "intro": "Aggiungi livelli per creare il tuo design liberamente — immagine, mappa, testo e decorazione.",
     "add": "Aggiungi livello",
     "addTitle": "Scegli tipo di livello",
-    "add.photo": "Foto",
-    "add.aiPhoto": "Foto AI",
-    "add.map": "Mappa",
-    "add.text": "Testo",
-    "add.shape": "Forma",
-    "add.line": "Linea",
-    "add.margin": "Margine",
     "listTitle": "I miei livelli",
     "empty": "Nessun livello ancora. Tocca \"Aggiungi livello\" per iniziare.",
     "added": "Livello aggiunto",
@@ -260,6 +253,13 @@
     "moveUp": "Sposta su",
     "moveDown": "Sposta giù",
     "delete": "Elimina livello",
-    "deleteDisabledTpl": "I livelli del modello non possono essere eliminati"
+    "deleteDisabledTpl": "I livelli del modello non possono essere eliminati",
+    "addPhoto": "Foto",
+    "addAiPhoto": "Foto AI",
+    "addMap": "Mappa",
+    "addText": "Testo",
+    "addShape": "Forma",
+    "addLine": "Linea",
+    "addMargin": "Margine"
   }
 }

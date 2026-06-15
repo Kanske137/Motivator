@@ -246,13 +246,6 @@
     "intro": "Legg til lag for å bygge designet ditt fritt — bilde, kart, tekst og dekor.",
     "add": "Legg til lag",
     "addTitle": "Velg lagtype",
-    "add.photo": "Bilde",
-    "add.aiPhoto": "AI-bilde",
-    "add.map": "Kart",
-    "add.text": "Tekst",
-    "add.shape": "Form",
-    "add.line": "Linje",
-    "add.margin": "Marg",
     "listTitle": "Mine lag",
     "empty": "Ingen lag ennå. Trykk \"Legg til lag\" for å starte.",
     "added": "Lag lagt til",
@@ -260,6 +253,13 @@
     "moveUp": "Flytt opp",
     "moveDown": "Flytt ned",
     "delete": "Slett lag",
-    "deleteDisabledTpl": "Mal-lag kan ikke slettes"
+    "deleteDisabledTpl": "Mal-lag kan ikke slettes",
+    "addPhoto": "Bilde",
+    "addAiPhoto": "AI-bilde",
+    "addMap": "Kart",
+    "addText": "Tekst",
+    "addShape": "Form",
+    "addLine": "Linje",
+    "addMargin": "Marg"
   }
 }

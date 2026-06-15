@@ -246,13 +246,6 @@
     "intro": "Dodawaj warstwy, aby swobodnie budować swój projekt — obraz, mapa, tekst i dekoracje.",
     "add": "Dodaj warstwę",
     "addTitle": "Wybierz typ warstwy",
-    "add.photo": "Zdjęcie",
-    "add.aiPhoto": "Zdjęcie AI",
-    "add.map": "Mapa",
-    "add.text": "Tekst",
-    "add.shape": "Kształt",
-    "add.line": "Linia",
-    "add.margin": "Margines",
     "listTitle": "Moje warstwy",
     "empty": "Brak warstw. Naciśnij \"Dodaj warstwę\", aby zacząć.",
     "added": "Warstwa dodana",
@@ -260,6 +253,13 @@
     "moveUp": "W górę",
     "moveDown": "W dół",
     "delete": "Usuń warstwę",
-    "deleteDisabledTpl": "Warstw szablonu nie można usunąć"
+    "deleteDisabledTpl": "Warstw szablonu nie można usunąć",
+    "addPhoto": "Zdjęcie",
+    "addAiPhoto": "Zdjęcie AI",
+    "addMap": "Mapa",
+    "addText": "Tekst",
+    "addShape": "Kształt",
+    "addLine": "Linia",
+    "addMargin": "Margines"
   }
 }
