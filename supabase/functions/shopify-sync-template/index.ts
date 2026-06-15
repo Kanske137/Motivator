@@ -331,6 +331,14 @@ const PRODUCT_VARIANTS_BULK_DELETE = `
     }
   }`;
 
+const METAFIELDS_SET = `
+  mutation metafieldsSet($metafields: [MetafieldsSetInput!]!) {
+    metafieldsSet(metafields: $metafields) {
+      userErrors { field message code }
+    }
+  }`;
+
+
 const PUBLICATIONS_QUERY = `
   query publications {
     publications(first: 50) {
