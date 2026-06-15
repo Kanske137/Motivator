@@ -187,6 +187,8 @@ export function LayersSection() {
   const reorderLayers = useEditorStore((s) => s.reorderLayers);
   const hiddenLayerIds = useEditorStore((s) => s.hiddenLayerIds);
   const [sheetOpen, setSheetOpen] = useState(false);
+  type Stage = "root" | "shape" | "line";
+  const [stage, setStage] = useState<Stage>("root");
 
   // Onboarding-popover (visas första gången kunden öppnar Lager-fliken).
   const [onboardingOpen, setOnboardingOpen] = useState(false);
