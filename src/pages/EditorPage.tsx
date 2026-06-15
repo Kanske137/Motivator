@@ -238,14 +238,36 @@ export default function EditorPage() {
     .filter(Boolean)
     .join(" · ");
 
+  const hiddenLayerIds = useEditorStore((s) => s.hiddenLayerIds);
+  const hasDesignContent = useEditorStore((s) => s.hasDesignContent);
+  const isFreeform = Boolean(config?.is_freeform);
+  const canAddToCart = !isFreeform || hasDesignContent();
+
   const handleAddToCart = async () => {
     if (!config || !size || !variant) return;
+    if (isFreeform && !hasDesignContent()) {
+      toast.error(t("cartAdd.freeformEmpty"), {
+        description: t("cartAdd.freeformEmptyHint"),
+      });
+      return;
+    }
     const inIframe = window.self !== window.top;
     const designId = (crypto as any)?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
     if (!template) return;
+    // Strip hidden layers from the template before snapshot/print so the
+    // customer's "öga av"-val faktiskt syns i tryckfilen och kundvagnsbilden.
+    const printableTemplate = Object.keys(hiddenLayerIds).length
+      ? mutateActiveLayoutBlock(
+          template,
+          config.product_type,
+          layoutId,
+          orientation,
+          (ls) => ls.filter((l) => !hiddenLayerIds[l.id]),
+        )
+      : template;
     const baseTemplateInput = {
-      template,
+      template: printableTemplate,
       orientation,
       productType: config?.product_type,
       layoutId,
