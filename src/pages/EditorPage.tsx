@@ -416,7 +416,7 @@ export default function EditorPage() {
   );
 
   const ctaNode = (
-    <StickyCta price={displayPrice} summary={summary} loading={isAdding || isPreparing} onAdd={handleAddToCart} />
+    <StickyCta price={displayPrice} summary={summary} loading={isAdding || isPreparing} disabled={!canAddToCart} onAdd={handleAddToCart} />
   );
 
   const standalone = window.self === window.top;
