@@ -1428,12 +1428,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const tpl = state.template;
     const config = state.config;
     if (!tpl || !config) return null;
-    // Lazy import to avoid cyclic deps
-    const {
-      createFreeformLayer,
-      mutateActiveLayoutBlock,
-      nextTopZIndex,
-    } = require("@/lib/freeform-layers") as typeof import("@/lib/freeform-layers");
     const block = getActiveLayoutBlock(tpl, config.product_type, state.layoutId)[state.orientation];
     const newLayer = createFreeformLayer(type, {
       zIndex: nextTopZIndex(block.layers),
@@ -1495,7 +1489,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const tpl = state.template;
     const config = state.config;
     if (!tpl || !config) return;
-    const { mutateActiveLayoutBlock } = require("@/lib/freeform-layers") as typeof import("@/lib/freeform-layers");
     const nextTemplate = mutateActiveLayoutBlock(
       tpl,
       config.product_type,
