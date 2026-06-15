@@ -36,7 +36,8 @@
     "text": "Tekst",
     "format": "Format",
     "aiStyle": "AI-stil",
-    "style": "Stil"
+    "style": "Stil",
+    "layers": "Lag"
   },
   "format": {
     "backgroundColor": "Bakgrunnsfarge",
@@ -240,5 +241,25 @@
     "recreate": "Lag igjen",
     "creating": "Lager…",
     "allRequired": "Last opp et portrett for hvert ansikt for å fortsette."
+  },
+  "layers": {
+    "intro": "Legg til lag for å bygge designet ditt fritt — bilde, kart, tekst og dekor.",
+    "add": "Legg til lag",
+    "addTitle": "Velg lagtype",
+    "listTitle": "Mine lag",
+    "empty": "Ingen lag ennå. Trykk \"Legg til lag\" for å starte.",
+    "added": "Lag lagt til",
+    "maxReached": "Maks {{max}} lag",
+    "moveUp": "Flytt opp",
+    "moveDown": "Flytt ned",
+    "delete": "Slett lag",
+    "deleteDisabledTpl": "Mal-lag kan ikke slettes",
+    "addPhoto": "Bilde",
+    "addAiPhoto": "AI-bilde",
+    "addMap": "Kart",
+    "addText": "Tekst",
+    "addShape": "Form",
+    "addLine": "Linje",
+    "addMargin": "Marg"
   }
 }

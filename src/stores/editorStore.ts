@@ -7,6 +7,11 @@ import { getActiveLayoutBlock } from "@/lib/template-schema";
 import { resolveTemplate } from "@/lib/template-migrate";
 import { clampLayerRect } from "@/lib/layer-utils";
 import {
+  createFreeformLayer,
+  mutateActiveLayoutBlock,
+  nextTopZIndex,
+} from "@/lib/freeform-layers";
+import {
   type AiCacheEntry,
   loadAiCache,
   makeCacheKey,
@@ -291,6 +296,14 @@ interface EditorState {
   addMapIcon: (layerId: string, icon: MapIcon) => void;
   removeMapIcon: (layerId: string, iconInstanceId: string) => void;
   replaceMapIcon: (layerId: string, iconInstanceId: string, patch: Partial<MapIcon>) => void;
+
+  // ---------- freeform (kund-tillagda lager i "fri mall"-läge) ----------
+  /** Lägg till ett kund-skapat lager i det aktiva layout-blocket. */
+  addCustomLayer: (type: import("@/lib/freeform-layers").FreeformLayerType) => string | null;
+  /** Ta bort ett (typiskt kund-tillagt) lager. Funkar även för admin-lager. */
+  removeCustomLayer: (id: string) => void;
+  /** Flytta ett lager upp/ner i z-stack (1 = upp, -1 = ner). */
+  moveLayerZ: (id: string, direction: 1 | -1) => void;
 
   // ---------- legacy globals (derived getters; mutators apply to first layer) ----------
   // These setters/getters keep older code (EditorPage cart payload, snapshot
@@ -1408,7 +1421,117 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const v = get().layerValues[id];
     return v && v.kind === "text" ? v : null;
   },
+
+  // ---------- freeform actions ----------
+  addCustomLayer: (type) => {
+    const state = get();
+    const tpl = state.template;
+    const config = state.config;
+    if (!tpl || !config) return null;
+    const block = getActiveLayoutBlock(tpl, config.product_type, state.layoutId)[state.orientation];
+    const newLayer = createFreeformLayer(type, {
+      zIndex: nextTopZIndex(block.layers),
+      defaultFont: tpl.productOptions?.allowedFonts?.[0] ?? undefined,
+      defaultMapStyleId: tpl.productOptions?.mapStyles?.[0]?.id ?? undefined,
+    });
+    const nextTemplate = mutateActiveLayoutBlock(
+      tpl,
+      config.product_type,
+      state.layoutId,
+      state.orientation,
+      (layers) => [...layers, newLayer],
+    );
+    // Seed layer values entry
+    const layerValues = { ...state.layerValues };
+    if (newLayer.type === "map") {
+      layerValues[newLayer.id] = {
+        kind: "map",
+        center: [newLayer.defaults.center[0], newLayer.defaults.center[1]],
+        zoom: newLayer.defaults.zoom,
+        styleId: newLayer.defaults.styleId,
+        shape: newLayer.defaults.shape as MapShape,
+        showLabels: newLayer.defaults.showLabels,
+        placeName: newLayer.defaults.placeName ?? "",
+        city: newLayer.defaults.city,
+        country: newLayer.defaults.country,
+        icons: [],
+      };
+    } else if (newLayer.type === "text") {
+      layerValues[newLayer.id] = {
+        kind: "text",
+        text: newLayer.defaults.text,
+        overrideText: null,
+        font: newLayer.defaults.font,
+        visible: true,
+      };
+    } else if (newLayer.type === "photo") {
+      layerValues[newLayer.id] = {
+        kind: "photo",
+        shape: newLayer.defaults.shape as PhotoShape,
+        offsetX: 0,
+        offsetY: 0,
+        zoom: 1,
+      };
+    } else if (newLayer.type === "aiPhoto") {
+      layerValues[newLayer.id] = {
+        kind: "aiPhoto",
+        shape: newLayer.defaults.shape as PhotoShape,
+        offsetX: 0,
+        offsetY: 0,
+        zoom: 1,
+      };
+    }
+    set({ template: nextTemplate, layerValues });
+    return newLayer.id;
+  },
+  removeCustomLayer: (id) => {
+    const state = get();
+    const tpl = state.template;
+    const config = state.config;
+    if (!tpl || !config) return;
+    const nextTemplate = mutateActiveLayoutBlock(
+      tpl,
+      config.product_type,
+      state.layoutId,
+      state.orientation,
+      (layers) => layers.filter((l) => l.id !== id),
+    );
+    const layerValues = { ...state.layerValues };
+    delete layerValues[id];
+    const layerTransforms = { ...state.layerTransforms };
+    delete layerTransforms[id];
+    set({ template: nextTemplate, layerValues, layerTransforms });
+  },
+  moveLayerZ: (id, direction) => {
+    const state = get();
+    const tpl = state.template;
+    const config = state.config;
+    if (!tpl || !config) return;
+    const nextTemplate = mutateActiveLayoutBlock(
+      tpl,
+      config.product_type,
+      state.layoutId,
+      state.orientation,
+      (layers) => {
+        const sorted = [...layers].sort((a, b) => a.zIndex - b.zIndex);
+        const idx = sorted.findIndex((l) => l.id === id);
+        if (idx === -1) return layers;
+        const swapIdx = idx + direction;
+        if (swapIdx < 0 || swapIdx >= sorted.length) return layers;
+        const a = sorted[idx]!;
+        const b = sorted[swapIdx]!;
+        const out = layers.map((l) => {
+          if (l.id === a.id) return { ...l, zIndex: b.zIndex };
+          if (l.id === b.id) return { ...l, zIndex: a.zIndex };
+          return l;
+        });
+        return out;
+      },
+    );
+    set({ template: nextTemplate });
+  },
 }));
+
 
 // ---------- internal helpers ----------
 type SetFn = (partial: Partial<EditorState> | ((s: EditorState) => Partial<EditorState>)) => void;

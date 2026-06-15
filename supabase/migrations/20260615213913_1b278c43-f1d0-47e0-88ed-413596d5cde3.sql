@@ -1,0 +1,1 @@
+ALTER TABLE public.product_configs ADD COLUMN IF NOT EXISTS is_freeform boolean NOT NULL DEFAULT false;

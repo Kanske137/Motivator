@@ -36,7 +36,8 @@
     "text": "Texte",
     "format": "Format",
     "aiStyle": "Style IA",
-    "style": "Style"
+    "style": "Style",
+    "layers": "Calques"
   },
   "format": {
     "backgroundColor": "Couleur de fond",
@@ -240,5 +241,25 @@
     "recreate": "Créer à nouveau",
     "creating": "Création…",
     "allRequired": "Téléversez un portrait pour chaque visage pour continuer."
+  },
+  "layers": {
+    "intro": "Ajoutez des calques pour créer votre design librement — image, carte, texte et décoration.",
+    "add": "Ajouter un calque",
+    "addTitle": "Choisir le type de calque",
+    "listTitle": "Mes calques",
+    "empty": "Aucun calque pour le moment. Appuyez sur \"Ajouter un calque\".",
+    "added": "Calque ajouté",
+    "maxReached": "Max {{max}} calques",
+    "moveUp": "Monter",
+    "moveDown": "Descendre",
+    "delete": "Supprimer le calque",
+    "deleteDisabledTpl": "Les calques du modèle ne peuvent pas être supprimés",
+    "addPhoto": "Photo",
+    "addAiPhoto": "Photo IA",
+    "addMap": "Carte",
+    "addText": "Texte",
+    "addShape": "Forme",
+    "addLine": "Ligne",
+    "addMargin": "Marge"
   }
 }

@@ -59,6 +59,7 @@ export type Database = {
           gelato_sku_map: Json
           id: string
           is_consolidated: boolean
+          is_freeform: boolean
           layouts: Json
           map_styles: Json
           product_type: string
@@ -83,6 +84,7 @@ export type Database = {
           gelato_sku_map?: Json
           id?: string
           is_consolidated?: boolean
+          is_freeform?: boolean
           layouts?: Json
           map_styles?: Json
           product_type: string
@@ -107,6 +109,7 @@ export type Database = {
           gelato_sku_map?: Json
           id?: string
           is_consolidated?: boolean
+          is_freeform?: boolean
           layouts?: Json
           map_styles?: Json
           product_type?: string

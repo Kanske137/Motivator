@@ -36,7 +36,8 @@
     "text": "Text",
     "format": "Format",
     "aiStyle": "KI-Stil",
-    "style": "Stil"
+    "style": "Stil",
+    "layers": "Ebenen"
   },
   "format": {
     "backgroundColor": "Hintergrundfarbe",
@@ -240,5 +241,25 @@
     "recreate": "Erneut erstellen",
     "creating": "Wird erstellt…",
     "allRequired": "Lade ein Porträt für jedes Gesicht hoch, um fortzufahren."
+  },
+  "layers": {
+    "intro": "Fügen Sie Ebenen hinzu, um Ihr Design frei zu gestalten — Bild, Karte, Text und Dekoration.",
+    "add": "Ebene hinzufügen",
+    "addTitle": "Ebenentyp wählen",
+    "listTitle": "Meine Ebenen",
+    "empty": "Noch keine Ebenen. Tippen Sie auf \"Ebene hinzufügen\".",
+    "added": "Ebene hinzugefügt",
+    "maxReached": "Max. {{max}} Ebenen",
+    "moveUp": "Nach oben",
+    "moveDown": "Nach unten",
+    "delete": "Ebene löschen",
+    "deleteDisabledTpl": "Vorlagenebenen können nicht gelöscht werden",
+    "addPhoto": "Foto",
+    "addAiPhoto": "KI-Foto",
+    "addMap": "Karte",
+    "addText": "Text",
+    "addShape": "Form",
+    "addLine": "Linie",
+    "addMargin": "Rand"
   }
 }

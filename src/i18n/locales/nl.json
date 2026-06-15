@@ -36,7 +36,8 @@
     "text": "Tekst",
     "format": "Formaat",
     "aiStyle": "AI-stijl",
-    "style": "Stijl"
+    "style": "Stijl",
+    "layers": "Lagen"
   },
   "format": {
     "backgroundColor": "Achtergrondkleur",
@@ -240,5 +241,25 @@
     "recreate": "Opnieuw maken",
     "creating": "Bezig met maken…",
     "allRequired": "Upload een portret voor elk gezicht om door te gaan."
+  },
+  "layers": {
+    "intro": "Voeg lagen toe om je ontwerp vrij te bouwen — afbeelding, kaart, tekst en decoratie.",
+    "add": "Laag toevoegen",
+    "addTitle": "Kies lagentype",
+    "listTitle": "Mijn lagen",
+    "empty": "Nog geen lagen. Tik op \"Laag toevoegen\" om te beginnen.",
+    "added": "Laag toegevoegd",
+    "maxReached": "Max {{max}} lagen",
+    "moveUp": "Omhoog",
+    "moveDown": "Omlaag",
+    "delete": "Laag verwijderen",
+    "deleteDisabledTpl": "Sjabloonlagen kunnen niet worden verwijderd",
+    "addPhoto": "Foto",
+    "addAiPhoto": "AI-foto",
+    "addMap": "Kaart",
+    "addText": "Tekst",
+    "addShape": "Vorm",
+    "addLine": "Lijn",
+    "addMargin": "Marge"
   }
 }

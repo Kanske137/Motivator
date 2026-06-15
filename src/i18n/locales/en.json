@@ -36,7 +36,8 @@
     "text": "Text",
     "format": "Format",
     "aiStyle": "AI style",
-    "style": "Style"
+    "style": "Style",
+    "layers": "Layers"
   },
   "format": {
     "backgroundColor": "Background colour",
@@ -240,5 +241,25 @@
     "recreate": "Create again",
     "creating": "Creating…",
     "allRequired": "Upload one portrait for each face to continue."
+  },
+  "layers": {
+    "intro": "Add layers to build your design freely — image, map, text and decoration.",
+    "add": "Add layer",
+    "addTitle": "Choose layer type",
+    "listTitle": "My layers",
+    "empty": "No layers yet. Tap \"Add layer\" to start.",
+    "added": "Layer added",
+    "maxReached": "Max {{max}} layers",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "delete": "Delete layer",
+    "deleteDisabledTpl": "Template layers cannot be deleted",
+    "addPhoto": "Photo",
+    "addAiPhoto": "AI photo",
+    "addMap": "Map",
+    "addText": "Text",
+    "addShape": "Shape",
+    "addLine": "Line",
+    "addMargin": "Margin"
   }
 }

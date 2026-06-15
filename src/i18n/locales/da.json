@@ -36,7 +36,8 @@
     "text": "Tekst",
     "format": "Format",
     "aiStyle": "AI-stil",
-    "style": "Stil"
+    "style": "Stil",
+    "layers": "Lag"
   },
   "format": {
     "backgroundColor": "Baggrundsfarve",
@@ -240,5 +241,25 @@
     "recreate": "Skab igen",
     "creating": "Skaber…",
     "allRequired": "Upload et portræt for hvert ansigt for at fortsætte."
+  },
+  "layers": {
+    "intro": "Tilføj lag for at bygge dit design frit — billede, kort, tekst og dekoration.",
+    "add": "Tilføj lag",
+    "addTitle": "Vælg lagtype",
+    "listTitle": "Mine lag",
+    "empty": "Ingen lag endnu. Tryk \"Tilføj lag\" for at starte.",
+    "added": "Lag tilføjet",
+    "maxReached": "Maks {{max}} lag",
+    "moveUp": "Flyt op",
+    "moveDown": "Flyt ned",
+    "delete": "Slet lag",
+    "deleteDisabledTpl": "Skabelonens lag kan ikke slettes",
+    "addPhoto": "Billede",
+    "addAiPhoto": "AI-billede",
+    "addMap": "Kort",
+    "addText": "Tekst",
+    "addShape": "Form",
+    "addLine": "Linje",
+    "addMargin": "Margen"
   }
 }

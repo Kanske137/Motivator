@@ -36,7 +36,8 @@
     "text": "Texto",
     "format": "Formato",
     "aiStyle": "Estilo IA",
-    "style": "Estilo"
+    "style": "Estilo",
+    "layers": "Capas"
   },
   "format": {
     "backgroundColor": "Color de fondo",
@@ -240,5 +241,25 @@
     "recreate": "Crear de nuevo",
     "creating": "Creando…",
     "allRequired": "Sube un retrato por cada rostro para continuar."
+  },
+  "layers": {
+    "intro": "Añade capas para construir tu diseño libremente — imagen, mapa, texto y decoración.",
+    "add": "Añadir capa",
+    "addTitle": "Elegir tipo de capa",
+    "listTitle": "Mis capas",
+    "empty": "Aún no hay capas. Pulsa \"Añadir capa\" para empezar.",
+    "added": "Capa añadida",
+    "maxReached": "Máx {{max}} capas",
+    "moveUp": "Subir",
+    "moveDown": "Bajar",
+    "delete": "Eliminar capa",
+    "deleteDisabledTpl": "Las capas de la plantilla no se pueden eliminar",
+    "addPhoto": "Foto",
+    "addAiPhoto": "Foto IA",
+    "addMap": "Mapa",
+    "addText": "Texto",
+    "addShape": "Forma",
+    "addLine": "Línea",
+    "addMargin": "Margen"
   }
 }
