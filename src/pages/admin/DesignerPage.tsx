@@ -356,6 +356,7 @@ export default function DesignerPage() {
         description_html: config.description_html ?? null,
         seo_title: config.seo_title ?? null,
         seo_description: config.seo_description ?? null,
+        is_freeform: config.is_freeform ?? false,
         map_styles: enabledMapStyleIds.length > 0 ? (enabledMapStyleIds as unknown as never) : ([] as unknown as never),
       })
       .eq("shopify_handle", handle);
@@ -518,6 +519,21 @@ export default function DesignerPage() {
         />
 
         <ShopifyPublishingSection config={config} onChange={updateConfigMeta} />
+
+        <Card className="p-5 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold">Fri mall</h2>
+              <p className="text-xs text-muted-foreground">
+                När påslagen får kunden en "Lager"-flik och kan själv lägga till bild, AI-bild, karta, text, form, linje och marginal. Mallens egna lager fungerar som startläge.
+              </p>
+            </div>
+            <Switch
+              checked={!!config.is_freeform}
+              onCheckedChange={(v) => updateConfigMeta({ is_freeform: v })}
+            />
+          </div>
+        </Card>
 
         <StylesSection
           template={template}
