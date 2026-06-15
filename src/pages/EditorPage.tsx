@@ -54,6 +54,7 @@ export default function EditorPage() {
   const typeParam = normalizeType(params.get("type"));
   const [configs, setConfigs] = useState<ProductConfig[]>([]);
   const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
 
   const {
     config,
