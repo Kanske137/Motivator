@@ -168,7 +168,9 @@
     "added": "Zum Warenkorb hinzugefügt",
     "prepareFailed": "Druckdatei konnte nicht vorbereitet werden",
     "variantUnavailable": "Diese Kombination ist im Shop noch nicht verfügbar",
-    "variantUnavailableHint": "{{size}} · {{variant}} wurde nicht für {{handle}} gefunden."
+    "variantUnavailableHint": "{{size}} · {{variant}} wurde nicht für {{handle}} gefunden.",
+    "freeformEmpty": "Füge zuerst etwas zu deinem Design hinzu",
+    "freeformEmptyHint": "Füge mindestens ein Bild, eine Karte oder einen Text hinzu, bevor du zur Kasse gehst."
   },
   "scene": {
     "livingroom": "Wohnzimmer",
@@ -249,7 +251,7 @@
     "listTitle": "Meine Ebenen",
     "empty": "Noch keine Ebenen. Tippen Sie auf \"Ebene hinzufügen\".",
     "added": "Ebene hinzugefügt",
-    "maxReached": "Max. {{max}} Ebenen",
+    "maxReached": "Maximale Anzahl Ebenen erreicht",
     "moveUp": "Nach oben",
     "moveDown": "Nach unten",
     "delete": "Ebene löschen",
@@ -260,6 +262,14 @@
     "addText": "Text",
     "addShape": "Form",
     "addLine": "Linie",
-    "addMargin": "Rand"
+    "addMargin": "Rand",
+    "dragHandle": "Zum Neuordnen ziehen",
+    "toggleVisible": "Ebene einblenden",
+    "toggleHidden": "Ebene ausblenden",
+    "onboarding": {
+      "title": "Frei gestalten",
+      "body": "Füge Bilder, Karte, Text und Deko hinzu. Ziehe zum Sortieren, tippe auf das Auge zum Ausblenden und auf den Papierkorb zum Entfernen.",
+      "dismiss": "Verstanden"
+    }
   }
 }

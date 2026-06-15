@@ -168,7 +168,9 @@
     "added": "Lisätty ostoskoriin",
     "prepareFailed": "Tulostustiedoston valmistelu epäonnistui",
     "variantUnavailable": "Tämä yhdistelmä ei ole vielä saatavilla kaupassa",
-    "variantUnavailableHint": "{{size}} · {{variant}} ei löytynyt tuotteelle {{handle}}."
+    "variantUnavailableHint": "{{size}} · {{variant}} ei löytynyt tuotteelle {{handle}}.",
+    "freeformEmpty": "Lisää ensin jotain suunnitelmaasi",
+    "freeformEmptyHint": "Lisää vähintään yksi kuva, kartta tai teksti ennen kassalle siirtymistä."
   },
   "scene": {
     "livingroom": "Olohuone",
@@ -249,7 +251,7 @@
     "listTitle": "Tasoni",
     "empty": "Ei tasoja vielä. Aloita painamalla \"Lisää taso\".",
     "added": "Taso lisätty",
-    "maxReached": "Enintään {{max}} tasoa",
+    "maxReached": "Tasojen enimmäismäärä saavutettu",
     "moveUp": "Siirrä ylös",
     "moveDown": "Siirrä alas",
     "delete": "Poista taso",
@@ -260,6 +262,14 @@
     "addText": "Teksti",
     "addShape": "Muoto",
     "addLine": "Viiva",
-    "addMargin": "Marginaali"
+    "addMargin": "Marginaali",
+    "dragHandle": "Vedä järjestääksesi",
+    "toggleVisible": "Näytä taso",
+    "toggleHidden": "Piilota taso",
+    "onboarding": {
+      "title": "Luo vapaasti",
+      "body": "Lisää kuvia, kartta, tekstiä ja koristeita. Vedä järjestääksesi, napauta silmää piilottaaksesi ja roskakoria poistaaksesi.",
+      "dismiss": "Selvä"
+    }
   }
 }

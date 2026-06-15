@@ -168,7 +168,9 @@
     "added": "Dodano do koszyka",
     "prepareFailed": "Nie można przygotować pliku do druku",
     "variantUnavailable": "Ta kombinacja nie jest jeszcze dostępna w sklepie",
-    "variantUnavailableHint": "{{size}} · {{variant}} nie znaleziono dla {{handle}}."
+    "variantUnavailableHint": "{{size}} · {{variant}} nie znaleziono dla {{handle}}.",
+    "freeformEmpty": "Najpierw dodaj coś do swojego projektu",
+    "freeformEmptyHint": "Dodaj co najmniej jeden obraz, mapę lub tekst przed przejściem do kasy."
   },
   "scene": {
     "livingroom": "Salon",
@@ -249,7 +251,7 @@
     "listTitle": "Moje warstwy",
     "empty": "Brak warstw. Naciśnij \"Dodaj warstwę\", aby zacząć.",
     "added": "Warstwa dodana",
-    "maxReached": "Maks. {{max}} warstw",
+    "maxReached": "Osiągnięto maksymalną liczbę warstw",
     "moveUp": "W górę",
     "moveDown": "W dół",
     "delete": "Usuń warstwę",
@@ -260,6 +262,14 @@
     "addText": "Tekst",
     "addShape": "Kształt",
     "addLine": "Linia",
-    "addMargin": "Margines"
+    "addMargin": "Margines",
+    "dragHandle": "Przeciągnij, aby zmienić kolejność",
+    "toggleVisible": "Pokaż warstwę",
+    "toggleHidden": "Ukryj warstwę",
+    "onboarding": {
+      "title": "Twórz swobodnie",
+      "body": "Dodaj obrazy, mapę, tekst i dekoracje. Przeciągnij, aby zmienić kolejność, dotknij oka, aby ukryć, i kosza, aby usunąć.",
+      "dismiss": "Rozumiem"
+    }
   }
 }

@@ -168,7 +168,9 @@
     "added": "Tilføjet til kurven",
     "prepareFailed": "Kunne ikke forberede trykfil",
     "variantUnavailable": "Denne kombination er endnu ikke tilgængelig i butikken",
-    "variantUnavailableHint": "{{size}} · {{variant}} blev ikke fundet for {{handle}}."
+    "variantUnavailableHint": "{{size}} · {{variant}} blev ikke fundet for {{handle}}.",
+    "freeformEmpty": "Tilføj noget til dit design først",
+    "freeformEmptyHint": "Tilføj mindst ét billede, kort eller tekst, før du går til kassen."
   },
   "scene": {
     "livingroom": "Stue",
@@ -249,7 +251,7 @@
     "listTitle": "Mine lag",
     "empty": "Ingen lag endnu. Tryk \"Tilføj lag\" for at starte.",
     "added": "Lag tilføjet",
-    "maxReached": "Maks {{max}} lag",
+    "maxReached": "Maks antal lag nået",
     "moveUp": "Flyt op",
     "moveDown": "Flyt ned",
     "delete": "Slet lag",
@@ -260,6 +262,14 @@
     "addText": "Tekst",
     "addShape": "Form",
     "addLine": "Linje",
-    "addMargin": "Margen"
+    "addMargin": "Margen",
+    "dragHandle": "Træk for at omarrangere",
+    "toggleVisible": "Vis lag",
+    "toggleHidden": "Skjul lag",
+    "onboarding": {
+      "title": "Skab frit",
+      "body": "Tilføj billeder, kort, tekst og dekoration. Træk for at ændre rækkefølge, tryk på øjet for at skjule, og papirkurven for at fjerne.",
+      "dismiss": "Forstået"
+    }
   }
 }

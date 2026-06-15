@@ -168,7 +168,9 @@
     "added": "Added to cart",
     "prepareFailed": "Could not prepare print file",
     "variantUnavailable": "This combination is not yet available in the store",
-    "variantUnavailableHint": "{{size}} · {{variant}} not found for {{handle}}."
+    "variantUnavailableHint": "{{size}} · {{variant}} not found for {{handle}}.",
+    "freeformEmpty": "Add something to your design first",
+    "freeformEmptyHint": "Add at least one image, map or text before checking out."
   },
   "scene": {
     "livingroom": "Living room",
@@ -249,7 +251,7 @@
     "listTitle": "My layers",
     "empty": "No layers yet. Tap \"Add layer\" to start.",
     "added": "Layer added",
-    "maxReached": "Max {{max}} layers",
+    "maxReached": "Maximum layers reached",
     "moveUp": "Move up",
     "moveDown": "Move down",
     "delete": "Delete layer",
@@ -260,6 +262,14 @@
     "addText": "Text",
     "addShape": "Shape",
     "addLine": "Line",
-    "addMargin": "Margin"
+    "addMargin": "Margin",
+    "dragHandle": "Drag to reorder",
+    "toggleVisible": "Show layer",
+    "toggleHidden": "Hide layer",
+    "onboarding": {
+      "title": "Create freely",
+      "body": "Add images, a map, text and decor. Drag to reorder, tap the eye to hide, and the trash icon to remove.",
+      "dismiss": "Got it"
+    }
   }
 }
