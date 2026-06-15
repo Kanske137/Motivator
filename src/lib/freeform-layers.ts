@@ -53,6 +53,10 @@ interface CreateOpts {
   defaultFont?: string;
   /** Default kartstil-id om vi skapar ett map-lager. */
   defaultMapStyleId?: string;
+  /** Specifik form-variant när type === "shape" (default: frame-rect). */
+  shapeKind?: import("./template-schema").ShapeKind;
+  /** Specifik linjeorientering när type === "line" (default: horizontal). */
+  lineOrientation?: "horizontal" | "vertical";
 }
 
 /** Skapa ett nytt TemplateLayer med vettiga defaults för fri-mall. */
