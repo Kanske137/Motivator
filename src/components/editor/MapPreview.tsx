@@ -775,11 +775,16 @@ export function MapPreview({
           }
 
           if (l.type === "line") {
-            // Customer never interacts with lines (admin-locked) — let clicks
-            // pass through the wrapper to layers underneath.
+            // Kund-tillagda linjer kan flyttas/resizas — admin-låsta linjer
+            // släpper klick igenom till lager under.
+            const style = isCustomDecor
+              ? wrapStyle
+              : { ...wrapStyle, pointerEvents: "none" as const };
             return (
-              <div key={l.id} style={{ ...wrapStyle, pointerEvents: "none" }}>
+              <div key={l.id} style={style}>
                 <LineLayerView layer={l} thicknessPx={lineThicknessPxFromCanvas(l, frameShortPx)} />
+                {moveHandle}
+                {resizeHandle}
               </div>
             );
           }
@@ -797,10 +802,14 @@ export function MapPreview({
           }
 
           if (l.type === "shape") {
-            // Admin-only decoration — never blocks customer interaction.
+            const style = isCustomDecor
+              ? wrapStyle
+              : { ...wrapStyle, pointerEvents: "none" as const };
             return (
-              <div key={l.id} style={{ ...wrapStyle, pointerEvents: "none" }}>
+              <div key={l.id} style={style}>
                 <ShapeLayerView layer={l} canvasShortPx={frameShortPx} />
+                {moveHandle}
+                {resizeHandle}
               </div>
             );
           }
