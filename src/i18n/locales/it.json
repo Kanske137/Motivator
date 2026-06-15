@@ -270,6 +270,23 @@
       "title": "Crea liberamente",
       "body": "Aggiungi immagini, mappa, testo e decorazioni. Trascina per riordinare, tocca l'occhio per nascondere e il cestino per rimuovere.",
       "dismiss": "Capito"
-    }
+    },
+    "shape": {
+      "pickTitle": "Scegli forma",
+      "rect": "Rettangolo",
+      "oval": "Ovale",
+      "rounded": "Arrotondato",
+      "double": "Doppia cornice",
+      "corners": "Angoli"
+    },
+    "line": {
+      "pickTitle": "Scegli direzione",
+      "horizontal": "Orizzontale",
+      "vertical": "Verticale"
+    },
+    "settings": "Impostazioni",
+    "color": "Colore",
+    "thickness": "Spessore",
+    "resizeHandle": "Trascina per ridimensionare"
   }
 }

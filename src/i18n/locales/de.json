@@ -270,6 +270,23 @@
       "title": "Frei gestalten",
       "body": "Füge Bilder, Karte, Text und Deko hinzu. Ziehe zum Sortieren, tippe auf das Auge zum Ausblenden und auf den Papierkorb zum Entfernen.",
       "dismiss": "Verstanden"
-    }
+    },
+    "shape": {
+      "pickTitle": "Form wählen",
+      "rect": "Rechteck",
+      "oval": "Oval",
+      "rounded": "Abgerundet",
+      "double": "Doppelrahmen",
+      "corners": "Ecken"
+    },
+    "line": {
+      "pickTitle": "Richtung wählen",
+      "horizontal": "Horizontal",
+      "vertical": "Vertikal"
+    },
+    "settings": "Einstellungen",
+    "color": "Farbe",
+    "thickness": "Stärke",
+    "resizeHandle": "Zum Skalieren ziehen"
   }
 }

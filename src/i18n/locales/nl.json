@@ -270,6 +270,23 @@
       "title": "Maak vrij",
       "body": "Voeg afbeeldingen, een kaart, tekst en decoratie toe. Sleep om te herschikken, tik op het oog om te verbergen en de prullenbak om te verwijderen.",
       "dismiss": "Begrepen"
-    }
+    },
+    "shape": {
+      "pickTitle": "Kies vorm",
+      "rect": "Rechthoek",
+      "oval": "Ovaal",
+      "rounded": "Afgerond",
+      "double": "Dubbel kader",
+      "corners": "Hoeken"
+    },
+    "line": {
+      "pickTitle": "Kies richting",
+      "horizontal": "Horizontaal",
+      "vertical": "Verticaal"
+    },
+    "settings": "Instellingen",
+    "color": "Kleur",
+    "thickness": "Dikte",
+    "resizeHandle": "Sleep om te schalen"
   }
 }

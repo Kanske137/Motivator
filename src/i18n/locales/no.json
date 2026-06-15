@@ -270,6 +270,23 @@
       "title": "Skap fritt",
       "body": "Legg til bilder, kart, tekst og dekor. Dra for å endre rekkefølge, trykk på øyet for å skjule, og søppelbøtten for å fjerne.",
       "dismiss": "Skjønner"
-    }
+    },
+    "shape": {
+      "pickTitle": "Velg form",
+      "rect": "Rektangel",
+      "oval": "Oval",
+      "rounded": "Avrundet",
+      "double": "Dobbel ramme",
+      "corners": "Hjørner"
+    },
+    "line": {
+      "pickTitle": "Velg retning",
+      "horizontal": "Horisontal",
+      "vertical": "Vertikal"
+    },
+    "settings": "Innstillinger",
+    "color": "Farge",
+    "thickness": "Tykkelse",
+    "resizeHandle": "Dra for å endre størrelse"
   }
 }

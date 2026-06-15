@@ -270,6 +270,23 @@
       "title": "Twórz swobodnie",
       "body": "Dodaj obrazy, mapę, tekst i dekoracje. Przeciągnij, aby zmienić kolejność, dotknij oka, aby ukryć, i kosza, aby usunąć.",
       "dismiss": "Rozumiem"
-    }
+    },
+    "shape": {
+      "pickTitle": "Wybierz kształt",
+      "rect": "Prostokąt",
+      "oval": "Owal",
+      "rounded": "Zaokrąglony",
+      "double": "Podwójna ramka",
+      "corners": "Narożniki"
+    },
+    "line": {
+      "pickTitle": "Wybierz kierunek",
+      "horizontal": "Pozioma",
+      "vertical": "Pionowa"
+    },
+    "settings": "Ustawienia",
+    "color": "Kolor",
+    "thickness": "Grubość",
+    "resizeHandle": "Przeciągnij, aby zmienić rozmiar"
   }
 }

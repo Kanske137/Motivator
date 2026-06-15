@@ -270,6 +270,23 @@
       "title": "Create freely",
       "body": "Add images, a map, text and decor. Drag to reorder, tap the eye to hide, and the trash icon to remove.",
       "dismiss": "Got it"
-    }
+    },
+    "shape": {
+      "pickTitle": "Choose shape",
+      "rect": "Rectangle",
+      "oval": "Oval",
+      "rounded": "Rounded",
+      "double": "Double frame",
+      "corners": "Corners"
+    },
+    "line": {
+      "pickTitle": "Choose direction",
+      "horizontal": "Horizontal",
+      "vertical": "Vertical"
+    },
+    "settings": "Settings",
+    "color": "Color",
+    "thickness": "Thickness",
+    "resizeHandle": "Drag to resize"
   }
 }

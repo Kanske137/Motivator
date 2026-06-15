@@ -270,6 +270,23 @@
       "title": "Créez librement",
       "body": "Ajoutez des images, une carte, du texte et de la déco. Glissez pour réorganiser, touchez l'œil pour masquer et la corbeille pour supprimer.",
       "dismiss": "Compris"
-    }
+    },
+    "shape": {
+      "pickTitle": "Choisir une forme",
+      "rect": "Rectangle",
+      "oval": "Ovale",
+      "rounded": "Arrondi",
+      "double": "Double cadre",
+      "corners": "Coins"
+    },
+    "line": {
+      "pickTitle": "Choisir l'orientation",
+      "horizontal": "Horizontale",
+      "vertical": "Verticale"
+    },
+    "settings": "Réglages",
+    "color": "Couleur",
+    "thickness": "Épaisseur",
+    "resizeHandle": "Glisser pour redimensionner"
   }
 }

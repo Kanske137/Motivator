@@ -270,6 +270,23 @@
       "title": "Skab frit",
       "body": "Tilføj billeder, kort, tekst og dekoration. Træk for at ændre rækkefølge, tryk på øjet for at skjule, og papirkurven for at fjerne.",
       "dismiss": "Forstået"
-    }
+    },
+    "shape": {
+      "pickTitle": "Vælg form",
+      "rect": "Rektangel",
+      "oval": "Oval",
+      "rounded": "Afrundet",
+      "double": "Dobbeltramme",
+      "corners": "Hjørner"
+    },
+    "line": {
+      "pickTitle": "Vælg retning",
+      "horizontal": "Vandret",
+      "vertical": "Lodret"
+    },
+    "settings": "Indstillinger",
+    "color": "Farve",
+    "thickness": "Tykkelse",
+    "resizeHandle": "Træk for at ændre størrelse"
   }
 }
