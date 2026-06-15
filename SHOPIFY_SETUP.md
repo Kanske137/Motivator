@@ -21,10 +21,12 @@ Följ stegen i ordning. Allt sker i din Shopify Admin — ingen Dev Dashboard, i
   .lovable-map-editor-wrap iframe { width:100%; min-height:100vh; border:0; display:block; background:#fff; }
 </style>
 
+{%- assign editor_handle = product.metafields.custom.template_slug | default: product.handle -%}
+
 <div class="lovable-map-editor-wrap">
   <iframe
     id="lovable-editor-iframe-{{ product.handle }}"
-    src="https://artful-create-studio-87.lovable.app/editor?handle={{ product.handle }}&locale={{ request.locale.iso_code }}&currency={{ localization.country.currency.iso_code | default: cart.currency.iso_code }}&rate={{ cart.currency.rate | default: 1 }}&country={{ localization.country.iso_code }}"
+    src="https://artful-create-studio-87.lovable.app/editor?handle={{ editor_handle }}&locale={{ request.locale.iso_code }}&currency={{ localization.country.currency.iso_code | default: cart.currency.iso_code }}&rate={{ cart.currency.rate | default: 1 }}&country={{ localization.country.iso_code }}"
     allow="clipboard-write; geolocation"
     loading="eager"
   ></iframe>

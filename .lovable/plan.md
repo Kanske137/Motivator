@@ -1,36 +1,57 @@
-# Multi Face-Swap: stöd flera referensbilder (kund kan välja)
+## Rotorsak
 
-## Problem
-`MultiFaceUploadSection` använder hårdkodat `referenceImages[0]?.url` (eller legacy `referenceImageUrl`). Admin kan i inspektorn lägga in flera referensbilder per `aiPhoto`-lager (samma `defaults.referenceImages[]` som vanlig face-swap), men kunden får inget val — multi-face kör alltid på den första.
+Editorn på Shopify-produkten "Kungligt parporträtt — er som kung och drottning" visar innehåll för "Karttavla med egen plats". Det är inte den här mallen som är trasig — det är resolvern.
 
-Vanlig `AiPhotoSection` har redan en picker som:
-1. Filtrerar `referenceImages` efter aktuell `orientation` ("portrait" / "landscape" / "any").
-2. Visar grid när ≥2 alternativ finns, kallar `setAiPhotoSelectedRef(layerId, url)`.
-3. Läser `aiPhotoSelectedRefUrl[layerId]` från store, faller tillbaka på första.
+Verifierat:
 
-## Lösning — strikt additivt, endast `MultiFaceUploadSection.tsx`
+- Shopify-produktens handle är `kungligt-parportratt` (Shopify auto-deriverar handle från titeln när produkten skapas; "familjemotiv" finns bara kvar som tagg).
+- DB-raden i `product_configs` har `shopify_handle = kungligt-familjemotiv` och `template_slug = kungligt-familjemotiv`.
+- Theme-snippeten injicerar `?handle={{ product.handle }}` → `?handle=kungligt-parportratt`.
+- `EditorPage` (rad 201) gör `resolveConfigForHandle(configs, "kungligt-parportratt") ?? configs[0]`. Ingen config matchar, så fallbacken `configs[0]` = **karttavla** (äldsta `created_at` i tabellen) renderas tyst.
 
-Återanvänd exakt samma logik och samma store-fält (`aiPhotoSelectedRefUrl`, `setAiPhotoSelectedRef`) så att valet är konsistent om kunden skulle växla mellan multi-face och vanlig face-swap (även om bara ett av lägena är aktivt åt gången per lager).
+Detta är en silent-failure som drabbar varje produkt där Shopify-handle och DB-handle har glidit isär (t.ex. när titel byts manuellt i Shopify Admin efter sync).
 
-### Ändringar i `src/components/editor/MultiFaceUploadSection.tsx`
+## Åtgärder
 
-1. **Resolva referensbilder** identiskt med `AiPhotoSection` (rad 93–110 där):
-   - Bygg `allReferenceImages` från `layer.defaults.referenceImages` med fallback till legacy `referenceImageUrl`.
-   - Filtrera efter `useEditorStore(s => s.orientation)` på `r.orientation` ("any" | matchande).
-2. **Selektion**: läs `aiPhotoSelectedRefUrl[layer.id]` från store, fall tillbaka på `referenceImages[0]`. `refUrl` = vald url.
-3. **Heal-effect**: om `stored` saknas eller inte längre finns i listan (orientation-byte), kalla `setAiPhotoSelectedRef(layer.id, referenceImages[0].url)`.
-4. **Picker-UI**: rendera samma grid som `AiPhotoSection` (rad 367–396) när `referenceImages.length >= 2`. Rubrik via befintlig nyckel `t("aiPhoto.chooseSubject")` — inga nya i18n-nycklar.
-5. **Cache-nyckel**: `makeMultiFaceKey(layer.id, refUrl, hashEntries)` — redan `refUrl`-beroende, så byte av referens → ny cache-bucket utan ändringar i `multi-face-cache.ts`.
-6. **Skapa-igen vid byte av referens**: vid orientation- eller refUrl-byte, om `aiPhotoResults[layer.id]` finns men ingen cache för nya (refUrl, hashes) — rensa via `setAiPhotoResult(layer.id, null)` (samma mönster som `AiPhotoSection` rad 134-ff). Om cache finns → återanvänd direkt.
+### 1. Akut datafix för den aktuella produkten
 
-### Edge function
-**Ingen ändring.** `multi-face-swap` får redan `referenceImageUrl` i bodyn — kommer nu få den valda istället för alltid den första.
+Uppdatera DB-raden så `shopify_handle`/`template_slug` matchar det faktiska Shopify-handle. Implementeras som data-migration (UPDATE) eftersom det inte ändrar schema:
 
-### Schema / store / admin / övriga komponenter
-**Helt orörda.** `referenceImages[]` på `aiPhoto.defaults` finns redan, admin-UI för att lägga till flera är redan på plats, store-actions `setAiPhotoSelectedRef` finns redan, vanlig `AiPhotoSection` fungerar identiskt.
+```sql
+UPDATE public.product_configs
+SET shopify_handle = 'kungligt-parportratt',
+    template_slug  = 'kungligt-parportratt'
+WHERE id = 'fa72157d-894e-416f-b330-0057c37571e2';
+```
 
-## Acceptanskrav
-1. Mall med multi-face aktiverat och **1** referensbild: ingen picker, beter sig som idag.
-2. Mall med multi-face aktiverat och **≥2** referensbilder (orientation-filtrerat): kunden ser samma picker-grid som vanlig face-swap. Byte av referens → om cache finns visas resultatet direkt, annars rensas resultatet och "Skapa" kör nytt anrop mot vald referens.
-3. Vanlig (single-face) `AiPhotoSection` oförändrad.
-4. Inga ändringar i edge function, schema, store, admin-inspector, cache-lib eller i18n.
+Detta gör att kunder på Shopify-produkten direkt får rätt mall (kungligt parporträtt med multi-face) istället för karttavla.
+
+### 2. Ta bort silent-fallback i `EditorPage.tsx`
+
+Ändra rad 201 från `resolveConfigForHandle(...) ?? configs[0]` till att, om ingen träff finns, sätta `config = null` och rendera ett tydligt "Mallen kunde inte hittas"-meddelande (i18n-nyckel) istället för att visa fel mall. Förhindrar att framtida handle-glidningar visar fel motiv för kunden.
+
+### 3. Robustare koppling Shopify ↔ DB (rekommenderad uppföljning)
+
+Lägg till en `template_slug`-metafält som sätts av `shopify-sync-template` på Shopify-produkten (`namespace: custom`, `key: template_slug`, värde: `cfg.template_slug`). Uppdatera theme-snippeten i `SHOPIFY_SETUP.md` så den föredrar `{{ product.metafields.custom.template_slug }}` framför `{{ product.handle }}` när iframe-URL byggs:
+
+```liquid
+?handle={{ product.metafields.custom.template_slug | default: product.handle }}
+```
+
+Då blir kopplingen oberoende av om någon byter titel/handle i Shopify Admin. Befintliga produkter får metafältet automatiskt vid nästa sync.
+
+### 4. Admin-varning (valfritt)
+
+I `/admin/configs`-listan, läs `shopify_sync_state.last_synced_payload.product.handle` och visa en varning om `shopify_handle` skiljer sig från det faktiska Shopify-handlet — så vi fångar glidningar innan kunderna ser dem.
+
+## Vad jag INTE rör
+
+- Mallinnehåll (template-JSON) för kungligt-familjemotiv eller karttavla.
+- Sync-pipeline utöver det nya metafältet i steg 3.
+- Resolver-logik för konsoliderade mallar (`expandConsolidatedConfig`, `deriveTemplateSlug`) — den fungerar korrekt så länge handlena matchar.
+
+## Verifiering
+
+1. Efter steg 1: öppna `https://wdxugd-yq.myshopify.com/products/kungligt-parportratt` → editorn ska visa multi-face uppladdning för "Kung" + "Drottning", inte kartval.
+2. Efter steg 2: ladda `/editor?handle=existerar-inte` → tydligt felmeddelande, ingen karttavla-fallback.
+3. Efter steg 3: kör sync på `kungligt-parportratt` → bekräfta metafält i Shopify Admin → uppdatera theme-snippet → iframe pekar fortfarande rätt även om handle byts framöver.
