@@ -1416,7 +1416,125 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const v = get().layerValues[id];
     return v && v.kind === "text" ? v : null;
   },
+
+  // ---------- freeform actions ----------
+  addCustomLayer: (type) => {
+    const state = get();
+    const tpl = state.template;
+    const config = state.config;
+    if (!tpl || !config) return null;
+    // Lazy import to avoid cyclic deps
+    const {
+      createFreeformLayer,
+      mutateActiveLayoutBlock,
+      nextTopZIndex,
+    } = require("@/lib/freeform-layers") as typeof import("@/lib/freeform-layers");
+    const block = getActiveLayoutBlock(tpl, config.product_type, state.layoutId)[state.orientation];
+    const newLayer = createFreeformLayer(type, {
+      zIndex: nextTopZIndex(block.layers),
+      defaultFont: tpl.productOptions?.fontPresets?.[0]?.family ?? undefined,
+      defaultMapStyleId: tpl.productOptions?.mapStylePresets?.[0]?.id ?? undefined,
+    });
+    const nextTemplate = mutateActiveLayoutBlock(
+      tpl,
+      config.product_type,
+      state.layoutId,
+      state.orientation,
+      (layers) => [...layers, newLayer],
+    );
+    // Seed layer values entry
+    const layerValues = { ...state.layerValues };
+    if (newLayer.type === "map") {
+      layerValues[newLayer.id] = {
+        kind: "map",
+        center: [newLayer.defaults.center[0], newLayer.defaults.center[1]],
+        zoom: newLayer.defaults.zoom,
+        styleId: newLayer.defaults.styleId,
+        shape: newLayer.defaults.shape as MapShape,
+        showLabels: newLayer.defaults.showLabels,
+        placeName: newLayer.defaults.placeName ?? "",
+        city: newLayer.defaults.city,
+        country: newLayer.defaults.country,
+        icons: [],
+      };
+    } else if (newLayer.type === "text") {
+      layerValues[newLayer.id] = {
+        kind: "text",
+        text: newLayer.defaults.text,
+        overrideText: null,
+        font: newLayer.defaults.font,
+        visible: true,
+      };
+    } else if (newLayer.type === "photo") {
+      layerValues[newLayer.id] = {
+        kind: "photo",
+        shape: newLayer.defaults.shape as PhotoShape,
+        offsetX: 0,
+        offsetY: 0,
+        zoom: 1,
+      };
+    } else if (newLayer.type === "aiPhoto") {
+      layerValues[newLayer.id] = {
+        kind: "aiPhoto",
+        shape: newLayer.defaults.shape as PhotoShape,
+        offsetX: 0,
+        offsetY: 0,
+        zoom: 1,
+      };
+    }
+    set({ template: nextTemplate, layerValues });
+    return newLayer.id;
+  },
+  removeCustomLayer: (id) => {
+    const state = get();
+    const tpl = state.template;
+    const config = state.config;
+    if (!tpl || !config) return;
+    const { mutateActiveLayoutBlock } = require("@/lib/freeform-layers") as typeof import("@/lib/freeform-layers");
+    const nextTemplate = mutateActiveLayoutBlock(
+      tpl,
+      config.product_type,
+      state.layoutId,
+      state.orientation,
+      (layers) => layers.filter((l) => l.id !== id),
+    );
+    const layerValues = { ...state.layerValues };
+    delete layerValues[id];
+    const layerTransforms = { ...state.layerTransforms };
+    delete layerTransforms[id];
+    set({ template: nextTemplate, layerValues, layerTransforms });
+  },
+  moveLayerZ: (id, direction) => {
+    const state = get();
+    const tpl = state.template;
+    const config = state.config;
+    if (!tpl || !config) return;
+    const { mutateActiveLayoutBlock } = require("@/lib/freeform-layers") as typeof import("@/lib/freeform-layers");
+    const nextTemplate = mutateActiveLayoutBlock(
+      tpl,
+      config.product_type,
+      state.layoutId,
+      state.orientation,
+      (layers) => {
+        const sorted = [...layers].sort((a, b) => a.zIndex - b.zIndex);
+        const idx = sorted.findIndex((l) => l.id === id);
+        if (idx === -1) return layers;
+        const swapIdx = idx + direction;
+        if (swapIdx < 0 || swapIdx >= sorted.length) return layers;
+        const a = sorted[idx]!;
+        const b = sorted[swapIdx]!;
+        const out = layers.map((l) => {
+          if (l.id === a.id) return { ...l, zIndex: b.zIndex };
+          if (l.id === b.id) return { ...l, zIndex: a.zIndex };
+          return l;
+        });
+        return out;
+      },
+    );
+    set({ template: nextTemplate });
+  },
 }));
+
 
 // ---------- internal helpers ----------
 type SetFn = (partial: Partial<EditorState> | ((s: EditorState) => Partial<EditorState>)) => void;
