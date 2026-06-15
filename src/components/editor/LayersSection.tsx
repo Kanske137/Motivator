@@ -50,8 +50,9 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editorStore";
-import type { TemplateLayer } from "@/lib/template-schema";
+import type { TemplateLayer, ShapeKind } from "@/lib/template-schema";
 import { isCustomLayerId, type FreeformLayerType } from "@/lib/freeform-layers";
+import { LayerQuickSettings } from "./LayerQuickSettings";
 
 const TYPE_META: Record<
   FreeformLayerType,
