@@ -251,9 +251,12 @@
     "listTitle": "Mina lager",
     "empty": "Inga lager ännu. Tryck på \"Lägg till lager\" för att börja.",
     "added": "Lager tillagt",
-    "maxReached": "Max {{max}} lager",
+    "maxReached": "Max antal lager nått",
     "moveUp": "Flytta upp",
     "moveDown": "Flytta ner",
+    "dragHandle": "Dra för att ändra ordning",
+    "toggleVisible": "Visa lager",
+    "toggleHidden": "Dölj lager",
     "delete": "Ta bort lager",
     "deleteDisabledTpl": "Mallens egna lager kan inte tas bort",
     "addPhoto": "Bild",
@@ -262,6 +265,11 @@
     "addText": "Text",
     "addShape": "Form",
     "addLine": "Linje",
-    "addMargin": "Marginal"
+    "addMargin": "Marginal",
+    "onboarding": {
+      "title": "Skapa fritt",
+      "body": "Lägg till bilder, karta, text och dekor. Dra för att ändra ordning, tryck på ögat för att dölja, och papperskorgen för att ta bort.",
+      "dismiss": "Förstått"
+    }
   }
 }
