@@ -298,12 +298,23 @@ interface EditorState {
   replaceMapIcon: (layerId: string, iconInstanceId: string, patch: Partial<MapIcon>) => void;
 
   // ---------- freeform (kund-tillagda lager i "fri mall"-läge) ----------
+  /** Map of layer-id → true för lager som kunden valt att dölja. Respekteras
+   *  av preview + print (filtreras innan snapshot/print-fil byggs). */
+  hiddenLayerIds: Record<string, true>;
   /** Lägg till ett kund-skapat lager i det aktiva layout-blocket. */
   addCustomLayer: (type: import("@/lib/freeform-layers").FreeformLayerType) => string | null;
   /** Ta bort ett (typiskt kund-tillagt) lager. Funkar även för admin-lager. */
   removeCustomLayer: (id: string) => void;
   /** Flytta ett lager upp/ner i z-stack (1 = upp, -1 = ner). */
   moveLayerZ: (id: string, direction: 1 | -1) => void;
+  /** Sätt synlighet för ett lager (true = visa, false = dölj). */
+  setLayerVisible: (id: string, visible: boolean) => void;
+  /** Är lagret dolt? */
+  isLayerHidden: (id: string) => boolean;
+  /** Skriv om zIndex enligt orderedIds (TOPP-först = högst zIndex). */
+  reorderLayers: (orderedIds: string[]) => void;
+  /** True om fri mall har minst en designkälla med riktigt innehåll. */
+  hasDesignContent: () => boolean;
 
   // ---------- legacy globals (derived getters; mutators apply to first layer) ----------
   // These setters/getters keep older code (EditorPage cart payload, snapshot
@@ -541,6 +552,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   aiPhotoSelectedRefUrl: {},
   faceSwapCache: loadFaceSwapCache(),
   multiFacePortraits: {},
+  hiddenLayerIds: {},
 
   // legacy mirrors (initial values, replaced once a config is loaded)
   mapCenter: [18.0686, 59.3293],
@@ -1500,7 +1512,66 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     delete layerValues[id];
     const layerTransforms = { ...state.layerTransforms };
     delete layerTransforms[id];
-    set({ template: nextTemplate, layerValues, layerTransforms });
+    const hiddenLayerIds = { ...state.hiddenLayerIds };
+    delete hiddenLayerIds[id];
+    set({ template: nextTemplate, layerValues, layerTransforms, hiddenLayerIds });
+  },
+  setLayerVisible: (id, visible) => {
+    const next = { ...get().hiddenLayerIds };
+    if (visible) delete next[id];
+    else next[id] = true;
+    set({ hiddenLayerIds: next });
+  },
+  isLayerHidden: (id) => Boolean(get().hiddenLayerIds[id]),
+  reorderLayers: (orderedIds) => {
+    const state = get();
+    const tpl = state.template;
+    const config = state.config;
+    if (!tpl || !config) return;
+    const nextTemplate = mutateActiveLayoutBlock(
+      tpl,
+      config.product_type,
+      state.layoutId,
+      state.orientation,
+      (layers) => {
+        // orderedIds är TOPP-först (= högst zIndex först). Tilldela jämna
+        // steg så det finns gap för framtida insert.
+        const total = orderedIds.length;
+        const byId = new Map(layers.map((l) => [l.id, l] as const));
+        return layers.map((l) => {
+          const idx = orderedIds.indexOf(l.id);
+          if (idx === -1) return l;
+          const newZ = (total - idx) * 10;
+          return { ...l, zIndex: newZ };
+        });
+      },
+    );
+    set({ template: nextTemplate });
+  },
+  hasDesignContent: () => {
+    const state = get();
+    const layers = state.templateLayers();
+    if (layers.length === 0) return false;
+    for (const layer of layers) {
+      if (state.hiddenLayerIds[layer.id]) continue;
+      const v = state.layerValues[layer.id];
+      if (layer.type === "photo") {
+        const src = state.photoSources[layer.id];
+        if (src?.previewUrl || src?.originalUrl) return true;
+      } else if (layer.type === "aiPhoto") {
+        if (state.aiPhotoResults[layer.id]) return true;
+        const src = state.aiPhotoSources[layer.id];
+        if (src?.previewUrl || src?.uploadedUrl) return true;
+      } else if (layer.type === "map") {
+        if (v && v.kind === "map" && v.placeName) return true;
+      } else if (layer.type === "text") {
+        if (v && v.kind === "text") {
+          const eff = v.overrideText ?? v.text;
+          if (eff && eff.trim().length > 0) return true;
+        }
+      }
+    }
+    return false;
   },
   moveLayerZ: (id, direction) => {
     const state = get();

@@ -168,7 +168,9 @@
     "added": "Añadido al carrito",
     "prepareFailed": "No se pudo preparar el archivo de impresión",
     "variantUnavailable": "Esta combinación aún no está disponible en la tienda",
-    "variantUnavailableHint": "{{size}} · {{variant}} no encontrado para {{handle}}."
+    "variantUnavailableHint": "{{size}} · {{variant}} no encontrado para {{handle}}.",
+    "freeformEmpty": "Añade algo a tu diseño primero",
+    "freeformEmptyHint": "Añade al menos una imagen, mapa o texto antes de finalizar la compra."
   },
   "scene": {
     "livingroom": "Salón",
@@ -249,7 +251,7 @@
     "listTitle": "Mis capas",
     "empty": "Aún no hay capas. Pulsa \"Añadir capa\" para empezar.",
     "added": "Capa añadida",
-    "maxReached": "Máx {{max}} capas",
+    "maxReached": "Número máximo de capas alcanzado",
     "moveUp": "Subir",
     "moveDown": "Bajar",
     "delete": "Eliminar capa",
@@ -260,6 +262,14 @@
     "addText": "Texto",
     "addShape": "Forma",
     "addLine": "Línea",
-    "addMargin": "Margen"
+    "addMargin": "Margen",
+    "dragHandle": "Arrastra para reordenar",
+    "toggleVisible": "Mostrar capa",
+    "toggleHidden": "Ocultar capa",
+    "onboarding": {
+      "title": "Crea libremente",
+      "body": "Añade imágenes, mapa, texto y decoración. Arrastra para reordenar, toca el ojo para ocultar y la papelera para eliminar.",
+      "dismiss": "Entendido"
+    }
   }
 }

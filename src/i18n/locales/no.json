@@ -168,7 +168,9 @@
     "added": "Lagt til i handlekurven",
     "prepareFailed": "Kunne ikke forberede trykkfil",
     "variantUnavailable": "Denne kombinasjonen er ikke tilgjengelig i butikken ennå",
-    "variantUnavailableHint": "{{size}} · {{variant}} ble ikke funnet for {{handle}}."
+    "variantUnavailableHint": "{{size}} · {{variant}} ble ikke funnet for {{handle}}.",
+    "freeformEmpty": "Legg til noe i designet ditt først",
+    "freeformEmptyHint": "Legg til minst ett bilde, kart eller tekst før du går til kassen."
   },
   "scene": {
     "livingroom": "Stue",
@@ -249,7 +251,7 @@
     "listTitle": "Mine lag",
     "empty": "Ingen lag ennå. Trykk \"Legg til lag\" for å starte.",
     "added": "Lag lagt til",
-    "maxReached": "Maks {{max}} lag",
+    "maxReached": "Maks antall lag nådd",
     "moveUp": "Flytt opp",
     "moveDown": "Flytt ned",
     "delete": "Slett lag",
@@ -260,6 +262,14 @@
     "addText": "Tekst",
     "addShape": "Form",
     "addLine": "Linje",
-    "addMargin": "Marg"
+    "addMargin": "Marg",
+    "dragHandle": "Dra for å endre rekkefølge",
+    "toggleVisible": "Vis lag",
+    "toggleHidden": "Skjul lag",
+    "onboarding": {
+      "title": "Skap fritt",
+      "body": "Legg til bilder, kart, tekst og dekor. Dra for å endre rekkefølge, trykk på øyet for å skjule, og søppelbøtten for å fjerne.",
+      "dismiss": "Skjønner"
+    }
   }
 }

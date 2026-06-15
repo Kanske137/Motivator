@@ -306,7 +306,9 @@ export function MapPreview({
   const marginRemovedInsets = !whiteMarginEnabled ? marginInsets : undefined;
   // Margin must always render visually on top of all other layers (but its
   // wrapper still has pointer-events:none so it never blocks clicks).
-  const visibleLayers = whiteMarginEnabled ? allLayers : allLayers.filter((l) => l.type !== "margin");
+  const hiddenLayerIds = useEditorStore((s) => s.hiddenLayerIds);
+  const notHidden = (l: TemplateLayer) => !hiddenLayerIds[l.id];
+  const visibleLayers = (whiteMarginEnabled ? allLayers : allLayers.filter((l) => l.type !== "margin")).filter(notHidden);
   const layers = [
     ...visibleLayers.filter((l) => l.type !== "margin"),
     ...visibleLayers.filter((l) => l.type === "margin"),

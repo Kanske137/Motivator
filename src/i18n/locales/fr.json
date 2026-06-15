@@ -168,7 +168,9 @@
     "added": "Ajouté au panier",
     "prepareFailed": "Impossible de préparer le fichier d'impression",
     "variantUnavailable": "Cette combinaison n'est pas encore disponible en boutique",
-    "variantUnavailableHint": "{{size}} · {{variant}} introuvable pour {{handle}}."
+    "variantUnavailableHint": "{{size}} · {{variant}} introuvable pour {{handle}}.",
+    "freeformEmpty": "Ajoutez d'abord un élément à votre design",
+    "freeformEmptyHint": "Ajoutez au moins une image, une carte ou du texte avant de passer à la caisse."
   },
   "scene": {
     "livingroom": "Salon",
@@ -249,7 +251,7 @@
     "listTitle": "Mes calques",
     "empty": "Aucun calque pour le moment. Appuyez sur \"Ajouter un calque\".",
     "added": "Calque ajouté",
-    "maxReached": "Max {{max}} calques",
+    "maxReached": "Nombre maximum de calques atteint",
     "moveUp": "Monter",
     "moveDown": "Descendre",
     "delete": "Supprimer le calque",
@@ -260,6 +262,14 @@
     "addText": "Texte",
     "addShape": "Forme",
     "addLine": "Ligne",
-    "addMargin": "Marge"
+    "addMargin": "Marge",
+    "dragHandle": "Faites glisser pour réorganiser",
+    "toggleVisible": "Afficher le calque",
+    "toggleHidden": "Masquer le calque",
+    "onboarding": {
+      "title": "Créez librement",
+      "body": "Ajoutez des images, une carte, du texte et de la déco. Glissez pour réorganiser, touchez l'œil pour masquer et la corbeille pour supprimer.",
+      "dismiss": "Compris"
+    }
   }
 }

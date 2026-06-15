@@ -1,54 +1,49 @@
-# Felsökning: tom sida i Appen + enbart Format-flik i Shopify
+## Tillägg till "Fri mall"-editorn
 
-## Vad jag hittade
+Fyra fokuserade förbättringar till `LayersSection` + en validering på CTA.
 
-1. **Root cause — infinite render loop i `LayersSection`.** Konsolen visar:
-   > Warning: The result of getSnapshot should be cached to avoid an infinite loop … at LayersSection (LayersSection.tsx:86)
+### 1. Drag-reorder (ersätt upp/ner-knappar)
+- Lägg till `@dnd-kit/core` + `@dnd-kit/sortable` (om de inte redan finns; annars använd HTML5 native drag).
+- Wrappa `<ul>` i `LayersSection.tsx` med `DndContext` + `SortableContext` (vertikal). Varje rad blir en `useSortable`-item med drag-handle (grip-ikon) till vänster.
+- Vid drop: räkna om `zIndex` (överst i listan = högst zIndex). Anropa ny store-action `reorderLayers(orderedIds: string[])` som muterar via `mutateActiveLayoutBlock` och skriver tillbaka zIndex sekventiellt.
+- Behåll upp/ner-knapparna som `sr-only` keyboard-fallback? Nej — ersätt helt, men gör drag-handle keyboard-aktiverbar (dnd-kit har inbyggt stöd via `KeyboardSensor`).
 
-   Felet kommer från rad 73:
-   ```ts
-   const layers = useEditorStore((s) => s.templateLayers());
-   ```
-   `templateLayers()` returnerar en **ny array** varje gång selectorn körs → Zustand tror att state ändras varje render → React varnar och komponenten remountar i loop → editorn kraschar (vit sida) så fort `LayersSection` monteras.
+### 2. Visibility-toggle
+- Alla `TemplateLayer`-instanser har redan en valfri `visible: boolean`-egenskap (default true). Verifieras vid implementation.
+- Lägg till en ögon-ikon (Eye / EyeOff) i raden, mellan namn och delete-knappen.
+- Ny store-action `setLayerVisible(id, visible)` som muterar layern i aktivt layout-block. Renderpipen (`StaticLayers`, snapshot, print) respekterar redan `visible === false` → dölj då.
+- Dolda lager visas i listan med `opacity-50` så det är tydligt.
+- Detta gäller både template-lager OCH custom-lager (i motsats till delete som bara funkar på custom).
 
-   Detta förklarar **båda symptomen**:
-   - **"Tom sida från Appen"** (`/editor?handle=skapa-sjalv`): Lager-fliken är default-aktiv (första tillgängliga section), monteras direkt, kraschar → blank skärm.
-   - **"Bara Format-fliken i Shopify-iframen"**: den publicerade builden i Shopify-temat är äldre än freeform-koden, så `is_freeform`-grenen finns inte → bara Format syns. När du publicerar om kommer Lager-fliken med, men då måste loop-buggen vara fixad annars kraschar den där också.
+### 3. Onboarding-tooltip
+- Första gången kunden öppnar "Lager"-fliken på en fri mall: visa en popover/tooltip ankrad mot "Lägg till lager"-knappen med kort text (i18n: `layers.onboarding.title` + `layers.onboarding.body` + "Förstått"-knapp).
+- Persistens: `localStorage.setItem("freeform-onboarding-seen", "1")` när användaren stänger den. Läs vid mount; visa bara om saknas och `is_freeform === true`.
+- Komponent: shadcn `Popover` öppen som default, stängs på klick. Inga ändringar i editorStore.
 
-2. **DB-raden är OK.** `skapa-sjalv` har `is_freeform=true`, `is_consolidated=true`, `enabled_product_types=[posters,canvas,aluminum,acrylic]` och ett giltigt template med tomma `layers[]` i båda orienteringarna. Editorn expanderar raden korrekt via `expandConsolidatedConfig`.
+### 4. Validering: blockera "Lägg i varukorg" vid saknad designkälla
+- Definition av "saknad designkälla" på fri mall:
+  - 0 lager totalt, ELLER
+  - Ingen av lagren har ett "innehåll" (photo utan uploadedUrl, map utan placeName, text med tom sträng, AI-photo utan resultat). Form/line/margin räknas inte som designkälla.
+- Lägg en selector i `editorStore`: `hasDesignContent(): boolean`.
+- I `EditorPage.tsx`:
+  - Beräkna `const canAddToCart = !config.is_freeform || hasDesignContent()`.
+  - Skicka `disabled={!canAddToCart}` till `StickyCta` (lägg till prop om den saknas).
+  - Vid klick på disabled CTA: visa `toast.error(t("cartAdd.freeformEmpty"))` med hint "Lägg till minst en bild, karta eller text".
+- För icke-fria mallar: ingen ändring (befintliga validering oförändrad).
 
-3. **Tomt canvas är dock fortfarande förvirrande för kunden** — när Lager-fliken fungerar landar kunden på en helt blank yta utan vägledning.
+### i18n-nycklar (sv som källa, översätt till en/de/no/da/fi/fr/es/it/nl/pl)
+- `layers.dragHandle` ("Dra för att ändra ordning")
+- `layers.toggleVisible` / `layers.toggleHidden`
+- `layers.onboarding.title` / `layers.onboarding.body` / `layers.onboarding.dismiss`
+- `cartAdd.freeformEmpty` / `cartAdd.freeformEmptyHint`
 
-## Plan
+### Filer som ändras
+- `src/components/editor/LayersSection.tsx` — drag-reorder, visibility-toggle, onboarding-popover
+- `src/stores/editorStore.ts` — `reorderLayers`, `setLayerVisible`, `hasDesignContent`
+- `src/components/editor/StickyCta.tsx` — ny `disabled`-prop (om saknas)
+- `src/pages/EditorPage.tsx` — koppla validering till CTA
+- 11 × `src/i18n/locales/*.json` — nya nycklar
+- `package.json` — `@dnd-kit/core` + `@dnd-kit/sortable` (om ej redan installerade)
 
-### Steg 1 — Fixa loopen i `LayersSection.tsx` (kritiskt)
-Hämta funktionsreferensen i selectorn (stabil) och anropa den i render, precis som `ControlPanel` redan gör:
-
-```ts
-const templateLayers = useEditorStore((s) => s.templateLayers);
-const layers = templateLayers();
-```
-
-Inget annat behöver röras i komponenten. Detta tar bort loopen → den vita sidan försvinner.
-
-### Steg 2 — Onboarding/tom-läge i `LayersSection`
-När `layers.length === 0`:
-- Visa en tydlig hint överst i preview-ytan via en ny prop på `MapPreview` (eller via `EditorShell`): "Börja med att lägga till ett lager →" som pekar mot "Lägg till"-knappen.
-- I `LayersSection`s tom-tillstånd: byt ut den nuvarande korta texten mot en kort guide med de tre vanligaste startpunkterna som direktknappar (Bild · Karta · Text) — samma `addCustomLayer`-anrop som "Lägg till"-arket använder.
-
-### Steg 3 — Skydd mot framtida snapshot-bugs
-Lägg en kort kommentar ovanför `templateLayers`-användningar i editor-komponenter:
-> Selectorn returnerar FUNKTIONEN, inte resultatet — annars triggas Zustands "getSnapshot should be cached"-loop.
-
-### Steg 4 — Verifiera och publicera
-1. Öppna `/editor?handle=skapa-sjalv` i preview → sidan ska rendera, Lager-fliken ska visas i NavRail tillsammans med Format.
-2. Klicka Lager → lägg till Bild/Karta/Text → bekräfta att lager visas i preview.
-3. Publicera (så att Shopify-iframen får ny build) — då försvinner symptomet "bara Format" där också.
-
-## Tekniska detaljer
-
-Filer som ändras:
-- `src/components/editor/LayersSection.tsx` — fix selector + tomt-läge med snabbknappar.
-- (ev.) `src/components/editor/MapPreview.tsx` eller `EditorShell.tsx` — overlay-hint vid 0 lager för freeform.
-
-Inga DB-migrationer, inga ändringar i `editorStore`, `freeform-layers.ts`, print-pipeline eller Shopify-sync. Befintliga mallar påverkas inte (de har `is_freeform=false` och får ändå inte Lager-fliken).
+### Inget rörs
+- `freeform-layers.ts`-factory, print-pipeline, template-schema, DB/migrations, Shopify-sync, övriga sektioner i ControlPanel.

@@ -7,11 +7,12 @@ interface Props {
   price: string;
   summary?: string;
   loading?: boolean;
+  disabled?: boolean;
   onAdd: () => void;
   className?: string;
 }
 
-export function StickyCta({ price, summary, loading, onAdd, className }: Props) {
+export function StickyCta({ price, summary, loading, disabled, onAdd, className }: Props) {
   const { t } = useTranslation();
   return (
     <div
@@ -29,9 +30,9 @@ export function StickyCta({ price, summary, loading, onAdd, className }: Props) 
       </div>
       <Button
         onClick={onAdd}
-        disabled={loading}
+        disabled={loading || disabled}
         aria-label={t("common.addToCart")}
-        className="h-12 md:h-12 rounded-full bg-background text-foreground hover:bg-background/90 px-5 md:px-7 font-semibold"
+        className="h-12 md:h-12 rounded-full bg-background text-foreground hover:bg-background/90 px-5 md:px-7 font-semibold disabled:opacity-50"
       >
         {loading ? (
           <Loader2 className="h-4 w-4 animate-spin" />
