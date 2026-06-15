@@ -7,6 +7,11 @@ import { getActiveLayoutBlock } from "@/lib/template-schema";
 import { resolveTemplate } from "@/lib/template-migrate";
 import { clampLayerRect } from "@/lib/layer-utils";
 import {
+  createFreeformLayer,
+  mutateActiveLayoutBlock,
+  nextTopZIndex,
+} from "@/lib/freeform-layers";
+import {
   type AiCacheEntry,
   loadAiCache,
   makeCacheKey,
