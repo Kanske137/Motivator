@@ -1512,7 +1512,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     delete layerValues[id];
     const layerTransforms = { ...state.layerTransforms };
     delete layerTransforms[id];
-    set({ template: nextTemplate, layerValues, layerTransforms });
+    const hiddenLayerIds = { ...state.hiddenLayerIds };
+    delete hiddenLayerIds[id];
+    set({ template: nextTemplate, layerValues, layerTransforms, hiddenLayerIds });
   },
   setLayerVisible: (id, visible) => {
     const next = { ...get().hiddenLayerIds };
