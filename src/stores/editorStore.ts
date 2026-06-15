@@ -1530,6 +1530,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ hiddenLayerIds: next });
   },
   isLayerHidden: (id) => Boolean(get().hiddenLayerIds[id]),
+  updateLayerDefaults: (id, patch) => {
+    const state = get();
+    const tpl = state.template;
+    const config = state.config;
+    if (!tpl || !config) return;
+    const nextTemplate = mutateActiveLayoutBlock(
+      tpl,
+      config.product_type,
+      state.layoutId,
+      state.orientation,
+      (layers) =>
+        layers.map((l) =>
+          l.id === id
+            ? ({ ...l, defaults: { ...(l as { defaults: object }).defaults, ...patch } } as typeof l)
+            : l,
+        ),
+    );
+    set({ template: nextTemplate });
+  },
   reorderLayers: (orderedIds) => {
     const state = get();
     const tpl = state.template;
