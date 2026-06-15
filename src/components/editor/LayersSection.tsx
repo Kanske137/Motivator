@@ -219,13 +219,27 @@ export function LayersSection() {
   const ordered = [...layers].sort((a, b) => b.zIndex - a.zIndex);
   const orderedIds = ordered.map((l) => l.id);
 
-  const onAdd = (type: FreeformLayerType) => {
+  const onAdd = (
+    type: FreeformLayerType,
+    opts?: { shapeKind?: ShapeKind; lineOrientation?: "horizontal" | "vertical" },
+  ) => {
     if (layers.length >= MAX_LAYERS) {
       toast.error(t("layers.maxReached"));
       return;
     }
-    const id = addCustomLayer(type);
+    // Form/Linje öppnar ett sub-steg där kunden väljer variant innan vi
+    // skapar lagret.
+    if (!opts && type === "shape") {
+      setStage("shape");
+      return;
+    }
+    if (!opts && type === "line") {
+      setStage("line");
+      return;
+    }
+    const id = addCustomLayer(type, opts);
     setSheetOpen(false);
+    setStage("root");
     if (id) toast.success(t("layers.added"));
   };
 
