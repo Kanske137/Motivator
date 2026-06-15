@@ -16,6 +16,7 @@ import {
 } from "@/lib/layer-utils";
 import { AcrylicCornerOverlay } from "./AcrylicCornerOverlay";
 import { MapIconsOverlay } from "./MapIconsOverlay";
+import { isCustomLayerId } from "@/lib/freeform-layers";
 
 interface Props {
   frameColor?: string;
