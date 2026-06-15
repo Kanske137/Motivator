@@ -139,31 +139,41 @@ export function createFreeformLayer(
           color: "#000000",
         },
       };
-    case "shape":
+    case "shape": {
+      const kind = opts.shapeKind ?? "frame-rect";
+      const defaults: import("./template-schema").ShapeDefaults = {
+        kind,
+        strokeMm: 1,
+        color: "#000000",
+        ...(kind === "frame-rounded" ? { cornerRadiusPct: 8 } : {}),
+        ...(kind === "frame-double" ? { gapMm: 4 } : {}),
+      };
       return {
         ...base,
         type: "shape",
         name: opts.name ?? "Form",
         locks,
-        defaults: {
-          kind: "frame-rect",
-          strokeMm: 1,
-          color: "#000000",
-        },
+        defaults,
       };
-    case "line":
+    }
+    case "line": {
+      const orientation = opts.lineOrientation ?? "horizontal";
+      // Linje-höjd vs bredd: en horisontell linje får liten "tjocklek-låda"
+      // i hPct (height) men full wPct (length). Vertikal tvärtom.
       return {
         ...base,
-        hPct: 1,
+        wPct: orientation === "horizontal" ? 60 : 1,
+        hPct: orientation === "horizontal" ? 1 : 60,
         type: "line",
         name: opts.name ?? "Linje",
         locks,
         defaults: {
-          orientation: "horizontal",
+          orientation,
           thicknessMm: 1,
           color: "#000000",
         },
       };
+    }
     case "margin":
       return {
         ...base,
