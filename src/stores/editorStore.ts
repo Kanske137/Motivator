@@ -1432,8 +1432,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const block = getActiveLayoutBlock(tpl, config.product_type, state.layoutId)[state.orientation];
     const newLayer = createFreeformLayer(type, {
       zIndex: nextTopZIndex(block.layers),
-      defaultFont: tpl.productOptions?.fontPresets?.[0]?.family ?? undefined,
-      defaultMapStyleId: tpl.productOptions?.mapStylePresets?.[0]?.id ?? undefined,
+      defaultFont: tpl.productOptions?.allowedFonts?.[0] ?? undefined,
+      defaultMapStyleId: tpl.productOptions?.mapStyles?.[0]?.id ?? undefined,
     });
     const nextTemplate = mutateActiveLayoutBlock(
       tpl,
