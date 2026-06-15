@@ -111,7 +111,7 @@ interface Props {
   sectionId?: SectionId;
 }
 
-export type SectionId = "bild" | "forvandling" | "karta" | "stil" | "text" | "format";
+export type SectionId = "lager" | "bild" | "forvandling" | "karta" | "stil" | "text" | "format";
 
 export interface SectionMeta {
   id: SectionId;
@@ -119,9 +119,10 @@ export interface SectionMeta {
   icon: LucideIcon;
 }
 
-const SECTION_ORDER: SectionId[] = ["bild", "forvandling", "karta", "stil", "text", "format"];
+const SECTION_ORDER: SectionId[] = ["lager", "bild", "forvandling", "karta", "stil", "text", "format"];
 
 const SECTION_META: Record<SectionId, { labelKey: string; icon: LucideIcon }> = {
+  lager: { labelKey: "section.layers", icon: Layers },
   bild: { labelKey: "section.image", icon: ImageIcon },
   forvandling: { labelKey: "section.transformation", icon: Sparkles },
   karta: { labelKey: "section.map", icon: MapPin },
@@ -132,6 +133,7 @@ const SECTION_META: Record<SectionId, { labelKey: string; icon: LucideIcon }> = 
 
 /** Computes which sections are available for the currently loaded template. */
 export function useAvailableSections(): SectionMeta[] {
+  const config = useEditorStore((s) => s.config);
   const template = useEditorStore((s) => s.template);
   const templateLayers = useEditorStore((s) => s.templateLayers);
   // Re-derive layers when layoutId changes (different style → different layers).
@@ -151,8 +153,10 @@ export function useAvailableSections(): SectionMeta[] {
       (l: any) => !l.locks.content || !l.locks.font || !l.locks.visibility || !l.locks.size || !l.locks.move,
     );
     const allLayouts = template ? getAllLayouts(template) : [];
+    const isFreeform = !!config?.is_freeform;
 
     const flags: Record<SectionId, boolean> = {
+      lager: isFreeform,
       bild: photoLayers.length > 0,
       forvandling: aiPhotoLayers.length > 0,
       karta: editableMaps.length > 0,
@@ -166,8 +170,9 @@ export function useAvailableSections(): SectionMeta[] {
       icon: SECTION_META[id].icon,
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [template, layoutId, templateLayers]);
+  }, [template, layoutId, templateLayers, config?.is_freeform]);
 }
+
 
 export function ControlPanel({ configs, activeHandle, activeProductType, onProductChange, sectionId }: Props) {
   const { t } = useTranslation();
