@@ -69,7 +69,11 @@ const MAX_LAYERS = 12;
 
 export function LayersSection() {
   const { t } = useTranslation();
-  const layers = useEditorStore((s) => s.templateLayers());
+  // OBS: hämta FUNKTIONEN i selectorn (stabil ref) och anropa i render.
+  // `useEditorStore((s) => s.templateLayers())` triggar Zustands
+  // "getSnapshot should be cached"-loop → editor kraschar (vit sida).
+  const templateLayers = useEditorStore((s) => s.templateLayers);
+  const layers = templateLayers();
   const addCustomLayer = useEditorStore((s) => s.addCustomLayer);
   const removeCustomLayer = useEditorStore((s) => s.removeCustomLayer);
   const moveLayerZ = useEditorStore((s) => s.moveLayerZ);
