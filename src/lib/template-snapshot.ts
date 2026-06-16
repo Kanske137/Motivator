@@ -754,7 +754,7 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
         : null;
       const overrideText = tv?.overrideText ?? (isLive ? input.liveText ?? null : null);
       const { text } = buildEffectiveTextWithSpans(layer.defaults, place, overrideText);
-      drawTextLayer(ctx, rect, layer, text, font, Math.min(frontPxW, frontPxH));
+      drawTextLayer(ctx, rect, layer, text, font, Math.min(frontPxW, frontPxH), tv?.fontSizePt ?? null);
     } else if (layer.type === "image") {
       try {
         await drawImageLayer(ctx, rect, layer);
