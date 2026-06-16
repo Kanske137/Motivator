@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Circle, Heart, Star, Square, RotateCcw } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEditorStore, type MapLayerValue, type TextLayerValue, type PhotoLayerValue, type PhotoShape } from "@/stores/editorStore";
 import { FONT_FAMILIES } from "@/lib/font-catalog";
 import { substituteTokens } from "@/lib/text-typography";
@@ -698,8 +699,15 @@ function TextLayerSection({
   const { t } = useTranslation();
   const setLayerText = useEditorStore((s) => s.setLayerText);
   const setLayerTextFont = useEditorStore((s) => s.setLayerTextFont);
+  const setLayerTextFontSizePt = useEditorStore((s) => s.setLayerTextFontSizePt);
   const setLayerTextVisible = useEditorStore((s) => s.setLayerTextVisible);
   const productOptions = useEditorStore((s) => s.productOptions);
+  const isFreeform = !!config.is_freeform;
+  const PT_OPTIONS = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 42, 48, 56, 64, 72, 80, 96, 120, 144];
+  const effectivePt = Math.round(value?.fontSizePt ?? layer.defaults.fontSizePt ?? 24);
+  const ptOptions = PT_OPTIONS.includes(effectivePt)
+    ? PT_OPTIONS
+    : [...PT_OPTIONS, effectivePt].sort((a, b) => a - b);
 
   const linked = !!layer.defaults.linkedMapLayerId;
   const place = linkedMap
@@ -789,7 +797,30 @@ function TextLayerSection({
           </div>
         </div>
       )}
-      <LayerTransformControls layer={layer} />
+      {isFreeform ? (
+        <div className="space-y-2">
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
+            {t("text.fontSize")}
+          </Label>
+          <Select
+            value={String(effectivePt)}
+            onValueChange={(v) => setLayerTextFontSizePt(layer.id, Number(v))}
+          >
+            <SelectTrigger className="rounded-xl">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ptOptions.map((pt) => (
+                <SelectItem key={pt} value={String(pt)}>
+                  {pt} pt
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : (
+        <LayerTransformControls layer={layer} />
+      )}
     </div>
   );
 }
