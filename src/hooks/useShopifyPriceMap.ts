@@ -57,7 +57,6 @@ export function useShopifyPriceMap(): ShopifyPriceMapResult {
       combos.map((c) => ({ size: c.size, variant: c.variant })),
     ).then((m) => {
       if (cancelled) return;
-      console.log("[price-debug] handle=", config.shopify_handle, "country=", country, "combos=", combos.length, "mapSize=", m.size, "firstKey=", combos[0] ? `${combos[0].size}|${combos[0].variant}` : null, "firstMatch=", combos[0] ? m.get(`${combos[0].size}|${combos[0].variant}`) : null);
       setMap(m);
       // Derive FX from any matched combo so the SEK-fallback in the UI can
       // convert correctly even when a specific (size,variant) was missing.
