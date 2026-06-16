@@ -15,12 +15,12 @@ import { defaultLocks, DEFAULT_LAYOUT_ID } from "./template-schema";
 
 export type FreeformLayerType =
   | "photo"
-  | "aiPhoto"
   | "map"
   | "text"
   | "shape"
   | "line"
   | "margin";
+
 
 /** Stable prefix vi använder för id:n på kund-tillagda lager så
  *  snapshot/pris/sync m.fl. kan filtrera bort dem om de behöver. */
@@ -86,21 +86,8 @@ export function createFreeformLayer(
         locks,
         defaults: { shape: "rect", fit: "cover" },
       };
-    case "aiPhoto":
-      return {
-        ...base,
-        type: "aiPhoto",
-        name: opts.name ?? "AI-bild",
-        locks,
-        defaults: {
-          shape: "rect",
-          fit: "cover",
-          referenceImages: [],
-          swapPrompt:
-            "Replace only the face/head onto the reference subject. Preserve the reference outfit, hair contour, lighting, pose and background.",
-          subjectKind: "removeBackground",
-        },
-      };
+
+
     case "map":
       return {
         ...base,

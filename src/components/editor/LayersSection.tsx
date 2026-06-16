@@ -59,7 +59,6 @@ const TYPE_META: Record<
   { icon: LucideIcon; labelKey: string }
 > = {
   photo: { icon: ImageIcon, labelKey: "layers.addPhoto" },
-  aiPhoto: { icon: Sparkles, labelKey: "layers.addAiPhoto" },
   map: { icon: MapPin, labelKey: "layers.addMap" },
   text: { icon: Type, labelKey: "layers.addText" },
   shape: { icon: Frame, labelKey: "layers.addShape" },
@@ -69,13 +68,13 @@ const TYPE_META: Record<
 
 const ADD_ORDER: FreeformLayerType[] = [
   "photo",
-  "aiPhoto",
   "map",
   "text",
   "shape",
   "line",
   "margin",
 ];
+
 
 const LAYER_TYPE_ICON: Record<TemplateLayer["type"], LucideIcon> = {
   map: MapPin,
