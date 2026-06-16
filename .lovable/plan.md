@@ -1,86 +1,52 @@
-# Plan: Textstorleks-dropdown per textlager (endast Skapa själv)
+## Mål
 
-På Skapa själv-mallar:
-- **Ta bort** lagerstorleks-slidern (`<LayerTransformControls>`) från textlagrets textflik.
-- **Lägg in** en dropdown för **textstorlek (pt)** i stället, separat per textlager.
-- **Behåll** resize-handtaget i previewen oförändrat (det justerar lager-rect:en wPct/hPct, inte typsnittet).
-- Allt annat (font-väljare, visible-toggle, textfält, decoration, vanliga mallar) helt orört.
+1. Lägg de 6 uppladdade bilderna som standard-thumbnails för AI-stilarna (Akvarell, Skiss, Olja, Pop-art, Linjekonst, Vintage).
+2. Byt namn: **Linjeart → Linjekonst** och **Vintage poster → Vintage**.
+3. Gäller både nya mallar (defaults) och alla befintliga mallar i databasen.
 
-## Datamodell — kund-override av fontSizePt
+## Steg
 
-`src/stores/editorStore.ts`:
-- `TextLayerValue` får `fontSizePt: number | null` (null = följer admin-default).
-- Init till `null` på alla skapande-vägar (mall-load runt rad 420, override-konvertering runt rad 966, addCustomLayer text-fall runt rad 1487).
-- Ny setter `setLayerTextFontSizePt(id, pt | null)` (mönster: `setLayerTextFont`).
+### 1. Ladda upp thumbnails till Supabase Storage
+Använd den befintliga publika bucketen `ai-references` (samma som AI-bilder redan ligger i). Lägger filerna under `style-thumbnails/{id}.png`:
 
-## Render-pipeline (override vinner när satt)
+| id | fil | publik URL |
+|---|---|---|
+| watercolor | Akvarell.png | …/ai-references/style-thumbnails/watercolor.png |
+| sketch | Skiss.png | …/ai-references/style-thumbnails/sketch.png |
+| oil | Olja.png | …/ai-references/style-thumbnails/oil.png |
+| pop-art | Pop-art.png | …/ai-references/style-thumbnails/pop-art.png |
+| lineart | Linjekonst.png | …/ai-references/style-thumbnails/lineart.png |
+| vintage-poster | Vintage.png | …/ai-references/style-thumbnails/vintage-poster.png |
 
-- `src/components/editor/layers/TextLayerView.tsx`: ny prop `effectiveFontSizePt?: number`. När satt → `resolveFontPx({ fontSizePt: effectiveFontSizePt }, canvasShortPx)`. Annars nuvarande beteende.
-- `src/components/editor/MapPreview.tsx` text-grenen: skicka `effectiveFontSizePt={tv?.fontSizePt ?? undefined}`.
-- `src/lib/template-snapshot.ts` `drawTextLayer`: ny param `liveFontSizePt`; använder den i `fontPx`-beräkningen när satt. Anroparen (rad 757) skickar `tv?.fontSizePt ?? null`.
+(Schemat `aiStylePresetSchema.thumbnailUrl = z.string().url()` kräver absolut URL — Storage public URL fungerar; Lovable Assets `/__l5e/...` gör inte det.)
 
-Detta garanterar att override:n syns identiskt i preview, mockup och print-fil.
+### 2. `src/lib/ai-style-defaults.ts`
+- Lägg till `thumbnailUrl` på alla 6 presets (URL:erna ovan).
+- `lineart.label`: "Linjeart" → **"Linjekonst"**.
+- `vintage-poster.label`: "Vintage poster" → **"Vintage"**.
+- (Behåller id:n oförändrade så cache + Shopify-historik fortsätter matcha.)
 
-## UI: dropdown i textfliken (endast freeform)
+### 3. `src/lib/pricing.ts`
+- Rad 68: `label: "Vintage poster"` → **"Vintage"** (för konsekvens; samma id `vintage-poster`).
 
-`src/components/editor/ControlPanel.tsx` → `TextLayerSection` (rad 685–795):
+### 4. SQL-migration — uppdatera alla befintliga mallar
+För varje rad i `product_configs` där `template->'productOptions'->'aiStyles'` är en array, mappa över arrayen och:
+- sätt `thumbnailUrl` per `id` (de 6 URL:erna ovan),
+- ersätt label `"Linjeart"` med `"Linjekonst"` (id `lineart`),
+- ersätt label `"Vintage poster"` med `"Vintage"` (id `vintage-poster`).
 
-```tsx
-const isFreeform = !!config.is_freeform;
-const effectivePt = Math.round(value?.fontSizePt ?? layer.defaults.fontSizePt ?? 24);
+Implementeras som `jsonb_set` + `jsonb_agg` över aiStyles-arrayen, idempotent (kan köras igen utan effekt).
 
-// Predefinierade Word-liknande punktstorlekar
-const PT_OPTIONS = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 42, 48, 56, 64, 72, 80, 96, 120, 144];
-// Om aktuellt värde inte finns i listan, lägg in det överst så Select visar rätt
-const ptOptions = PT_OPTIONS.includes(effectivePt) ? PT_OPTIONS : [effectivePt, ...PT_OPTIONS].sort((a,b)=>a-b);
-```
+### 5. i18n
+Inga träffar på "Linjeart"/"Vintage poster" i `src/i18n/locales/*` — labels lagras som data i template/defaults, inte som översättningsnycklar. Inget att ändra där.
 
-Renderas efter font-väljaren, **i stället för** `<LayerTransformControls>` när `isFreeform`:
+### Inte berört
+- AiStyleSection-UI (läser redan `p.thumbnailUrl`).
+- Admin-ProductOptionsSection (visar redan thumbnail när den finns).
+- Prompts, id:n, cache-nycklar (`photoHash::presetId`), Shopify-sync-flöden.
+- Replicate-edge-functionen.
 
-```tsx
-{isFreeform ? (
-  <div className="space-y-2">
-    <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-      {t("text.fontSize")}
-    </Label>
-    <Select
-      value={String(effectivePt)}
-      onValueChange={(v) => setLayerTextFontSizePt(layer.id, Number(v))}
-    >
-      <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
-      <SelectContent>
-        {ptOptions.map((pt) => (
-          <SelectItem key={pt} value={String(pt)}>{pt} pt</SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  </div>
-) : (
-  <LayerTransformControls layer={layer} />
-)}
-```
-
-- Ingen explicit reset-knapp behövs — dropdownen visar alltid effektiv pt (default ärvs initialt eftersom override är `null`).
-- Resize-handtaget i previewen är fortsatt aktivt (`MapPreview` text-grenen har redan move + resize handtag från förra leveransen) och påverkar bara wPct/hPct.
-
-## i18n
-
-`src/i18n/locales/sv.json` (källa) + översätt till `en/de/no/da/fi/fr/es/it/nl/pl`:
-- `text.fontSize` = "Textstorlek"
-
-## Filer som ändras
-
-- `src/stores/editorStore.ts` — `TextLayerValue.fontSizePt`, init, `setLayerTextFontSizePt`.
-- `src/components/editor/layers/TextLayerView.tsx` — `effectiveFontSizePt`-prop.
-- `src/components/editor/MapPreview.tsx` — skicka `effectiveFontSizePt`.
-- `src/lib/template-snapshot.ts` — `drawTextLayer` honourar override.
-- `src/components/editor/ControlPanel.tsx` — `TextLayerSection`: dropdown istället för `LayerTransformControls` när freeform.
-- `src/i18n/locales/*.json` — `text.fontSize`.
-
-## Vad som INTE rörs
-
-- Vanliga (ej freeform) mallar — `LayerTransformControls` finns kvar exakt som idag.
-- Foto-, AI-foto-, karta-, form- och linjelagrens transformkontroller — orörda.
-- Admin-designern, span-baserade per-token-pt, decoration (box/side-rules) — orörda.
-- Resize-handtaget för textlager i previewen — orört (kvar som det infördes i förra leveransen).
-- `pricing.ts`, Shopify-sync, AI-flöden, övriga komponenter — orörda.
+## Verifiering
+- Öppna en mall i editorn → AI-stilar visar de nya thumbnails och nya namn.
+- Öppna admin → ProductOptions visar samma thumbnails som defaults.
+- Skapa ny mall → seed kör DEFAULT_AI_STYLES med nya namn + thumbnails.
