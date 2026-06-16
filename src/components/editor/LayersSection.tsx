@@ -498,6 +498,15 @@ export function LayersSection() {
           </DndContext>
         )}
       </div>
+
+      <button
+        type="button"
+        onClick={reopenOnboarding}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition mx-auto"
+      >
+        <HelpCircle className="h-3.5 w-3.5" />
+        {t("layers.onboarding.showAgain")}
+      </button>
     </div>
   );
 }
