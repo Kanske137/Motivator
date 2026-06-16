@@ -93,7 +93,8 @@
     "placeholder": "Your text here…",
     "font": "Font",
     "tab": "Text {{n}}",
-    "autoHint": "Leave empty to return to automatic text"
+    "autoHint": "Leave empty to return to automatic text",
+    "fontSize": "Font size"
   },
   "layer": {
     "size": "Size",

@@ -93,7 +93,8 @@
     "placeholder": "Jouw tekst hier…",
     "font": "Lettertype",
     "tab": "Tekst {{n}}",
-    "autoHint": "Laat leeg om terug te keren naar automatische tekst"
+    "autoHint": "Laat leeg om terug te keren naar automatische tekst",
+    "fontSize": "Tekstgrootte"
   },
   "layer": {
     "size": "Maat",

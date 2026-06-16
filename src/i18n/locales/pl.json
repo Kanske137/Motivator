@@ -93,7 +93,8 @@
     "placeholder": "Twój tekst tutaj…",
     "font": "Czcionka",
     "tab": "Tekst {{n}}",
-    "autoHint": "Pozostaw puste, aby wrócić do automatycznego tekstu"
+    "autoHint": "Pozostaw puste, aby wrócić do automatycznego tekstu",
+    "fontSize": "Rozmiar tekstu"
   },
   "layer": {
     "size": "Rozmiar",

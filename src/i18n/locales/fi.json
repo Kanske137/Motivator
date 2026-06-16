@@ -93,7 +93,8 @@
     "placeholder": "Tekstisi tähän…",
     "font": "Fontti",
     "tab": "Teksti {{n}}",
-    "autoHint": "Jätä tyhjäksi palauttaaksesi automaattisen tekstin"
+    "autoHint": "Jätä tyhjäksi palauttaaksesi automaattisen tekstin",
+    "fontSize": "Tekstin koko"
   },
   "layer": {
     "size": "Koko",

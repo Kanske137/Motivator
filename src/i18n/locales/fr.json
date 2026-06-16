@@ -93,7 +93,8 @@
     "placeholder": "Votre texte ici…",
     "font": "Police",
     "tab": "Texte {{n}}",
-    "autoHint": "Laissez vide pour revenir au texte automatique"
+    "autoHint": "Laissez vide pour revenir au texte automatique",
+    "fontSize": "Taille du texte"
   },
   "layer": {
     "size": "Taille",
