@@ -1,0 +1,1 @@
+UPDATE public.product_configs SET shopify_handle = 'designa-din-egen-tavla' WHERE id = '524e8218-513a-4382-8e46-1fba88ab2d42';
