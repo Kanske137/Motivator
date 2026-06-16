@@ -387,18 +387,62 @@ export function LayersSection() {
             )}
           </SheetContent>
         </Sheet>
-        <PopoverContent side="bottom" align="center" className="w-72">
-          <div className="space-y-2">
+        <PopoverContent side="bottom" align="center" className="w-80">
+          <div className="space-y-3">
             <h4 className="font-semibold text-sm">{t("layers.onboarding.title")}</h4>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              {t("layers.onboarding.body")}
-            </p>
-            <Button size="sm" className="w-full mt-2" onClick={dismissOnboarding}>
+            <ol className="space-y-2.5">
+              <li className="flex gap-2.5">
+                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                  <Plus className="h-3.5 w-3.5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold leading-tight">{t("layers.onboarding.step1Title")}</p>
+                  <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+                    {t("layers.onboarding.step1Body")}
+                  </p>
+                </div>
+              </li>
+              <li className="flex gap-2.5">
+                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                  <Move className="h-3.5 w-3.5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold leading-tight">{t("layers.onboarding.step2Title")}</p>
+                  <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+                    {t("layers.onboarding.step2Body")}
+                  </p>
+                </div>
+              </li>
+              <li className="flex gap-2.5">
+                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                  <Maximize2 className="h-3.5 w-3.5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold leading-tight">{t("layers.onboarding.step3Title")}</p>
+                  <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+                    {t("layers.onboarding.step3Body")}
+                  </p>
+                </div>
+              </li>
+              <li className="flex gap-2.5">
+                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                  <Eye className="h-3.5 w-3.5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold leading-tight">{t("layers.onboarding.step4Title")}</p>
+                  <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+                    {t("layers.onboarding.step4Body")}
+                  </p>
+                </div>
+              </li>
+            </ol>
+            <Button size="sm" className="w-full mt-1" onClick={dismissOnboarding}>
               {t("layers.onboarding.dismiss")}
             </Button>
           </div>
         </PopoverContent>
       </Popover>
+
 
       <div className="space-y-2">
         <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
