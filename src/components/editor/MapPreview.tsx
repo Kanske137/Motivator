@@ -519,8 +519,8 @@ export function MapPreview({
           const isInteractiveLayer =
             l.type === "photo" ||
             l.type === "aiPhoto" ||
-            (l.type === "map" && !l.locks.position) ||
-            isCustomDecor;
+            (l.type === "map" && !l.locks.position);
+
           const wrapStyle: React.CSSProperties = {
             position: "absolute",
             left: `${rect.left}%`,
@@ -775,11 +775,9 @@ export function MapPreview({
           }
 
           if (l.type === "line") {
-            // Kund-tillagda linjer kan flyttas/resizas — admin-låsta linjer
-            // släpper klick igenom till lager under.
-            const style = isCustomDecor
-              ? wrapStyle
-              : { ...wrapStyle, pointerEvents: "none" as const };
+            // Wrappern släpper alltid igenom pekare till lager under;
+            // bara move/resize-handtagen är interaktiva för kund-tillagda linjer.
+            const style = { ...wrapStyle, pointerEvents: "none" as const };
             return (
               <div key={l.id} style={style}>
                 <LineLayerView layer={l} thicknessPx={lineThicknessPxFromCanvas(l, frameShortPx)} />
@@ -788,6 +786,7 @@ export function MapPreview({
               </div>
             );
           }
+
 
           if (l.type === "margin") {
             // Margin wrapper covers the full canvas; without pointerEvents:none
@@ -802,9 +801,7 @@ export function MapPreview({
           }
 
           if (l.type === "shape") {
-            const style = isCustomDecor
-              ? wrapStyle
-              : { ...wrapStyle, pointerEvents: "none" as const };
+            const style = { ...wrapStyle, pointerEvents: "none" as const };
             return (
               <div key={l.id} style={style}>
                 <ShapeLayerView layer={l} canvasShortPx={frameShortPx} />
@@ -813,6 +810,7 @@ export function MapPreview({
               </div>
             );
           }
+
 
           return null;
         })}

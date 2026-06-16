@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import { useEditorStore } from "@/stores/editorStore";
+import { effectiveLayerRect, clampLayerRect } from "@/lib/layer-utils";
 import type { TemplateLayer, ShapeKind } from "@/lib/template-schema";
+
 
 type ShapeLayer = Extract<TemplateLayer, { type: "shape" }>;
 type LineLayer = Extract<TemplateLayer, { type: "line" }>;
@@ -175,6 +177,27 @@ function LineSettings({
   t: (k: string) => string;
 }) {
   const d = layer.defaults;
+  const setLayerTransform = useEditorStore((s) => s.setLayerTransform);
+  const layerTransforms = useEditorStore((s) => s.layerTransforms);
+
+  const applyOrientation = (next: "horizontal" | "vertical") => {
+    if (d.orientation === next) return;
+    onPatch({ orientation: next });
+    // Swap bbox kring centern så längden bevaras på den nya axeln.
+    const eff = effectiveLayerRect(layer, layerTransforms);
+    const cx = eff.xPct + eff.wPct / 2;
+    const cy = eff.yPct + eff.hPct / 2;
+    const newW = eff.hPct;
+    const newH = eff.wPct;
+    const rect = clampLayerRect({
+      xPct: cx - newW / 2,
+      yPct: cy - newH / 2,
+      wPct: newW,
+      hPct: newH,
+    });
+    setLayerTransform(layer.id, rect);
+  };
+
   return (
     <>
       <div>
@@ -184,7 +207,7 @@ function LineSettings({
             <button
               key={o}
               type="button"
-              onClick={() => onPatch({ orientation: o })}
+              onClick={() => applyOrientation(o)}
               className={`flex items-center justify-center p-2 rounded border ${
                 d.orientation === o ? "border-primary bg-primary/10" : "border-input bg-background hover:bg-accent"
               }`}
@@ -199,6 +222,7 @@ function LineSettings({
           ))}
         </div>
       </div>
+
       <div className="flex items-center gap-2">
         <label className="text-xs font-medium flex-1">{t("layers.color")}</label>
         <input
