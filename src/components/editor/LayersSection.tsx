@@ -273,6 +273,24 @@ export function LayersSection() {
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">{t("layers.intro")}</p>
 
+      <div className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30">
+        <div className="flex-1 min-w-0">
+          <Label htmlFor="handles-toggle" className="text-sm font-medium cursor-pointer">
+            {t("layers.handlesToggle.label")}
+          </Label>
+          <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
+            {t("layers.handlesToggle.hint")}
+          </p>
+        </div>
+        <Switch
+          id="handles-toggle"
+          checked={handlesVisible}
+          onCheckedChange={setHandlesVisible}
+          aria-label={t("layers.handlesToggle.label")}
+        />
+      </div>
+
+
       <Popover open={onboardingOpen} onOpenChange={(o) => !o && dismissOnboarding()}>
         <Sheet
           open={sheetOpen}
