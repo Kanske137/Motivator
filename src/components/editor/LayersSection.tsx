@@ -16,6 +16,9 @@ import {
   Eye,
   EyeOff,
   GripVertical,
+  Move,
+  Maximize2,
+  HelpCircle,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -48,11 +51,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editorStore";
 import type { TemplateLayer, ShapeKind } from "@/lib/template-schema";
 import { isCustomLayerId, type FreeformLayerType } from "@/lib/freeform-layers";
 import { LayerQuickSettings } from "./LayerQuickSettings";
+
 
 const TYPE_META: Record<
   FreeformLayerType,
@@ -185,6 +191,8 @@ export function LayersSection() {
   const setLayerVisible = useEditorStore((s) => s.setLayerVisible);
   const reorderLayers = useEditorStore((s) => s.reorderLayers);
   const hiddenLayerIds = useEditorStore((s) => s.hiddenLayerIds);
+  const handlesVisible = useEditorStore((s) => s.handlesVisible);
+  const setHandlesVisible = useEditorStore((s) => s.setHandlesVisible);
   const [sheetOpen, setSheetOpen] = useState(false);
   type Stage = "root" | "shape" | "line";
   const [stage, setStage] = useState<Stage>("root");
@@ -206,6 +214,15 @@ export function LayersSection() {
       /* noop */
     }
   };
+  const reopenOnboarding = () => {
+    try {
+      localStorage.removeItem(ONBOARDING_KEY);
+    } catch {
+      /* noop */
+    }
+    setOnboardingOpen(true);
+  };
+
 
   // dnd-kit sensors. PointerSensor med distance:5 så vanliga klick på
   // grip-knappen inte triggar drag i misstag.
