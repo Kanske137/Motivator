@@ -114,6 +114,11 @@ function findVariant(
 ): VariantNode | null {
   const sizeN = normalize(size);
   const variantN = normalize(variantName);
+  if (typeof window !== "undefined" && (window as any).__priceDebugOnce !== true) {
+    (window as any).__priceDebugOnce = true;
+    console.log("[price-debug] looking for size=", sizeN, "variant=", variantN, "in", variants.length, "variants");
+    console.log("[price-debug] first variant opts=", variants[0]?.selectedOptions, "normalized=", variants[0]?.selectedOptions?.map(o => normalize(o.value)));
+  }
   for (const v of variants) {
     const opts = v.selectedOptions ?? [];
     const sizeMatch = opts.some((o) => normalize(o.value) === sizeN);
