@@ -9,8 +9,11 @@ export interface ShopifyMoney {
   currencyCode: string;
 }
 
+// Shopify @inContext lokaliserar BÅDE pris och option-värden ("Utförande"→"Design",
+// "Ingen"→"None" osv) när marknaden har en översättning. Vi vill ha lokaliserat pris
+// men källspråkets (svenska) option-värden — annars matchar inte vår variant-lookup.
 const PRODUCT_PRICES_QUERY = /* GraphQL */ `
-  query ProductPrices($handle: String!, $country: CountryCode!) @inContext(country: $country) {
+  query ProductPrices($handle: String!, $country: CountryCode!) @inContext(country: $country, language: SV) {
     productByHandle(handle: $handle) {
       variants(first: 100) {
         edges {
