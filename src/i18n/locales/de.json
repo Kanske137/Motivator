@@ -267,9 +267,18 @@
     "toggleVisible": "Ebene einblenden",
     "toggleHidden": "Ebene ausblenden",
     "onboarding": {
-      "title": "Frei gestalten",
+      "title": "So funktioniert „Selbst gestalten“",
       "body": "Füge Bilder, Karte, Text und Deko hinzu. Ziehe zum Sortieren, tippe auf das Auge zum Ausblenden und auf den Papierkorb zum Entfernen.",
-      "dismiss": "Verstanden"
+      "step1Title": "Ebene hinzufügen",
+      "step1Body": "Tippe auf „Ebene hinzufügen“ und wähle einen Typ: Bild, Karte, Text, Form oder Linie.",
+      "step2Title": "Ebenen verschieben",
+      "step2Body": "Nutze den blauen Punkt oben links jeder Ebene, um sie an die gewünschte Stelle zu ziehen.",
+      "step3Title": "Größe ändern",
+      "step3Body": "Mit dem Griff unten rechts skalierst du die Ebene. Mit dem Schalter oben kannst du alle Griffe ausblenden.",
+      "step4Title": "Ordnen & ausblenden",
+      "step4Body": "Ziehe in der Liste, um die Reihenfolge zu ändern. Das Auge blendet eine Ebene aus, der Papierkorb löscht sie.",
+      "dismiss": "Verstanden",
+      "showAgain": "Tipps erneut anzeigen"
     },
     "shape": {
       "pickTitle": "Form wählen",
@@ -287,6 +296,10 @@
     "settings": "Einstellungen",
     "color": "Farbe",
     "thickness": "Stärke",
-    "resizeHandle": "Zum Skalieren ziehen"
+    "resizeHandle": "Zum Skalieren ziehen",
+    "handlesToggle": {
+      "label": "Verschiebe- und Größengriffe anzeigen",
+      "hint": "Ausschalten für eine saubere Vorschau ohne Griffe auf den Ebenen."
+    }
   }
 }

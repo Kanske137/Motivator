@@ -267,9 +267,18 @@
     "toggleVisible": "Vis lag",
     "toggleHidden": "Skjul lag",
     "onboarding": {
-      "title": "Skap fritt",
+      "title": "Slik fungerer Lag selv",
       "body": "Legg til bilder, kart, tekst og dekor. Dra for å endre rekkefølge, trykk på øyet for å skjule, og søppelbøtten for å fjerne.",
-      "dismiss": "Skjønner"
+      "step1Title": "Legg til lag",
+      "step1Body": "Trykk på «Legg til lag» og velg type: bilde, kart, tekst, form eller linje.",
+      "step2Title": "Flytt lag",
+      "step2Body": "Bruk den blå prikken øverst til venstre på hvert lag for å dra det dit du vil.",
+      "step3Title": "Endre størrelse",
+      "step3Body": "Bruk håndtaket nederst til høyre for å skalere laget. Du kan skjule alle håndtak med bryteren ovenfor.",
+      "step4Title": "Sorter og skjul",
+      "step4Body": "Dra i listen for å endre rekkefølge. Øyet skjuler et lag, søppelbøtta fjerner det.",
+      "dismiss": "Forstått",
+      "showAgain": "Vis tipsene igjen"
     },
     "shape": {
       "pickTitle": "Velg form",
@@ -287,6 +296,10 @@
     "settings": "Innstillinger",
     "color": "Farge",
     "thickness": "Tykkelse",
-    "resizeHandle": "Dra for å endre størrelse"
+    "resizeHandle": "Dra for å endre størrelse",
+    "handlesToggle": {
+      "label": "Vis flytte- og størrelseshåndtak",
+      "hint": "Slå av for en ren forhåndsvisning uten håndtak på lagene."
+    }
   }
 }

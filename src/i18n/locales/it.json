@@ -267,9 +267,18 @@
     "toggleVisible": "Mostra livello",
     "toggleHidden": "Nascondi livello",
     "onboarding": {
-      "title": "Crea liberamente",
+      "title": "Come funziona Crea da te",
       "body": "Aggiungi immagini, mappa, testo e decorazioni. Trascina per riordinare, tocca l'occhio per nascondere e il cestino per rimuovere.",
-      "dismiss": "Capito"
+      "step1Title": "Aggiungi un livello",
+      "step1Body": "Tocca \"Aggiungi livello\" e scegli un tipo: foto, mappa, testo, forma o linea.",
+      "step2Title": "Sposta i livelli",
+      "step2Body": "Usa il punto blu in alto a sinistra di ogni livello per trascinarlo dove vuoi.",
+      "step3Title": "Ridimensiona",
+      "step3Body": "Usa la maniglia nell'angolo in basso a destra per scalare il livello. Puoi nascondere tutte le maniglie con l'interruttore qui sopra.",
+      "step4Title": "Riordina e nascondi",
+      "step4Body": "Trascina nell'elenco per riordinare. L'occhio nasconde un livello, il cestino lo rimuove.",
+      "dismiss": "Capito",
+      "showAgain": "Mostra di nuovo i consigli"
     },
     "shape": {
       "pickTitle": "Scegli forma",
@@ -287,6 +296,10 @@
     "settings": "Impostazioni",
     "color": "Colore",
     "thickness": "Spessore",
-    "resizeHandle": "Trascina per ridimensionare"
+    "resizeHandle": "Trascina per ridimensionare",
+    "handlesToggle": {
+      "label": "Mostra maniglie di spostamento e ridimensionamento",
+      "hint": "Disattiva per un'anteprima pulita senza maniglie sui livelli."
+    }
   }
 }

@@ -276,8 +276,10 @@ export function MapPreview({
     aiPhotoResults,
     aiPhotoSelectedRefUrl,
     whiteMarginEnabled,
+    handlesVisible,
   } = useEditorStore();
   const isAcrylic = config?.product_type === "acrylic";
+  const isFreeform = !!config?.is_freeform;
 
   const allLayers = templateLayers();
   // Center-alignment guides shown while dragging a layer (in % of editor).
@@ -533,8 +535,19 @@ export function MapPreview({
           const movable =
             !l.locks.move &&
             (l.type === "map" || l.type === "photo" || l.type === "aiPhoto" || l.type === "text" || l.type === "image" || isCustomDecor);
-          const resizable = isCustomDecor && !l.locks.move;
-          const moveHandle = movable ? (
+          // Skapa själv: tillåt fri storleksändring på ALLA flyttbara lager
+          // (utom margin). På vanliga mallar behåller vi tidigare beteende
+          // där bara kund-tillagda shape/line har resize-handtag.
+          const resizable =
+            !l.locks.move &&
+            (isCustomDecor ||
+              (isFreeform &&
+                (l.type === "photo" ||
+                  l.type === "aiPhoto" ||
+                  l.type === "map" ||
+                  l.type === "text" ||
+                  l.type === "image")));
+          const moveHandle = movable && handlesVisible ? (
             <button
               type="button"
               onPointerDown={(e) => onDragStart(l, e)}
@@ -546,7 +559,7 @@ export function MapPreview({
               ✥
             </button>
           ) : null;
-          const resizeHandle = resizable ? (
+          const resizeHandle = resizable && handlesVisible ? (
             <button
               type="button"
               onPointerDown={(e) => onResizeStart(l, e)}
@@ -584,6 +597,7 @@ export function MapPreview({
                       getMap={() => mapInstances.current[l.id] ?? null}
                     />
                     {moveHandle}
+                    {resizeHandle}
                   </>
                 }
               >
@@ -621,7 +635,7 @@ export function MapPreview({
                 wrapStyle={wrapStyle}
                 shape={effectiveShape}
                 staticClip={staticClip}
-                overlay={moveHandle}
+                overlay={<>{moveHandle}{resizeHandle}</>}
               >
                 {(clip) => (
                   <PhotoLayerView
@@ -690,7 +704,7 @@ export function MapPreview({
                 wrapStyle={wrapStyle}
                 shape={effectiveShape}
                 staticClip={staticClip}
-                overlay={moveHandle}
+                overlay={<>{moveHandle}{resizeHandle}</>}
               >
                 {(clip) =>
                   src ? (
@@ -761,6 +775,7 @@ export function MapPreview({
                   layerHeightPx={layerHeightPx}
                 />
                 {moveHandle}
+                {resizeHandle}
               </div>
             );
           }
@@ -770,6 +785,7 @@ export function MapPreview({
               <div key={l.id} style={wrapStyle}>
                 <ImageLayerView layer={l} />
                 {moveHandle}
+                {resizeHandle}
               </div>
             );
           }

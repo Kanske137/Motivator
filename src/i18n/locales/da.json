@@ -267,9 +267,18 @@
     "toggleVisible": "Vis lag",
     "toggleHidden": "Skjul lag",
     "onboarding": {
-      "title": "Skab frit",
+      "title": "Sådan fungerer Lav selv",
       "body": "Tilføj billeder, kort, tekst og dekoration. Træk for at ændre rækkefølge, tryk på øjet for at skjule, og papirkurven for at fjerne.",
-      "dismiss": "Forstået"
+      "step1Title": "Tilføj lag",
+      "step1Body": "Tryk på \"Tilføj lag\" og vælg type: billede, kort, tekst, form eller linje.",
+      "step2Title": "Flyt lag",
+      "step2Body": "Brug den blå prik øverst til venstre på hvert lag for at trække det hen, hvor du vil.",
+      "step3Title": "Ændr størrelse",
+      "step3Body": "Brug håndtaget nederst til højre for at skalere laget. Du kan skjule alle håndtag med kontakten ovenfor.",
+      "step4Title": "Sortér og skjul",
+      "step4Body": "Træk i listen for at ændre rækkefølgen. Øjet skjuler et lag, skraldespanden fjerner det.",
+      "dismiss": "Forstået",
+      "showAgain": "Vis tipsene igen"
     },
     "shape": {
       "pickTitle": "Vælg form",
@@ -287,6 +296,10 @@
     "settings": "Indstillinger",
     "color": "Farve",
     "thickness": "Tykkelse",
-    "resizeHandle": "Træk for at ændre størrelse"
+    "resizeHandle": "Træk for at ændre størrelse",
+    "handlesToggle": {
+      "label": "Vis flytte- og størrelseshåndtag",
+      "hint": "Slå fra for en ren forhåndsvisning uden håndtag på lagene."
+    }
   }
 }

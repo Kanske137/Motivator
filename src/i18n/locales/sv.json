@@ -267,9 +267,18 @@
     "addLine": "Linje",
     "addMargin": "Marginal",
     "onboarding": {
-      "title": "Skapa fritt",
+      "title": "Så funkar Skapa själv",
       "body": "Lägg till bilder, karta, text och dekor. Dra för att ändra ordning, tryck på ögat för att dölja, och papperskorgen för att ta bort.",
-      "dismiss": "Förstått"
+      "step1Title": "Lägg till lager",
+      "step1Body": "Tryck på \"Lägg till lager\" och välj typ: bild, karta, text, form eller linje.",
+      "step2Title": "Flytta lager",
+      "step2Body": "Använd den blå pricken högst upp till vänster på varje lager för att dra det dit du vill.",
+      "step3Title": "Ändra storlek",
+      "step3Body": "Använd handtaget i nedre högra hörnet för att skala lagret. Du kan dölja alla handtag med växeln ovan.",
+      "step4Title": "Ordna & dölj",
+      "step4Body": "Dra i listan för att ändra ordning. Ögat döljer ett lager och papperskorgen tar bort det.",
+      "dismiss": "Förstått",
+      "showAgain": "Visa tipset igen"
     },
     "shape": {
       "pickTitle": "Välj form",
@@ -287,6 +296,10 @@
     "settings": "Inställningar",
     "color": "Färg",
     "thickness": "Tjocklek",
-    "resizeHandle": "Dra för att ändra storlek"
+    "resizeHandle": "Dra för att ändra storlek",
+    "handlesToggle": {
+      "label": "Visa flytta- och storleks-handtag",
+      "hint": "Stäng av för en ren förhandsvisning utan handtag på lagren."
+    }
   }
 }

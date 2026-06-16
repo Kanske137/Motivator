@@ -267,9 +267,18 @@
     "toggleVisible": "Mostrar capa",
     "toggleHidden": "Ocultar capa",
     "onboarding": {
-      "title": "Crea libremente",
+      "title": "Cómo funciona Crear tú mismo",
       "body": "Añade imágenes, mapa, texto y decoración. Arrastra para reordenar, toca el ojo para ocultar y la papelera para eliminar.",
-      "dismiss": "Entendido"
+      "step1Title": "Añadir una capa",
+      "step1Body": "Toca \"Añadir capa\" y elige un tipo: foto, mapa, texto, forma o línea.",
+      "step2Title": "Mover capas",
+      "step2Body": "Usa el punto azul en la parte superior izquierda de cada capa para arrastrarla donde quieras.",
+      "step3Title": "Cambiar tamaño",
+      "step3Body": "Usa el tirador de la esquina inferior derecha para escalar la capa. Puedes ocultar todos los tiradores con el interruptor de arriba.",
+      "step4Title": "Reordenar y ocultar",
+      "step4Body": "Arrastra en la lista para reordenar. El ojo oculta una capa, la papelera la elimina.",
+      "dismiss": "Entendido",
+      "showAgain": "Mostrar los consejos de nuevo"
     },
     "shape": {
       "pickTitle": "Elegir forma",
@@ -287,6 +296,10 @@
     "settings": "Ajustes",
     "color": "Color",
     "thickness": "Grosor",
-    "resizeHandle": "Arrastra para redimensionar"
+    "resizeHandle": "Arrastra para redimensionar",
+    "handlesToggle": {
+      "label": "Mostrar tiradores de mover y redimensionar",
+      "hint": "Desactiva para una vista previa limpia sin tiradores en las capas."
+    }
   }
 }

@@ -16,6 +16,9 @@ import {
   Eye,
   EyeOff,
   GripVertical,
+  Move,
+  Maximize2,
+  HelpCircle,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -48,11 +51,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editorStore";
 import type { TemplateLayer, ShapeKind } from "@/lib/template-schema";
 import { isCustomLayerId, type FreeformLayerType } from "@/lib/freeform-layers";
 import { LayerQuickSettings } from "./LayerQuickSettings";
+
 
 const TYPE_META: Record<
   FreeformLayerType,
@@ -185,6 +191,8 @@ export function LayersSection() {
   const setLayerVisible = useEditorStore((s) => s.setLayerVisible);
   const reorderLayers = useEditorStore((s) => s.reorderLayers);
   const hiddenLayerIds = useEditorStore((s) => s.hiddenLayerIds);
+  const handlesVisible = useEditorStore((s) => s.handlesVisible);
+  const setHandlesVisible = useEditorStore((s) => s.setHandlesVisible);
   const [sheetOpen, setSheetOpen] = useState(false);
   type Stage = "root" | "shape" | "line";
   const [stage, setStage] = useState<Stage>("root");
@@ -206,6 +214,15 @@ export function LayersSection() {
       /* noop */
     }
   };
+  const reopenOnboarding = () => {
+    try {
+      localStorage.removeItem(ONBOARDING_KEY);
+    } catch {
+      /* noop */
+    }
+    setOnboardingOpen(true);
+  };
+
 
   // dnd-kit sensors. PointerSensor med distance:5 så vanliga klick på
   // grip-knappen inte triggar drag i misstag.
@@ -255,6 +272,24 @@ export function LayersSection() {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">{t("layers.intro")}</p>
+
+      <div className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30">
+        <div className="flex-1 min-w-0">
+          <Label htmlFor="handles-toggle" className="text-sm font-medium cursor-pointer">
+            {t("layers.handlesToggle.label")}
+          </Label>
+          <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
+            {t("layers.handlesToggle.hint")}
+          </p>
+        </div>
+        <Switch
+          id="handles-toggle"
+          checked={handlesVisible}
+          onCheckedChange={setHandlesVisible}
+          aria-label={t("layers.handlesToggle.label")}
+        />
+      </div>
+
 
       <Popover open={onboardingOpen} onOpenChange={(o) => !o && dismissOnboarding()}>
         <Sheet
@@ -352,18 +387,62 @@ export function LayersSection() {
             )}
           </SheetContent>
         </Sheet>
-        <PopoverContent side="bottom" align="center" className="w-72">
-          <div className="space-y-2">
+        <PopoverContent side="bottom" align="center" className="w-80">
+          <div className="space-y-3">
             <h4 className="font-semibold text-sm">{t("layers.onboarding.title")}</h4>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              {t("layers.onboarding.body")}
-            </p>
-            <Button size="sm" className="w-full mt-2" onClick={dismissOnboarding}>
+            <ol className="space-y-2.5">
+              <li className="flex gap-2.5">
+                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                  <Plus className="h-3.5 w-3.5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold leading-tight">{t("layers.onboarding.step1Title")}</p>
+                  <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+                    {t("layers.onboarding.step1Body")}
+                  </p>
+                </div>
+              </li>
+              <li className="flex gap-2.5">
+                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                  <Move className="h-3.5 w-3.5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold leading-tight">{t("layers.onboarding.step2Title")}</p>
+                  <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+                    {t("layers.onboarding.step2Body")}
+                  </p>
+                </div>
+              </li>
+              <li className="flex gap-2.5">
+                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                  <Maximize2 className="h-3.5 w-3.5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold leading-tight">{t("layers.onboarding.step3Title")}</p>
+                  <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+                    {t("layers.onboarding.step3Body")}
+                  </p>
+                </div>
+              </li>
+              <li className="flex gap-2.5">
+                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                  <Eye className="h-3.5 w-3.5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold leading-tight">{t("layers.onboarding.step4Title")}</p>
+                  <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+                    {t("layers.onboarding.step4Body")}
+                  </p>
+                </div>
+              </li>
+            </ol>
+            <Button size="sm" className="w-full mt-1" onClick={dismissOnboarding}>
               {t("layers.onboarding.dismiss")}
             </Button>
           </div>
         </PopoverContent>
       </Popover>
+
 
       <div className="space-y-2">
         <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
@@ -419,6 +498,15 @@ export function LayersSection() {
           </DndContext>
         )}
       </div>
+
+      <button
+        type="button"
+        onClick={reopenOnboarding}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition mx-auto"
+      >
+        <HelpCircle className="h-3.5 w-3.5" />
+        {t("layers.onboarding.showAgain")}
+      </button>
     </div>
   );
 }
