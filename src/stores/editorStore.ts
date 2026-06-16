@@ -301,6 +301,9 @@ interface EditorState {
   /** Map of layer-id → true för lager som kunden valt att dölja. Respekteras
    *  av preview + print (filtreras innan snapshot/print-fil byggs). */
   hiddenLayerIds: Record<string, true>;
+  /** Skapa själv: visa/dölj alla move/resize-handtag i previewen. Default true. */
+  handlesVisible: boolean;
+  setHandlesVisible: (v: boolean) => void;
   /** Lägg till ett kund-skapat lager i det aktiva layout-blocket. */
   addCustomLayer: (
     type: import("@/lib/freeform-layers").FreeformLayerType,
@@ -558,6 +561,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   faceSwapCache: loadFaceSwapCache(),
   multiFacePortraits: {},
   hiddenLayerIds: {},
+  handlesVisible: true,
 
   // legacy mirrors (initial values, replaced once a config is loaded)
   mapCenter: [18.0686, 59.3293],
@@ -1530,6 +1534,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ hiddenLayerIds: next });
   },
   isLayerHidden: (id) => Boolean(get().hiddenLayerIds[id]),
+  setHandlesVisible: (v) => set({ handlesVisible: v }),
   updateLayerDefaults: (id, patch) => {
     const state = get();
     const tpl = state.template;
