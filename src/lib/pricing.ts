@@ -65,7 +65,7 @@ export const STYLE_PRESETS = [
   { id: "none", label: "Original", prompt: "" },
   { id: "watercolor", label: "Akvarell", prompt: "Transform this image into a soft watercolor painting with delicate brush strokes and pastel colors, preserving the composition." },
   { id: "minimal-line", label: "Minimal linje", prompt: "Convert this image into a minimal single-line drawing with clean black lines on white background." },
-  { id: "vintage-poster", label: "Vintage poster", prompt: "Transform this image into a vintage travel poster style with bold flat colors, art deco influences." },
+  { id: "vintage-poster", label: "Vintage", prompt: "Transform this image into a vintage travel poster style with bold flat colors, art deco influences." },
   { id: "oil-painting", label: "Oljemålning", prompt: "Transform this image into a classical oil painting with rich textures and dramatic lighting." },
   { id: "sketch", label: "Skiss", prompt: "Convert this image into a detailed pencil sketch with cross-hatching and shading." },
   { id: "anime", label: "Anime", prompt: "Transform this image into anime / manga illustration style with cel shading." },
