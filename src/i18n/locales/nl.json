@@ -267,9 +267,18 @@
     "toggleVisible": "Laag tonen",
     "toggleHidden": "Laag verbergen",
     "onboarding": {
-      "title": "Maak vrij",
+      "title": "Zo werkt Zelf maken",
       "body": "Voeg afbeeldingen, een kaart, tekst en decoratie toe. Sleep om te herschikken, tik op het oog om te verbergen en de prullenbak om te verwijderen.",
-      "dismiss": "Begrepen"
+      "step1Title": "Voeg een laag toe",
+      "step1Body": "Tik op \"Laag toevoegen\" en kies een type: foto, kaart, tekst, vorm of lijn.",
+      "step2Title": "Lagen verplaatsen",
+      "step2Body": "Gebruik de blauwe stip linksboven elke laag om hem te slepen naar waar je wilt.",
+      "step3Title": "Formaat wijzigen",
+      "step3Body": "Gebruik de hendel rechtsonder om de laag te schalen. Je kunt alle hendels verbergen met de schakelaar hierboven.",
+      "step4Title": "Herordenen en verbergen",
+      "step4Body": "Sleep in de lijst om te herordenen. Het oog verbergt een laag, de prullenbak verwijdert hem.",
+      "dismiss": "Begrepen",
+      "showAgain": "Tips opnieuw tonen"
     },
     "shape": {
       "pickTitle": "Kies vorm",
@@ -287,6 +296,10 @@
     "settings": "Instellingen",
     "color": "Kleur",
     "thickness": "Dikte",
-    "resizeHandle": "Sleep om te schalen"
+    "resizeHandle": "Sleep om te schalen",
+    "handlesToggle": {
+      "label": "Toon verplaats- en formaathandvatten",
+      "hint": "Schakel uit voor een schone preview zonder handvatten op de lagen."
+    }
   }
 }

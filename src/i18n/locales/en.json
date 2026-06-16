@@ -267,9 +267,18 @@
     "toggleVisible": "Show layer",
     "toggleHidden": "Hide layer",
     "onboarding": {
-      "title": "Create freely",
+      "title": "How Create your own works",
       "body": "Add images, a map, text and decor. Drag to reorder, tap the eye to hide, and the trash icon to remove.",
-      "dismiss": "Got it"
+      "step1Title": "Add a layer",
+      "step1Body": "Tap \"Add layer\" and pick a type: photo, map, text, shape or line.",
+      "step2Title": "Move layers",
+      "step2Body": "Use the blue dot at the top-left of each layer to drag it where you want.",
+      "step3Title": "Resize",
+      "step3Body": "Use the handle in the bottom-right corner to scale the layer. You can hide all handles with the toggle above.",
+      "step4Title": "Reorder & hide",
+      "step4Body": "Drag in the list to reorder. The eye hides a layer, the trash removes it.",
+      "dismiss": "Got it",
+      "showAgain": "Show the tips again"
     },
     "shape": {
       "pickTitle": "Choose shape",
@@ -287,6 +296,10 @@
     "settings": "Settings",
     "color": "Color",
     "thickness": "Thickness",
-    "resizeHandle": "Drag to resize"
+    "resizeHandle": "Drag to resize",
+    "handlesToggle": {
+      "label": "Show move and resize handles",
+      "hint": "Turn off for a clean preview without handles on the layers."
+    }
   }
 }

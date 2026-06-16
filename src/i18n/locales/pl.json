@@ -267,9 +267,18 @@
     "toggleVisible": "Pokaż warstwę",
     "toggleHidden": "Ukryj warstwę",
     "onboarding": {
-      "title": "Twórz swobodnie",
+      "title": "Jak działa Stwórz sam",
       "body": "Dodaj obrazy, mapę, tekst i dekoracje. Przeciągnij, aby zmienić kolejność, dotknij oka, aby ukryć, i kosza, aby usunąć.",
-      "dismiss": "Rozumiem"
+      "step1Title": "Dodaj warstwę",
+      "step1Body": "Dotknij \"Dodaj warstwę\" i wybierz typ: zdjęcie, mapa, tekst, kształt lub linia.",
+      "step2Title": "Przenoś warstwy",
+      "step2Body": "Użyj niebieskiej kropki w lewym górnym rogu każdej warstwy, aby przeciągnąć ją w dowolne miejsce.",
+      "step3Title": "Zmień rozmiar",
+      "step3Body": "Użyj uchwytu w prawym dolnym rogu, aby przeskalować warstwę. Możesz ukryć wszystkie uchwyty za pomocą przełącznika powyżej.",
+      "step4Title": "Sortuj i ukrywaj",
+      "step4Body": "Przeciągaj na liście, aby zmienić kolejność. Oko ukrywa warstwę, kosz usuwa ją.",
+      "dismiss": "Rozumiem",
+      "showAgain": "Pokaż wskazówki ponownie"
     },
     "shape": {
       "pickTitle": "Wybierz kształt",
@@ -287,6 +296,10 @@
     "settings": "Ustawienia",
     "color": "Kolor",
     "thickness": "Grubość",
-    "resizeHandle": "Przeciągnij, aby zmienić rozmiar"
+    "resizeHandle": "Przeciągnij, aby zmienić rozmiar",
+    "handlesToggle": {
+      "label": "Pokaż uchwyty przesuwania i zmiany rozmiaru",
+      "hint": "Wyłącz, aby uzyskać czysty podgląd bez uchwytów na warstwach."
+    }
   }
 }

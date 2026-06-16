@@ -267,9 +267,18 @@
     "toggleVisible": "Näytä taso",
     "toggleHidden": "Piilota taso",
     "onboarding": {
-      "title": "Luo vapaasti",
+      "title": "Näin Tee itse toimii",
       "body": "Lisää kuvia, kartta, tekstiä ja koristeita. Vedä järjestääksesi, napauta silmää piilottaaksesi ja roskakoria poistaaksesi.",
-      "dismiss": "Selvä"
+      "step1Title": "Lisää taso",
+      "step1Body": "Napauta \"Lisää taso\" ja valitse tyyppi: kuva, kartta, teksti, muoto tai viiva.",
+      "step2Title": "Siirrä tasoja",
+      "step2Body": "Käytä jokaisen tason vasemman yläkulman sinistä pistettä raahataksesi sen haluamaasi paikkaan.",
+      "step3Title": "Muuta kokoa",
+      "step3Body": "Käytä oikean alakulman kahvaa tason skaalaamiseen. Voit piilottaa kaikki kahvat yllä olevalla kytkimellä.",
+      "step4Title": "Järjestä ja piilota",
+      "step4Body": "Vedä listassa muuttaaksesi järjestystä. Silmä piilottaa tason, roskakori poistaa sen.",
+      "dismiss": "Selvä",
+      "showAgain": "Näytä vinkit uudelleen"
     },
     "shape": {
       "pickTitle": "Valitse muoto",
@@ -287,6 +296,10 @@
     "settings": "Asetukset",
     "color": "Väri",
     "thickness": "Paksuus",
-    "resizeHandle": "Vedä muuttaaksesi kokoa"
+    "resizeHandle": "Vedä muuttaaksesi kokoa",
+    "handlesToggle": {
+      "label": "Näytä siirto- ja koonmuutoskahvat",
+      "hint": "Sammuta saadaksesi siistin esikatselun ilman tasojen kahvoja."
+    }
   }
 }

@@ -267,9 +267,18 @@
     "toggleVisible": "Afficher le calque",
     "toggleHidden": "Masquer le calque",
     "onboarding": {
-      "title": "Créez librement",
+      "title": "Comment fonctionne « Créer soi-même »",
       "body": "Ajoutez des images, une carte, du texte et de la déco. Glissez pour réorganiser, touchez l'œil pour masquer et la corbeille pour supprimer.",
-      "dismiss": "Compris"
+      "step1Title": "Ajouter un calque",
+      "step1Body": "Appuyez sur « Ajouter un calque » et choisissez un type : photo, carte, texte, forme ou ligne.",
+      "step2Title": "Déplacer les calques",
+      "step2Body": "Utilisez le point bleu en haut à gauche de chaque calque pour le glisser où vous voulez.",
+      "step3Title": "Redimensionner",
+      "step3Body": "Utilisez la poignée en bas à droite pour mettre à l'échelle le calque. Vous pouvez masquer toutes les poignées avec le bouton ci-dessus.",
+      "step4Title": "Réorganiser et masquer",
+      "step4Body": "Faites glisser dans la liste pour réorganiser. L'œil masque un calque, la corbeille le supprime.",
+      "dismiss": "Compris",
+      "showAgain": "Afficher les conseils à nouveau"
     },
     "shape": {
       "pickTitle": "Choisir une forme",
@@ -287,6 +296,10 @@
     "settings": "Réglages",
     "color": "Couleur",
     "thickness": "Épaisseur",
-    "resizeHandle": "Glisser pour redimensionner"
+    "resizeHandle": "Glisser pour redimensionner",
+    "handlesToggle": {
+      "label": "Afficher les poignées de déplacement et de redimensionnement",
+      "hint": "Désactivez pour un aperçu propre sans poignées sur les calques."
+    }
   }
 }
