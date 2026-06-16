@@ -14,14 +14,24 @@ export interface ShopifyMoney {
 // option-värden även om vi ber om language:SV. För att kunna matcha varianter mot
 // våra svenska källvärden hämtar vi DEM via en icke-kontextuell query, och priserna
 // separat via @inContext. Variant-id är detsamma i båda — vi joinar på id.
-const COMBINED_QUERY = /* GraphQL */ `
-  query ProductPricesAndOptions($handle: String!, $country: CountryCode!) {
-    source: productByHandle(handle: $handle) {
+// Shopify @inContext lokaliserar BÅDE pris och option-värden ("Utförande"→"Design",
+// "Ingen"→"None" osv) — och kan bara appliceras på top-level query, inte på fält.
+// Vi gör därför TVÅ separata queries: en utan kontext för källspråkets options
+// (matchning), en med @inContext för priser. Variant-id är detsamma → join på id.
+const SOURCE_QUERY = /* GraphQL */ `
+  query ProductSource($handle: String!) {
+    productByHandle(handle: $handle) {
       variants(first: 100) {
         edges { node { id selectedOptions { name value } } }
       }
     }
-    contextual: productByHandle(handle: $handle) @inContext(country: $country) {
+  }
+`;
+
+const CONTEXTUAL_QUERY = /* GraphQL */ `
+  query ProductPrices($handle: String!, $country: CountryCode!)
+  @inContext(country: $country) {
+    productByHandle(handle: $handle) {
       variants(first: 100) {
         edges { node { id price { amount currencyCode } } }
       }
@@ -62,18 +72,23 @@ async function fetchVariants(handle: string, country: string): Promise<VariantNo
 
   const promise = (async () => {
     try {
-      const { data, error } = await supabase.functions.invoke("shopify-storefront", {
-        body: {
-          query: COMBINED_QUERY,
-          variables: { handle, country: country.toUpperCase() },
-        },
-      });
-      if (error) {
-        console.warn("[shopify-prices] proxy error", error.message);
+      const [sourceRes, contextRes] = await Promise.all([
+        supabase.functions.invoke("shopify-storefront", {
+          body: { query: SOURCE_QUERY, variables: { handle } },
+        }),
+        supabase.functions.invoke("shopify-storefront", {
+          body: {
+            query: CONTEXTUAL_QUERY,
+            variables: { handle, country: country.toUpperCase() },
+          },
+        }),
+      ]);
+      if (sourceRes.error || contextRes.error) {
+        console.warn("[shopify-prices] proxy error", sourceRes.error?.message || contextRes.error?.message);
         return null;
       }
-      const source = (data as any)?.data?.source;
-      const contextual = (data as any)?.data?.contextual;
+      const source = (sourceRes.data as any)?.data?.productByHandle;
+      const contextual = (contextRes.data as any)?.data?.productByHandle;
       if (!source || !contextual) {
         console.info(
           `[shopify-prices] no Shopify product for handle="${handle}" (country=${country}). ` +
@@ -82,8 +97,6 @@ async function fetchVariants(handle: string, country: string): Promise<VariantNo
         cache.set(k, { ts: Date.now(), variants: [] });
         return [] as VariantNode[];
       }
-      // Bygg pris-map per variant-id från @inContext, joina sen mot källspråkets
-      // selectedOptions så vår matchning hittar rätt variant oavsett marknad.
       const priceById = new Map<string, { amount: string; currencyCode: string }>();
       for (const e of contextual.variants?.edges ?? []) {
         if (e?.node?.id && e.node.price) priceById.set(e.node.id, e.node.price);
