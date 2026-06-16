@@ -296,6 +296,7 @@ function drawTextLayer(
   liveText: string,
   liveFont: string,
   canvasShortPx: number,
+  liveFontSizePt: number | null = null,
 ): void {
   const d = layer.defaults;
   const text = liveText || d.text;
@@ -309,10 +310,16 @@ function drawTextLayer(
   if (!text.trim()) return;
   const lines = text.split("\n");
   // pt-based size when present (A4 reference); else legacy %-of-height.
-  // A4 short = 595.276pt.
+  // A4 short = 595.276pt. Customer override (liveFontSizePt) wins.
+  const effectivePt =
+    typeof liveFontSizePt === "number" && liveFontSizePt > 0
+      ? liveFontSizePt
+      : typeof d.fontSizePt === "number" && d.fontSizePt > 0
+      ? d.fontSizePt
+      : null;
   const fontPx =
-    typeof d.fontSizePt === "number" && d.fontSizePt > 0
-      ? Math.max(6, Math.round((d.fontSizePt / 595.276) * canvasShortPx))
+    effectivePt !== null
+      ? Math.max(6, Math.round((effectivePt / 595.276) * canvasShortPx))
       : Math.max(8, Math.round(rect.h * ((d.fontSizePct ?? 8) / 100)));
   const lineMul = typeof d.lineHeight === "number" && d.lineHeight > 0 ? d.lineHeight : 1.15;
   const lineH = Math.round(fontPx * lineMul);
