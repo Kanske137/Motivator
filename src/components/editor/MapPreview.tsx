@@ -597,6 +597,7 @@ export function MapPreview({
                       getMap={() => mapInstances.current[l.id] ?? null}
                     />
                     {moveHandle}
+                    {resizeHandle}
                   </>
                 }
               >
@@ -634,7 +635,7 @@ export function MapPreview({
                 wrapStyle={wrapStyle}
                 shape={effectiveShape}
                 staticClip={staticClip}
-                overlay={moveHandle}
+                overlay={<>{moveHandle}{resizeHandle}</>}
               >
                 {(clip) => (
                   <PhotoLayerView
@@ -703,7 +704,7 @@ export function MapPreview({
                 wrapStyle={wrapStyle}
                 shape={effectiveShape}
                 staticClip={staticClip}
-                overlay={moveHandle}
+                overlay={<>{moveHandle}{resizeHandle}</>}
               >
                 {(clip) =>
                   src ? (
@@ -774,6 +775,7 @@ export function MapPreview({
                   layerHeightPx={layerHeightPx}
                 />
                 {moveHandle}
+                {resizeHandle}
               </div>
             );
           }
@@ -783,6 +785,7 @@ export function MapPreview({
               <div key={l.id} style={wrapStyle}>
                 <ImageLayerView layer={l} />
                 {moveHandle}
+                {resizeHandle}
               </div>
             );
           }
