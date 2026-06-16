@@ -773,6 +773,7 @@ export function MapPreview({
                   effectiveSpans={effectiveSpans}
                   canvasShortPx={frameShortPx}
                   layerHeightPx={layerHeightPx}
+                  effectiveFontSizePt={tv?.fontSizePt ?? undefined}
                 />
                 {moveHandle}
                 {resizeHandle}

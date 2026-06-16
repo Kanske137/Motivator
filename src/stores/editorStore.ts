@@ -72,6 +72,9 @@ export interface TextLayerValue {
    *  linked map. Cleared on every kartuppdatering — kartan vinner alltid. */
   overrideText: string | null;
   font: string;
+  /** Customer-overridden font size i pt (A4-relativ, samma referens som
+   *  `defaults.fontSizePt`). null = följer admin-default. */
+  fontSizePt: number | null;
   visible: boolean;
 }
 
@@ -280,6 +283,7 @@ interface EditorState {
   updateMapLayerFromPan: (id: string, args: ApplyPlaceArgs) => void;
   setLayerText: (id: string, t: string) => void;
   setLayerTextFont: (id: string, f: string) => void;
+  setLayerTextFontSizePt: (id: string, pt: number | null) => void;
   setLayerTextVisible: (id: string, v: boolean) => void;
   setLayerPhotoShape: (id: string, s: PhotoShape) => void;
   setLayerPhotoOffset: (id: string, x: number, y: number) => void;
@@ -418,6 +422,7 @@ function hydrateLayerValues(
         text: l.defaults.text,
         overrideText: null,
         font: l.defaults.font,
+        fontSizePt: null,
         visible: true,
       };
     } else if (l.type === "photo") {
@@ -966,12 +971,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       } else if (oldVal.kind === "text" && fresh.kind === "text" && newLayer.type === "text") {
         const locks = newLayer.locks;
         // Only customer-edited override survives a layout switch — otherwise
-        // the destination layout's default text should win.
+        // the destination layout's default text should win. Bevara även
+        // kundens font-size-override (om satt) över layout-byten.
         layerValues[newId] = {
           ...fresh,
           ...(!locks.content && oldVal.overrideText !== null
             ? { overrideText: oldVal.overrideText, text: oldVal.overrideText }
             : {}),
+          ...(oldVal.fontSizePt !== null ? { fontSizePt: oldVal.fontSizePt } : {}),
         };
       } else if (oldVal.kind === "photo" && fresh.kind === "photo" && newLayer.type === "photo") {
         const locks = newLayer.locks;
@@ -1356,6 +1363,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setLayerText: (id, t) => setLayerOverrideText(set, get, id, t),
   setLayerTextFont: (id, f) => updateText(set, get, id, { font: f }),
+  setLayerTextFontSizePt: (id, pt) => updateText(set, get, id, { fontSizePt: pt }),
   setLayerTextVisible: (id, v) => updateText(set, get, id, { visible: v }),
   setLayerPhotoShape: (id, s) => updatePhoto(set, get, id, { shape: s }),
   setLayerPhotoOffset: (id, x, y) =>
@@ -1485,6 +1493,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         text: newLayer.defaults.text,
         overrideText: null,
         font: newLayer.defaults.font,
+        fontSizePt: null,
         visible: true,
       };
     } else if (newLayer.type === "photo") {

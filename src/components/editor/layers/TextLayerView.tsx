@@ -27,6 +27,8 @@ interface Props {
   canvasShortPx: number;
   /** Layer height in px — fallback only for legacy fontSizePct templates. */
   layerHeightPx: number;
+  /** Customer-overridden font size in pt (Skapa själv). Wins over defaults. */
+  effectiveFontSizePt?: number;
 }
 
 export function TextLayerView({
@@ -36,9 +38,13 @@ export function TextLayerView({
   effectiveSpans,
   canvasShortPx,
   layerHeightPx,
+  effectiveFontSizePt,
 }: Props) {
   const d = layer.defaults;
-  const fontPx = resolveFontPx(d, canvasShortPx, layerHeightPx);
+  const fontPx =
+    typeof effectiveFontSizePt === "number" && effectiveFontSizePt > 0
+      ? resolveFontPx({ fontSizePt: effectiveFontSizePt }, canvasShortPx)
+      : resolveFontPx(d, canvasShortPx, layerHeightPx);
   const lineH = resolveLineHeight(d);
   const letterSp = resolveLetterSpacingEm(d);
   const dec = decorationDefaults(d.decoration);

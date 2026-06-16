@@ -93,7 +93,8 @@
     "placeholder": "Din tekst her…",
     "font": "Skrifttype",
     "tab": "Tekst {{n}}",
-    "autoHint": "La stå tomt for å gå tilbake til automatisk tekst"
+    "autoHint": "La stå tomt for å gå tilbake til automatisk tekst",
+    "fontSize": "Tekststørrelse"
   },
   "layer": {
     "size": "Størrelse",
