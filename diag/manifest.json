@@ -1,0 +1,17 @@
+{
+  "input": "https://api.replicate.com/v1/files/NDYwODUxMzctOGI5YS00M2UzLWIwZGEtODJiZmU0ZWFkNTk3.png",
+  "runs": [
+    {
+      "tag": "A1_offwhite",
+      "fluxOutputUrl": "https://replicate.delivery/xezq/tolEbAIZ4dYSJFdWNyST8Mq2t6md0zpmutNr1YRwGnzynCsF/tmpv9pzc9x1.png",
+      "removerInputUrl": "https://replicate.delivery/xezq/tolEbAIZ4dYSJFdWNyST8Mq2t6md0zpmutNr1YRwGnzynCsF/tmpv9pzc9x1.png",
+      "removerOutputUrl": "https://replicate.delivery/czjl/ZnT0nciTKkYFBhzSR4FtkRweCdugioWqneKmITZVMyEPfUgtA/output.png"
+    },
+    {
+      "tag": "A2_midgrey",
+      "fluxOutputUrl": "https://replicate.delivery/xezq/MtQMJeV6HNTJZiefnOgewlEPARSY2CB3feBgwfS0336WuPFYLA/tmpwqo5mb7j.png",
+      "removerInputUrl": "https://replicate.delivery/xezq/MtQMJeV6HNTJZiefnOgewlEPARSY2CB3feBgwfS0336WuPFYLA/tmpwqo5mb7j.png",
+      "removerOutputUrl": "https://replicate.delivery/czjl/sRMG5Fx12nL6OFRLyw6VYxsG6msqj2riVB4iWulg9LM4nCsF/output.png"
+    }
+  ]
+}
