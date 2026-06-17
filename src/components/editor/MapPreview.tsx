@@ -698,6 +698,13 @@ export function MapPreview({
             // the reference image did — no empty edges.
             const aiSubjectKind = l.defaults.subjectKind ?? "human";
             const effectiveFit = aiResultUrl && aiSubjectKind === "removeBackground" ? "contain" : l.defaults.fit;
+            // removeBackground only: render the per-layer backdropColor as a
+            // solid fill BEHIND the (potentially transparent) AI result so the
+            // editor preview matches the print snapshot exactly. Shape-clipped
+            // by the surrounding MapLayerSlot.
+            const rbBackdropColor = aiSubjectKind === "removeBackground"
+              ? (l.defaults as { backdropColor?: string }).backdropColor ?? null
+              : null;
             return (
               <MapLayerSlot
                 key={l.id}
@@ -708,17 +715,31 @@ export function MapPreview({
               >
                 {(clip) =>
                   src ? (
-                    <PhotoLayerView
-                      layerId={l.id}
-                      src={src}
-                      fit={effectiveFit}
-                      shape={effectiveShape}
-                      staticClipPath={clip}
-                      offsetX={offsetX}
-                      offsetY={offsetY}
-                      zoom={zoom}
-                      draggable={!!src && !usingRefOrSwap}
-                    />
+                    <>
+                      {rbBackdropColor ? (
+                        <div
+                          aria-hidden="true"
+                          style={{
+                            position: "absolute",
+                            inset: 0,
+                            backgroundColor: rbBackdropColor,
+                            clipPath: clip,
+                            pointerEvents: "none",
+                          }}
+                        />
+                      ) : null}
+                      <PhotoLayerView
+                        layerId={l.id}
+                        src={src}
+                        fit={effectiveFit}
+                        shape={effectiveShape}
+                        staticClipPath={clip}
+                        offsetX={offsetX}
+                        offsetY={offsetY}
+                        zoom={zoom}
+                        draggable={!!src && !usingRefOrSwap}
+                      />
+                    </>
                   ) : (
                     <div
                       className={`w-full h-full flex flex-col items-center justify-center gap-1 text-center px-2 bg-accent/30 rounded${
