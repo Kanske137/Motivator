@@ -1,84 +1,94 @@
-> **Inga produktionsändringar.** Endast en tillfällig diagnostik-edge-funktion + körningar. Allt raderas eller lämnas oanvänt efteråt. Inget i `replicate-face-swap`, ingen schema-ändring, inga frontend-edits.
+# Transparent-PNG removeBackground via Flux Kontext + dedikerad bg-removal
 
-## Vad jag kommer göra
+Generisk, config-driven. Flux som primär för removeBackground-lager när nytt fält är ifyllt. Husposter är första valideringsmål. Ingen mall-specifik kod.
 
-### Steg 0 — Skapa en tillfällig diagnostik-funktion `face-swap-diag`
-Ny edge-funktion, helt separat från `replicate-face-swap`. Tar:
-```json
-{ "promptText": "...", "imageUrl": "...", "repeat": 10, "label": "test-A" }
+## Trigger-princip (avgörande)
+
+- **Produktions-trigger = fältets närvaro i config.** Ett `aiPhoto`-lager med `subjectKind === "removeBackground"` OCH `defaults.fluxStylePrompt` ifyllt → Flux-pipeline. Saknas fältet → Gemini, exakt som idag. Aldrig villkor på mall-id.
+- **Flux är PRIMÄR** för dessa lager — inte "Gemini först, Flux retry". Gemini används som fallback ENDAST om Flux/bg-removal själva felar tekniskt (ej safety).
+- **Env-flagga `FLUX_REMOVEBG_ENABLED`** (default `false` under validering). När `false`: fält-triggern är vilande (Gemini körs även om fältet är satt), men `?engine=flux` query-override funkar för manuella tester. När vi flippar till `true` styr fältet live.
+- `?engine=` kvar ENBART som test-override.
+
+## FAS 0 — Verifiera komposition (ingen modell, ingen Flux)
+
+**0a. Nuläge (redan utrett):** transparent alfa flödar redan korrekt genom editor-preview (`MapPreview.tsx` → `PhotoLayerView` via `<img>`) och print-snapshot (`template-snapshot.ts` rad 677–678 fyller `livePosterBgColor || "#ffffff"` och ritar lager via `drawImage`). **Lucka:** per-lager `defaults.backdropColor` komposiras INTE bakom aiPhoto-lagret — vi förlitar oss på att modellen bakat in färgen. Måste fixas för transparent-flödet.
+
+**0b. Komposit-fix (generisk, bara removeBackground):**
+- `src/lib/template-snapshot.ts` rad ~789, aiPhoto-grenen, FÖRE `drawPhotoLayer`: om `layer.defaults.subjectKind === "removeBackground"` och `layer.defaults.backdropColor` finns → `ctx.save() / clipForShape(layer.defaults.shape) / fillStyle = backdropColor / fillRect(rect) / restore()`.
+- `src/components/editor/MapPreview.tsx` rad ~657: spegla med inline `backgroundColor` på lagrets wrap (respektera shape-clip-path).
+- Ingen ändring för andra subjectKinds.
+
+**0c. Test-PNG-stub (utan modeller):** i `replicate-face-swap/index.ts`, när `URL.searchParams.get("engine")==="flux"` OCH `searchParams.get("stub")==="1"` OCH `subjectKind==="removeBackground"`: hoppa över alla modeller, läs transparent test-PNG från `?stubUrl=` eller `FACE_SWAP_DIAG_TRANSPARENT_PNG_URL`, ladda upp oförändrad till `print-files/<designId>.png`, returnera vanlig svar-shape. Test-PNG hostas i `cart-previews`-bucket, ska innehålla både hård och feathrad alfa-kant. Default-flödet rörs inte.
+
+**0d. Verifiera (klistra in skärmar) — husposter:**
+- Stubbed transparent PNG genom `getPrintFileUrl` med:
+  - `backdropColor = #FFFFFF`, portrait 3:4
+  - `backdropColor = #6B8E5A`, portrait 3:4
+  - Samma två i en annan aspect ratio (landscape eller square via testlayout)
+- Acceptans:
+  - Editor-preview: motiv över vald färg, alfa respekteras (hård + feathrad), ingen vit/svart ruta.
+  - Print-fil: motiv komposerat över EXAKT `backdropColor`, rena kanter (ingen halo/fringe från komposit), transparenta ytor fyllda av bakgrundslagret.
+  - Format/DPI/färg matchar dagens spec (`PX_PER_CM`, `MAX_PX`, `renderHiresTemplateSnapshotSafe`).
+
+**Gå vidare till Fas 1 endast om Fas 0 passerar.**
+
+## FAS 1 — Pipelinen (generisk, config-driven, default oförändrad)
+
+**1. Schema-fält** i `src/lib/template-schema.ts`, `aiPhotoDefaultsSchema`, direkt under `swapPrompt` (rad ~145):
+
+```ts
+/** removeBackground only: bas-stilinstruktion till Flux Kontext-steget.
+ *  Fältets närvaro aktiverar Flux-pipelinen för lagret (när
+ *  FLUX_REMOVEBG_ENABLED=true). Utelämnas (undefined) när tomt — aldrig "". */
+fluxStylePrompt: z.string().min(1).optional(),
 ```
-Den loopar `repeat` gånger, anropar Lovable AI Gateway (`google/gemini-3.1-flash-image-preview`) med EXAKT samma body som produktion, och loggar per försök:
-- HTTP-status
-- **Hela råa errBody** (otrunkerat — produktionskoden truncar till 200 tecken, det är därför vi inte ser Googles riktiga fel)
-- `finishReason`, `promptFeedback.blockReason`, `safetyRatings` från `data.choices[0]` om de finns
-- input-bildens `width`, `height`, `bytes` (hämtas via `fetch(imageUrl)` + `readImageSize`)
-- latens (ms)
 
-Returnerar en sammanställning `{ ok: N, fail: N, perAttempt: [...] }`.
+**2. Routing** i `supabase/functions/replicate-face-swap/index.ts`:
+- Läs `engineParam = new URL(req.url).searchParams.get("engine")` och `fluxStylePrompt = typeof body?.fluxStylePrompt === "string" ? body.fluxStylePrompt.trim() : ""`.
+- `FLUX_REMOVEBG_ENABLED = Deno.env.get("FLUX_REMOVEBG_ENABLED") === "true"`.
+- `useFlux = subjectKind === "removeBackground" && (engineParam === "flux" || (FLUX_REMOVEBG_ENABLED && fluxStylePrompt.length > 0))`.
+- När `useFlux`:
+  - **Steg A — Flux Kontext** via Replicate connector (`black-forest-labs/flux-kontext-pro`, samma anropsmönster som `supabase/functions/replicate-style/index.ts`):
+    - `input_image = faceImageUrl`
+    - `prompt` = fast bas (`"Restyle the subject. Replace the background with a single plain, uniform, neutral light backdrop. No text, no border, no vignette, no decorative edge effects."`) + `fluxStylePrompt` + (om finns) `removeBackgroundStylePrompt`.
+    - `safety_tolerance: 5`, `aspect_ratio` matchad mot `targetAspectRatio` (närmast bland Flux-stödda värden).
+    - Polla till `succeeded`, hämta output-URL.
+  - **Steg B — dedikerad bg-removal** via Replicate, samma gateway-mönster. Förslag på modell: `lucataco/remove-bg` eller `cjwbw/rembg` (BiRefNet) — exakt slug bekräftas vid implementering, kriteriet: returnerar transparent PNG med äkta alfa.
+  - Ladda upp transparent PNG → `print-files/<designId>.png` (samma upload-kod som befintlig). Returnera samma svar-shape som idag.
+  - **Ingen retry.** Båda stegen deterministiska och träffar inte safety-filtret.
+  - **Fallback ENDAST om Flux/bg-removal själva felar (ej safety):** kör Gemini-vägen som idag. Logga `[removeBackground] engine=flux failed, falling back to gemini` med felorsak.
+- När `!useFlux`: Gemini-vägen exakt som idag. Ingen ändring.
 
-### Steg 1 — Punkt 1: Provider-detalj
-Kör `face-swap-diag` 1 gång med en känd failande prompt + bild. Rapportera **hela råa svaret** från gatewayen. Det visar om Google säger `SAFETY`, `RECITATION`, `INVALID_ARGUMENT` eller `5xx`. Om gatewayen fortsatt bara säger `"Provider returned error"` utan detalj → dokumentera det som ett gateway-tak och be Lovable AI Gateway exponera upstream-body (separat ärende).
+**3. Klient** i `src/components/editor/AiPhotoSection.tsx`:
+- Skicka alltid `fluxStylePrompt: layer.defaults.fluxStylePrompt ?? ""` i `invoke`-body. Motorval sker server-side. Default-flow oförändrad.
+- `?engine=` är test-override (hanteras via URL i edge, inget UI).
 
-### Steg 2 — Punkt 2: Basfrekvens, identisk input × 10
-Två körningar à 10:
-- **2a:** Skiss-prompt (icke-akvarell, full produktionsscaffold) + bild `face-d9910430-…jpg`
-- **2b:** Akvarell-prompt (full produktionsscaffold) + samma bild
+## Vad som rapporteras tillbaka efter bygget (för SQL)
 
-Rapportera `200/400`-fördelning och alla errBody-strängar.
+- **Fältnamn:** `fluxStylePrompt`. Zod: `z.string().min(1).optional()`.
+- **DB-kolumn:** `product_configs.template` (jsonb).
+- **JSON-sökväg (husposter):** `template.canvasLayout.portrait.layers[<index av id="house">].defaults.fluxStylePrompt`. Husposter har bara `portrait` — ingen landscape/square/`extraLayouts`. Andra mallars `extraLayouts` ska inventeras separat innan SQL skrivs för dem.
+- **Mål-laget identifieras generiskt:** `type === "aiPhoto"` AND `defaults.subjectKind === "removeBackground"`.
+- **Routing läser:** `body.fluxStylePrompt` (string) + env `FLUX_REMOVEBG_ENABLED` + query `?engine=flux` (test).
+- **Husposterns nuvarande aiPhoto-layer (ordagrant, för referens):**
+  ```json
+  {"id":"house","type":"aiPhoto","xPct":4,"yPct":11,"wPct":92,"hPct":60,"zIndex":1,
+   "defaults":{"fit":"contain","shape":"rect","subjectKind":"removeBackground",
+     "swapPrompt":"Architectural illustration of the house, isolated on solid warm off white background hex f5f1ea, clean watercolor style with soft pencil line work, front facade view, no people, no cars, no surroundings, house centered with subtle shadow at base, editorial magazine illustration aesthetic, full color but muted palette.",
+     "referenceImages":[]}}
+  ```
 
-### Steg 3 — Punkt 3: Isolera bild vs text
-Två körningar à 10:
-- **3a:** Minimal prompt (`"Remove the background and place the subject on a pure white #FFFFFF backdrop. Return one image."`) + samma failande bild
-- **3b:** Full failande Skiss-prompt + neutral objektbild utan ansikte (en stol-bild jag laddar upp till `ai-references`-bucketen tillfälligt)
+## Beroenden / secrets
 
-Rapportera `200/400`-fördelning per körning.
+- `FLUX_REMOVEBG_ENABLED` — ny env-flagga (sätts via `add_secret`, default lämnas osatt = false).
+- `FACE_SWAP_DIAG_TRANSPARENT_PNG_URL` — ny env för Fas 0-stub (kan också skickas som `?stubUrl=` query och då behövs ingen secret).
+- Replicate-anrop: använder befintlig `REPLICATE_API_TOKEN` (samma som `replicate-style`).
 
-### Steg 4 — Punkt 4: Reda ut motsägelserna
-- **4a (retry-beteendet):** Kör `supabase--edge_function_logs` för `replicate-face-swap` och filtrera på `attempt`. Visa råa lograder så vi ser om 400 faktiskt retryas i deployen, eller om "after 3 attempts" kom från en äldre build. Komplettera med `supabase--analytics_query` på `function_edge_logs` för att se `deployment_id` + `version` på de failande anropen → jämför mot nuvarande deploy.
-- **4b (test-case-mismatch):** Kör `supabase--analytics_query` mot `function_edge_logs` för de senaste 50 anropen till `replicate-face-swap`, joina mot edge-loggens egen `[face-swap] start`-rad och plocka ut `adminPrompt`-prefixet (120 tkn loggas redan) per `designId`. Då ser vi ordagrant: var det husposter-mallen med hus-bilden, eller var det födelsetavla-mallen med bebis-bilden? Inga gissningar.
+## Vad som INTE rörs
 
-### Steg 5 — Punkt 5: Bilddimensioner
-Redan inbyggt i `face-swap-diag` (steg 0). För historiska 400-anrop i produktion: lägg INTE till loggning i `replicate-face-swap` nu (det vore en produktionsändring). Istället plockar jag `faceImageUrl` ur befintliga loggar och kör `HEAD`/`readImageSize` separat på dem, så vi får px+bytes utan att röra produktionsfunktionen.
+`swapPrompt`-värden, Gemini-grenen i `runRemoveBackground`, default-modell, `verify_jwt`, frontend för andra subjectKinds, andra edge-funktioner, `multi-face-swap`, `face-swap-diag` (behålls). Ingen mall-specifik kod.
 
-### Steg 6 — Rapport
-Klistrar in **rå output** (ingen tolkning, inga sammanfattningar) som:
-```
-=== Punkt 1: Provider detail ===
-HTTP 400
-errBody (raw, untruncated): { ... }
-finishReason: ...
-safetyRatings: ...
-inputImage: 2048x1536, 4187234 bytes
+## Acceptans
 
-=== Punkt 2a: Skiss × 10 (same input) ===
-attempt 1: 200, 14823ms
-attempt 2: 400, errBody=...
-...
-Summary: 6 ok / 4 fail
-
-=== Punkt 2b: Akvarell × 10 ===
-...
-```
-osv för alla punkter.
-
-### Steg 7 — Städning
-Tar bort `supabase/functions/face-swap-diag/` när rapporten är godkänd. Den eventuella stol-bilden i `ai-references` kan stå kvar (publikt bucket, ingen risk) eller raderas på begäran.
-
-## Vad jag INTE gör
-- Inga edits i `supabase/functions/replicate-face-swap/index.ts`
-- Inga schema-/migrationsändringar
-- Inga frontend-edits
-- Inga ändringar i `swapPrompt`-värden i `product_configs`
-- Inga retry-logik-ändringar
-- Inga prompt-saneringar (det väntar tills granskaren sett rådatan)
-
-## Kostnad / risk
-- ~41 Gemini-anrop totalt (1 + 10 + 10 + 10 + 10). Varje anrop ≈ samma kostnad som en kund-körning idag.
-- Inga sidoeffekter i kundens flöde — separat funktion, separat designId-prefix `diag-…`.
-
-## Frågor innan jag startar (i build mode)
-1. **Bekräfta failande bild:** ska jag använda `face-d9910430-e534-49c9-8e99-230d8db0be30.jpg` (den vi sett 400 på), eller har du en annan bild du vill testa?
-2. **Neutral kontrollbild (3b):** ska jag generera en enkel stol-bild via image-gen, eller har du en specifik objektbild du vill att jag använder?
-3. **Direktanrop till Google utanför gatewayen (punkt 1, alternativ B):** detta kräver en separat Google AI Studio / Vertex API-nyckel som vi inte har idag. OK att jag begränsar punkt 1 till "hämta otrunkerat errBody från gatewayen" istället för att gå runt den? Om du vill ha riktig direktåtkomst behöver vi `GEMINI_API_KEY` via `add_secret`.
-
-Säg ja så kör jag, eller justera scopet.
+- **Fas 0:** print-fil komposerar transparent motiv över EXAKT `backdropColor`, rätt format/DPI; skärmar inklistrade.
+- **Fas 1:** med `FLUX_REMOVEBG_ENABLED=true` ger ett removeBackground-lager med `fluxStylePrompt` ifyllt en transparent PNG via Flux → bg-removal, komposerad över `backdropColor`. Lager UTAN fältet kör Gemini oförändrat. Ingen mall-specifik kod. `?engine=` bara test-override. Strukturen rapporterad så SQL kan skrivas direkt.
