@@ -569,11 +569,17 @@ async function runRemoveBackground(params: {
         ? `Return ONE single edited image with the same aspect ratio as the input. The subject must fill the frame as much as possible. No collage, no side-by-side, no before/after comparison.`
         : `Return ONE single edited image with the same aspect ratio as the input. Keep the subject's original position and scale. No collage, no side-by-side.`);
 
+  // Style-neutral motif/isolation block from the template config. Inserted
+  // BEFORE the customer's chosen style so style words always win at the end.
+  // MUST NOT contain artistic style language — that's the customer's choice.
+  const fluxMotifBlock = params.fluxStylePrompt?.trim() ?? "";
+
   const promptText = [
     `Edit the input photo:`,
     `1. Isolate the main subject in the photo and COMPLETELY REMOVE the original background.`,
     preserveColorsLine,
     adminPromptLine,
+    fluxMotifBlock,
     backdropInstruction,
     ringInstruction,
     edgeInstruction,
@@ -582,6 +588,13 @@ async function runRemoveBackground(params: {
     styleBlock,
     aspectInstruction,
   ].filter(Boolean).join("\n");
+
+  const fluxEnabled = Deno.env.get("FLUX_REMOVEBG_ENABLED") === "true";
+  const useFlux =
+    params.subjectKind === "removeBackground" &&
+    typeof params.fluxStylePrompt === "string" &&
+    params.fluxStylePrompt.trim().length > 0 &&
+    fluxEnabled;
 
   console.log("[runRemoveBackground] config", {
     designId: params.designId,
@@ -592,13 +605,189 @@ async function runRemoveBackground(params: {
     styleLabel: params.styleLabel,
     targetAspectRatio: params.targetAspectRatio,
     promptLength: promptText.length,
+    fluxEnabled,
+    hasFluxStylePrompt: !!params.fluxStylePrompt?.trim(),
+    useFlux,
   });
   console.log("[runRemoveBackground] promptText\n" + promptText);
+
+  if (useFlux) {
+    return callFluxRemoveBg({
+      faceImageUrl: params.faceImageUrl,
+      promptText,
+      designId: params.designId,
+    });
+  }
 
   return callNanoBanana({
     promptText,
     imageUrls: [params.faceImageUrl],
   });
+}
+
+// ---------- Route 3b: Flux Kontext Pro → 851-labs background-remover ----------
+// Gated by env FLUX_REMOVEBG_ENABLED === "true" AND a non-empty
+// defaults.fluxStylePrompt on the layer. Mirrors the validated diag6 pipeline.
+// Returns the bg-remover's RGBA PNG bytes RAW — no Canvas, no flatten, no
+// JPEG — so the caller's existing upload (~line 803-820) preserves alpha.
+const FLUX_KONTEXT_MODEL = "black-forest-labs/flux-kontext-pro";
+const BG_REMOVER_VERSION =
+  "a029dff38972b5fda4ec5d75d7d1cd25aeff621d2cf4946a41055d7db66b80bc";
+
+async function pollReplicate(
+  predictionId: string,
+  token: string,
+  maxAttempts: number,
+  shortMs: number,
+  longMs: number,
+): Promise<
+  | { ok: true; output: string }
+  | { ok: false; reason: string }
+> {
+  for (let i = 1; i <= maxAttempts; i++) {
+    await new Promise((r) => setTimeout(r, i < 5 ? shortMs : longMs));
+    const r = await fetch(
+      `https://api.replicate.com/v1/predictions/${predictionId}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    const j = await r.json();
+    const status = j?.status;
+    if (status === "succeeded") {
+      const out = Array.isArray(j.output) ? j.output[0] : j.output;
+      if (typeof out === "string" && out.length > 0) {
+        return { ok: true, output: out };
+      }
+      return { ok: false, reason: "Empty output" };
+    }
+    if (status === "failed" || status === "canceled") {
+      return { ok: false, reason: `${status}: ${j?.error ?? "(no error)"}` };
+    }
+  }
+  return { ok: false, reason: "timeout" };
+}
+
+async function callFluxRemoveBg(params: {
+  faceImageUrl: string;
+  promptText: string;
+  designId: string;
+}): Promise<
+  | { ok: true; bytes: Uint8Array; contentType: string; outputUrl: string }
+  | { ok: false; response: Response }
+> {
+  const REPLICATE_API_TOKEN = Deno.env.get("REPLICATE_API_TOKEN");
+  if (!REPLICATE_API_TOKEN) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Tjänsten är tillfälligt otillgänglig. Försök igen senare.",
+        "REPLICATE_API_TOKEN not configured (flux path)",
+      ),
+    };
+  }
+
+  console.log(`[flux-removebg] start designId=${params.designId}`);
+
+  // Step 1: Flux Kontext Pro — restyle / isolate against flat backdrop.
+  const fluxStart = await fetch(
+    `https://api.replicate.com/v1/models/${FLUX_KONTEXT_MODEL}/predictions`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        input: {
+          input_image: params.faceImageUrl,
+          prompt: params.promptText,
+          output_format: "png",
+          safety_tolerance: 2,
+          prompt_upsampling: false,
+          aspect_ratio: "match_input_image",
+        },
+      }),
+    },
+  );
+  const fluxJson = await fluxStart.json();
+  if (!fluxStart.ok || !fluxJson?.id) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
+        `Flux start failed: ${fluxStart.status} ${JSON.stringify(fluxJson).slice(0, 300)}`,
+      ),
+    };
+  }
+  const fluxPoll = await pollReplicate(fluxJson.id, REPLICATE_API_TOKEN, 120, 3000, 6000);
+  if (!fluxPoll.ok) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte skapa bilden den här gången. Försök igen.",
+        `Flux ${fluxPoll.reason}`,
+      ),
+    };
+  }
+  const fluxUrl = fluxPoll.output;
+  console.log(`[flux-removebg] flux done designId=${params.designId} url=${fluxUrl}`);
+
+  // Step 2: 851-labs/background-remover — RGBA PNG cutout.
+  const bgStart = await fetch(`https://api.replicate.com/v1/predictions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      version: BG_REMOVER_VERSION,
+      input: {
+        image: fluxUrl,
+        format: "png",
+        background_type: "rgba",
+      },
+    }),
+  });
+  const bgJson = await bgStart.json();
+  if (!bgStart.ok || !bgJson?.id) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
+        `BG-remover start failed: ${bgStart.status} ${JSON.stringify(bgJson).slice(0, 300)}`,
+      ),
+    };
+  }
+  const bgPoll = await pollReplicate(bgJson.id, REPLICATE_API_TOKEN, 90, 2000, 4000);
+  if (!bgPoll.ok) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte skapa bilden den här gången. Försök igen.",
+        `BG-remover ${bgPoll.reason}`,
+      ),
+    };
+  }
+  const cutoutUrl = bgPoll.output;
+
+  // Fetch the RGBA bytes raw — no decode, no re-encode, alpha preserved.
+  const cutoutResp = await fetch(cutoutUrl);
+  if (!cutoutResp.ok) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte hämta den genererade bilden. Försök igen.",
+        `BG-remover fetch ${cutoutResp.status}`,
+      ),
+    };
+  }
+  const ab = await cutoutResp.arrayBuffer();
+  const bytes = new Uint8Array(ab);
+  const contentType = cutoutResp.headers.get("content-type") ?? "image/png";
+  console.log(
+    `[flux-removebg] done designId=${params.designId} bytes=${bytes.byteLength} ` +
+      `contentType=${contentType} url=${cutoutUrl}`,
+  );
+  return { ok: true, bytes, contentType, outputUrl: cutoutUrl };
 }
 
 Deno.serve(async (req) => {
