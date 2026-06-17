@@ -1,50 +1,37 @@
-## Sandbox-plan — inga prod-/schema-/DB-ändringar
+# ALFA — slutverifiering före live
 
-### 1. Deployment-status (svaras direkt i chatten, inga filer)
+Ingen prod-/schema-/kod-ändring. Endast diagnostik + statusrapport.
 
-| Fråga | Svar |
-|---|---|
-| Något live i prod? | **NEJ** — allt under `diag6/` är sandbox. `src/lib/template-schema.ts`, `supabase/functions/replicate-face-swap/index.ts`, `src/components/editor/AiPhotoSection.tsx`, `product_configs` är orörda. |
-| `FLUX_REMOVEBG_ENABLED=false`? | **N/A → effektivt JA (av)** — env-flaggan finns inte i koden, ingen kodväg läser den, ingen live-kund kan träffa Flux. |
-| `product_configs` orört (ingen `swapPrompt`/`fluxStylePrompt` ändrad)? | **JA, orört** — inga SQL-migrationer eller skript har körts. Fältet `fluxStylePrompt` finns inte ens i schemat. |
-| Gemini-default oförändrad live? | **JA** — `AiPhotoSection.tsx` + `replicate-face-swap` produktionsväg orörd. |
+## Bakgrund (vad jag redan vet från koden)
 
-### 2. Bevisa äkta RGBA programmatiskt
+- Live edge-funktionen `supabase/functions/replicate-face-swap/index.ts` (rad 803-820) laddar upp `result.bytes` rakt av till `print-files/<designId>.<ext>` med `contentType` från modellen. **Inget eget komposit-/plattningssteg sker före upload** — vi skickar exakt vad modellen returnerar.
+- Live-modellen är fortfarande **Nano-Banana / Gemini** (`callNanoBanana`, rad 596-599 i `runRemoveBackground`). Den returnerar JPEG/PNG **utan alfakanal** — där finns alltså ingen alfa att bevara från början.
+- Flux + `851-labs/background-remover` (med `background_type:"rgba"`) finns ENDAST i sandbox-scriptet `diag6/stress/run.sh`. Det är inte inkopplat i edge-funktionen, inte bakom någon flagga, och `FLUX_REMOVEBG_ENABLED` finns inte i kodbasen (`rg` ger 0 träffar).
 
-Problemet: `*_on_checker.png` är komposit → mode `RGB`, inte bevis. Jag måste bevisa det på själva cutout-filen som klienten skulle lagra.
+Punkt 1-3 i din fråga rör alltså **sandbox-buffern** från 851-labs (den enda RGBA-källan vi har idag), inte live-pipen.
 
-Steg:
-- Kör på alla 6 `diag6/*_cutout.png` (= rå output från `851-labs/background-remover`, samma fil som skulle landa i `print-files/<designId>.png`):
-  ```python
-  from PIL import Image
-  im = Image.open(p)
-  print(p, im.mode, im.getextrema(), 'A_extrema=', im.getchannel('A').getextrema() if im.mode=='RGBA' else 'N/A')
-  ```
-  + `identify -format '%[channels] alpha=%A\n' p` per fil.
-  + `pngcheck -v` per fil.
-- Förväntat: `mode=RGBA`, alfa-extrema `(0, 255)`, `alpha=True`, IHDR `color type = 6 (RGBA)`.
-- Klistra in RÅ utdata i chatten. Inga checker-/magenta-bilder denna gång — det är just det formatet som är tvetydigt.
-- Om någon fil visar `RGB` eller alfa-extrema `(255,255)`: spåra till bg-removal-anropet (`background_type:"rgba"`, `format:"png"`) och åtgärda i `diag6/`. Aldrig flatten mot svart/vit/checker.
+## Vad jag kommer göra (build mode)
 
-### 3. Robusthet på stökiga hus
+1. **Rå readout av de faktiskt lagrade cutout-PNG:erna** under `diag6/` och `diag6/stress/` — dvs precis de filer som `curl -sSL "$url" -o "$out"` skrev från 851-labs. Två oberoende verktyg:
+   - Python: `Image.open(p); print(p, im.mode, len(im.getbands()), "A" in im.getbands(), im.getextrema())`
+   - ImageMagick: `identify -format '%f %[channels] alpha=%A depth=%[depth]\n' p`
+   - Plus andel transparenta pixlar (`alpha == 0`) och andel semi-transparenta (`0 < alpha < 255`).
+   - Klistras in RÅ i chatten, fil för fil.
 
-- Hämta 3-4 stökiga referensfoton (lövverk framför fasad, sned vinkel, dålig belysning, halv skymd av träd). Källa: jag använder fritt licensierade Unsplash/Pexels-bilder eller, om granskaren föredrar, väntar in 3-4 uppladdade kundliknande foton.
-- Kör 2 stilar per foto: **akvarell** (mjuk, godkänd referens) + **olja** (känd risk: målar full landskaps-bakgrund).
-- Pipeline per foto/stil (samma som tidigare):
-  1. Flux-kontext-pro med husposter-prompten (struktur/identitet bevarad, mid-grey studio-bakgrund, inga omgivningar/lövverk).
-  2. `851-labs/background-remover` → RGBA-cutout.
-  3. RGBA-check enligt punkt 2.
-- För **olja** specifikt: om bg-removal lämnar landskaps-rester eller hål → stärk Flux-promptens *background isolation* (uttrycklig "no landscape, no sky, no foliage, flat #7f7f7f studio only") snarare än att försvaga oljestilen. Klistra in före/efter.
-- Outputs sparas under `diag6/stress/<foto>/<stil>_flux.png` + `_cutout.png`. Inga checker-kompositer — bara RGBA-utdata + identify/PIL-bevis.
+2. **Leverera EN cutout som artefakt utan någon omkodning**: kopiera den befintliga `diag6/stress/house2_watercolor_cutout.png` till `/mnt/documents/` med `cp` (binär, ingen ImageMagick, ingen re-encode) och visa som `<presentation-artifact>` så du kan ladda ner originalbytes och själv köra `identify` lokalt.
 
-### Acceptans
-- Punkt 1 besvarad ja/nej i chatten.
-- Punkt 2: alla 6 cutouts visar `mode=RGBA` + alfa-extrema spridda (`0..255`), eller buggen åtgärdad i sandbox.
-- Punkt 3: 3-4 stökiga hus × 2 stilar = 6-8 cutouts, alla med rent urklipp (inga lövverk-rester, inga hål) och RGBA-bevis. Oljan klarar bg-removal eller har plainare Flux-bakgrund.
+3. **Om någon fil visar sig vara RGB/saknar alfa**: rapportera det rakt ut. Det finns inget spar-steg att fixa i live-koden (live komprimerar/plattar inte — den passerar bara modellens bytes). Om det är 851-labs-svaret självt som är RGB ligger felet i `run.sh`-anropet (t.ex. `format:"png"` + `background_type:"rgba"` parametrarna), och då uppdaterar jag `diag6/stress/run.sh` — INTE prod-funktionen.
 
-### Filer som rörs
-- Endast under `diag6/` (ny `diag6/stress/`).
-- **Inte rörda:** `src/**`, `supabase/functions/**`, `supabase/config.toml`, `.env`, `product_configs`, schema, migrations.
+4. **Deployment-status — svar baserat på kodläsning, inte gissning:**
+   - Live i prod? **Nej.** Allt Flux+bg-remover-arbete ligger under `diag6/`. Edge-funktionen `replicate-face-swap` är oförändrad och kör fortfarande `callNanoBanana` i `runRemoveBackground`.
+   - `FLUX_REMOVEBG_ENABLED` fortfarande false? **Den existerar inte i kodbasen** (`rg FLUX_REMOVEBG_ENABLED` = 0 träffar), så den kan inte vara true. Effektivt false.
+   - `product_configs` orört? Behöver bekräftas via `supabase--read_query` mot tabellen (kollar att inga `swapPrompt`/`fluxStylePrompt` ändrats nyligen) — eller jag bekräftar via git-historik att ingen migration/seed rörts.
+   - Gemini-default oförändrad? **Ja** — `runRemoveBackground` returnerar `callNanoBanana(...)` (rad 596). Inget i koden väljer Flux-vägen för live-kunder.
 
-### Frågor innan körning
-- Stökiga foton: ska jag använda fritt licensierade webbfoton, eller vill du ladda upp 3-4 specifika kundliknande hus?
+## Leverabel
+
+- Inline rå-output från Python+identify för alla cutouts under `diag6/` och `diag6/stress/`.
+- En `<presentation-artifact>` med en oförändrad PNG som du kan inspektera själv.
+- Punktlista med fyra ja/nej-svar på deployment-frågorna, med kodreferenser.
+
+Inga filer i `src/`, `supabase/functions/`, `supabase/migrations/` eller `supabase/config.toml` ändras. Inga prod-anrop görs.
