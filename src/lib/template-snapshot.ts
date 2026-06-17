@@ -817,6 +817,19 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
           aiResultUrl && aiSubjectKind === "removeBackground"
             ? "contain"
             : layer.defaults.fit;
+        // removeBackground only: composite the per-layer backdropColor BEHIND
+        // the (potentially transparent) AI result so alpha pixels reveal the
+        // exact configured hex — not the global poster bg. Respects the
+        // layer's shape clip so e.g. circle layers don't paint outside.
+        const backdropColor = (layer.defaults as { backdropColor?: string })
+          .backdropColor;
+        if (aiSubjectKind === "removeBackground" && backdropColor) {
+          ctx.save();
+          clipForShape(ctx, shape, rect.x, rect.y, rect.w, rect.h);
+          ctx.fillStyle = backdropColor;
+          ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+          ctx.restore();
+        }
         try {
           await drawPhotoLayer(ctx, rect, url, shape, fit, offsetX, offsetY, zoom);
         } catch (e) {

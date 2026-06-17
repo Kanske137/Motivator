@@ -602,6 +602,13 @@ async function runRemoveBackground(params: {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  // Parse query params early — used for the Flux test-stub (Fas 0) and the
+  // ?engine= test-override (Fas 1).
+  const reqUrl = new URL(req.url);
+  const engineParam = reqUrl.searchParams.get("engine");
+  const stubParam = reqUrl.searchParams.get("stub");
+  const stubUrlParam = reqUrl.searchParams.get("stubUrl");
+
   try {
     const body = await req.json();
     const referenceImageUrl: string | undefined = body?.referenceImageUrl;
@@ -620,6 +627,70 @@ Deno.serve(async (req) => {
       : "human") as "human" | "pet" | "removeBackground";
     const designId: string =
       typeof body?.designId === "string" ? body.designId : crypto.randomUUID();
+
+    // -------- Fas 0 stub: skip all models, return a known transparent PNG --
+    // Trigger: ?engine=flux&stub=1 with subjectKind=removeBackground.
+    // Source: ?stubUrl=<https://...> OR env FACE_SWAP_DIAG_TRANSPARENT_PNG_URL.
+    // Purpose: verify that the editor + print pipeline composites the per-layer
+    // backdropColor under a truly-transparent AI result. Default flow untouched.
+    if (
+      engineParam === "flux" &&
+      stubParam === "1" &&
+      subjectKind === "removeBackground"
+    ) {
+      const stubUrl =
+        stubUrlParam ?? Deno.env.get("FACE_SWAP_DIAG_TRANSPARENT_PNG_URL") ?? "";
+      if (!stubUrl) {
+        return fallbackResponse(
+          "Stub-URL saknas.",
+          "stub mode: no ?stubUrl= and FACE_SWAP_DIAG_TRANSPARENT_PNG_URL not set",
+        );
+      }
+      console.log(`[face-swap] stub mode: designId=${designId} stubUrl=${stubUrl}`);
+      try {
+        const r = await fetch(stubUrl);
+        if (!r.ok) {
+          return fallbackResponse(
+            "Kunde inte hämta stub-bilden.",
+            `stub fetch ${r.status}`,
+          );
+        }
+        const ab = await r.arrayBuffer();
+        const bytes = new Uint8Array(ab);
+        const contentType = r.headers.get("content-type") ?? "image/png";
+        const supabase = createClient(
+          Deno.env.get("SUPABASE_URL")!,
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+        );
+        const ext = contentType.includes("png") ? "png" : "jpg";
+        const path = `${designId}.${ext}`;
+        const { error: upErr } = await supabase.storage
+          .from("print-files")
+          .upload(path, bytes, { contentType, upsert: true });
+        if (upErr) {
+          return fallbackResponse(
+            "Kunde inte spara stub-bilden.",
+            `stub upload failed: ${upErr.message}`,
+          );
+        }
+        const { data: pub } = supabase.storage.from("print-files").getPublicUrl(path);
+        const printFileUrl = pub.publicUrl;
+        console.log(`[face-swap] stub done → printFileUrl=${printFileUrl}`);
+        return jsonResponse({
+          output: printFileUrl,
+          previewUrl: printFileUrl,
+          printFileUrl,
+          replicateOutputUrl: stubUrl,
+          usedFaceImageUrl: faceImageUrl ?? null,
+          modelUsed: "stub-passthrough",
+          route: "remove-bg-stub",
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        return fallbackResponse("Stub-fel.", `stub mode error: ${msg}`);
+      }
+    }
+
 
     const removeBackgroundStylePrompt: string | null =
       typeof body?.removeBackgroundStylePrompt === "string"
