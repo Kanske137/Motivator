@@ -823,7 +823,7 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
         // layer's shape clip so e.g. circle layers don't paint outside.
         const backdropColor = (layer.defaults as { backdropColor?: string })
           .backdropColor;
-        if (aiSubjectKind === "removeBackground" && backdropColor) {
+        if (aiResultUrl && aiSubjectKind === "removeBackground" && backdropColor) {
           ctx.save();
           clipForShape(ctx, shape, rect.x, rect.y, rect.w, rect.h);
           ctx.fillStyle = backdropColor;
