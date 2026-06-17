@@ -937,6 +937,10 @@ Deno.serve(async (req) => {
       typeof body?.preserveSubjectColors === "boolean"
         ? body.preserveSubjectColors
         : true;
+    const fluxStylePrompt: string | null =
+      typeof body?.fluxStylePrompt === "string" && body.fluxStylePrompt.trim().length > 0
+        ? body.fluxStylePrompt
+        : null;
 
     const result =
       subjectKind === "human"
@@ -961,6 +965,8 @@ Deno.serve(async (req) => {
             fillFrame,
             preserveSubjectColors,
             designId,
+            fluxStylePrompt,
+            subjectKind: "removeBackground",
           });
 
 
