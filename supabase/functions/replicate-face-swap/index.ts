@@ -569,14 +569,14 @@ async function runRemoveBackground(params: {
 
   const promptText = [
     `Edit the input photo:`,
-    `1. Isolate the main subject (a person, pet or vehicle) and COMPLETELY REMOVE the original background.`,
+    `1. Isolate the main subject in the photo and COMPLETELY REMOVE the original background.`,
     preserveColorsLine,
     adminPromptLine,
     backdropInstruction,
     ringInstruction,
     edgeInstruction,
     framingInstruction,
-    `6. Keep the subject's identity, face, eyes, fur/skin and proportions exactly as in the input photo unless an artistic style is specified below.`,
+    `6. Keep the subject's identity, shape, surfaces, colors and proportions exactly as in the input photo unless an artistic style is specified below.`,
     styleBlock,
     aspectInstruction,
   ].filter(Boolean).join("\n");
