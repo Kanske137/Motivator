@@ -602,6 +602,13 @@ async function runRemoveBackground(params: {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  // Parse query params early — used for the Flux test-stub (Fas 0) and the
+  // ?engine= test-override (Fas 1).
+  const reqUrl = new URL(req.url);
+  const engineParam = reqUrl.searchParams.get("engine");
+  const stubParam = reqUrl.searchParams.get("stub");
+  const stubUrlParam = reqUrl.searchParams.get("stubUrl");
+
   try {
     const body = await req.json();
     const referenceImageUrl: string | undefined = body?.referenceImageUrl;
