@@ -35,7 +35,7 @@ ${preset}"
   echo "===== $name ====="
   local body
   body=$(jq -n --arg img "$SRC_URL" --arg p "$prompt" \
-    '{input:{input_image:$img, prompt:$p, output_format:"png", safety_tolerance:2, prompt_upsampling:false, aspect_ratio:"match_input"}}')
+    '{input:{input_image:$img, prompt:$p, output_format:"png", safety_tolerance:2, prompt_upsampling:false, aspect_ratio:"match_input_image"}}')
   local create
   create=$(curl -sS -X POST "$API/models/black-forest-labs/flux-kontext-pro/predictions" \
     "${AUTH[@]}" -H "Content-Type: application/json" -d "$body")
