@@ -702,7 +702,7 @@ export function MapPreview({
             // solid fill BEHIND the (potentially transparent) AI result so the
             // editor preview matches the print snapshot exactly. Shape-clipped
             // by the surrounding MapLayerSlot.
-            const rbBackdropColor = aiSubjectKind === "removeBackground"
+            const rbBackdropColor = aiResultUrl && aiSubjectKind === "removeBackground"
               ? (l.defaults as { backdropColor?: string }).backdropColor ?? null
               : null;
             return (
