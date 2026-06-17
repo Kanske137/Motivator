@@ -143,6 +143,12 @@ export const aiPhotoDefaultsSchema = z.object({
   swapPrompt: z.string().min(1).default(
     "Replace only the face/head onto the reference subject. Preserve the reference outfit, hair contour, lighting, pose and background.",
   ),
+  /** removeBackground + FLUX_REMOVEBG_ENABLED only: motif/isolation instruction
+   *  forwarded to Flux Kontext Pro before background-removal. Must be
+   *  STYLE-NEUTRAL — no artistic style words. Style comes solely from the
+   *  customer's chosen AI style preset. Absent/empty ⇒ stay on the legacy
+   *  Nano-Banana path. */
+  fluxStylePrompt: z.string().optional(),
   /** Helps admin pick a sensible default prompt; also forwarded to the
    *  edge function so it can pick the best swap-mode for animals vs humans. */
   subjectKind: aiPhotoSubjectKindSchema.default("human"),
