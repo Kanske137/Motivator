@@ -304,6 +304,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
           backdropColor: layer.defaults.backdropColor ?? null,
           fillFrame: layer.defaults.fillFrame ?? null,
           preserveSubjectColors: layer.defaults.preserveSubjectColors ?? null,
+          fluxStylePrompt: layer.defaults.fluxStylePrompt ?? null,
         },
       });
       if (error) throw error;
