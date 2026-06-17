@@ -1,62 +1,50 @@
+## Sandbox-plan — inga prod-/schema-/DB-ändringar
 
-## 1. Deployment-status (verifierat mot repo nu)
+### 1. Deployment-status (svaras direkt i chatten, inga filer)
 
-| Punkt | Status |
+| Fråga | Svar |
 |---|---|
-| `fluxStylePrompt` mergeat till prod-schema | **NEJ** — fältet finns inte alls i `src/lib/template-schema.ts` eller någon annan källfil. Endast i sandbox-scripts under `diag/` och `diag6/`. |
-| Flux-routing deployad i `replicate-face-swap` | **NEJ** — `supabase/functions/replicate-face-swap/index.ts` har bara en `?engine=flux&stub=1`-diag-gren (rad 632), ingen riktig Flux→bg-removal-pipeline. |
-| `FLUX_REMOVEBG_ENABLED=false` | **N/A** — env-flaggan existerar inte i koden ännu. Ingen live-kund kan träffa Flux-vägen. |
-| `product_configs` ändrat (husposterns swap/flux-prompt) | **NEJ** — inga SQL-migrationer eller skript har körts mot DB. Granskaren skriver SQL:en. |
-| Default-vägen (Gemini) oförändrad för live | **JA** — `AiPhotoSection.tsx` och `replicate-face-swap` orörda i produktions-flödet. |
-| 6-stilars-körningen sandbox-only | **JA** — kördes som lokala node/curl-scripts mot Replicate direkt, lagrade endast i `diag6/`. Inga prod-filer rörda. |
+| Något live i prod? | **NEJ** — allt under `diag6/` är sandbox. `src/lib/template-schema.ts`, `supabase/functions/replicate-face-swap/index.ts`, `src/components/editor/AiPhotoSection.tsx`, `product_configs` är orörda. |
+| `FLUX_REMOVEBG_ENABLED=false`? | **N/A → effektivt JA (av)** — env-flaggan finns inte i koden, ingen kodväg läser den, ingen live-kund kan träffa Flux. |
+| `product_configs` orört (ingen `swapPrompt`/`fluxStylePrompt` ändrad)? | **JA, orört** — inga SQL-migrationer eller skript har körts. Fältet `fluxStylePrompt` finns inte ens i schemat. |
+| Gemini-default oförändrad live? | **JA** — `AiPhotoSection.tsx` + `replicate-face-swap` produktionsväg orörd. |
 
-Sammanfattning: **inget är live, inget i prod-schema, inget i DB**. Allt arbete hittills är sandbox.
+### 2. Bevisa äkta RGBA programmatiskt
 
-## 2. Äkta RGBA — verifierat nu
+Problemet: `*_on_checker.png` är komposit → mode `RGB`, inte bevis. Jag måste bevisa det på själva cutout-filen som klienten skulle lagra.
 
-Jag körde PIL direkt på `diag6/*_cutout.png` (samma filer som visas i panelen):
+Steg:
+- Kör på alla 6 `diag6/*_cutout.png` (= rå output från `851-labs/background-remover`, samma fil som skulle landa i `print-files/<designId>.png`):
+  ```python
+  from PIL import Image
+  im = Image.open(p)
+  print(p, im.mode, im.getextrema(), 'A_extrema=', im.getchannel('A').getextrema() if im.mode=='RGBA' else 'N/A')
+  ```
+  + `identify -format '%[channels] alpha=%A\n' p` per fil.
+  + `pngcheck -v` per fil.
+- Förväntat: `mode=RGBA`, alfa-extrema `(0, 255)`, `alpha=True`, IHDR `color type = 6 (RGBA)`.
+- Klistra in RÅ utdata i chatten. Inga checker-/magenta-bilder denna gång — det är just det formatet som är tvetydigt.
+- Om någon fil visar `RGB` eller alfa-extrema `(255,255)`: spåra till bg-removal-anropet (`background_type:"rgba"`, `format:"png"`) och åtgärda i `diag6/`. Aldrig flatten mot svart/vit/checker.
 
-```
-vintage_cutout.png    RGBA  transp=614688 / opaque=418487 / total=1042176
-oil_cutout.png        RGBA  transp=627351 / opaque=404355
-watercolor_cutout.png RGBA  transp=675359 / opaque=356242
-sketch_cutout.png     RGBA  transp=665643 / opaque=361359
-popart_cutout.png     RGBA  transp=633974 / opaque=398765
-lineart_cutout.png    RGBA  transp=857104 / opaque=48279
-```
+### 3. Robusthet på stökiga hus
 
-Alla 6 har `mode == 'RGBA'` och majoritet transparenta pixlar. De är inte opaka RGB på svart.
+- Hämta 3-4 stökiga referensfoton (lövverk framför fasad, sned vinkel, dålig belysning, halv skymd av träd). Källa: jag använder fritt licensierade Unsplash/Pexels-bilder eller, om granskaren föredrar, väntar in 3-4 uppladdade kundliknande foton.
+- Kör 2 stilar per foto: **akvarell** (mjuk, godkänd referens) + **olja** (känd risk: målar full landskaps-bakgrund).
+- Pipeline per foto/stil (samma som tidigare):
+  1. Flux-kontext-pro med husposter-prompten (struktur/identitet bevarad, mid-grey studio-bakgrund, inga omgivningar/lövverk).
+  2. `851-labs/background-remover` → RGBA-cutout.
+  3. RGBA-check enligt punkt 2.
+- För **olja** specifikt: om bg-removal lämnar landskaps-rester eller hål → stärk Flux-promptens *background isolation* (uttrycklig "no landscape, no sky, no foliage, flat #7f7f7f studio only") snarare än att försvaga oljestilen. Klistra in före/efter.
+- Outputs sparas under `diag6/stress/<foto>/<stil>_flux.png` + `_cutout.png`. Inga checker-kompositer — bara RGBA-utdata + identify/PIL-bevis.
 
-Trolig orsak till "ser svart ut": filvisaren i panelen renderar PNG-alfa mot svart bakgrund istället för ett rutmönster. Verifieringsplan nedan eliminerar den tvetydigheten.
+### Acceptans
+- Punkt 1 besvarad ja/nej i chatten.
+- Punkt 2: alla 6 cutouts visar `mode=RGBA` + alfa-extrema spridda (`0..255`), eller buggen åtgärdad i sandbox.
+- Punkt 3: 3-4 stökiga hus × 2 stilar = 6-8 cutouts, alla med rent urklipp (inga lövverk-rester, inga hål) och RGBA-bevis. Oljan klarar bg-removal eller har plainare Flux-bakgrund.
 
-### Planerade RGBA-bevis (sandbox)
-- Kör `pngcheck -v` + `python -c "Image.open(f).info, mode, getchannel('A').getextrema()"` per fil och klistra in utdata i chatt.
-- Generera en `*_on_checker.png` (kompositerat mot rutmönster) och en `*_on_magenta.png` per cutout — om alfa är äkta syns rutorna/magentan kring motivet. Spara i `diag6/proof/`.
-- Om någon fil faktiskt visar sig vara opak: spåra till `format:"png"` i bg-removal-anropet och åtgärda — aldrig flatten mot svart/vit.
+### Filer som rörs
+- Endast under `diag6/` (ny `diag6/stress/`).
+- **Inte rörda:** `src/**`, `supabase/functions/**`, `supabase/config.toml`, `.env`, `product_configs`, schema, migrations.
 
-## 3. Förstärk olja + vintage (sandbox-rerun)
-
-Justeringar i sandbox-skriptet (`diag6/run.ts`), endast för dessa två presets — övriga 4 rörs ej:
-
-**Olja** — höj måleriskt uttryck:
-- Lägg till i bridge: *"Apply the painting style aggressively. The result must read as an oil painting, not a photograph: visible thick impasto brush strokes, palette-knife texture, painterly edges, no photographic micro-detail."*
-- Höj Flux `guidance` 3.5 → 5.0, `prompt_strength` 0.85 → 0.92 för denna körning.
-
-**Vintage** — tydligare retro/print-look:
-- Bridge: *"The result must look like an aged printed illustration or vintage travel poster — flat screen-print shapes, limited muted retro palette (ochre, faded teal, cream), visible halftone/paper grain, no photographic lighting or modern color."*
-- Höj `guidance` → 5.0, `prompt_strength` → 0.92.
-
-Kör endast olja + vintage, generera Flux-mellanbild + RGBA-cutout + checker/magenta-proof. Klistra in resultaten.
-
-## 4. Acceptans innan något annat
-
-- Deployment-status ovan bekräftad (allt NEJ utom Gemini-default = JA).
-- 6 cutouts har dokumenterat RGBA-bevis (checker/magenta-kompositer + pngcheck-utdata).
-- Olja och vintage rerun visar tydligt måleri/retro, inte foto.
-- Fortfarande **noll** ändringar i prod-schema, edge-funktion eller `product_configs`.
-
-## Tekniska detaljer
-
-- Endast filer under `diag6/` (+ ny `diag6/proof/`) och `diag6/run.ts` rörs.
-- `supabase/functions/replicate-face-swap/index.ts`, `src/lib/template-schema.ts`, `src/components/editor/AiPhotoSection.tsx`, `.env` och `supabase/config.toml` rörs **inte**.
-- Inga DB-migrationer, inga `product_configs`-uppdateringar.
+### Frågor innan körning
+- Stökiga foton: ska jag använda fritt licensierade webbfoton, eller vill du ladda upp 3-4 specifika kundliknande hus?
