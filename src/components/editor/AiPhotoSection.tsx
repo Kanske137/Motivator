@@ -275,7 +275,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         faceImageUrl,
         subjectKind,
         removeBackgroundStyleId: selectedPreset?.id ?? null,
-        structural: structuralActive ? structural : null,
+        simpleStyleMode,
         force: !!opts.force,
       });
       // Layer aspect ratio (visual width / height in CM) — passed to the
