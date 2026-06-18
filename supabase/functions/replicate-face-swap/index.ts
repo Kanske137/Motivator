@@ -1253,17 +1253,32 @@ Deno.serve(async (req) => {
     }
 
     const fluxEnabledHandler = Deno.env.get("FLUX_REMOVEBG_ENABLED") === "true";
-    const willUseFlux =
+    const hasFluxStyle =
+      typeof body?.fluxStylePrompt === "string" && body.fluxStylePrompt.trim().length > 0;
+    const willUseStructural =
       subjectKind === "removeBackground" &&
       fluxEnabledHandler &&
-      typeof body?.fluxStylePrompt === "string" &&
-      body.fluxStylePrompt.trim().length > 0;
+      hasFluxStyle &&
+      !!(body?.structuralConditioning?.enabled);
+    const willUseFlux =
+      !willUseStructural &&
+      subjectKind === "removeBackground" &&
+      fluxEnabledHandler &&
+      hasFluxStyle;
+    const structuralModel =
+      body?.structuralConditioning?.controlType === "depth"
+        ? FLUX_DEPTH_MODEL
+        : FLUX_CANNY_MODEL;
     const route =
       subjectKind === "human" ? "human-nano-banana"
       : subjectKind === "pet" ? "pet-nano-banana"
+      : willUseStructural ? "remove-bg-structural"
       : willUseFlux ? "remove-bg-flux"
       : "remove-bg-nano-banana";
-    const modelUsed = willUseFlux ? "black-forest-labs/flux-kontext-pro+851-labs/background-remover" : ANIMAL_MODEL;
+    const modelUsed =
+      willUseStructural ? `${structuralModel}+851-labs/background-remover`
+      : willUseFlux ? "black-forest-labs/flux-kontext-pro+851-labs/background-remover"
+      : ANIMAL_MODEL;
 
     console.log(
       `[face-swap] start route=${route} model=${modelUsed} ` +
