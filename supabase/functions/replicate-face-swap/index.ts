@@ -607,6 +607,8 @@ async function runRemoveBackground(params: {
   // applies in snapshot/preview.
   const styleLabelLower = (params.styleLabel ?? "").toLowerCase();
   const styleHaystackForBridge = `${styleLabelLower} ${(params.stylePrompt ?? "").toLowerCase()}`;
+  const motifLower = (params.fluxStylePrompt ?? "").toLowerCase();
+  const isVehicleSubject = /(?:vehicle|car|bil|fordon|automobile|truck|lastbil|motorcycle|motorcykel)\b/.test(motifLower);
   const bridge = isWatercolorStyle
     ? ""
     : /oil|olja|oljemålning|impasto/.test(styleHaystackForBridge)
@@ -614,20 +616,22 @@ async function runRemoveBackground(params: {
       : /sketch|skiss|pencil|graphite/.test(styleHaystackForBridge)
         ? "The result must read as a hand-drawn pencil sketch on paper, NOT a photograph: visible graphite strokes and cross-hatching, paper grain, no photographic micro-detail."
         : /line|linje|ink|kontur/.test(styleHaystackForBridge)
-          ? "The result must read as a clean line-art illustration, NOT a photograph: crisp ink outlines, flat or minimal fill, no photographic micro-detail."
+          ? (isVehicleSubject
+              ? "The result must read as a clean line-art illustration of the vehicle, NOT a photograph: crisp even-weight ink outlines following the car's body panels, window frames, door seams, wheel rims, spokes, headlights and grille. Flat or minimal fill, no shading hatching, no photographic micro-detail, no reflections, no road, no environment."
+              : "The result must read as a clean line-art illustration, NOT a photograph: crisp ink outlines, flat or minimal fill, no photographic micro-detail.")
           : /pop[\s-]?art|warhol/.test(styleHaystackForBridge)
             ? "The result must read as a bold pop-art illustration, NOT a photograph: flat saturated color blocks, thick outlines, halftone dots, high contrast, no photographic micro-detail."
             : /vintage|retro|aged/.test(styleHaystackForBridge)
               ? "The result must read as a vintage illustrated print, NOT a photograph: muted aged palette, slight grain, painterly/print texture, no photographic micro-detail."
               : "The result must read as an artistic illustration, NOT a photograph: clearly painterly/illustrative surface treatment, no photographic micro-detail.";
 
+  // Geometry, orientation and final size are guaranteed by the post-Flux
+  // correspondence detector + alpha-bbox normalization step in
+  // callFluxRemoveBg. Keep this prompt focused on subject identity, backdrop
+  // isolation and the no-environment guarantee.
   const fluxBase =
     "The subject is the main object in the input photo. Preserve its structure, " +
     "proportions and overall composition so it stays recognizable as the same subject. " +
-    "Keep the subject at the EXACT same orientation, facing direction, angle and " +
-    "position as in the input photo. NEVER mirror, flip, rotate or re-angle it. " +
-    "Do not output a mirror image. If the subject faces left in the input it must " +
-    "face left in the output; if it faces right it must face right. " +
     "Completely isolate the subject on a perfectly flat mid-grey (#7f7f7f) studio backdrop. " +
     "ABSOLUTELY NO landscape, NO sky, NO trees, NO foliage, NO bushes, NO grass, NO ground, " +
     "NO shadow, NO surroundings, NO people, NO vehicles, NO text, NO watermark. " +
@@ -636,7 +640,7 @@ async function runRemoveBackground(params: {
   const fluxStyleTail = params.stylePrompt?.trim()
     ? [
         bridge,
-        "Render the subject in the following art style. Apply it fully to the subject while keeping its structure and identity recognizable. The style is a SURFACE TREATMENT only — it must not change the subject's orientation, facing direction, position or scale:",
+        "Render the subject in the following art style. Apply it fully to the subject while keeping its structure and identity recognizable. The style is a SURFACE TREATMENT only:",
         params.stylePrompt.trim(),
       ].filter(Boolean).join("\n")
     : "";
