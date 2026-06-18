@@ -259,12 +259,23 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
       const hash = await ensureHash();
       const structural = layer.defaults.structuralConditioning ?? null;
       const structuralActive = !!(structural?.enabled && isRemoveBg);
+      const presetForCache = isRemoveBg && selectedStyleId
+        ? visibleStyles.find((p) => p.id === selectedStyleId) ?? null
+        : null;
+      const engineForCache = structuralActive
+        ? (structural as { engine?: string }).engine ?? "bfl-canny"
+        : null;
+      const loraTagForCache =
+        structuralActive && engineForCache === "sdxl-controlnet-lora"
+          ? loraTagOf(presetForCache?.loraUrl ?? null)
+          : null;
       const cacheRefSlot = refSlotFor(
         subjectKind,
         refUrl,
         selectedStyleId,
         structuralActive ? structural!.controlType : null,
-        structuralActive ? (structural as { engine?: string }).engine ?? "bfl-canny" : null,
+        engineForCache,
+        loraTagForCache,
       );
       // Only use cache when the user hasn't explicitly asked for a regenerate.
       if (!opts.force && hash) {
