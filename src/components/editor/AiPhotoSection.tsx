@@ -526,8 +526,9 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
               const structural = layer.defaults.structuralConditioning ?? null;
               const ctrl = structural?.enabled ? structural.controlType : null;
               const eng = structural?.enabled ? ((structural as { engine?: string }).engine ?? "bfl-canny") : null;
+              const loraTag = eng === "sdxl-controlnet-lora" ? loraTagOf(p.loraUrl ?? null) : null;
               const cachedUrl = source?.hash
-                ? getCachedFaceSwap(layer.id, source.hash, refSlotFor("removeBackground", null, p.id, ctrl, eng))
+                ? getCachedFaceSwap(layer.id, source.hash, refSlotFor("removeBackground", null, p.id, ctrl, eng, loraTag))
                 : null;
               const thumbSrc = cachedUrl ?? p.thumbnailUrl ?? null;
               return (
