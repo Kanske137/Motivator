@@ -606,6 +606,11 @@ async function runRemoveBackground(params: {
   // applies in snapshot/preview.
   const styleLabelLower = (params.styleLabel ?? "").toLowerCase();
   const styleHaystackForBridge = `${styleLabelLower} ${(params.stylePrompt ?? "").toLowerCase()}`;
+  // Vehicle-aware: the customer-side motif line (`fluxStylePrompt`) describes
+  // the subject. If it mentions a vehicle/car, line-art needs concrete car
+  // anatomy hints — otherwise Flux blends photo micro-detail with sketch.
+  const motifLower = (params.fluxStylePrompt ?? "").toLowerCase();
+  const isVehicleSubject = /\b(vehicle|car|bil|fordon|automobile|truck|lastbil|motorcycle|motorcykel)\b/.test(motifLower);
   const bridge = isWatercolorStyle
     ? ""
     : /oil|olja|oljemålning|impasto/.test(styleHaystackForBridge)
@@ -613,7 +618,9 @@ async function runRemoveBackground(params: {
       : /sketch|skiss|pencil|graphite/.test(styleHaystackForBridge)
         ? "The result must read as a hand-drawn pencil sketch on paper, NOT a photograph: visible graphite strokes and cross-hatching, paper grain, no photographic micro-detail."
         : /line|linje|ink|kontur/.test(styleHaystackForBridge)
-          ? "The result must read as a clean line-art illustration, NOT a photograph: crisp ink outlines, flat or minimal fill, no photographic micro-detail."
+          ? (isVehicleSubject
+              ? "The result must read as a clean line-art illustration of the vehicle, NOT a photograph: crisp even-weight ink outlines following the car's body panels, window frames, door seams, wheel rims, spokes, headlights and grille. Flat or minimal fill, no shading hatching, no photographic micro-detail, no reflections, no road, no environment."
+              : "The result must read as a clean line-art illustration, NOT a photograph: crisp ink outlines, flat or minimal fill, no photographic micro-detail.")
           : /pop[\s-]?art|warhol/.test(styleHaystackForBridge)
             ? "The result must read as a bold pop-art illustration, NOT a photograph: flat saturated color blocks, thick outlines, halftone dots, high contrast, no photographic micro-detail."
             : /vintage|retro|aged/.test(styleHaystackForBridge)
@@ -786,28 +793,43 @@ async function callFluxRemoveBg(params: {
   console.log(`[flux-removebg] flux done designId=${params.designId} url=${fluxUrl}`);
 
   // Step 2: 851-labs/background-remover — RGBA PNG cutout.
-  const bgStart = await fetch(`https://api.replicate.com/v1/predictions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      version: BG_REMOVER_VERSION,
-      input: {
-        image: fluxUrl,
-        format: "png",
-        background_type: "rgba",
+  // Replicate throttles to 6 req/min when the account is below $5 credit, so
+  // we retry with backoff on 429 before giving up. Other errors fail fast.
+  let bgStart: Response | null = null;
+  let bgJson: any = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    bgStart = await fetch(`https://api.replicate.com/v1/predictions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
+        "Content-Type": "application/json",
       },
-    }),
-  });
-  const bgJson = await bgStart.json();
-  if (!bgStart.ok || !bgJson?.id) {
+      body: JSON.stringify({
+        version: BG_REMOVER_VERSION,
+        input: {
+          image: fluxUrl,
+          format: "png",
+          background_type: "rgba",
+        },
+      }),
+    });
+    bgJson = await bgStart.json().catch(() => ({}));
+    if (bgStart.ok && bgJson?.id) break;
+    if (bgStart.status === 429 && attempt < 3) {
+      const retryAfter = Number(bgJson?.retry_after);
+      const waitMs = Math.max(Number.isFinite(retryAfter) ? retryAfter : 1.5, 1.5) * 1000;
+      console.warn(`[bg-remover] 429 retry ${attempt}/3 after ${Math.round(waitMs)}ms`);
+      await new Promise((r) => setTimeout(r, waitMs));
+      continue;
+    }
+    break;
+  }
+  if (!bgStart?.ok || !bgJson?.id) {
     return {
       ok: false,
       response: fallbackResponse(
         "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
-        `BG-remover start failed: ${bgStart.status} ${JSON.stringify(bgJson).slice(0, 300)}`,
+        `BG-remover start failed: ${bgStart?.status ?? "n/a"} ${JSON.stringify(bgJson).slice(0, 300)}`,
       ),
     };
   }
