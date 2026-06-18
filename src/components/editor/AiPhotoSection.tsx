@@ -164,9 +164,9 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
 
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState<string | null>(null);
-  // removeBackground now runs up to 3 Flux attempts + orientation/size
-  // post-processing. Other routes still finish in ~18s.
-  const expectedSeconds = isRemoveBg ? 30 : 18;
+  // All three routes now run through Nano Banana 2 — expect ~18s end-to-end
+  // including potential retry backoff.
+  const expectedSeconds = 18;
 
   // Hash the face photo whenever it changes.
   useEffect(() => {
