@@ -452,6 +452,14 @@ export const aiStylePresetSchema = z.object({
   prompt: z.string().min(1),
   /** Per-template visibility toggle. Defaults to true for backwards-compat. */
   enabled: z.boolean().optional().default(true),
+  /** Optional SDXL LoRA weights URL (Replicate file URL, HF, R2 etc).
+   *  When set AND the layer's structuralConditioning.engine === "sdxl-controlnet-lora"
+   *  the edge function bakes this LoRA into the prediction so the style
+   *  comes from trained weights instead of text. Saved per style because
+   *  it's the customer's style pick that decides which LoRA to load. */
+  loraUrl: z.string().url().optional(),
+  loraScale: z.number().min(0).max(1).optional().default(0.85),
+  loraTrigger: z.string().optional(),
 });
 export type AiStylePreset = z.infer<typeof aiStylePresetSchema>;
 
