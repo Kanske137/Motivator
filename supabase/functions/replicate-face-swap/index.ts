@@ -606,6 +606,11 @@ async function runRemoveBackground(params: {
   // applies in snapshot/preview.
   const styleLabelLower = (params.styleLabel ?? "").toLowerCase();
   const styleHaystackForBridge = `${styleLabelLower} ${(params.stylePrompt ?? "").toLowerCase()}`;
+  // Vehicle-aware: the customer-side motif line (`fluxStylePrompt`) describes
+  // the subject. If it mentions a vehicle/car, line-art needs concrete car
+  // anatomy hints — otherwise Flux blends photo micro-detail with sketch.
+  const motifLower = (params.fluxStylePrompt ?? "").toLowerCase();
+  const isVehicleSubject = /\b(vehicle|car|bil|fordon|automobile|truck|lastbil|motorcycle|motorcykel)\b/.test(motifLower);
   const bridge = isWatercolorStyle
     ? ""
     : /oil|olja|oljemålning|impasto/.test(styleHaystackForBridge)
@@ -613,7 +618,9 @@ async function runRemoveBackground(params: {
       : /sketch|skiss|pencil|graphite/.test(styleHaystackForBridge)
         ? "The result must read as a hand-drawn pencil sketch on paper, NOT a photograph: visible graphite strokes and cross-hatching, paper grain, no photographic micro-detail."
         : /line|linje|ink|kontur/.test(styleHaystackForBridge)
-          ? "The result must read as a clean line-art illustration, NOT a photograph: crisp ink outlines, flat or minimal fill, no photographic micro-detail."
+          ? (isVehicleSubject
+              ? "The result must read as a clean line-art illustration of the vehicle, NOT a photograph: crisp even-weight ink outlines following the car's body panels, window frames, door seams, wheel rims, spokes, headlights and grille. Flat or minimal fill, no shading hatching, no photographic micro-detail, no reflections, no road, no environment."
+              : "The result must read as a clean line-art illustration, NOT a photograph: crisp ink outlines, flat or minimal fill, no photographic micro-detail.")
           : /pop[\s-]?art|warhol/.test(styleHaystackForBridge)
             ? "The result must read as a bold pop-art illustration, NOT a photograph: flat saturated color blocks, thick outlines, halftone dots, high contrast, no photographic micro-detail."
             : /vintage|retro|aged/.test(styleHaystackForBridge)
