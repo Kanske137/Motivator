@@ -458,7 +458,7 @@ export const aiStylePresetSchema = z.object({
    *  comes from trained weights instead of text. Saved per style because
    *  it's the customer's style pick that decides which LoRA to load. */
   loraUrl: z.string().url().optional(),
-  loraScale: z.number().min(0).max(1).optional().default(0.85),
+  loraScale: z.number().min(0).max(1).optional(),
   loraTrigger: z.string().optional(),
 });
 export type AiStylePreset = z.infer<typeof aiStylePresetSchema>;
