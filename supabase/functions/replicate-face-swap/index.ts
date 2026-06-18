@@ -1119,37 +1119,30 @@ Deno.serve(async (req) => {
     const fluxEnabledHandler = Deno.env.get("FLUX_REMOVEBG_ENABLED") === "true";
     const hasFluxStyle =
       typeof body?.fluxStylePrompt === "string" && body.fluxStylePrompt.trim().length > 0;
-    const willUseStructural =
-      subjectKind === "removeBackground" &&
-      fluxEnabledHandler &&
-      hasFluxStyle &&
-      !!(body?.structuralConditioning?.enabled);
+    const simpleStyleMode: boolean =
+      subjectKind === "removeBackground" && body?.simpleStyleMode === true;
+    const styleInstruction: string | null =
+      typeof body?.styleInstruction === "string" && body.styleInstruction.trim().length > 0
+        ? body.styleInstruction.trim()
+        : null;
+    const willUseSimple =
+      simpleStyleMode &&
+      (!!styleInstruction ||
+        (typeof body?.removeBackgroundStylePrompt === "string" &&
+          body.removeBackgroundStylePrompt.trim().length > 0));
     const willUseFlux =
-      !willUseStructural &&
+      !willUseSimple &&
       subjectKind === "removeBackground" &&
       fluxEnabledHandler &&
       hasFluxStyle;
-    const rawEngine = body?.structuralConditioning?.engine;
-    const structuralEngineHint: "bfl-canny" | "bfl-depth" | "sdxl-controlnet-lora" =
-      rawEngine === "bfl-depth"
-        ? "bfl-depth"
-        : rawEngine === "sdxl-controlnet-lora"
-        ? "sdxl-controlnet-lora"
-        : "bfl-canny";
-    const structuralModel =
-      structuralEngineHint === "sdxl-controlnet-lora"
-        ? SDXL_CN_LORA_MODEL
-        : structuralEngineHint === "bfl-depth"
-        ? FLUX_DEPTH_MODEL
-        : FLUX_CANNY_MODEL;
     const route =
       subjectKind === "human" ? "human-nano-banana"
       : subjectKind === "pet" ? "pet-nano-banana"
-      : willUseStructural ? "remove-bg-structural"
+      : willUseSimple ? "remove-bg-simple"
       : willUseFlux ? "remove-bg-flux"
       : "remove-bg-nano-banana";
     const modelUsed =
-      willUseStructural ? `${structuralModel}+851-labs/background-remover`
+      willUseSimple ? "black-forest-labs/flux-kontext-pro+851-labs/background-remover"
       : willUseFlux ? "black-forest-labs/flux-kontext-pro+851-labs/background-remover"
       : ANIMAL_MODEL;
 
@@ -1158,6 +1151,7 @@ Deno.serve(async (req) => {
         `subjectKind=${subjectKind} designId=${designId} ` +
         `referenceImage=${referenceImageUrl ?? "(none)"} faceImage=${faceImageUrl} ` +
         `removeBgStyleId=${removeBackgroundStyleId ?? "(none)"} ` +
+        `simpleStyleMode=${simpleStyleMode} styleInstruction="${styleInstruction ?? ""}" ` +
         `adminPrompt="${prompt.slice(0, 120)}"`,
     );
 
@@ -1184,58 +1178,7 @@ Deno.serve(async (req) => {
         ? body.fluxStylePrompt
         : null;
 
-    // Optional structural conditioning block from the layer config.
-    // Server-side validation; falls back to nulls when missing/invalid.
-    let structuralConditioning: {
-      enabled: boolean;
-      engine: "bfl-canny" | "bfl-depth" | "sdxl-controlnet-lora";
-      controlType: "canny" | "depth";
-      guidance: number;
-      steps: number;
-      controlnetScale: number;
-      loraUrl: string | null;
-      loraScale: number;
-      loraTrigger: string | null;
-    } | null = null;
-    const sc = body?.structuralConditioning;
-    if (sc && typeof sc === "object" && sc.enabled === true) {
-      const eng: "bfl-canny" | "bfl-depth" | "sdxl-controlnet-lora" =
-        sc.engine === "bfl-depth"
-          ? "bfl-depth"
-          : sc.engine === "sdxl-controlnet-lora"
-          ? "sdxl-controlnet-lora"
-          : "bfl-canny";
-      const ct = sc.controlType === "depth" ? "depth" : "canny";
-      const g = typeof sc.guidance === "number" && isFinite(sc.guidance)
-        ? Math.max(0, Math.min(100, sc.guidance))
-        : 30;
-      const st = typeof sc.steps === "number" && isFinite(sc.steps)
-        ? Math.max(15, Math.min(50, Math.round(sc.steps)))
-        : 28;
-      const cs = typeof sc.controlnetScale === "number" && isFinite(sc.controlnetScale)
-        ? Math.max(0, Math.min(4, sc.controlnetScale))
-        : 0.7;
-      const loraUrl = typeof sc.loraUrl === "string" && /^https?:\/\//.test(sc.loraUrl)
-        ? sc.loraUrl
-        : null;
-      const loraScale = typeof sc.loraScale === "number" && isFinite(sc.loraScale)
-        ? Math.max(0, Math.min(1, sc.loraScale))
-        : 0.85;
-      const loraTrigger = typeof sc.loraTrigger === "string" && sc.loraTrigger.trim().length > 0
-        ? sc.loraTrigger.trim()
-        : null;
-      structuralConditioning = {
-        enabled: true,
-        engine: eng,
-        controlType: ct,
-        guidance: g,
-        steps: st,
-        controlnetScale: cs,
-        loraUrl,
-        loraScale,
-        loraTrigger,
-      };
-    }
+
 
     const result =
       subjectKind === "human"
