@@ -711,6 +711,7 @@ async function runRemoveBackground(params: {
       faceImageUrl: params.faceImageUrl,
       promptText: structuralPromptText,
       designId: params.designId,
+      engine: params.structuralConditioning!.engine,
       controlType: params.structuralConditioning!.controlType,
       guidance: params.structuralConditioning!.guidance,
       steps: params.structuralConditioning!.steps,
@@ -989,8 +990,27 @@ function boxBlurRGB(
 async function prepareControlImage(
   rgbaPngBytes: Uint8Array,
   hex: number,
+  controlType: "canny" | "depth",
 ): Promise<{ bytes: Uint8Array; width: number; height: number }> {
   let img = await Image.decode(rgbaPngBytes);
+  if (controlType === "depth") {
+    // Depth-pro needs the actual subject pixels to build a meaningful depth map.
+    // No blur, no posterize — just resize and flatten over flat backdrop.
+    const maxDim = Math.max(img.width, img.height);
+    if (maxDim > 1024) {
+      const scale = 1024 / maxDim;
+      img = img.resize(
+        Math.max(1, Math.round(img.width * scale)),
+        Math.max(1, Math.round(img.height * scale)),
+      );
+    }
+    const bg = new Image(img.width, img.height).fill(
+      Image.rgbaToColor((hex >> 16) & 0xff, (hex >> 8) & 0xff, hex & 0xff, 0xff),
+    );
+    bg.composite(img, 0, 0);
+    return { bytes: await bg.encode(), width: img.width, height: img.height };
+  }
+  // canny path: aggressive edge-preserving simplification.
   const maxDim = Math.max(img.width, img.height);
   if (maxDim > 768) {
     const scale = 768 / maxDim;
@@ -1014,12 +1034,7 @@ async function prepareControlImage(
     src[i + 2] = ((useBlur ? blurred[i + 2] : src[i + 2]) & 0xf8);
   }
   const bg = new Image(w, h).fill(
-    Image.rgbaToColor(
-      (hex >> 16) & 0xff,
-      (hex >> 8) & 0xff,
-      hex & 0xff,
-      0xff,
-    ),
+    Image.rgbaToColor((hex >> 16) & 0xff, (hex >> 8) & 0xff, hex & 0xff, 0xff),
   );
   bg.composite(img, 0, 0);
   const bytes = await bg.encode();
@@ -1030,6 +1045,7 @@ async function callFluxStructural(params: {
   faceImageUrl: string;
   promptText: string;
   designId: string;
+  engine: "bfl-canny" | "bfl-depth";
   controlType: "canny" | "depth";
   guidance: number;
   steps: number;
@@ -1054,9 +1070,12 @@ async function callFluxStructural(params: {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
+  const model = params.engine === "bfl-depth" ? FLUX_DEPTH_MODEL : FLUX_CANNY_MODEL;
+
   console.log(
-    `[flux-structural] start designId=${params.designId} controlType=${params.controlType} ` +
-      `guidance=${params.guidance} steps=${params.steps} styleLabel=${params.styleLabel ?? "-"}`,
+    `[flux-structural] start designId=${params.designId} engine=${params.engine} model=${model} ` +
+      `controlType=${params.controlType} guidance=${params.guidance} steps=${params.steps} ` +
+      `styleLabel=${params.styleLabel ?? "-"}`,
   );
 
   // Step 1: bg-remove the original photo → RGBA cutout.
