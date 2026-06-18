@@ -933,162 +933,17 @@ async function callFluxRemoveBg(params: {
   return { ok: true, bytes, contentType, outputUrl: cutoutUrl };
 }
 
-// ---------- Route 3c: Structural conditioning via BFL flux-{canny|depth}-pro ----------
-// Pipeline:
-//   1. 851-labs/background-remover on the original photo (geometry comes from
-//      the actual pixels — orientation, angle, scale, mirroring are locked).
-//   2. Flatten the RGBA cutout over a solid #7f7f7f background and upload the
-//      result to print-files. This is the `control_image` the BFL model
-//      consumes; it generates its own canny / depth map internally.
-//   3. flux-canny-pro OR flux-depth-pro with guidance + steps from the
-//      template config. Style words come last so they dominate; orientation
-//      language is dropped because the control image already locks geometry.
-//   4. 851-labs/background-remover #2 to strip the #7f7f7f backdrop again
-//      and return RGBA bytes (same shape as Route 3b so the rest of the
-//      pipeline is unchanged).
-const FLUX_CANNY_MODEL = "black-forest-labs/flux-canny-pro";
-const FLUX_DEPTH_MODEL = "black-forest-labs/flux-depth-pro";
-// fofr/sdxl-multi-controlnet-lora — community model, must be called via
-// /v1/predictions with `version`. Pin the version we validated the schema
-// against (controlnet_1=enum, lora_weights/lora_scale, prompt_strength etc).
-const SDXL_CN_LORA_MODEL = "fofr/sdxl-multi-controlnet-lora";
-const SDXL_CN_LORA_VERSION =
-  "89eb212b3d1366a83e949c12a4b45dfe6b6b313b594cb8268e864931ac9ffb16";
-
-async function flattenOverGrey(
-  rgbaPngBytes: Uint8Array,
-  hex: number, // 0xRRGGBB
-): Promise<Uint8Array> {
-  const img = await Image.decode(rgbaPngBytes);
-  const bg = new Image(img.width, img.height).fill(
-    Image.rgbaToColor(
-      (hex >> 16) & 0xff,
-      (hex >> 8) & 0xff,
-      hex & 0xff,
-      0xff,
-    ),
-  );
-  bg.composite(img, 0, 0);
-  return await bg.encode();
-}
-
-/** Box-blur over RGB only (alpha preserved). Separable 2-pass. */
-function boxBlurRGB(
-  src: Uint8Array | Uint8ClampedArray,
-  w: number,
-  h: number,
-  r: number,
-): Uint8Array {
-  const tmp = new Uint8Array(src.length);
-  const dst = new Uint8Array(src.length);
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      let rs = 0, gs = 0, bs = 0, n = 0;
-      const x0 = Math.max(0, x - r);
-      const x1 = Math.min(w - 1, x + r);
-      for (let xx = x0; xx <= x1; xx++) {
-        const i = (y * w + xx) * 4;
-        rs += src[i]; gs += src[i + 1]; bs += src[i + 2]; n++;
-      }
-      const o = (y * w + x) * 4;
-      tmp[o] = (rs / n) | 0;
-      tmp[o + 1] = (gs / n) | 0;
-      tmp[o + 2] = (bs / n) | 0;
-      tmp[o + 3] = src[o + 3];
-    }
-  }
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      let rs = 0, gs = 0, bs = 0, n = 0;
-      const y0 = Math.max(0, y - r);
-      const y1 = Math.min(h - 1, y + r);
-      for (let yy = y0; yy <= y1; yy++) {
-        const i = (yy * w + x) * 4;
-        rs += tmp[i]; gs += tmp[i + 1]; bs += tmp[i + 2]; n++;
-      }
-      const o = (y * w + x) * 4;
-      dst[o] = (rs / n) | 0;
-      dst[o + 1] = (gs / n) | 0;
-      dst[o + 2] = (bs / n) | 0;
-      dst[o + 3] = tmp[o + 3];
-    }
-  }
-  return dst;
-}
-
-/** Prepare control image for flux-canny-pro:
- *   1. Downsample so max(w,h) = 768 (caps control-map detail).
- *   2. Edge-preserving smoothing: keep silhouette + high-contrast panel/limb
- *      edges sharp; replace low-contrast micro-texture (reflections, tread,
- *      lists, weave) with a box-blurred copy. Proxy for raising canny
- *      threshold since BFL flux-canny-pro runs canny internally without an
- *      exposed threshold.
- *   3. Posterize RGB to 32 levels (& 0xF8) to wipe remaining micro variation.
- *   4. Flatten over flat mid-grey (#7f7f7f) so canny only finds subject edges.
- */
-async function prepareControlImage(
-  rgbaPngBytes: Uint8Array,
-  hex: number,
-  controlType: "canny" | "depth",
-): Promise<{ bytes: Uint8Array; width: number; height: number }> {
-  let img = await Image.decode(rgbaPngBytes);
-  if (controlType === "depth") {
-    // Depth-pro needs the actual subject pixels to build a meaningful depth map.
-    // No blur, no posterize — just resize and flatten over flat backdrop.
-    const maxDim = Math.max(img.width, img.height);
-    if (maxDim > 1024) {
-      const scale = 1024 / maxDim;
-      img = img.resize(
-        Math.max(1, Math.round(img.width * scale)),
-        Math.max(1, Math.round(img.height * scale)),
-      );
-    }
-    const bg = new Image(img.width, img.height).fill(
-      Image.rgbaToColor((hex >> 16) & 0xff, (hex >> 8) & 0xff, hex & 0xff, 0xff),
-    );
-    bg.composite(img, 0, 0);
-    return { bytes: await bg.encode(), width: img.width, height: img.height };
-  }
-  // canny path: aggressive edge-preserving simplification.
-  const maxDim = Math.max(img.width, img.height);
-  if (maxDim > 768) {
-    const scale = 768 / maxDim;
-    img = img.resize(
-      Math.max(1, Math.round(img.width * scale)),
-      Math.max(1, Math.round(img.height * scale)),
-    );
-  }
-  const w = img.width;
-  const h = img.height;
-  const src = img.bitmap as Uint8Array | Uint8ClampedArray;
-  const blurred = boxBlurRGB(src, w, h, 2);
-  const threshold = 18 * 3; // sum of |dR|+|dG|+|dB|
-  for (let i = 0; i < src.length; i += 4) {
-    const dr = Math.abs(src[i] - blurred[i]);
-    const dg = Math.abs(src[i + 1] - blurred[i + 1]);
-    const db = Math.abs(src[i + 2] - blurred[i + 2]);
-    const useBlur = dr + dg + db < threshold;
-    src[i] = ((useBlur ? blurred[i] : src[i]) & 0xf8);
-    src[i + 1] = ((useBlur ? blurred[i + 1] : src[i + 1]) & 0xf8);
-    src[i + 2] = ((useBlur ? blurred[i + 2] : src[i + 2]) & 0xf8);
-  }
-  const bg = new Image(w, h).fill(
-    Image.rgbaToColor((hex >> 16) & 0xff, (hex >> 8) & 0xff, hex & 0xff, 0xff),
-  );
-  bg.composite(img, 0, 0);
-  const bytes = await bg.encode();
-  return { bytes, width: w, height: h };
-}
-
-async function callFluxStructural(params: {
+// ---------- Route 3d: simpleStyleMode — flux-kontext-pro with a tiny ----------
+// Empirically, Kontext preserves geometry and applies style perfectly when
+// the prompt is a SHORT instruction (e.g. "make this in oil styling"). Long
+// prompts make Kontext interpret the text as "recreate against this" and the
+// geometry drifts. So this branch sends ONLY `instruction` as the text input
+// — no base prompt, no isolation rules, no negative — then runs the standard
+// 851-labs background-remover on the Kontext output.
+async function callKontextSimpleStyle(params: {
   faceImageUrl: string;
-  promptText: string;
+  instruction: string;
   designId: string;
-  engine: "bfl-canny" | "bfl-depth";
-  controlType: "canny" | "depth";
-  guidance: number;
-  steps: number;
-  styleLabel?: string | null;
 }): Promise<
   | { ok: true; bytes: Uint8Array; contentType: string; outputUrl: string }
   | { ok: false; response: Response }
@@ -1099,119 +954,18 @@ async function callFluxStructural(params: {
       ok: false,
       response: fallbackResponse(
         "Tjänsten är tillfälligt otillgänglig. Försök igen senare.",
-        "REPLICATE_API_TOKEN not configured (structural path)",
+        "REPLICATE_API_TOKEN not configured (kontext-simple)",
       ),
     };
   }
-
-  const supabaseAdmin = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
-
-  const model = params.engine === "bfl-depth" ? FLUX_DEPTH_MODEL : FLUX_CANNY_MODEL;
 
   console.log(
-    `[flux-structural] start designId=${params.designId} engine=${params.engine} model=${model} ` +
-      `controlType=${params.controlType} guidance=${params.guidance} steps=${params.steps} ` +
-      `styleLabel=${params.styleLabel ?? "-"}`,
+    `[kontext-simple] start designId=${params.designId} instruction="${params.instruction}"`,
   );
 
-  // Step 1: bg-remove the original photo → RGBA cutout.
-  const bg1Start = await fetch(`https://api.replicate.com/v1/predictions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      version: BG_REMOVER_VERSION,
-      input: {
-        image: params.faceImageUrl,
-        format: "png",
-        background_type: "rgba",
-      },
-    }),
-  });
-  const bg1Json = await bg1Start.json();
-  if (!bg1Start.ok || !bg1Json?.id) {
-    return {
-      ok: false,
-      response: fallbackResponse(
-        "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
-        `Structural BG#1 start failed: ${bg1Start.status} ${JSON.stringify(bg1Json).slice(0, 300)}`,
-      ),
-    };
-  }
-  const bg1Poll = await pollReplicate(bg1Json.id, REPLICATE_API_TOKEN, 90, 2000, 4000);
-  if (!bg1Poll.ok) {
-    return {
-      ok: false,
-      response: fallbackResponse(
-        "Vi kunde inte skapa bilden den här gången. Försök igen.",
-        `Structural BG#1 ${bg1Poll.reason}`,
-      ),
-    };
-  }
-  const cutoutUrl1 = bg1Poll.output;
-  console.log(`[flux-structural] bg#1 done designId=${params.designId} url=${cutoutUrl1}`);
-
-  // Step 2: fetch cutout, flatten over #7f7f7f, upload as control image.
-  const cutoutResp = await fetch(cutoutUrl1);
-  if (!cutoutResp.ok) {
-    return {
-      ok: false,
-      response: fallbackResponse(
-        "Vi kunde inte hämta den genererade bilden. Försök igen.",
-        `Structural cutout#1 fetch ${cutoutResp.status}`,
-      ),
-    };
-  }
-  const cutoutBytes = new Uint8Array(await cutoutResp.arrayBuffer());
-
-  let prepared: { bytes: Uint8Array; width: number; height: number };
-  try {
-    prepared = await prepareControlImage(cutoutBytes, 0x7f7f7f, params.controlType);
-  } catch (e) {
-    return {
-      ok: false,
-      response: fallbackResponse(
-        "Vi kunde inte förbereda bilden. Försök igen.",
-        `Structural prepare failed: ${e instanceof Error ? e.message : String(e)}`,
-      ),
-    };
-  }
-  const flatBytes = prepared.bytes;
-
-  const ctrlPath = `${params.designId}-ctrl.png`;
-  const { error: ctrlUpErr } = await supabaseAdmin.storage
-    .from("print-files")
-    .upload(ctrlPath, flatBytes, { contentType: "image/png", upsert: true });
-  if (ctrlUpErr) {
-    return {
-      ok: false,
-      response: fallbackResponse(
-        "Vi kunde inte förbereda bilden. Försök igen.",
-        `Structural control upload failed: ${ctrlUpErr.message}`,
-      ),
-    };
-  }
-  const { data: ctrlPub } = supabaseAdmin.storage
-    .from("print-files")
-    .getPublicUrl(ctrlPath);
-  const controlImageUrl = ctrlPub.publicUrl;
-  console.log(
-    `[flux-structural] control image ready designId=${params.designId} engine=${params.engine} ` +
-      `controlType=${params.controlType} controlImageBytes=${flatBytes.length} ` +
-      `controlImageDims=${prepared.width}x${prepared.height} ` +
-      `styleLabel=${params.styleLabel ?? "-"} guidance=${params.guidance} steps=${params.steps} ` +
-      `url=${controlImageUrl}`,
-  );
-
-  // Step 3: call BFL flux-{canny|depth}-pro with control_image + prompt.
-  // Model picked by `engine` (set above from caller).
+  // Step 1: flux-kontext-pro with ONLY the short instruction.
   const fluxStart = await fetch(
-    `https://api.replicate.com/v1/models/${model}/predictions`,
+    `https://api.replicate.com/v1/models/${FLUX_KONTEXT_MODEL}/predictions`,
     {
       method: "POST",
       headers: {
@@ -1220,13 +974,12 @@ async function callFluxStructural(params: {
       },
       body: JSON.stringify({
         input: {
-          prompt: params.promptText,
-          control_image: controlImageUrl,
-          guidance: params.guidance,
-          steps: params.steps,
+          input_image: params.faceImageUrl,
+          prompt: params.instruction,
           output_format: "png",
           safety_tolerance: 2,
           prompt_upsampling: false,
+          aspect_ratio: "match_input_image",
         },
       }),
     },
@@ -1237,7 +990,7 @@ async function callFluxStructural(params: {
       ok: false,
       response: fallbackResponse(
         "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
-        `Structural flux start failed (${model}): ${fluxStart.status} ${JSON.stringify(fluxJson).slice(0, 300)}`,
+        `Kontext-simple start failed: ${fluxStart.status} ${JSON.stringify(fluxJson).slice(0, 300)}`,
       ),
     };
   }
@@ -1247,15 +1000,15 @@ async function callFluxStructural(params: {
       ok: false,
       response: fallbackResponse(
         "Vi kunde inte skapa bilden den här gången. Försök igen.",
-        `Structural flux ${fluxPoll.reason} (${model})`,
+        `Kontext-simple ${fluxPoll.reason}`,
       ),
     };
   }
-  const fluxUrl = fluxPoll.output;
-  console.log(`[flux-structural] flux done designId=${params.designId} model=${model} url=${fluxUrl}`);
+  const styledUrl = fluxPoll.output;
+  console.log(`[kontext-simple] flux done designId=${params.designId} url=${styledUrl}`);
 
-  // Step 4: bg-remove the structural output → strip #7f7f7f, return RGBA.
-  const bg2Start = await fetch(`https://api.replicate.com/v1/predictions`, {
+  // Step 2: 851-labs/background-remover — RGBA PNG cutout from the styled image.
+  const bgStart = await fetch(`https://api.replicate.com/v1/predictions`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
@@ -1263,296 +1016,55 @@ async function callFluxStructural(params: {
     },
     body: JSON.stringify({
       version: BG_REMOVER_VERSION,
-      input: { image: fluxUrl, format: "png", background_type: "rgba" },
+      input: {
+        image: styledUrl,
+        format: "png",
+        background_type: "rgba",
+      },
     }),
   });
-  const bg2Json = await bg2Start.json();
-  if (!bg2Start.ok || !bg2Json?.id) {
+  const bgJson = await bgStart.json();
+  if (!bgStart.ok || !bgJson?.id) {
     return {
       ok: false,
       response: fallbackResponse(
         "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
-        `Structural BG#2 start failed: ${bg2Start.status} ${JSON.stringify(bg2Json).slice(0, 300)}`,
+        `Kontext-simple BG-remover start failed: ${bgStart.status} ${JSON.stringify(bgJson).slice(0, 300)}`,
       ),
     };
   }
-  const bg2Poll = await pollReplicate(bg2Json.id, REPLICATE_API_TOKEN, 90, 2000, 4000);
-  if (!bg2Poll.ok) {
+  const bgPoll = await pollReplicate(bgJson.id, REPLICATE_API_TOKEN, 90, 2000, 4000);
+  if (!bgPoll.ok) {
     return {
       ok: false,
       response: fallbackResponse(
         "Vi kunde inte skapa bilden den här gången. Försök igen.",
-        `Structural BG#2 ${bg2Poll.reason}`,
+        `Kontext-simple BG-remover ${bgPoll.reason}`,
       ),
     };
   }
-  const finalCutoutUrl = bg2Poll.output;
-  const finalResp = await fetch(finalCutoutUrl);
-  if (!finalResp.ok) {
-    return {
-      ok: false,
-      response: fallbackResponse(
-        "Vi kunde inte hämta den genererade bilden. Försök igen.",
-        `Structural final fetch ${finalResp.status}`,
-      ),
-    };
-  }
-  const finalBytes = new Uint8Array(await finalResp.arrayBuffer());
-  const finalContentType = finalResp.headers.get("content-type") ?? "image/png";
-  console.log(
-    `[flux-structural] done designId=${params.designId} bytes=${finalBytes.byteLength} ` +
-      `contentType=${finalContentType} url=${finalCutoutUrl}`,
-  );
-  return { ok: true, bytes: finalBytes, contentType: finalContentType, outputUrl: finalCutoutUrl };
-}
-
-/**
- * Vehicle pipeline (bilposter + mc): SDXL multi-controlnet + style-LoRA.
- * Geometry from depth/canny controlnet; style from LoRA weights, not text.
- * Same envelope as callFluxStructural so the rest of the pipeline (bg-remove
- * #1 → control prep → model → bg-remove #2) is unchanged. Only the middle
- * model call differs.
- */
-async function callSdxlControlnetLora(params: {
-  faceImageUrl: string;
-  promptText: string;
-  designId: string;
-  controlType: "canny" | "depth";
-  controlnetScale: number;
-  loraUrl: string;
-  loraScale: number;
-  loraTrigger: string | null;
-  styleLabel?: string | null;
-}): Promise<
-  | { ok: true; bytes: Uint8Array; contentType: string; outputUrl: string }
-  | { ok: false; response: Response }
-> {
-  const REPLICATE_API_TOKEN = Deno.env.get("REPLICATE_API_TOKEN");
-  if (!REPLICATE_API_TOKEN) {
-    return {
-      ok: false,
-      response: fallbackResponse(
-        "Tjänsten är tillfälligt otillgänglig. Försök igen senare.",
-        "REPLICATE_API_TOKEN not configured (sdxl-cn-lora path)",
-      ),
-    };
-  }
-  const supabaseAdmin = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
-
-  // fofr/sdxl-multi-controlnet-lora enum values for controlnet_1.
-  const controlnetType = params.controlType === "depth" ? "depth_midas" : "edge_canny";
-  const finalPrompt = [params.promptText, params.loraTrigger].filter(Boolean).join("\n");
-
-  console.log(
-    `[sdxl-cn-lora] start designId=${params.designId} model=${SDXL_CN_LORA_MODEL} ` +
-      `controlType=${params.controlType} controlnet_1=${controlnetType} ` +
-      `controlnetScale=${params.controlnetScale} loraScale=${params.loraScale} ` +
-      `loraUrl=${params.loraUrl} loraTrigger=${params.loraTrigger ?? "-"} ` +
-      `styleLabel=${params.styleLabel ?? "-"}`,
-  );
-
-  // Step 1: bg-remove the original photo → RGBA cutout.
-  const bg1Start = await fetch(`https://api.replicate.com/v1/predictions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      version: BG_REMOVER_VERSION,
-      input: { image: params.faceImageUrl, format: "png", background_type: "rgba" },
-    }),
-  });
-  const bg1Json = await bg1Start.json();
-  if (!bg1Start.ok || !bg1Json?.id) {
-    return {
-      ok: false,
-      response: fallbackResponse(
-        "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
-        `SDXL BG#1 start failed: ${bg1Start.status} ${JSON.stringify(bg1Json).slice(0, 300)}`,
-      ),
-    };
-  }
-  const bg1Poll = await pollReplicate(bg1Json.id, REPLICATE_API_TOKEN, 90, 2000, 4000);
-  if (!bg1Poll.ok) {
-    return {
-      ok: false,
-      response: fallbackResponse(
-        "Vi kunde inte skapa bilden den här gången. Försök igen.",
-        `SDXL BG#1 ${bg1Poll.reason}`,
-      ),
-    };
-  }
-  const cutoutUrl1 = bg1Poll.output;
-
-  // Step 2: prep control image (same as flux-structural — depth=clean cutout,
-  // canny=edge-preserving simplification).
-  const cutoutResp = await fetch(cutoutUrl1);
+  const cutoutUrl = bgPoll.output;
+  const cutoutResp = await fetch(cutoutUrl);
   if (!cutoutResp.ok) {
     return {
       ok: false,
       response: fallbackResponse(
         "Vi kunde inte hämta den genererade bilden. Försök igen.",
-        `SDXL cutout fetch ${cutoutResp.status}`,
+        `Kontext-simple BG-remover fetch ${cutoutResp.status}`,
       ),
     };
   }
-  const cutoutBytes = new Uint8Array(await cutoutResp.arrayBuffer());
-  let prepared: { bytes: Uint8Array; width: number; height: number };
-  try {
-    prepared = await prepareControlImage(cutoutBytes, 0x7f7f7f, params.controlType);
-  } catch (e) {
-    return {
-      ok: false,
-      response: fallbackResponse(
-        "Vi kunde inte förbereda bilden. Försök igen.",
-        `SDXL prepare failed: ${e instanceof Error ? e.message : String(e)}`,
-      ),
-    };
-  }
-
-  const ctrlPath = `${params.designId}-sdxl-ctrl.png`;
-  const { error: ctrlUpErr } = await supabaseAdmin.storage
-    .from("print-files")
-    .upload(ctrlPath, prepared.bytes, { contentType: "image/png", upsert: true });
-  if (ctrlUpErr) {
-    return {
-      ok: false,
-      response: fallbackResponse(
-        "Vi kunde inte förbereda bilden. Försök igen.",
-        `SDXL control upload failed: ${ctrlUpErr.message}`,
-      ),
-    };
-  }
-  const { data: ctrlPub } = supabaseAdmin.storage
-    .from("print-files")
-    .getPublicUrl(ctrlPath);
-  const controlImageUrl = ctrlPub.publicUrl;
+  const ab = await cutoutResp.arrayBuffer();
+  const bytes = new Uint8Array(ab);
+  const contentType = cutoutResp.headers.get("content-type") ?? "image/png";
   console.log(
-    `[sdxl-cn-lora] control image ready designId=${params.designId} ` +
-      `controlImageBytes=${prepared.bytes.length} dims=${prepared.width}x${prepared.height} ` +
-      `url=${controlImageUrl}`,
+    `[kontext-simple] done designId=${params.designId} bytes=${bytes.byteLength} ` +
+      `contentType=${contentType} url=${cutoutUrl}`,
   );
-
-  // Step 3: call fofr/sdxl-multi-controlnet-lora (community → /v1/predictions
-  // with `version`). sizing_strategy=controlnet_1_image so output dims follow
-  // the control image, keeping aspect ratio.
-  const sdxlStart = await fetch(`https://api.replicate.com/v1/predictions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      version: SDXL_CN_LORA_VERSION,
-      input: {
-        prompt: finalPrompt,
-        negative_prompt: "photo, photograph, photorealistic, 3d render, cgi",
-        controlnet_1: controlnetType,
-        controlnet_1_image: controlImageUrl,
-        controlnet_1_conditioning_scale: params.controlnetScale,
-        controlnet_1_start: 0,
-        controlnet_1_end: 1,
-        lora_weights: params.loraUrl,
-        lora_scale: params.loraScale,
-        sizing_strategy: "controlnet_1_image",
-        num_inference_steps: 30,
-        guidance_scale: 6.5,
-        scheduler: "K_EULER",
-        apply_watermark: false,
-        num_outputs: 1,
-      },
-    }),
-  });
-  const sdxlJson = await sdxlStart.json();
-  if (!sdxlStart.ok || !sdxlJson?.id) {
-    return {
-      ok: false,
-      response: fallbackResponse(
-        "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
-        `SDXL start failed: ${sdxlStart.status} ${JSON.stringify(sdxlJson).slice(0, 400)}`,
-      ),
-    };
-  }
-  const sdxlPoll = await pollReplicate(sdxlJson.id, REPLICATE_API_TOKEN, 180, 3000, 6000);
-  if (!sdxlPoll.ok) {
-    return {
-      ok: false,
-      response: fallbackResponse(
-        "Vi kunde inte skapa bilden den här gången. Försök igen.",
-        `SDXL ${sdxlPoll.reason}`,
-      ),
-    };
-  }
-  // sdxl-multi-controlnet-lora returns an array of output URLs; take the first.
-  const sdxlOutput = Array.isArray(sdxlPoll.output) ? sdxlPoll.output[0] : sdxlPoll.output;
-  if (!sdxlOutput) {
-    return {
-      ok: false,
-      response: fallbackResponse(
-        "Vi kunde inte skapa bilden den här gången. Försök igen.",
-        `SDXL succeeded but no output URL: ${JSON.stringify(sdxlPoll).slice(0, 300)}`,
-      ),
-    };
-  }
-  console.log(`[sdxl-cn-lora] sdxl done designId=${params.designId} url=${sdxlOutput}`);
-
-  // Step 4: bg-remove the SDXL output → strip the #7f7f7f backdrop the
-  // controlnet was conditioned on. Returns RGBA so the per-layer
-  // backdropColor still applies downstream.
-  const bg2Start = await fetch(`https://api.replicate.com/v1/predictions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      version: BG_REMOVER_VERSION,
-      input: { image: sdxlOutput, format: "png", background_type: "rgba" },
-    }),
-  });
-  const bg2Json = await bg2Start.json();
-  if (!bg2Start.ok || !bg2Json?.id) {
-    return {
-      ok: false,
-      response: fallbackResponse(
-        "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
-        `SDXL BG#2 start failed: ${bg2Start.status} ${JSON.stringify(bg2Json).slice(0, 300)}`,
-      ),
-    };
-  }
-  const bg2Poll = await pollReplicate(bg2Json.id, REPLICATE_API_TOKEN, 90, 2000, 4000);
-  if (!bg2Poll.ok) {
-    return {
-      ok: false,
-      response: fallbackResponse(
-        "Vi kunde inte skapa bilden den här gången. Försök igen.",
-        `SDXL BG#2 ${bg2Poll.reason}`,
-      ),
-    };
-  }
-  const finalCutoutUrl = bg2Poll.output;
-  const finalResp = await fetch(finalCutoutUrl);
-  if (!finalResp.ok) {
-    return {
-      ok: false,
-      response: fallbackResponse(
-        "Vi kunde inte hämta den genererade bilden. Försök igen.",
-        `SDXL final fetch ${finalResp.status}`,
-      ),
-    };
-  }
-  const finalBytes = new Uint8Array(await finalResp.arrayBuffer());
-  const finalContentType = finalResp.headers.get("content-type") ?? "image/png";
-  console.log(
-    `[sdxl-cn-lora] done designId=${params.designId} bytes=${finalBytes.byteLength} ` +
-      `contentType=${finalContentType} url=${finalCutoutUrl}`,
-  );
-  return { ok: true, bytes: finalBytes, contentType: finalContentType, outputUrl: finalCutoutUrl };
+  return { ok: true, bytes, contentType, outputUrl: cutoutUrl };
 }
+
+
 
 
 
