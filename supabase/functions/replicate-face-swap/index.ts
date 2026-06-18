@@ -1109,18 +1109,19 @@ async function callFluxStructural(params: {
   }
   const cutoutBytes = new Uint8Array(await cutoutResp.arrayBuffer());
 
-  let flatBytes: Uint8Array;
+  let prepared: { bytes: Uint8Array; width: number; height: number };
   try {
-    flatBytes = await flattenOverGrey(cutoutBytes, 0x7f7f7f);
+    prepared = await prepareControlImage(cutoutBytes, 0x7f7f7f);
   } catch (e) {
     return {
       ok: false,
       response: fallbackResponse(
         "Vi kunde inte förbereda bilden. Försök igen.",
-        `Structural flatten failed: ${e instanceof Error ? e.message : String(e)}`,
+        `Structural prepare failed: ${e instanceof Error ? e.message : String(e)}`,
       ),
     };
   }
+  const flatBytes = prepared.bytes;
 
   const ctrlPath = `${params.designId}-ctrl.png`;
   const { error: ctrlUpErr } = await supabaseAdmin.storage
@@ -1139,7 +1140,12 @@ async function callFluxStructural(params: {
     .from("print-files")
     .getPublicUrl(ctrlPath);
   const controlImageUrl = ctrlPub.publicUrl;
-  console.log(`[flux-structural] control image ready designId=${params.designId} url=${controlImageUrl}`);
+  console.log(
+    `[flux-structural] control image ready designId=${params.designId} ` +
+      `controlImageBytes=${flatBytes.length} controlImageDims=${prepared.width}x${prepared.height} ` +
+      `styleLabel=${params.styleLabel ?? "-"} guidance=${params.guidance} steps=${params.steps} ` +
+      `url=${controlImageUrl}`,
+  );
 
   // Step 3: call BFL flux-{canny|depth}-pro with control_image + prompt.
   const model =
