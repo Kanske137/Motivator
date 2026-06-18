@@ -1031,6 +1031,7 @@ async function callFluxStructural(params: {
   controlType: "canny" | "depth";
   guidance: number;
   steps: number;
+  styleLabel?: string | null;
 }): Promise<
   | { ok: true; bytes: Uint8Array; contentType: string; outputUrl: string }
   | { ok: false; response: Response }
@@ -1053,7 +1054,7 @@ async function callFluxStructural(params: {
 
   console.log(
     `[flux-structural] start designId=${params.designId} controlType=${params.controlType} ` +
-      `guidance=${params.guidance} steps=${params.steps}`,
+      `guidance=${params.guidance} steps=${params.steps} styleLabel=${params.styleLabel ?? "-"}`,
   );
 
   // Step 1: bg-remove the original photo → RGBA cutout.
