@@ -163,6 +163,28 @@ export const aiPhotoDefaultsSchema = z.object({
    *  instruction to preserve the subject's original colors/hue so applied art
    *  styles act as a surface treatment only. */
   preserveSubjectColors: z.boolean().optional(),
+  /** removeBackground only: opt-in structural-conditioning path via BFL's
+   *  flux-canny-pro / flux-depth-pro on Replicate. When `enabled === true`
+   *  the edge function runs:
+   *    bg-remove → flatten on #7f7f7f → flux-{canny|depth}-pro → bg-remove
+   *  Geometry (orientation, angle, scale, mirroring) is locked by the
+   *  control image from the original photo; the style prompt only changes
+   *  the surface. When absent/disabled the existing flux-kontext-pro path
+   *  (or Nano Banana fallback) runs unchanged.
+   *
+   *  BFL's flux-{canny|depth}-pro exposes `guidance` (0..100, ~30) and
+   *  `steps`. There is no separate control-strength knob — geometry vs.
+   *  style balance is steered purely via guidance. `controlStrength` is
+   *  accepted for forward-compatibility but IGNORED by the BFL path. */
+  structuralConditioning: z
+    .object({
+      enabled: z.boolean(),
+      controlType: z.enum(["canny", "depth"]).default("canny"),
+      controlStrength: z.number().min(0).max(1).optional(),
+      guidance: z.number().min(0).max(100).default(30),
+      steps: z.number().int().min(15).max(50).default(28),
+    })
+    .optional(),
   /** OPTIONAL multi-face mode. Strictly additive: when `enabled !== true`
    *  the layer behaves EXACTLY like a single-face aiPhoto (same UI, same
    *  edge function, same cache, same render). When enabled the customer
