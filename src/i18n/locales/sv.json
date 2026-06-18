@@ -152,7 +152,9 @@
     "subjectHintHuman": "Bilden ska visa ansiktet rakt framifrån, väl belyst.",
     "subjectHintPet": "Bilden ska visa djurets ansikte tydligt, gärna framifrån.",
     "subjectHintRemoveBg": "Ladda upp bilden där motivet syns tydligt — vi tar bort bakgrunden åt dig.",
-    "chooseSubject": "Välj motiv"
+    "chooseSubject": "Välj motiv",
+    "previousVersions": "Tidigare versioner",
+    "reused": "Återanvänd version"
   },
   "preview": {
     "title": "Förhandsgranska",

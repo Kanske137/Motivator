@@ -152,7 +152,9 @@
     "subjectHintHuman": "Billedet skal vise ansigtet lige forfra, godt belyst.",
     "subjectHintPet": "Billedet skal vise dyrets ansigt tydeligt, gerne forfra.",
     "subjectHintRemoveBg": "Upload et billede hvor motivet er tydeligt — vi fjerner baggrunden for dig.",
-    "chooseSubject": "Vælg motiv"
+    "chooseSubject": "Vælg motiv",
+    "previousVersions": "Tidligere versioner",
+    "reused": "Version genbrugt"
   },
   "preview": {
     "title": "Forhåndsvisning",
