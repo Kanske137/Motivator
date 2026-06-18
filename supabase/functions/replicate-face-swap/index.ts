@@ -674,9 +674,16 @@ async function runRemoveBackground(params: {
     fluxStyleTail,
   ].filter(Boolean).join("\n\n");
 
+  // Structural path: control image already locks geometry, so the
+  //   "SURFACE TREATMENT only / do not re-angle" framing just dilutes the
+  //   style. Put the style FIRST so flux treats it as the primary instruction,
+  //   then the motif/isolation rules.
+  const structuralStyleHead = params.stylePrompt?.trim()
+    ? [bridge, params.stylePrompt.trim()].filter(Boolean).join("\n")
+    : "";
   const structuralPromptText = [
+    structuralStyleHead,
     fluxMotifLine ? `${fluxBaseStructural} ${fluxMotifLine}` : fluxBaseStructural,
-    fluxStyleTail,
   ].filter(Boolean).join("\n\n");
 
   console.log("[runRemoveBackground] config", {
@@ -705,6 +712,7 @@ async function runRemoveBackground(params: {
       controlType: params.structuralConditioning!.controlType,
       guidance: params.structuralConditioning!.guidance,
       steps: params.structuralConditioning!.steps,
+      styleLabel: params.styleLabel,
     });
   }
 
@@ -922,6 +930,100 @@ async function flattenOverGrey(
   return await bg.encode();
 }
 
+/** Box-blur over RGB only (alpha preserved). Separable 2-pass. */
+function boxBlurRGB(
+  src: Uint8Array | Uint8ClampedArray,
+  w: number,
+  h: number,
+  r: number,
+): Uint8Array {
+  const tmp = new Uint8Array(src.length);
+  const dst = new Uint8Array(src.length);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let rs = 0, gs = 0, bs = 0, n = 0;
+      const x0 = Math.max(0, x - r);
+      const x1 = Math.min(w - 1, x + r);
+      for (let xx = x0; xx <= x1; xx++) {
+        const i = (y * w + xx) * 4;
+        rs += src[i]; gs += src[i + 1]; bs += src[i + 2]; n++;
+      }
+      const o = (y * w + x) * 4;
+      tmp[o] = (rs / n) | 0;
+      tmp[o + 1] = (gs / n) | 0;
+      tmp[o + 2] = (bs / n) | 0;
+      tmp[o + 3] = src[o + 3];
+    }
+  }
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let rs = 0, gs = 0, bs = 0, n = 0;
+      const y0 = Math.max(0, y - r);
+      const y1 = Math.min(h - 1, y + r);
+      for (let yy = y0; yy <= y1; yy++) {
+        const i = (yy * w + x) * 4;
+        rs += tmp[i]; gs += tmp[i + 1]; bs += tmp[i + 2]; n++;
+      }
+      const o = (y * w + x) * 4;
+      dst[o] = (rs / n) | 0;
+      dst[o + 1] = (gs / n) | 0;
+      dst[o + 2] = (bs / n) | 0;
+      dst[o + 3] = tmp[o + 3];
+    }
+  }
+  return dst;
+}
+
+/** Prepare control image for flux-canny-pro:
+ *   1. Downsample so max(w,h) = 768 (caps control-map detail).
+ *   2. Edge-preserving smoothing: keep silhouette + high-contrast panel/limb
+ *      edges sharp; replace low-contrast micro-texture (reflections, tread,
+ *      lists, weave) with a box-blurred copy. Proxy for raising canny
+ *      threshold since BFL flux-canny-pro runs canny internally without an
+ *      exposed threshold.
+ *   3. Posterize RGB to 32 levels (& 0xF8) to wipe remaining micro variation.
+ *   4. Flatten over flat mid-grey (#7f7f7f) so canny only finds subject edges.
+ */
+async function prepareControlImage(
+  rgbaPngBytes: Uint8Array,
+  hex: number,
+): Promise<{ bytes: Uint8Array; width: number; height: number }> {
+  let img = await Image.decode(rgbaPngBytes);
+  const maxDim = Math.max(img.width, img.height);
+  if (maxDim > 768) {
+    const scale = 768 / maxDim;
+    img = img.resize(
+      Math.max(1, Math.round(img.width * scale)),
+      Math.max(1, Math.round(img.height * scale)),
+    );
+  }
+  const w = img.width;
+  const h = img.height;
+  const src = img.bitmap as Uint8Array | Uint8ClampedArray;
+  const blurred = boxBlurRGB(src, w, h, 2);
+  const threshold = 18 * 3; // sum of |dR|+|dG|+|dB|
+  for (let i = 0; i < src.length; i += 4) {
+    const dr = Math.abs(src[i] - blurred[i]);
+    const dg = Math.abs(src[i + 1] - blurred[i + 1]);
+    const db = Math.abs(src[i + 2] - blurred[i + 2]);
+    const useBlur = dr + dg + db < threshold;
+    src[i] = ((useBlur ? blurred[i] : src[i]) & 0xf8);
+    src[i + 1] = ((useBlur ? blurred[i + 1] : src[i + 1]) & 0xf8);
+    src[i + 2] = ((useBlur ? blurred[i + 2] : src[i + 2]) & 0xf8);
+  }
+  const bg = new Image(w, h).fill(
+    Image.rgbaToColor(
+      (hex >> 16) & 0xff,
+      (hex >> 8) & 0xff,
+      hex & 0xff,
+      0xff,
+    ),
+  );
+  bg.composite(img, 0, 0);
+  const bytes = await bg.encode();
+  return { bytes, width: w, height: h };
+}
+
 async function callFluxStructural(params: {
   faceImageUrl: string;
   promptText: string;
@@ -929,6 +1031,7 @@ async function callFluxStructural(params: {
   controlType: "canny" | "depth";
   guidance: number;
   steps: number;
+  styleLabel?: string | null;
 }): Promise<
   | { ok: true; bytes: Uint8Array; contentType: string; outputUrl: string }
   | { ok: false; response: Response }
@@ -951,7 +1054,7 @@ async function callFluxStructural(params: {
 
   console.log(
     `[flux-structural] start designId=${params.designId} controlType=${params.controlType} ` +
-      `guidance=${params.guidance} steps=${params.steps}`,
+      `guidance=${params.guidance} steps=${params.steps} styleLabel=${params.styleLabel ?? "-"}`,
   );
 
   // Step 1: bg-remove the original photo → RGBA cutout.
@@ -1006,18 +1109,19 @@ async function callFluxStructural(params: {
   }
   const cutoutBytes = new Uint8Array(await cutoutResp.arrayBuffer());
 
-  let flatBytes: Uint8Array;
+  let prepared: { bytes: Uint8Array; width: number; height: number };
   try {
-    flatBytes = await flattenOverGrey(cutoutBytes, 0x7f7f7f);
+    prepared = await prepareControlImage(cutoutBytes, 0x7f7f7f);
   } catch (e) {
     return {
       ok: false,
       response: fallbackResponse(
         "Vi kunde inte förbereda bilden. Försök igen.",
-        `Structural flatten failed: ${e instanceof Error ? e.message : String(e)}`,
+        `Structural prepare failed: ${e instanceof Error ? e.message : String(e)}`,
       ),
     };
   }
+  const flatBytes = prepared.bytes;
 
   const ctrlPath = `${params.designId}-ctrl.png`;
   const { error: ctrlUpErr } = await supabaseAdmin.storage
@@ -1036,7 +1140,12 @@ async function callFluxStructural(params: {
     .from("print-files")
     .getPublicUrl(ctrlPath);
   const controlImageUrl = ctrlPub.publicUrl;
-  console.log(`[flux-structural] control image ready designId=${params.designId} url=${controlImageUrl}`);
+  console.log(
+    `[flux-structural] control image ready designId=${params.designId} ` +
+      `controlImageBytes=${flatBytes.length} controlImageDims=${prepared.width}x${prepared.height} ` +
+      `styleLabel=${params.styleLabel ?? "-"} guidance=${params.guidance} steps=${params.steps} ` +
+      `url=${controlImageUrl}`,
+  );
 
   // Step 3: call BFL flux-{canny|depth}-pro with control_image + prompt.
   const model =
