@@ -55,14 +55,26 @@ function refSlotFor(
   styleId: string | null,
   controlType?: string | null,
   engine?: string | null,
+  loraTag?: string | null,
 ): string {
   if (subjectKind === "removeBackground") {
     let base = `no-ref::style:${styleId ?? "none"}`;
     if (controlType) base += `::ctrl:${controlType}`;
     if (engine) base += `::eng:${engine}`;
+    if (loraTag) base += `::lora:${loraTag}`;
     return base;
   }
   return refUrl ?? "";
+}
+
+/** Cheap stable tag for a LoRA URL — first 8 hex chars of a djb2 hash.
+ *  Async crypto is overkill for a cache key; we only need uniqueness within
+ *  the user's localStorage. */
+function loraTagOf(url: string | null | undefined): string | null {
+  if (!url) return null;
+  let h = 5381;
+  for (let i = 0; i < url.length; i++) h = ((h << 5) + h + url.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(16).padStart(8, "0").slice(0, 8);
 }
 
 async function blobToDataUrl(blob: Blob): Promise<string> {
