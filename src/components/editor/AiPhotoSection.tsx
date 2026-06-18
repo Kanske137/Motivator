@@ -373,6 +373,10 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
           <div className="grid grid-cols-3 gap-2">
             {referenceImages.map((r) => {
               const isActive = (selectedRef?.url ?? null) === r.url;
+              const cachedUrl = source?.hash
+                ? getCachedFaceSwap(layer.id, source.hash, refSlotFor(subjectKind, r.url, null))
+                : null;
+              const thumbSrc = cachedUrl ?? r.url;
               return (
                 <button
                   key={r.id}
@@ -383,7 +387,12 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
                     isActive && "ring-2 ring-primary",
                   )}
                 >
-                  <img src={r.url} alt={r.label ?? ""} className="w-full h-full object-cover" />
+                  <img src={thumbSrc} alt={r.label ?? ""} className="w-full h-full object-cover" />
+                  {cachedUrl && (
+                    <span className="absolute top-1 right-1 bg-primary text-primary-foreground text-[9px] font-semibold px-1.5 py-0.5 rounded-full leading-none">
+                      ✓
+                    </span>
+                  )}
                   {r.label && (
                     <span className="absolute bottom-0 inset-x-0 bg-background/85 backdrop-blur-sm text-[10px] py-1 text-center font-medium">
                       {r.label}
