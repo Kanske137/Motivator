@@ -674,9 +674,16 @@ async function runRemoveBackground(params: {
     fluxStyleTail,
   ].filter(Boolean).join("\n\n");
 
+  // Structural path: control image already locks geometry, so the
+  //   "SURFACE TREATMENT only / do not re-angle" framing just dilutes the
+  //   style. Put the style FIRST so flux treats it as the primary instruction,
+  //   then the motif/isolation rules.
+  const structuralStyleHead = params.stylePrompt?.trim()
+    ? [bridge, params.stylePrompt.trim()].filter(Boolean).join("\n")
+    : "";
   const structuralPromptText = [
+    structuralStyleHead,
     fluxMotifLine ? `${fluxBaseStructural} ${fluxMotifLine}` : fluxBaseStructural,
-    fluxStyleTail,
   ].filter(Boolean).join("\n\n");
 
   console.log("[runRemoveBackground] config", {
@@ -705,6 +712,7 @@ async function runRemoveBackground(params: {
       controlType: params.structuralConditioning!.controlType,
       guidance: params.structuralConditioning!.guidance,
       steps: params.structuralConditioning!.steps,
+      styleLabel: params.styleLabel,
     });
   }
 
