@@ -1306,6 +1306,256 @@ async function callFluxStructural(params: {
   return { ok: true, bytes: finalBytes, contentType: finalContentType, outputUrl: finalCutoutUrl };
 }
 
+/**
+ * Vehicle pipeline (bilposter + mc): SDXL multi-controlnet + style-LoRA.
+ * Geometry from depth/canny controlnet; style from LoRA weights, not text.
+ * Same envelope as callFluxStructural so the rest of the pipeline (bg-remove
+ * #1 → control prep → model → bg-remove #2) is unchanged. Only the middle
+ * model call differs.
+ */
+async function callSdxlControlnetLora(params: {
+  faceImageUrl: string;
+  promptText: string;
+  designId: string;
+  controlType: "canny" | "depth";
+  controlnetScale: number;
+  loraUrl: string;
+  loraScale: number;
+  loraTrigger: string | null;
+  styleLabel?: string | null;
+}): Promise<
+  | { ok: true; bytes: Uint8Array; contentType: string; outputUrl: string }
+  | { ok: false; response: Response }
+> {
+  const REPLICATE_API_TOKEN = Deno.env.get("REPLICATE_API_TOKEN");
+  if (!REPLICATE_API_TOKEN) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Tjänsten är tillfälligt otillgänglig. Försök igen senare.",
+        "REPLICATE_API_TOKEN not configured (sdxl-cn-lora path)",
+      ),
+    };
+  }
+  const supabaseAdmin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+
+  // fofr/sdxl-multi-controlnet-lora enum values for controlnet_1.
+  const controlnetType = params.controlType === "depth" ? "depth_midas" : "edge_canny";
+  const finalPrompt = [params.promptText, params.loraTrigger].filter(Boolean).join("\n");
+
+  console.log(
+    `[sdxl-cn-lora] start designId=${params.designId} model=${SDXL_CN_LORA_MODEL} ` +
+      `controlType=${params.controlType} controlnet_1=${controlnetType} ` +
+      `controlnetScale=${params.controlnetScale} loraScale=${params.loraScale} ` +
+      `loraUrl=${params.loraUrl} loraTrigger=${params.loraTrigger ?? "-"} ` +
+      `styleLabel=${params.styleLabel ?? "-"}`,
+  );
+
+  // Step 1: bg-remove the original photo → RGBA cutout.
+  const bg1Start = await fetch(`https://api.replicate.com/v1/predictions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      version: BG_REMOVER_VERSION,
+      input: { image: params.faceImageUrl, format: "png", background_type: "rgba" },
+    }),
+  });
+  const bg1Json = await bg1Start.json();
+  if (!bg1Start.ok || !bg1Json?.id) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
+        `SDXL BG#1 start failed: ${bg1Start.status} ${JSON.stringify(bg1Json).slice(0, 300)}`,
+      ),
+    };
+  }
+  const bg1Poll = await pollReplicate(bg1Json.id, REPLICATE_API_TOKEN, 90, 2000, 4000);
+  if (!bg1Poll.ok) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte skapa bilden den här gången. Försök igen.",
+        `SDXL BG#1 ${bg1Poll.reason}`,
+      ),
+    };
+  }
+  const cutoutUrl1 = bg1Poll.output;
+
+  // Step 2: prep control image (same as flux-structural — depth=clean cutout,
+  // canny=edge-preserving simplification).
+  const cutoutResp = await fetch(cutoutUrl1);
+  if (!cutoutResp.ok) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte hämta den genererade bilden. Försök igen.",
+        `SDXL cutout fetch ${cutoutResp.status}`,
+      ),
+    };
+  }
+  const cutoutBytes = new Uint8Array(await cutoutResp.arrayBuffer());
+  let prepared: { bytes: Uint8Array; width: number; height: number };
+  try {
+    prepared = await prepareControlImage(cutoutBytes, 0x7f7f7f, params.controlType);
+  } catch (e) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte förbereda bilden. Försök igen.",
+        `SDXL prepare failed: ${e instanceof Error ? e.message : String(e)}`,
+      ),
+    };
+  }
+
+  const ctrlPath = `${params.designId}-sdxl-ctrl.png`;
+  const { error: ctrlUpErr } = await supabaseAdmin.storage
+    .from("print-files")
+    .upload(ctrlPath, prepared.bytes, { contentType: "image/png", upsert: true });
+  if (ctrlUpErr) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte förbereda bilden. Försök igen.",
+        `SDXL control upload failed: ${ctrlUpErr.message}`,
+      ),
+    };
+  }
+  const { data: ctrlPub } = supabaseAdmin.storage
+    .from("print-files")
+    .getPublicUrl(ctrlPath);
+  const controlImageUrl = ctrlPub.publicUrl;
+  console.log(
+    `[sdxl-cn-lora] control image ready designId=${params.designId} ` +
+      `controlImageBytes=${prepared.bytes.length} dims=${prepared.width}x${prepared.height} ` +
+      `url=${controlImageUrl}`,
+  );
+
+  // Step 3: call fofr/sdxl-multi-controlnet-lora (community → /v1/predictions
+  // with `version`). sizing_strategy=controlnet_1_image so output dims follow
+  // the control image, keeping aspect ratio.
+  const sdxlStart = await fetch(`https://api.replicate.com/v1/predictions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      version: SDXL_CN_LORA_VERSION,
+      input: {
+        prompt: finalPrompt,
+        negative_prompt: "photo, photograph, photorealistic, 3d render, cgi",
+        controlnet_1: controlnetType,
+        controlnet_1_image: controlImageUrl,
+        controlnet_1_conditioning_scale: params.controlnetScale,
+        controlnet_1_start: 0,
+        controlnet_1_end: 1,
+        lora_weights: params.loraUrl,
+        lora_scale: params.loraScale,
+        sizing_strategy: "controlnet_1_image",
+        num_inference_steps: 30,
+        guidance_scale: 6.5,
+        scheduler: "K_EULER",
+        apply_watermark: false,
+        num_outputs: 1,
+      },
+    }),
+  });
+  const sdxlJson = await sdxlStart.json();
+  if (!sdxlStart.ok || !sdxlJson?.id) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
+        `SDXL start failed: ${sdxlStart.status} ${JSON.stringify(sdxlJson).slice(0, 400)}`,
+      ),
+    };
+  }
+  const sdxlPoll = await pollReplicate(sdxlJson.id, REPLICATE_API_TOKEN, 180, 3000, 6000);
+  if (!sdxlPoll.ok) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte skapa bilden den här gången. Försök igen.",
+        `SDXL ${sdxlPoll.reason}`,
+      ),
+    };
+  }
+  // sdxl-multi-controlnet-lora returns an array of output URLs; take the first.
+  const sdxlOutput = Array.isArray(sdxlPoll.output) ? sdxlPoll.output[0] : sdxlPoll.output;
+  if (!sdxlOutput) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte skapa bilden den här gången. Försök igen.",
+        `SDXL succeeded but no output URL: ${JSON.stringify(sdxlPoll).slice(0, 300)}`,
+      ),
+    };
+  }
+  console.log(`[sdxl-cn-lora] sdxl done designId=${params.designId} url=${sdxlOutput}`);
+
+  // Step 4: bg-remove the SDXL output → strip the #7f7f7f backdrop the
+  // controlnet was conditioned on. Returns RGBA so the per-layer
+  // backdropColor still applies downstream.
+  const bg2Start = await fetch(`https://api.replicate.com/v1/predictions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      version: BG_REMOVER_VERSION,
+      input: { image: sdxlOutput, format: "png", background_type: "rgba" },
+    }),
+  });
+  const bg2Json = await bg2Start.json();
+  if (!bg2Start.ok || !bg2Json?.id) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
+        `SDXL BG#2 start failed: ${bg2Start.status} ${JSON.stringify(bg2Json).slice(0, 300)}`,
+      ),
+    };
+  }
+  const bg2Poll = await pollReplicate(bg2Json.id, REPLICATE_API_TOKEN, 90, 2000, 4000);
+  if (!bg2Poll.ok) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte skapa bilden den här gången. Försök igen.",
+        `SDXL BG#2 ${bg2Poll.reason}`,
+      ),
+    };
+  }
+  const finalCutoutUrl = bg2Poll.output;
+  const finalResp = await fetch(finalCutoutUrl);
+  if (!finalResp.ok) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte hämta den genererade bilden. Försök igen.",
+        `SDXL final fetch ${finalResp.status}`,
+      ),
+    };
+  }
+  const finalBytes = new Uint8Array(await finalResp.arrayBuffer());
+  const finalContentType = finalResp.headers.get("content-type") ?? "image/png";
+  console.log(
+    `[sdxl-cn-lora] done designId=${params.designId} bytes=${finalBytes.byteLength} ` +
+      `contentType=${finalContentType} url=${finalCutoutUrl}`,
+  );
+  return { ok: true, bytes: finalBytes, contentType: finalContentType, outputUrl: finalCutoutUrl };
+}
+
+
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
