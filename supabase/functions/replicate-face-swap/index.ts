@@ -915,6 +915,12 @@ async function callFluxRemoveBg(params: {
 //      pipeline is unchanged).
 const FLUX_CANNY_MODEL = "black-forest-labs/flux-canny-pro";
 const FLUX_DEPTH_MODEL = "black-forest-labs/flux-depth-pro";
+// fofr/sdxl-multi-controlnet-lora — community model, must be called via
+// /v1/predictions with `version`. Pin the version we validated the schema
+// against (controlnet_1=enum, lora_weights/lora_scale, prompt_strength etc).
+const SDXL_CN_LORA_MODEL = "fofr/sdxl-multi-controlnet-lora";
+const SDXL_CN_LORA_VERSION =
+  "89eb212b3d1366a83e949c12a4b45dfe6b6b313b594cb8268e864931ac9ffb16";
 
 async function flattenOverGrey(
   rgbaPngBytes: Uint8Array,
