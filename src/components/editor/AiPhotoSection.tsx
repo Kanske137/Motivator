@@ -489,8 +489,10 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
           <div className="grid grid-cols-3 gap-2">
             {visibleStyles.map((p) => {
               const isActive = selectedStyleId === p.id;
+              const structural = layer.defaults.structuralConditioning ?? null;
+              const ctrl = structural?.enabled ? structural.controlType : null;
               const cachedUrl = source?.hash
-                ? getCachedFaceSwap(layer.id, source.hash, refSlotFor("removeBackground", null, p.id))
+                ? getCachedFaceSwap(layer.id, source.hash, refSlotFor("removeBackground", null, p.id, ctrl))
                 : null;
               const thumbSrc = cachedUrl ?? p.thumbnailUrl ?? null;
               return (
