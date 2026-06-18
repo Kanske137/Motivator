@@ -242,7 +242,14 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
     startAiJob(jobId, { label: t("ai.creatingImage"), expectedSeconds, stage: t("ai.stagePrep") });
     try {
       const hash = await ensureHash();
-      const cacheRefSlot = refSlotFor(subjectKind, refUrl, selectedStyleId);
+      const structural = layer.defaults.structuralConditioning ?? null;
+      const structuralActive = !!(structural?.enabled && isRemoveBg);
+      const cacheRefSlot = refSlotFor(
+        subjectKind,
+        refUrl,
+        selectedStyleId,
+        structuralActive ? structural!.controlType : null,
+      );
       // Only use cache when the user hasn't explicitly asked for a regenerate.
       if (!opts.force && hash) {
         const cached = getCachedFaceSwap(layer.id, hash, cacheRefSlot);
@@ -268,6 +275,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         faceImageUrl,
         subjectKind,
         removeBackgroundStyleId: selectedPreset?.id ?? null,
+        structural: structuralActive ? structural : null,
         force: !!opts.force,
       });
       // Layer aspect ratio (visual width / height in CM) — passed to the
@@ -312,6 +320,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
           fillFrame: layer.defaults.fillFrame ?? null,
           preserveSubjectColors: layer.defaults.preserveSubjectColors ?? null,
           fluxStylePrompt: layer.defaults.fluxStylePrompt ?? null,
+          structuralConditioning: structuralActive ? structural : null,
         },
       });
       if (error) throw error;
