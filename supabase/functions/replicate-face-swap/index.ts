@@ -1132,7 +1132,7 @@ async function callFluxStructural(params: {
 
   let prepared: { bytes: Uint8Array; width: number; height: number };
   try {
-    prepared = await prepareControlImage(cutoutBytes, 0x7f7f7f);
+    prepared = await prepareControlImage(cutoutBytes, 0x7f7f7f, params.controlType);
   } catch (e) {
     return {
       ok: false,
@@ -1162,15 +1162,15 @@ async function callFluxStructural(params: {
     .getPublicUrl(ctrlPath);
   const controlImageUrl = ctrlPub.publicUrl;
   console.log(
-    `[flux-structural] control image ready designId=${params.designId} ` +
-      `controlImageBytes=${flatBytes.length} controlImageDims=${prepared.width}x${prepared.height} ` +
+    `[flux-structural] control image ready designId=${params.designId} engine=${params.engine} ` +
+      `controlType=${params.controlType} controlImageBytes=${flatBytes.length} ` +
+      `controlImageDims=${prepared.width}x${prepared.height} ` +
       `styleLabel=${params.styleLabel ?? "-"} guidance=${params.guidance} steps=${params.steps} ` +
       `url=${controlImageUrl}`,
   );
 
   // Step 3: call BFL flux-{canny|depth}-pro with control_image + prompt.
-  const model =
-    params.controlType === "depth" ? FLUX_DEPTH_MODEL : FLUX_CANNY_MODEL;
+  // Model picked by `engine` (set above from caller).
   const fluxStart = await fetch(
     `https://api.replicate.com/v1/models/${model}/predictions`,
     {
