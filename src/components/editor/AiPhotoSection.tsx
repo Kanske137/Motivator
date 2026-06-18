@@ -46,35 +46,21 @@ const MAX_BYTES = 25 * 1024 * 1024;
 // Subject hints moved to i18n (aiPhoto.subjectHint*).
 
 /** Cache slot used in place of the admin reference URL for removeBackground.
- *  Including the style id keeps each style pick cached separately.
- *  When structural conditioning is active, controlType is appended so the
- *  structural-path result doesn't collide with the legacy kontext-pro result. */
+ *  Including the style id keeps each style pick cached separately. When
+ *  simpleStyleMode is on we append a tag so simple-mode results don't collide
+ *  with legacy results for the same style id. */
 function refSlotFor(
   subjectKind: string,
   refUrl: string | null,
   styleId: string | null,
-  controlType?: string | null,
-  engine?: string | null,
-  loraTag?: string | null,
+  simpleMode?: boolean,
 ): string {
   if (subjectKind === "removeBackground") {
     let base = `no-ref::style:${styleId ?? "none"}`;
-    if (controlType) base += `::ctrl:${controlType}`;
-    if (engine) base += `::eng:${engine}`;
-    if (loraTag) base += `::lora:${loraTag}`;
+    if (simpleMode) base += `::simple:1`;
     return base;
   }
   return refUrl ?? "";
-}
-
-/** Cheap stable tag for a LoRA URL — first 8 hex chars of a djb2 hash.
- *  Async crypto is overkill for a cache key; we only need uniqueness within
- *  the user's localStorage. */
-function loraTagOf(url: string | null | undefined): string | null {
-  if (!url) return null;
-  let h = 5381;
-  for (let i = 0; i < url.length; i++) h = ((h << 5) + h + url.charCodeAt(i)) | 0;
-  return (h >>> 0).toString(16).padStart(8, "0").slice(0, 8);
 }
 
 async function blobToDataUrl(blob: Blob): Promise<string> {
