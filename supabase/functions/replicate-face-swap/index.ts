@@ -1484,14 +1484,23 @@ Deno.serve(async (req) => {
     // Server-side validation; falls back to nulls when missing/invalid.
     let structuralConditioning: {
       enabled: boolean;
-      engine: "bfl-canny" | "bfl-depth";
+      engine: "bfl-canny" | "bfl-depth" | "sdxl-controlnet-lora";
       controlType: "canny" | "depth";
       guidance: number;
       steps: number;
+      controlnetScale: number;
+      loraUrl: string | null;
+      loraScale: number;
+      loraTrigger: string | null;
     } | null = null;
     const sc = body?.structuralConditioning;
     if (sc && typeof sc === "object" && sc.enabled === true) {
-      const eng = sc.engine === "bfl-depth" ? "bfl-depth" : "bfl-canny";
+      const eng: "bfl-canny" | "bfl-depth" | "sdxl-controlnet-lora" =
+        sc.engine === "bfl-depth"
+          ? "bfl-depth"
+          : sc.engine === "sdxl-controlnet-lora"
+          ? "sdxl-controlnet-lora"
+          : "bfl-canny";
       const ct = sc.controlType === "depth" ? "depth" : "canny";
       const g = typeof sc.guidance === "number" && isFinite(sc.guidance)
         ? Math.max(0, Math.min(100, sc.guidance))
@@ -1499,7 +1508,29 @@ Deno.serve(async (req) => {
       const st = typeof sc.steps === "number" && isFinite(sc.steps)
         ? Math.max(15, Math.min(50, Math.round(sc.steps)))
         : 28;
-      structuralConditioning = { enabled: true, engine: eng, controlType: ct, guidance: g, steps: st };
+      const cs = typeof sc.controlnetScale === "number" && isFinite(sc.controlnetScale)
+        ? Math.max(0, Math.min(4, sc.controlnetScale))
+        : 0.7;
+      const loraUrl = typeof sc.loraUrl === "string" && /^https?:\/\//.test(sc.loraUrl)
+        ? sc.loraUrl
+        : null;
+      const loraScale = typeof sc.loraScale === "number" && isFinite(sc.loraScale)
+        ? Math.max(0, Math.min(1, sc.loraScale))
+        : 0.85;
+      const loraTrigger = typeof sc.loraTrigger === "string" && sc.loraTrigger.trim().length > 0
+        ? sc.loraTrigger.trim()
+        : null;
+      structuralConditioning = {
+        enabled: true,
+        engine: eng,
+        controlType: ct,
+        guidance: g,
+        steps: st,
+        controlnetScale: cs,
+        loraUrl,
+        loraScale,
+        loraTrigger,
+      };
     }
 
     const result =
