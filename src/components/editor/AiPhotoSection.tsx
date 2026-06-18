@@ -490,12 +490,9 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
           <div className="grid grid-cols-3 gap-2">
             {visibleStyles.map((p) => {
               const isActive = selectedStyleId === p.id;
-              const structural = layer.defaults.structuralConditioning ?? null;
-              const ctrl = structural?.enabled ? structural.controlType : null;
-              const eng = structural?.enabled ? ((structural as { engine?: string }).engine ?? "bfl-canny") : null;
-              const loraTag = eng === "sdxl-controlnet-lora" ? loraTagOf(p.loraUrl ?? null) : null;
+              const simpleStyleMode = layer.defaults.simpleStyleMode === true;
               const cachedUrl = source?.hash
-                ? getCachedFaceSwap(layer.id, source.hash, refSlotFor("removeBackground", null, p.id, ctrl, eng, loraTag))
+                ? getCachedFaceSwap(layer.id, source.hash, refSlotFor("removeBackground", null, p.id, simpleStyleMode))
                 : null;
               const thumbSrc = cachedUrl ?? p.thumbnailUrl ?? null;
               return (
