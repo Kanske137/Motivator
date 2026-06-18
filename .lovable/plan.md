@@ -1,74 +1,57 @@
-## Diagnos
+## Mål
+Subjektet ska behålla originalfotots riktning/orientering i ALLA removeBackground-mallar. Ändringen sitter globalt i `fluxBase` + `callFluxRemoveBg` — inget product_configs-arbete behövs.
 
-Loggarna bekräftar:
-- `useFlux: true` på alla körningar
-- `styleLabel` varierar korrekt (Pop-art / Olja / Skiss / Vintage / Linjekonst / Akvarell)
-- `hasFluxStylePrompt: true`
-- `promptLength` ~4300 tecken
+## Ändringar (endast `supabase/functions/replicate-face-swap/index.ts`)
 
-Stilen skickas alltså — den ignoreras av Flux Kontext Pro.
-
-## Varför stilen inte slår igenom
-
-Flux-grenen återanvänder samma 4300-teckens prompt som byggdes för Nano Banana. Den prompten innehåller flera instruktioner som direkt motverkar stylebytet och som Flux tar bokstavligt:
-
-1. `PRESERVE SUBJECT COLORS — keep the subject's original colors, hue, saturation, paint/material tone and lighting exactly as in the input photo` — säger åt Flux att INTE ändra färgton, vilket är hela poängen med Pop-art/Olja/Skiss/Vintage.
-2. `Keep the subject's identity, shape, surfaces, colors and proportions exactly as in the input photo` — samma sak igen.
-3. `FILL THE FRAME … 90-95%` + `feather edges` + lång backdrop-färgsbeskrivning — bullret tränger ut styleBlock som ligger längst ner.
-4. Backdrop låst till `#FFFFFF`. I diag6 var det `#7f7f7f` mid-grey, vilket bg-remover-modellen är tränad/validerad mot. Vit backdrop gör det också svårare för bg-remover att skilja ljusa hus från bakgrund.
-5. Den validerade diag6-prompten var ~600 tecken, byggd som `BASE (isolate på #7f7f7f) + fluxStylePrompt + style preset` — kort, fokuserad, stilord sist.
-
-Nano Banana fungerar med mega-prompten eftersom Gemini väger sektioner. Flux gör det inte — den följer det första bestämda kravet den hittar.
-
-## Åtgärd (endast Flux-grenen, inget annat påverkas)
-
-### Ändring i `supabase/functions/replicate-face-swap/index.ts`
-
-Bygg en **separat kompakt prompt** för Flux-grenen, identisk till strukturen i `diag6/stress/run.sh`. Skicka den till `callFluxRemoveBg` istället för den Nano Banana-prompten.
-
-Struktur (~500-700 tecken):
+### 1. Skärp `fluxBase` (rad ~623–629)
+Lägg in orientering/spegling-spärr inuti samma stycke som motivblocket och bakgrundsspärren:
 
 ```
-The subject is a single residential house. Preserve its architecture, roofline,
-window/door placement, proportions and composition so it stays recognizable.
-Completely isolate the building on a perfectly flat mid-grey (#7f7f7f) studio
-backdrop. ABSOLUTELY NO landscape, sky, trees, foliage, grass, ground, shadow,
-people, vehicles, text or watermark. Area outside the building silhouette must
-be a single solid flat #7f7f7f.
+The subject is the main object in the input photo. Preserve its structure,
+proportions and overall composition so it stays recognizable as the same subject.
+Keep the subject at the EXACT same orientation, facing direction, angle and
+position as in the input photo. NEVER mirror, flip, rotate or re-angle it.
+Do not output a mirror image. If the subject faces left in the input it must
+face left in the output; if it faces right it must face right.
+Completely isolate the subject on a perfectly flat mid-grey (#7f7f7f) studio backdrop.
+ABSOLUTELY NO landscape, NO sky, NO trees, NO foliage, NO bushes, NO grass, NO ground,
+NO shadow, NO surroundings, NO people, NO vehicles, NO text, NO watermark.
+The area outside the subject silhouette must be a single solid flat #7f7f7f, nothing else.
+```
 
-[fluxStylePrompt från template — motiv/isolering, oförändrat]
+### 2. Slå ihop motivblock med fluxBase till ett stycke (rad ~639–643)
+Mallens `fluxStylePrompt` (motiv) limmas in i samma paragraf som `fluxBase`, inte som separat stycke. Style-tail ligger kvar i egen paragraf så stilen vinner visuellt men inte geometriskt.
 
-[Om stil ej är akvarell: bridge-mening "The result must read as a <style>, NOT
-a photograph: <painterly hints>"]
+```ts
+const fluxMotifLine = params.fluxStylePrompt?.trim() ?? "";
+const fluxPromptText = [
+  fluxMotifLine ? `${fluxBase} ${fluxMotifLine}` : fluxBase,
+  fluxStyleTail,
+].filter(Boolean).join("\n\n");
+```
 
+### 3. Förstärk style-tail-instruktionen (rad ~631–637)
+Lägg till en explicit "style is a surface treatment only" så stilbeskrivningen inte tolkas som tillstånd att rotera/omkomponera:
+
+```
 Render the subject in the following art style. Apply it fully to the subject
-while keeping its structure and identity recognizable:
-[stylePrompt — kundens valda stil, sist så det vinner]
+while keeping its structure and identity recognizable. The style is a SURFACE
+TREATMENT only — it must not change the subject's orientation, facing direction,
+position or scale:
 ```
 
-Vit slutbakgrund åstadkoms ändå — bg-remover-steget tar bort den grå studio-bakgrunden och returnerar RGBA. Komposition mot kundens valda `backdropColor` sker redan i snapshot/preview-lagret.
+### 4. `callFluxRemoveBg` (rad ~747–755)
+`prompt_upsampling` är redan `false` — bekräftat, ingen ändring.
+`aspect_ratio: "match_input_image"` och `input_image` behålls.
+Flux Kontext Pro exponerar ingen offentlig fidelity/structure-parameter — inget mer att skruva på där.
 
-### Vad som EXPLICIT INTE ändras
+## Verifiering
+1. Deploya `replicate-face-swap` och kör bilposter med **Olja** och **Vintage** på tre bilder (vänstervänd, högervänd, trekvartsvinkel). Kolla `[runRemoveBackground] fluxPromptText` i loggen att de nya raderna finns med och att riktningen matchar originalet i output.
+2. Regress: kör en husposter och en födelseposter — ska visuellt vara identiska med tidigare lyckade resultat.
+3. Om spegling fortfarande sker på fordon: gå vidare till steg 5 nedan (detect-and-correct), annars klart.
 
-- Nano Banana-grenen (`useFlux: false`) — samma mega-prompt som idag.
-- `product_configs` / mallar — `fluxStylePrompt` används som det är.
-- `aiPhotoSection.tsx` — fortsätter skicka `stylePrompt`, `fluxStylePrompt`, `backdropColor` som idag.
-- `callFluxRemoveBg`-pipelinen (Flux → 851-labs) — pollning, parametrar, RGBA-upload oförändrade.
-- Schemat — inga nya fält.
-- `FLUX_REMOVEBG_ENABLED`-gate — oförändrad.
-- Aspect ratio styrs fortsatt via `aspect_ratio: "match_input_image"` på Flux-anropet.
+## Steg 5 — endast om steg 1–4 inte räcker (separat plan)
+Bygg en post-Flux mirror-detektor: jämför Flux-utdatat mot input (t.ex. via perceptuell hash på horisontellt flippad version) och spegla tillbaka innan bg-removern. Det är en ny ~80-rads modul och bör behandlas som en egen iteration efter att vi sett om prompt-skärpningen räcker.
 
-### Logg-städning (samma fil)
-
-Sätt `route = "remove-bg-flux"` när `useFlux === true` så loggen `[face-swap] done route=...` speglar verkligheten. Idag säger den alltid `remove-bg-nano-banana` även när Flux körs.
-
-## Verifiering efter ändring
-
-Be dig köra en rendering per stil (Pop-art, Olja, Skiss, Vintage, Linjekonst, Akvarell). Förväntat i loggar:
-
-- `[runRemoveBackground] config … useFlux: true`
-- Ny separat Flux-prompt loggad, ~500-700 tecken (inte 4300)
-- `[flux-removebg] start`, `[flux-removebg] flux done`, `[flux-removebg] bg-remover done`
-- `[face-swap] done route=remove-bg-flux`
-
-Visuellt: tydlig skillnad mellan stilarna, transparent bakgrund i `print-files/<designId>.png`.
+## Risk
+Mycket låg. Alla tillägg är skärpningar inom redan etablerade direktiv (preserve identity / no background / surface treatment). Påverkar inte Nano Banana-grenen, klientkoden, cache-nycklar eller mallar.
