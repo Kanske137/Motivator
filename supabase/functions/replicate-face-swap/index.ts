@@ -953,11 +953,18 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "referenceImageUrl required for this subjectKind" }, 400);
     }
 
+    const fluxEnabledHandler = Deno.env.get("FLUX_REMOVEBG_ENABLED") === "true";
+    const willUseFlux =
+      subjectKind === "removeBackground" &&
+      fluxEnabledHandler &&
+      typeof body?.fluxStylePrompt === "string" &&
+      body.fluxStylePrompt.trim().length > 0;
     const route =
       subjectKind === "human" ? "human-nano-banana"
       : subjectKind === "pet" ? "pet-nano-banana"
+      : willUseFlux ? "remove-bg-flux"
       : "remove-bg-nano-banana";
-    const modelUsed = ANIMAL_MODEL;
+    const modelUsed = willUseFlux ? "black-forest-labs/flux-kontext-pro+851-labs/background-remover" : ANIMAL_MODEL;
 
     console.log(
       `[face-swap] start route=${route} model=${modelUsed} ` +
