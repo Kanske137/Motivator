@@ -81,6 +81,9 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
   const getCachedFaceSwap = useEditorStore((s) => s.getCachedFaceSwap);
   const aiPhotoSelectedRefUrl = useEditorStore((s) => s.aiPhotoSelectedRefUrl);
   const setAiPhotoSelectedRef = useEditorStore((s) => s.setAiPhotoSelectedRef);
+  // Subscribe to the cache so thumbnails re-render when new swaps complete.
+  const faceSwapCache = useEditorStore((s) => s.faceSwapCache);
+  void faceSwapCache;
 
   const source = sources[layer.id];
   const result = results[layer.id] ?? null;
