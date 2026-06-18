@@ -840,6 +840,18 @@ function AiPhotoDefaultsSection({
               onCheckedChange={(v) => updateDefaults({ preserveSubjectColors: v })}
             />
           </div>
+          <div className="flex items-center justify-between rounded-md border bg-muted/30 px-3 py-2">
+            <div className="space-y-0.5">
+              <Label className="text-xs">Enkelt stil-läge (Kontext)</Label>
+              <p className="text-[10px] text-muted-foreground">
+                På = kör flux-kontext-pro direkt med stilens korta instruktion (geometri bevaras, bg tas bort efteråt). Av = befintligt flöde.
+              </p>
+            </div>
+            <Switch
+              checked={layer.defaults.simpleStyleMode === true}
+              onCheckedChange={(v) => updateDefaults({ simpleStyleMode: v })}
+            />
+          </div>
         </>
       )}
 

@@ -46,35 +46,21 @@ const MAX_BYTES = 25 * 1024 * 1024;
 // Subject hints moved to i18n (aiPhoto.subjectHint*).
 
 /** Cache slot used in place of the admin reference URL for removeBackground.
- *  Including the style id keeps each style pick cached separately.
- *  When structural conditioning is active, controlType is appended so the
- *  structural-path result doesn't collide with the legacy kontext-pro result. */
+ *  Including the style id keeps each style pick cached separately. When
+ *  simpleStyleMode is on we append a tag so simple-mode results don't collide
+ *  with legacy results for the same style id. */
 function refSlotFor(
   subjectKind: string,
   refUrl: string | null,
   styleId: string | null,
-  controlType?: string | null,
-  engine?: string | null,
-  loraTag?: string | null,
+  simpleMode?: boolean,
 ): string {
   if (subjectKind === "removeBackground") {
     let base = `no-ref::style:${styleId ?? "none"}`;
-    if (controlType) base += `::ctrl:${controlType}`;
-    if (engine) base += `::eng:${engine}`;
-    if (loraTag) base += `::lora:${loraTag}`;
+    if (simpleMode) base += `::simple:1`;
     return base;
   }
   return refUrl ?? "";
-}
-
-/** Cheap stable tag for a LoRA URL — first 8 hex chars of a djb2 hash.
- *  Async crypto is overkill for a cache key; we only need uniqueness within
- *  the user's localStorage. */
-function loraTagOf(url: string | null | undefined): string | null {
-  if (!url) return null;
-  let h = 5381;
-  for (let i = 0; i < url.length; i++) h = ((h << 5) + h + url.charCodeAt(i)) | 0;
-  return (h >>> 0).toString(16).padStart(8, "0").slice(0, 8);
 }
 
 async function blobToDataUrl(blob: Blob): Promise<string> {
@@ -257,25 +243,12 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
     startAiJob(jobId, { label: t("ai.creatingImage"), expectedSeconds, stage: t("ai.stagePrep") });
     try {
       const hash = await ensureHash();
-      const structural = layer.defaults.structuralConditioning ?? null;
-      const structuralActive = !!(structural?.enabled && isRemoveBg);
-      const presetForCache = isRemoveBg && selectedStyleId
-        ? visibleStyles.find((p) => p.id === selectedStyleId) ?? null
-        : null;
-      const engineForCache = structuralActive
-        ? (structural as { engine?: string }).engine ?? "bfl-canny"
-        : null;
-      const loraTagForCache =
-        structuralActive && engineForCache === "sdxl-controlnet-lora"
-          ? loraTagOf(presetForCache?.loraUrl ?? null)
-          : null;
+      const simpleStyleMode = isRemoveBg && layer.defaults.simpleStyleMode === true;
       const cacheRefSlot = refSlotFor(
         subjectKind,
         refUrl,
         selectedStyleId,
-        structuralActive ? structural!.controlType : null,
-        engineForCache,
-        loraTagForCache,
+        simpleStyleMode,
       );
       // Only use cache when the user hasn't explicitly asked for a regenerate.
       if (!opts.force && hash) {
@@ -302,7 +275,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         faceImageUrl,
         subjectKind,
         removeBackgroundStyleId: selectedPreset?.id ?? null,
-        structural: structuralActive ? structural : null,
+        simpleStyleMode,
         force: !!opts.force,
       });
       // Layer aspect ratio (visual width / height in CM) — passed to the
@@ -347,14 +320,8 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
           fillFrame: layer.defaults.fillFrame ?? null,
           preserveSubjectColors: layer.defaults.preserveSubjectColors ?? null,
           fluxStylePrompt: layer.defaults.fluxStylePrompt ?? null,
-          structuralConditioning: structuralActive
-            ? {
-                ...structural,
-                loraUrl: selectedPreset?.loraUrl ?? null,
-                loraScale: selectedPreset?.loraScale ?? null,
-                loraTrigger: selectedPreset?.loraTrigger ?? null,
-              }
-            : null,
+          simpleStyleMode,
+          styleInstruction: selectedPreset?.styleInstruction ?? null,
         },
       });
       if (error) throw error;
@@ -523,12 +490,9 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
           <div className="grid grid-cols-3 gap-2">
             {visibleStyles.map((p) => {
               const isActive = selectedStyleId === p.id;
-              const structural = layer.defaults.structuralConditioning ?? null;
-              const ctrl = structural?.enabled ? structural.controlType : null;
-              const eng = structural?.enabled ? ((structural as { engine?: string }).engine ?? "bfl-canny") : null;
-              const loraTag = eng === "sdxl-controlnet-lora" ? loraTagOf(p.loraUrl ?? null) : null;
+              const simpleStyleMode = layer.defaults.simpleStyleMode === true;
               const cachedUrl = source?.hash
-                ? getCachedFaceSwap(layer.id, source.hash, refSlotFor("removeBackground", null, p.id, ctrl, eng, loraTag))
+                ? getCachedFaceSwap(layer.id, source.hash, refSlotFor("removeBackground", null, p.id, simpleStyleMode))
                 : null;
               const thumbSrc = cachedUrl ?? p.thumbnailUrl ?? null;
               return (

@@ -163,34 +163,16 @@ export const aiPhotoDefaultsSchema = z.object({
    *  instruction to preserve the subject's original colors/hue so applied art
    *  styles act as a surface treatment only. */
   preserveSubjectColors: z.boolean().optional(),
-  /** removeBackground only: opt-in structural-conditioning path via BFL's
-   *  flux-canny-pro / flux-depth-pro on Replicate. When `enabled === true`
-   *  the edge function runs:
-   *    bg-remove → flatten on #7f7f7f → flux-{canny|depth}-pro → bg-remove
-   *  Geometry (orientation, angle, scale, mirroring) is locked by the
-   *  control image from the original photo; the style prompt only changes
-   *  the surface. When absent/disabled the existing flux-kontext-pro path
-   *  (or Nano Banana fallback) runs unchanged.
-   *
-   *  BFL's flux-{canny|depth}-pro exposes `guidance` (0..100, ~30) and
-   *  `steps`. There is no separate control-strength knob — geometry vs.
-   *  style balance is steered purely via guidance. `controlStrength` is
-   *  accepted for forward-compatibility but IGNORED by the BFL path. */
-  structuralConditioning: z
-    .object({
-      enabled: z.boolean(),
-      engine: z
-        .enum(["bfl-canny", "bfl-depth", "sdxl-controlnet-lora"])
-        .default("bfl-canny"),
-      controlType: z.enum(["canny", "depth"]).default("canny"),
-      controlStrength: z.number().min(0).max(1).optional(),
-      /** SDXL-only. 0..4 per Replicate schema for fofr/sdxl-multi-controlnet-lora.
-       *  Default 0.7 is the geometry sweet-spot. Ignored by BFL engines. */
-      controlnetScale: z.number().min(0).max(4).optional(),
-      guidance: z.number().min(0).max(100).default(50),
-      steps: z.number().int().min(15).max(50).default(28),
-    })
-    .optional(),
+  /** removeBackground only. When true the edge function bypasses the long
+   *  Nano-Banana / Flux prompt pipeline and runs a single `flux-kontext-pro`
+   *  call with the chosen preset's `styleInstruction` as the ONLY text input
+   *  (no base prompt, no motif/isolation rules, no negative prompt). The
+   *  result is then fed through `851-labs/background-remover` to strip the
+   *  background, exactly as the existing Flux path does. Empirically Kontext
+   *  preserves geometry and applies style perfectly when prompts are kept
+   *  short — long prompts trigger geometry drift. When false/absent the
+   *  legacy behaviour is unchanged. */
+  simpleStyleMode: z.boolean().optional(),
   /** OPTIONAL multi-face mode. Strictly additive: when `enabled !== true`
    *  the layer behaves EXACTLY like a single-face aiPhoto (same UI, same
    *  edge function, same cache, same render). When enabled the customer
@@ -452,14 +434,12 @@ export const aiStylePresetSchema = z.object({
   prompt: z.string().min(1),
   /** Per-template visibility toggle. Defaults to true for backwards-compat. */
   enabled: z.boolean().optional().default(true),
-  /** Optional SDXL LoRA weights URL (Replicate file URL, HF, R2 etc).
-   *  When set AND the layer's structuralConditioning.engine === "sdxl-controlnet-lora"
-   *  the edge function bakes this LoRA into the prediction so the style
-   *  comes from trained weights instead of text. Saved per style because
-   *  it's the customer's style pick that decides which LoRA to load. */
-  loraUrl: z.string().url().optional(),
-  loraScale: z.number().min(0).max(1).optional(),
-  loraTrigger: z.string().optional(),
+  /** Short Kontext-Pro instruction (e.g. "make this in oil styling"). Used
+   *  ONLY when the layer's defaults.simpleStyleMode === true. When the layer
+   *  is in simple mode and this is empty, the edge function falls back to
+   *  `prompt`; if that's also missing it falls back to the legacy Nano-Banana
+   *  pipeline. Ignored when simpleStyleMode is off. */
+  styleInstruction: z.string().optional(),
 });
 export type AiStylePreset = z.infer<typeof aiStylePresetSchema>;
 
