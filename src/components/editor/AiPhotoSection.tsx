@@ -484,7 +484,10 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
                 <button
                   key={p.id}
                   type="button"
-                  onClick={() => setSelectedStyleId(p.id)}
+                  onClick={() => {
+                    setSelectedStyleId(p.id);
+                    if (cachedUrl) setAiPhotoResult(layer.id, cachedUrl);
+                  }}
                   className={cn(
                     "relative aspect-square rounded-xl overflow-hidden ring-1 ring-border bg-muted transition hover:-translate-y-0.5",
                     isActive && "ring-2 ring-primary",
