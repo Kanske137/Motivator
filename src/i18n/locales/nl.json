@@ -152,7 +152,9 @@
     "subjectHintHuman": "De afbeelding moet het gezicht recht van voren tonen, goed verlicht.",
     "subjectHintPet": "De afbeelding moet het gezicht van het dier duidelijk tonen, bij voorkeur van voren.",
     "subjectHintRemoveBg": "Upload een afbeelding waar het onderwerp duidelijk zichtbaar is — wij verwijderen de achtergrond voor je.",
-    "chooseSubject": "Kies onderwerp"
+    "chooseSubject": "Kies onderwerp",
+    "previousVersions": "Eerdere versies",
+    "reused": "Versie hergebruikt"
   },
   "preview": {
     "title": "Voorbeeld",

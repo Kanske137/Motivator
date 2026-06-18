@@ -152,7 +152,9 @@
     "subjectHintHuman": "L'immagine deve mostrare il viso di fronte, ben illuminato.",
     "subjectHintPet": "L'immagine deve mostrare chiaramente il viso dell'animale, preferibilmente di fronte.",
     "subjectHintRemoveBg": "Carica un'immagine dove il soggetto è chiaramente visibile — rimuoviamo lo sfondo per te.",
-    "chooseSubject": "Scegli il soggetto"
+    "chooseSubject": "Scegli il soggetto",
+    "previousVersions": "Versioni precedenti",
+    "reused": "Versione riutilizzata"
   },
   "preview": {
     "title": "Anteprima",

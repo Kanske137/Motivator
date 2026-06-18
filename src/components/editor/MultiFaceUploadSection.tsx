@@ -361,6 +361,41 @@ export function MultiFaceUploadSection({ layer, heading }: Props) {
         )}
       </Button>
 
+      {(() => {
+        const history = Object.values(cacheRef.current)
+          .filter((e) => e.layerId === layer.id)
+          .sort((a, b) => b.timestamp - a.timestamp);
+        if (history.length === 0) return null;
+        return (
+          <div className="space-y-2 pt-1">
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              {t("aiPhoto.previousVersions")}
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+              {history.map((entry) => {
+                const isActive = result === entry.url;
+                return (
+                  <button
+                    key={entry.cacheKey}
+                    type="button"
+                    onClick={() => {
+                      setAiPhotoResult(layer.id, entry.url);
+                      toast.success(t("aiPhoto.reused"));
+                    }}
+                    className={cn(
+                      "block w-16 h-16 shrink-0 rounded-lg overflow-hidden ring-1 ring-border bg-muted hover:-translate-y-0.5 transition",
+                      isActive && "ring-2 ring-primary",
+                    )}
+                  >
+                    <img src={entry.url} alt="" className="w-full h-full object-cover" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {!allFilled && (
         <p className="text-[11px] text-muted-foreground text-center">
           {t("multiFace.allRequired")}

@@ -152,7 +152,9 @@
     "subjectHintHuman": "Das Bild sollte das Gesicht von vorne zeigen, gut beleuchtet.",
     "subjectHintPet": "Das Bild sollte das Gesicht des Tieres deutlich zeigen, am besten von vorne.",
     "subjectHintRemoveBg": "Lade ein Bild hoch, auf dem das Motiv klar sichtbar ist — wir entfernen den Hintergrund für dich.",
-    "chooseSubject": "Motiv wählen"
+    "chooseSubject": "Motiv wählen",
+    "previousVersions": "Frühere Versionen",
+    "reused": "Version wiederverwendet"
   },
   "preview": {
     "title": "Vorschau",

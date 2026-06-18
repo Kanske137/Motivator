@@ -152,7 +152,9 @@
     "subjectHintHuman": "Zdjęcie powinno pokazywać twarz prosto z przodu, dobrze oświetloną.",
     "subjectHintPet": "Zdjęcie powinno wyraźnie pokazywać pysk zwierzęcia, najlepiej z przodu.",
     "subjectHintRemoveBg": "Prześlij zdjęcie, na którym motyw jest wyraźnie widoczny — usuniemy tło za Ciebie.",
-    "chooseSubject": "Wybierz motyw"
+    "chooseSubject": "Wybierz motyw",
+    "previousVersions": "Poprzednie wersje",
+    "reused": "Wersja ponownie użyta"
   },
   "preview": {
     "title": "Podgląd",
