@@ -889,6 +889,254 @@ async function callFluxRemoveBg(params: {
   return { ok: true, bytes, contentType, outputUrl: cutoutUrl };
 }
 
+// ---------- Route 3c: Structural conditioning via BFL flux-{canny|depth}-pro ----------
+// Pipeline:
+//   1. 851-labs/background-remover on the original photo (geometry comes from
+//      the actual pixels — orientation, angle, scale, mirroring are locked).
+//   2. Flatten the RGBA cutout over a solid #7f7f7f background and upload the
+//      result to print-files. This is the `control_image` the BFL model
+//      consumes; it generates its own canny / depth map internally.
+//   3. flux-canny-pro OR flux-depth-pro with guidance + steps from the
+//      template config. Style words come last so they dominate; orientation
+//      language is dropped because the control image already locks geometry.
+//   4. 851-labs/background-remover #2 to strip the #7f7f7f backdrop again
+//      and return RGBA bytes (same shape as Route 3b so the rest of the
+//      pipeline is unchanged).
+const FLUX_CANNY_MODEL = "black-forest-labs/flux-canny-pro";
+const FLUX_DEPTH_MODEL = "black-forest-labs/flux-depth-pro";
+
+async function flattenOverGrey(
+  rgbaPngBytes: Uint8Array,
+  hex: number, // 0xRRGGBB
+): Promise<Uint8Array> {
+  const img = await Image.decode(rgbaPngBytes);
+  const bg = new Image(img.width, img.height).fill(
+    Image.rgbaToColor(
+      (hex >> 16) & 0xff,
+      (hex >> 8) & 0xff,
+      hex & 0xff,
+      0xff,
+    ),
+  );
+  bg.composite(img, 0, 0);
+  return await bg.encode();
+}
+
+async function callFluxStructural(params: {
+  faceImageUrl: string;
+  promptText: string;
+  designId: string;
+  controlType: "canny" | "depth";
+  guidance: number;
+  steps: number;
+}): Promise<
+  | { ok: true; bytes: Uint8Array; contentType: string; outputUrl: string }
+  | { ok: false; response: Response }
+> {
+  const REPLICATE_API_TOKEN = Deno.env.get("REPLICATE_API_TOKEN");
+  if (!REPLICATE_API_TOKEN) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Tjänsten är tillfälligt otillgänglig. Försök igen senare.",
+        "REPLICATE_API_TOKEN not configured (structural path)",
+      ),
+    };
+  }
+
+  const supabaseAdmin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+
+  console.log(
+    `[flux-structural] start designId=${params.designId} controlType=${params.controlType} ` +
+      `guidance=${params.guidance} steps=${params.steps}`,
+  );
+
+  // Step 1: bg-remove the original photo → RGBA cutout.
+  const bg1Start = await fetch(`https://api.replicate.com/v1/predictions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      version: BG_REMOVER_VERSION,
+      input: {
+        image: params.faceImageUrl,
+        format: "png",
+        background_type: "rgba",
+      },
+    }),
+  });
+  const bg1Json = await bg1Start.json();
+  if (!bg1Start.ok || !bg1Json?.id) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
+        `Structural BG#1 start failed: ${bg1Start.status} ${JSON.stringify(bg1Json).slice(0, 300)}`,
+      ),
+    };
+  }
+  const bg1Poll = await pollReplicate(bg1Json.id, REPLICATE_API_TOKEN, 90, 2000, 4000);
+  if (!bg1Poll.ok) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte skapa bilden den här gången. Försök igen.",
+        `Structural BG#1 ${bg1Poll.reason}`,
+      ),
+    };
+  }
+  const cutoutUrl1 = bg1Poll.output;
+  console.log(`[flux-structural] bg#1 done designId=${params.designId} url=${cutoutUrl1}`);
+
+  // Step 2: fetch cutout, flatten over #7f7f7f, upload as control image.
+  const cutoutResp = await fetch(cutoutUrl1);
+  if (!cutoutResp.ok) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte hämta den genererade bilden. Försök igen.",
+        `Structural cutout#1 fetch ${cutoutResp.status}`,
+      ),
+    };
+  }
+  const cutoutBytes = new Uint8Array(await cutoutResp.arrayBuffer());
+
+  let flatBytes: Uint8Array;
+  try {
+    flatBytes = await flattenOverGrey(cutoutBytes, 0x7f7f7f);
+  } catch (e) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte förbereda bilden. Försök igen.",
+        `Structural flatten failed: ${e instanceof Error ? e.message : String(e)}`,
+      ),
+    };
+  }
+
+  const ctrlPath = `${params.designId}-ctrl.png`;
+  const { error: ctrlUpErr } = await supabaseAdmin.storage
+    .from("print-files")
+    .upload(ctrlPath, flatBytes, { contentType: "image/png", upsert: true });
+  if (ctrlUpErr) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte förbereda bilden. Försök igen.",
+        `Structural control upload failed: ${ctrlUpErr.message}`,
+      ),
+    };
+  }
+  const { data: ctrlPub } = supabaseAdmin.storage
+    .from("print-files")
+    .getPublicUrl(ctrlPath);
+  const controlImageUrl = ctrlPub.publicUrl;
+  console.log(`[flux-structural] control image ready designId=${params.designId} url=${controlImageUrl}`);
+
+  // Step 3: call BFL flux-{canny|depth}-pro with control_image + prompt.
+  const model =
+    params.controlType === "depth" ? FLUX_DEPTH_MODEL : FLUX_CANNY_MODEL;
+  const fluxStart = await fetch(
+    `https://api.replicate.com/v1/models/${model}/predictions`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        input: {
+          prompt: params.promptText,
+          control_image: controlImageUrl,
+          guidance: params.guidance,
+          steps: params.steps,
+          output_format: "png",
+          safety_tolerance: 2,
+          prompt_upsampling: false,
+        },
+      }),
+    },
+  );
+  const fluxJson = await fluxStart.json();
+  if (!fluxStart.ok || !fluxJson?.id) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
+        `Structural flux start failed (${model}): ${fluxStart.status} ${JSON.stringify(fluxJson).slice(0, 300)}`,
+      ),
+    };
+  }
+  const fluxPoll = await pollReplicate(fluxJson.id, REPLICATE_API_TOKEN, 120, 3000, 6000);
+  if (!fluxPoll.ok) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte skapa bilden den här gången. Försök igen.",
+        `Structural flux ${fluxPoll.reason} (${model})`,
+      ),
+    };
+  }
+  const fluxUrl = fluxPoll.output;
+  console.log(`[flux-structural] flux done designId=${params.designId} model=${model} url=${fluxUrl}`);
+
+  // Step 4: bg-remove the structural output → strip #7f7f7f, return RGBA.
+  const bg2Start = await fetch(`https://api.replicate.com/v1/predictions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      version: BG_REMOVER_VERSION,
+      input: { image: fluxUrl, format: "png", background_type: "rgba" },
+    }),
+  });
+  const bg2Json = await bg2Start.json();
+  if (!bg2Start.ok || !bg2Json?.id) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
+        `Structural BG#2 start failed: ${bg2Start.status} ${JSON.stringify(bg2Json).slice(0, 300)}`,
+      ),
+    };
+  }
+  const bg2Poll = await pollReplicate(bg2Json.id, REPLICATE_API_TOKEN, 90, 2000, 4000);
+  if (!bg2Poll.ok) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte skapa bilden den här gången. Försök igen.",
+        `Structural BG#2 ${bg2Poll.reason}`,
+      ),
+    };
+  }
+  const finalCutoutUrl = bg2Poll.output;
+  const finalResp = await fetch(finalCutoutUrl);
+  if (!finalResp.ok) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte hämta den genererade bilden. Försök igen.",
+        `Structural final fetch ${finalResp.status}`,
+      ),
+    };
+  }
+  const finalBytes = new Uint8Array(await finalResp.arrayBuffer());
+  const finalContentType = finalResp.headers.get("content-type") ?? "image/png";
+  console.log(
+    `[flux-structural] done designId=${params.designId} bytes=${finalBytes.byteLength} ` +
+      `contentType=${finalContentType} url=${finalCutoutUrl}`,
+  );
+  return { ok: true, bytes: finalBytes, contentType: finalContentType, outputUrl: finalCutoutUrl };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
