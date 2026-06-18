@@ -711,14 +711,43 @@ async function runRemoveBackground(params: {
 
   if (useStructural) {
     console.log("[runRemoveBackground] structuralPromptText\n" + structuralPromptText);
+    const sc = params.structuralConditioning!;
+    if (sc.engine === "sdxl-controlnet-lora") {
+      if (!sc.loraUrl) {
+        console.warn(
+          `[runRemoveBackground] engine=sdxl-controlnet-lora but no loraUrl on style "${params.styleLabel}" — falling back to BFL flux-canny-pro`,
+        );
+        return callFluxStructural({
+          faceImageUrl: params.faceImageUrl,
+          promptText: structuralPromptText,
+          designId: params.designId,
+          engine: "bfl-canny",
+          controlType: sc.controlType,
+          guidance: sc.guidance,
+          steps: sc.steps,
+          styleLabel: params.styleLabel,
+        });
+      }
+      return callSdxlControlnetLora({
+        faceImageUrl: params.faceImageUrl,
+        promptText: structuralPromptText,
+        designId: params.designId,
+        controlType: sc.controlType,
+        controlnetScale: sc.controlnetScale,
+        loraUrl: sc.loraUrl,
+        loraScale: sc.loraScale,
+        loraTrigger: sc.loraTrigger,
+        styleLabel: params.styleLabel,
+      });
+    }
     return callFluxStructural({
       faceImageUrl: params.faceImageUrl,
       promptText: structuralPromptText,
       designId: params.designId,
-      engine: params.structuralConditioning!.engine,
-      controlType: params.structuralConditioning!.controlType,
-      guidance: params.structuralConditioning!.guidance,
-      steps: params.structuralConditioning!.steps,
+      engine: sc.engine as "bfl-canny" | "bfl-depth",
+      controlType: sc.controlType,
+      guidance: sc.guidance,
+      steps: sc.steps,
       styleLabel: params.styleLabel,
     });
   }
