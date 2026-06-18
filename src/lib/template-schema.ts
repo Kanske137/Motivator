@@ -434,14 +434,12 @@ export const aiStylePresetSchema = z.object({
   prompt: z.string().min(1),
   /** Per-template visibility toggle. Defaults to true for backwards-compat. */
   enabled: z.boolean().optional().default(true),
-  /** Optional SDXL LoRA weights URL (Replicate file URL, HF, R2 etc).
-   *  When set AND the layer's structuralConditioning.engine === "sdxl-controlnet-lora"
-   *  the edge function bakes this LoRA into the prediction so the style
-   *  comes from trained weights instead of text. Saved per style because
-   *  it's the customer's style pick that decides which LoRA to load. */
-  loraUrl: z.string().url().optional(),
-  loraScale: z.number().min(0).max(1).optional(),
-  loraTrigger: z.string().optional(),
+  /** Short Kontext-Pro instruction (e.g. "make this in oil styling"). Used
+   *  ONLY when the layer's defaults.simpleStyleMode === true. When the layer
+   *  is in simple mode and this is empty, the edge function falls back to
+   *  `prompt`; if that's also missing it falls back to the legacy Nano-Banana
+   *  pipeline. Ignored when simpleStyleMode is off. */
+  styleInstruction: z.string().optional(),
 });
 export type AiStylePreset = z.infer<typeof aiStylePresetSchema>;
 
