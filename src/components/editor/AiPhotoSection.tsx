@@ -55,14 +55,26 @@ function refSlotFor(
   styleId: string | null,
   controlType?: string | null,
   engine?: string | null,
+  loraTag?: string | null,
 ): string {
   if (subjectKind === "removeBackground") {
     let base = `no-ref::style:${styleId ?? "none"}`;
     if (controlType) base += `::ctrl:${controlType}`;
     if (engine) base += `::eng:${engine}`;
+    if (loraTag) base += `::lora:${loraTag}`;
     return base;
   }
   return refUrl ?? "";
+}
+
+/** Cheap stable tag for a LoRA URL — first 8 hex chars of a djb2 hash.
+ *  Async crypto is overkill for a cache key; we only need uniqueness within
+ *  the user's localStorage. */
+function loraTagOf(url: string | null | undefined): string | null {
+  if (!url) return null;
+  let h = 5381;
+  for (let i = 0; i < url.length; i++) h = ((h << 5) + h + url.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(16).padStart(8, "0").slice(0, 8);
 }
 
 async function blobToDataUrl(blob: Blob): Promise<string> {
@@ -247,12 +259,23 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
       const hash = await ensureHash();
       const structural = layer.defaults.structuralConditioning ?? null;
       const structuralActive = !!(structural?.enabled && isRemoveBg);
+      const presetForCache = isRemoveBg && selectedStyleId
+        ? visibleStyles.find((p) => p.id === selectedStyleId) ?? null
+        : null;
+      const engineForCache = structuralActive
+        ? (structural as { engine?: string }).engine ?? "bfl-canny"
+        : null;
+      const loraTagForCache =
+        structuralActive && engineForCache === "sdxl-controlnet-lora"
+          ? loraTagOf(presetForCache?.loraUrl ?? null)
+          : null;
       const cacheRefSlot = refSlotFor(
         subjectKind,
         refUrl,
         selectedStyleId,
         structuralActive ? structural!.controlType : null,
-        structuralActive ? (structural as { engine?: string }).engine ?? "bfl-canny" : null,
+        engineForCache,
+        loraTagForCache,
       );
       // Only use cache when the user hasn't explicitly asked for a regenerate.
       if (!opts.force && hash) {
@@ -324,7 +347,14 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
           fillFrame: layer.defaults.fillFrame ?? null,
           preserveSubjectColors: layer.defaults.preserveSubjectColors ?? null,
           fluxStylePrompt: layer.defaults.fluxStylePrompt ?? null,
-          structuralConditioning: structuralActive ? structural : null,
+          structuralConditioning: structuralActive
+            ? {
+                ...structural,
+                loraUrl: selectedPreset?.loraUrl ?? null,
+                loraScale: selectedPreset?.loraScale ?? null,
+                loraTrigger: selectedPreset?.loraTrigger ?? null,
+              }
+            : null,
         },
       });
       if (error) throw error;
@@ -496,8 +526,9 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
               const structural = layer.defaults.structuralConditioning ?? null;
               const ctrl = structural?.enabled ? structural.controlType : null;
               const eng = structural?.enabled ? ((structural as { engine?: string }).engine ?? "bfl-canny") : null;
+              const loraTag = eng === "sdxl-controlnet-lora" ? loraTagOf(p.loraUrl ?? null) : null;
               const cachedUrl = source?.hash
-                ? getCachedFaceSwap(layer.id, source.hash, refSlotFor("removeBackground", null, p.id, ctrl, eng))
+                ? getCachedFaceSwap(layer.id, source.hash, refSlotFor("removeBackground", null, p.id, ctrl, eng, loraTag))
                 : null;
               const thumbSrc = cachedUrl ?? p.thumbnailUrl ?? null;
               return (

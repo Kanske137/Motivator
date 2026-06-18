@@ -179,9 +179,14 @@ export const aiPhotoDefaultsSchema = z.object({
   structuralConditioning: z
     .object({
       enabled: z.boolean(),
-      engine: z.enum(["bfl-canny", "bfl-depth"]).default("bfl-canny"),
+      engine: z
+        .enum(["bfl-canny", "bfl-depth", "sdxl-controlnet-lora"])
+        .default("bfl-canny"),
       controlType: z.enum(["canny", "depth"]).default("canny"),
       controlStrength: z.number().min(0).max(1).optional(),
+      /** SDXL-only. 0..4 per Replicate schema for fofr/sdxl-multi-controlnet-lora.
+       *  Default 0.7 is the geometry sweet-spot. Ignored by BFL engines. */
+      controlnetScale: z.number().min(0).max(4).optional(),
       guidance: z.number().min(0).max(100).default(50),
       steps: z.number().int().min(15).max(50).default(28),
     })
@@ -447,6 +452,14 @@ export const aiStylePresetSchema = z.object({
   prompt: z.string().min(1),
   /** Per-template visibility toggle. Defaults to true for backwards-compat. */
   enabled: z.boolean().optional().default(true),
+  /** Optional SDXL LoRA weights URL (Replicate file URL, HF, R2 etc).
+   *  When set AND the layer's structuralConditioning.engine === "sdxl-controlnet-lora"
+   *  the edge function bakes this LoRA into the prediction so the style
+   *  comes from trained weights instead of text. Saved per style because
+   *  it's the customer's style pick that decides which LoRA to load. */
+  loraUrl: z.string().url().optional(),
+  loraScale: z.number().min(0).max(1).optional(),
+  loraTrigger: z.string().optional(),
 });
 export type AiStylePreset = z.infer<typeof aiStylePresetSchema>;
 

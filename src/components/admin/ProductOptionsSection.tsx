@@ -632,6 +632,47 @@ function AiStyleRow({
               placeholder="Prompt till AI-modellen…"
               className="text-xs"
             />
+            {/* Optional: SDXL style-LoRA. Only used when the layer's
+                structuralConditioning.engine === "sdxl-controlnet-lora".
+                Leave empty for styles that should use text-only flow. */}
+            <div className="space-y-1 rounded-md border border-dashed border-border bg-muted/40 p-2">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                SDXL style-LoRA (valfritt, för fordonsspåret)
+              </p>
+              <Input
+                value={preset.loraUrl ?? ""}
+                onChange={(e) =>
+                  onChange({ loraUrl: e.target.value.trim() ? e.target.value.trim() : undefined })
+                }
+                placeholder="LoRA-vikt URL (Replicate/HF/R2)…"
+                className="h-7 text-xs"
+              />
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  step="0.05"
+                  min={0}
+                  max={1}
+                  value={preset.loraScale ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "") return onChange({ loraScale: undefined });
+                    const n = Number(v);
+                    if (Number.isFinite(n)) onChange({ loraScale: Math.max(0, Math.min(1, n)) });
+                  }}
+                  placeholder="lora_scale (0.85)"
+                  className="h-7 text-xs"
+                />
+                <Input
+                  value={preset.loraTrigger ?? ""}
+                  onChange={(e) =>
+                    onChange({ loraTrigger: e.target.value.trim() ? e.target.value : undefined })
+                  }
+                  placeholder="trigger-ord (valfritt)"
+                  className="h-7 text-xs"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </AccordionContent>
