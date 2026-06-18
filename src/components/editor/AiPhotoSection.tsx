@@ -464,6 +464,10 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
           <div className="grid grid-cols-3 gap-2">
             {visibleStyles.map((p) => {
               const isActive = selectedStyleId === p.id;
+              const cachedUrl = source?.hash
+                ? getCachedFaceSwap(layer.id, source.hash, refSlotFor("removeBackground", null, p.id))
+                : null;
+              const thumbSrc = cachedUrl ?? p.thumbnailUrl ?? null;
               return (
                 <button
                   key={p.id}
@@ -474,12 +478,17 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
                     isActive && "ring-2 ring-primary",
                   )}
                 >
-                  {p.thumbnailUrl ? (
-                    <img src={p.thumbnailUrl} alt={p.label} className="w-full h-full object-cover" />
+                  {thumbSrc ? (
+                    <img src={thumbSrc} alt={p.label} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-muted to-accent/30 flex items-center justify-center">
                       <Sparkles className="h-5 w-5 text-muted-foreground" />
                     </div>
+                  )}
+                  {cachedUrl && (
+                    <span className="absolute top-1 right-1 bg-primary text-primary-foreground text-[9px] font-semibold px-1.5 py-0.5 rounded-full leading-none">
+                      ✓
+                    </span>
                   )}
                   <span className="absolute bottom-0 inset-x-0 bg-background/85 backdrop-blur-sm text-[10px] py-1 text-center font-medium">
                     {p.label}
