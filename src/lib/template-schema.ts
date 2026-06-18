@@ -181,7 +181,7 @@ export const aiPhotoDefaultsSchema = z.object({
       enabled: z.boolean(),
       controlType: z.enum(["canny", "depth"]).default("canny"),
       controlStrength: z.number().min(0).max(1).optional(),
-      guidance: z.number().min(0).max(100).default(30),
+      guidance: z.number().min(0).max(100).default(50),
       steps: z.number().int().min(15).max(50).default(28),
     })
     .optional(),
