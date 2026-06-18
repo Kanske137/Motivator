@@ -1205,7 +1205,8 @@ Deno.serve(async (req) => {
             designId,
             fluxStylePrompt,
             subjectKind: "removeBackground",
-            structuralConditioning,
+            simpleStyleMode,
+            styleInstruction,
           });
 
 
