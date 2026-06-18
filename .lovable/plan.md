@@ -1,57 +1,44 @@
+# Minne av tidigare AI-resultat per uppladdad bild
+
 ## Mål
-Subjektet ska behålla originalfotots riktning/orientering i ALLA removeBackground-mallar. Ändringen sitter globalt i `fluxBase` + `callFluxRemoveBg` — inget product_configs-arbete behövs.
+När kunden har laddat upp en bild i ett AI-lager ska varje stil/preset-knapp i Förvandling-fliken visa miniatyren av det **cachade resultatet** (om det finns) istället för standard-thumbnailen. Klick = lagret uppdateras direkt utan ny generering. Cache är localStorage, knuten till fil-hashen, så samma uppladdning får tillbaka sin historik även efter sidladdning.
 
-## Ändringar (endast `supabase/functions/replicate-face-swap/index.ts`)
+## Nuläge
+- `AiStyleSection` (vanligt foto-lager med AI-stil) **gör redan exakt detta**: hashar filen, cachar per `(photoHash, presetId)`, visar ✓-badge på körda presets och en "Dina provade stilar"-rad. Inget behöver göras där.
+- `AiPhotoSection` (face-swap human/pet + background-removal med style-presets): cachar i `face-swap-cache.v5` per `(layerId, faceHash, refSlot)` där `refSlot` redan kodar style-id för removeBackground. Men UI:t visar bara standard-thumbnail på preset-knapparna och har ingen historik-rad.
+- `MultiFaceUploadSection` / `multi-face-cache`: cachar per slot-kombination men har ingen UI-historik.
 
-### 1. Skärp `fluxBase` (rad ~623–629)
-Lägg in orientering/spegling-spärr inuti samma stycke som motivblocket och bakgrundsspärren:
+## Vad som byggs
 
-```
-The subject is the main object in the input photo. Preserve its structure,
-proportions and overall composition so it stays recognizable as the same subject.
-Keep the subject at the EXACT same orientation, facing direction, angle and
-position as in the input photo. NEVER mirror, flip, rotate or re-angle it.
-Do not output a mirror image. If the subject faces left in the input it must
-face left in the output; if it faces right it must face right.
-Completely isolate the subject on a perfectly flat mid-grey (#7f7f7f) studio backdrop.
-ABSOLUTELY NO landscape, NO sky, NO trees, NO foliage, NO bushes, NO grass, NO ground,
-NO shadow, NO surroundings, NO people, NO vehicles, NO text, NO watermark.
-The area outside the subject silhouette must be a single solid flat #7f7f7f, nothing else.
-```
+### 1. `AiPhotoSection` — preset-knappar visar cachat resultat
+I sektionen "Välj stil" (removeBackground, `visibleStyles.length > 1`):
+- För varje preset `p`, slå upp `getCachedFaceSwap(layer.id, source.hash, refSlotFor("removeBackground", null, p.id))`.
+- Om träff → rendera `<img src={cachedUrl}>` istället för `p.thumbnailUrl`, lägg på `ring-2 ring-primary` när det är den aktiva (matchar `result`), och visa ✓-badge i hörnet.
+- Klick på en preset med cache: kör `applyStyle`-flödet oförändrat — `runSwap` har redan cache-träff-grenen som sätter resultatet direkt utan att anropa edge-funktionen.
+- Etiketten (`p.label`) ligger kvar längst ner som idag.
 
-### 2. Slå ihop motivblock med fluxBase till ett stycke (rad ~639–643)
-Mallens `fluxStylePrompt` (motiv) limmas in i samma paragraf som `fluxBase`, inte som separat stycke. Style-tail ligger kvar i egen paragraf så stilen vinner visuellt men inte geometriskt.
+### 2. `AiPhotoSection` — subjekt-väljaren (human/pet, flera referenser)
+Samma idé: om det finns en cachad swap för `(layer.id, faceHash, refUrl)` så används den som thumbnail på subjekt-knappen istället för admin-referensen, med ✓-badge. Befintlig effekt som auto-byter `result` när man väljer subjekt fungerar redan.
 
-```ts
-const fluxMotifLine = params.fluxStylePrompt?.trim() ?? "";
-const fluxPromptText = [
-  fluxMotifLine ? `${fluxBase} ${fluxMotifLine}` : fluxBase,
-  fluxStyleTail,
-].filter(Boolean).join("\n\n");
-```
+### 3. `MultiFaceUploadSection` — historik-rad (lättviktig)
+Multi-face har inga "presets" att hänga thumbnails på (cachen är per slot-kombination, inte per stil). Vi lägger till en horisontell "Tidigare versioner"-rad under genereringsknappen som listar alla `MultiFaceCacheEntry` vars `layerId` matchar — klick återanvänder URL:en direkt (samma `setResult`-flöde). Tom-state visas inte.
 
-### 3. Förstärk style-tail-instruktionen (rad ~631–637)
-Lägg till en explicit "style is a surface treatment only" så stilbeskrivningen inte tolkas som tillstånd att rotera/omkomponera:
+### 4. Inga schema- eller backend-ändringar
+All cache är redan på plats i localStorage (`face-swap-cache.v5`, `multi-face-cache.v1`, `aiResultCache` i editorStore). Inget edge-funktionsanrop, ingen ny tabell, ingen ny endpoint.
 
-```
-Render the subject in the following art style. Apply it fully to the subject
-while keeping its structure and identity recognizable. The style is a SURFACE
-TREATMENT only — it must not change the subject's orientation, facing direction,
-position or scale:
-```
+## Filer som ändras
+- `src/components/editor/AiPhotoSection.tsx` — visa cachad URL i preset-thumbnailen + subjekt-thumbnailen, lägg till ✓-badge. ~30 rader.
+- `src/components/editor/MultiFaceUploadSection.tsx` — läs cache-tabellen, rendera historik-rad. ~25 rader.
+- `src/stores/editorStore.ts` — exponera en liten `listFaceSwapsForLayer(layerId, faceHash)`-helper om det förenklar (annars läs `faceSwapCache` direkt i komponenten, samma mönster som `aiStyleSection` redan gör med `aiResultCache`).
+- `src/i18n/locales/sv.json` (+ alla språkfiler) — nya nycklar: `aiPhoto.previousVersions`, `aiPhoto.reused`. Översätts till `en/de/no/da/fi/fr/es/it/nl/pl`.
 
-### 4. `callFluxRemoveBg` (rad ~747–755)
-`prompt_upsampling` är redan `false` — bekräftat, ingen ändring.
-`aspect_ratio: "match_input_image"` och `input_image` behålls.
-Flux Kontext Pro exponerar ingen offentlig fidelity/structure-parameter — inget mer att skruva på där.
+## Inte i scope
+- Ingen ändring av `replicate-face-swap`, `replicate-style`, `multi-face-swap` edge-funktioner.
+- Ingen ändring av cache-nycklar eller TTL.
+- Ingen "rensa allt"-knapp (tar ✗ per entry följer befintligt mönster om vi vill, men inte krav nu).
 
 ## Verifiering
-1. Deploya `replicate-face-swap` och kör bilposter med **Olja** och **Vintage** på tre bilder (vänstervänd, högervänd, trekvartsvinkel). Kolla `[runRemoveBackground] fluxPromptText` i loggen att de nya raderna finns med och att riktningen matchar originalet i output.
-2. Regress: kör en husposter och en födelseposter — ska visuellt vara identiska med tidigare lyckade resultat.
-3. Om spegling fortfarande sker på fordon: gå vidare till steg 5 nedan (detect-and-correct), annars klart.
-
-## Steg 5 — endast om steg 1–4 inte räcker (separat plan)
-Bygg en post-Flux mirror-detektor: jämför Flux-utdatat mot input (t.ex. via perceptuell hash på horisontellt flippad version) och spegla tillbaka innan bg-removern. Det är en ny ~80-rads modul och bör behandlas som en egen iteration efter att vi sett om prompt-skärpningen räcker.
-
-## Risk
-Mycket låg. Alla tillägg är skärpningar inom redan etablerade direktiv (preserve identity / no background / surface treatment). Påverkar inte Nano Banana-grenen, klientkoden, cache-nycklar eller mallar.
+1. Bilposter: ladda upp en bild, kör Pop-art → ladda om sidan → ladda upp samma bil → preset-knappen "Pop-art" visar nu bilen i pop-art-stil med ✓.
+2. Födelseposter (face-swap pet med två referenser): kör swap på Hund A → byt till Hund B → byt tillbaka — thumbnailen för Hund A visar det swappade resultatet, inte admin-referensen.
+3. Husposter (multi-face): generera → ladda om → historik-raden visar tidigare resultat och klick återställer.
+4. Regress: vanligt foto-lager med AI-stil (AiStyleSection) ska se identiskt ut med idag.
