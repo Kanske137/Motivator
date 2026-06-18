@@ -186,7 +186,7 @@ export const aiPhotoDefaultsSchema = z.object({
       controlStrength: z.number().min(0).max(1).optional(),
       /** SDXL-only. 0..4 per Replicate schema for fofr/sdxl-multi-controlnet-lora.
        *  Default 0.7 is the geometry sweet-spot. Ignored by BFL engines. */
-      controlnetScale: z.number().min(0).max(4).optional().default(0.7),
+      controlnetScale: z.number().min(0).max(4).optional(),
       guidance: z.number().min(0).max(100).default(50),
       steps: z.number().int().min(15).max(50).default(28),
     })
