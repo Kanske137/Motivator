@@ -597,20 +597,27 @@ async function runRemoveBackground(params: {
   ].filter(Boolean).join("\n");
 
   const fluxEnabled = Deno.env.get("FLUX_REMOVEBG_ENABLED") === "true";
+  const useStructural =
+    params.subjectKind === "removeBackground" &&
+    !!params.structuralConditioning?.enabled &&
+    typeof params.fluxStylePrompt === "string" &&
+    params.fluxStylePrompt.trim().length > 0 &&
+    fluxEnabled;
   const useFlux =
+    !useStructural &&
     params.subjectKind === "removeBackground" &&
     typeof params.fluxStylePrompt === "string" &&
     params.fluxStylePrompt.trim().length > 0 &&
     fluxEnabled;
 
-  // Build a SEPARATE compact prompt for Flux Kontext Pro. Flux follows the
-  // first concrete instruction it sees, so the 4300-char Nano-Banana prompt
-  // (with "PRESERVE SUBJECT COLORS", "keep colors exactly", "FILL THE FRAME
-  // 90-95%", etc.) drowns out the customer's style. Mirrors diag6/stress/run.sh.
-  // Style words MUST come last so they win. Backdrop is mid-grey #7f7f7f
-  // (validated against 851-labs/background-remover); the bg-remover step
-  // strips it and returns RGBA, so the customer-facing backdropColor still
-  // applies in snapshot/preview.
+  // Build a SEPARATE compact prompt for Flux Kontext Pro / Flux-{canny|depth}-pro.
+  // Flux follows the first concrete instruction it sees, so the 4300-char Nano-
+  // Banana prompt (with "PRESERVE SUBJECT COLORS", "keep colors exactly",
+  // "FILL THE FRAME 90-95%", etc.) drowns out the customer's style. Mirrors
+  // diag6/stress/run.sh. Style words MUST come last so they win. Backdrop is
+  // mid-grey #7f7f7f (validated against 851-labs/background-remover); the
+  // bg-remover step strips it and returns RGBA, so the customer-facing
+  // backdropColor still applies in snapshot/preview.
   const styleLabelLower = (params.styleLabel ?? "").toLowerCase();
   const styleHaystackForBridge = `${styleLabelLower} ${(params.stylePrompt ?? "").toLowerCase()}`;
   const bridge = isWatercolorStyle
@@ -627,6 +634,10 @@ async function runRemoveBackground(params: {
               ? "The result must read as a vintage illustrated print, NOT a photograph: muted aged palette, slight grain, painterly/print texture, no photographic micro-detail."
               : "The result must read as an artistic illustration, NOT a photograph: clearly painterly/illustrative surface treatment, no photographic micro-detail.";
 
+  // fluxBase for the kontext-pro path keeps orientation language (model has
+  // to guess geometry from text). The structural path uses fluxBaseStructural
+  // below, which drops those rules because the control image fully locks
+  // orientation, angle, scale and mirroring.
   const fluxBase =
     "The subject is the main object in the input photo. Preserve its structure, " +
     "proportions and overall composition so it stays recognizable as the same subject. " +
@@ -637,6 +648,14 @@ async function runRemoveBackground(params: {
     "Completely isolate the subject on a perfectly flat mid-grey (#7f7f7f) studio backdrop. " +
     "ABSOLUTELY NO landscape, NO sky, NO trees, NO foliage, NO bushes, NO grass, NO ground, " +
     "NO shadow, NO surroundings, NO people, NO vehicles, NO text, NO watermark. " +
+    "The area outside the subject silhouette must be a single solid flat #7f7f7f, nothing else.";
+
+  const fluxBaseStructural =
+    "The control image already defines the subject's exact silhouette, orientation, " +
+    "facing direction, angle, position and scale — reproduce it faithfully. " +
+    "Render the subject isolated on a perfectly flat mid-grey (#7f7f7f) studio backdrop. " +
+    "ABSOLUTELY NO landscape, NO sky, NO trees, NO foliage, NO grass, NO ground, NO shadow, " +
+    "NO surroundings, NO people, NO vehicles, NO text, NO watermark. " +
     "The area outside the subject silhouette must be a single solid flat #7f7f7f, nothing else.";
 
   const fluxStyleTail = params.stylePrompt?.trim()
@@ -655,6 +674,11 @@ async function runRemoveBackground(params: {
     fluxStyleTail,
   ].filter(Boolean).join("\n\n");
 
+  const structuralPromptText = [
+    fluxMotifLine ? `${fluxBaseStructural} ${fluxMotifLine}` : fluxBaseStructural,
+    fluxStyleTail,
+  ].filter(Boolean).join("\n\n");
+
   console.log("[runRemoveBackground] config", {
     designId: params.designId,
     backdropHex,
@@ -667,8 +691,22 @@ async function runRemoveBackground(params: {
     fluxPromptLength: fluxPromptText.length,
     fluxEnabled,
     hasFluxStylePrompt: !!params.fluxStylePrompt?.trim(),
+    useStructural,
     useFlux,
+    structural: useStructural ? params.structuralConditioning : null,
   });
+
+  if (useStructural) {
+    console.log("[runRemoveBackground] structuralPromptText\n" + structuralPromptText);
+    return callFluxStructural({
+      faceImageUrl: params.faceImageUrl,
+      promptText: structuralPromptText,
+      designId: params.designId,
+      controlType: params.structuralConditioning!.controlType,
+      guidance: params.structuralConditioning!.guidance,
+      steps: params.structuralConditioning!.steps,
+    });
+  }
 
   if (useFlux) {
     console.log("[runRemoveBackground] fluxPromptText\n" + fluxPromptText);
