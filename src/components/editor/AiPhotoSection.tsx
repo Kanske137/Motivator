@@ -46,14 +46,18 @@ const MAX_BYTES = 25 * 1024 * 1024;
 // Subject hints moved to i18n (aiPhoto.subjectHint*).
 
 /** Cache slot used in place of the admin reference URL for removeBackground.
- *  Including the style id keeps each style pick cached separately. */
+ *  Including the style id keeps each style pick cached separately.
+ *  When structural conditioning is active, controlType is appended so the
+ *  structural-path result doesn't collide with the legacy kontext-pro result. */
 function refSlotFor(
   subjectKind: string,
   refUrl: string | null,
   styleId: string | null,
+  controlType?: string | null,
 ): string {
   if (subjectKind === "removeBackground") {
-    return `no-ref::style:${styleId ?? "none"}`;
+    const base = `no-ref::style:${styleId ?? "none"}`;
+    return controlType ? `${base}::ctrl:${controlType}` : base;
   }
   return refUrl ?? "";
 }
