@@ -54,10 +54,13 @@ function refSlotFor(
   refUrl: string | null,
   styleId: string | null,
   controlType?: string | null,
+  engine?: string | null,
 ): string {
   if (subjectKind === "removeBackground") {
-    const base = `no-ref::style:${styleId ?? "none"}`;
-    return controlType ? `${base}::ctrl:${controlType}` : base;
+    let base = `no-ref::style:${styleId ?? "none"}`;
+    if (controlType) base += `::ctrl:${controlType}`;
+    if (engine) base += `::eng:${engine}`;
+    return base;
   }
   return refUrl ?? "";
 }
@@ -249,6 +252,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         refUrl,
         selectedStyleId,
         structuralActive ? structural!.controlType : null,
+        structuralActive ? (structural as { engine?: string }).engine ?? "bfl-canny" : null,
       );
       // Only use cache when the user hasn't explicitly asked for a regenerate.
       if (!opts.force && hash) {
@@ -491,8 +495,9 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
               const isActive = selectedStyleId === p.id;
               const structural = layer.defaults.structuralConditioning ?? null;
               const ctrl = structural?.enabled ? structural.controlType : null;
+              const eng = structural?.enabled ? ((structural as { engine?: string }).engine ?? "bfl-canny") : null;
               const cachedUrl = source?.hash
-                ? getCachedFaceSwap(layer.id, source.hash, refSlotFor("removeBackground", null, p.id, ctrl))
+                ? getCachedFaceSwap(layer.id, source.hash, refSlotFor("removeBackground", null, p.id, ctrl, eng))
                 : null;
               const thumbSrc = cachedUrl ?? p.thumbnailUrl ?? null;
               return (

@@ -487,6 +487,7 @@ async function runRemoveBackground(params: {
   subjectKind: "removeBackground";
   structuralConditioning: {
     enabled: boolean;
+    engine: "bfl-canny" | "bfl-depth";
     controlType: "canny" | "depth";
     guidance: number;
     steps: number;
@@ -620,19 +621,20 @@ async function runRemoveBackground(params: {
   // backdropColor still applies in snapshot/preview.
   const styleLabelLower = (params.styleLabel ?? "").toLowerCase();
   const styleHaystackForBridge = `${styleLabelLower} ${(params.stylePrompt ?? "").toLowerCase()}`;
-  const bridge = isWatercolorStyle
-    ? ""
-    : /oil|olja|oljemålning|impasto/.test(styleHaystackForBridge)
-      ? "The result must read as an oil painting on canvas, NOT a photograph: visible thick impasto brush strokes, palette-knife texture, painterly broken edges, rich saturated pigment, no photographic micro-detail."
-      : /sketch|skiss|pencil|graphite/.test(styleHaystackForBridge)
-        ? "The result must read as a hand-drawn pencil sketch on paper, NOT a photograph: visible graphite strokes and cross-hatching, paper grain, no photographic micro-detail."
-        : /line|linje|ink|kontur/.test(styleHaystackForBridge)
-          ? "The result must read as a clean line-art illustration, NOT a photograph: crisp ink outlines, flat or minimal fill, no photographic micro-detail."
-          : /pop[\s-]?art|warhol/.test(styleHaystackForBridge)
-            ? "The result must read as a bold pop-art illustration, NOT a photograph: flat saturated color blocks, thick outlines, halftone dots, high contrast, no photographic micro-detail."
-            : /vintage|retro|aged/.test(styleHaystackForBridge)
-              ? "The result must read as a vintage illustrated print, NOT a photograph: muted aged palette, slight grain, painterly/print texture, no photographic micro-detail."
-              : "The result must read as an artistic illustration, NOT a photograph: clearly painterly/illustrative surface treatment, no photographic micro-detail.";
+  const bridge =
+    /water\s*colou?r|akvarell|aquarelle/.test(styleHaystackForBridge)
+      ? "soft watercolor painting, wet-on-wet washes, pigment bleed, visible paper grain, not a photo"
+      : /oil|olja|oljemålning|impasto/.test(styleHaystackForBridge)
+        ? "oil painting, impasto, brush strokes, canvas texture, not a photo"
+        : /sketch|skiss|pencil|graphite/.test(styleHaystackForBridge)
+          ? "pencil drawing, graphite strokes, paper grain, cross hatching, not a photo"
+          : /line|linje|ink|kontur/.test(styleHaystackForBridge)
+            ? "black ink line drawing, minimal fill, white paper, not a photo"
+            : /pop[\s-]?art|warhol/.test(styleHaystackForBridge)
+              ? "flat comic poster, halftone, hard outlines, saturated color blocks, not a photo"
+              : /vintage|retro|aged/.test(styleHaystackForBridge)
+                ? "screen printed 1950s poster illustration, flat shapes, limited palette, grain, not a photo"
+                : "artistic illustration, painterly surface, not a photo";
 
   // fluxBase for the kontext-pro path keeps orientation language (model has
   // to guess geometry from text). The structural path uses fluxBaseStructural
@@ -709,6 +711,7 @@ async function runRemoveBackground(params: {
       faceImageUrl: params.faceImageUrl,
       promptText: structuralPromptText,
       designId: params.designId,
+      engine: params.structuralConditioning!.engine,
       controlType: params.structuralConditioning!.controlType,
       guidance: params.structuralConditioning!.guidance,
       steps: params.structuralConditioning!.steps,
@@ -987,8 +990,27 @@ function boxBlurRGB(
 async function prepareControlImage(
   rgbaPngBytes: Uint8Array,
   hex: number,
+  controlType: "canny" | "depth",
 ): Promise<{ bytes: Uint8Array; width: number; height: number }> {
   let img = await Image.decode(rgbaPngBytes);
+  if (controlType === "depth") {
+    // Depth-pro needs the actual subject pixels to build a meaningful depth map.
+    // No blur, no posterize — just resize and flatten over flat backdrop.
+    const maxDim = Math.max(img.width, img.height);
+    if (maxDim > 1024) {
+      const scale = 1024 / maxDim;
+      img = img.resize(
+        Math.max(1, Math.round(img.width * scale)),
+        Math.max(1, Math.round(img.height * scale)),
+      );
+    }
+    const bg = new Image(img.width, img.height).fill(
+      Image.rgbaToColor((hex >> 16) & 0xff, (hex >> 8) & 0xff, hex & 0xff, 0xff),
+    );
+    bg.composite(img, 0, 0);
+    return { bytes: await bg.encode(), width: img.width, height: img.height };
+  }
+  // canny path: aggressive edge-preserving simplification.
   const maxDim = Math.max(img.width, img.height);
   if (maxDim > 768) {
     const scale = 768 / maxDim;
@@ -1012,12 +1034,7 @@ async function prepareControlImage(
     src[i + 2] = ((useBlur ? blurred[i + 2] : src[i + 2]) & 0xf8);
   }
   const bg = new Image(w, h).fill(
-    Image.rgbaToColor(
-      (hex >> 16) & 0xff,
-      (hex >> 8) & 0xff,
-      hex & 0xff,
-      0xff,
-    ),
+    Image.rgbaToColor((hex >> 16) & 0xff, (hex >> 8) & 0xff, hex & 0xff, 0xff),
   );
   bg.composite(img, 0, 0);
   const bytes = await bg.encode();
@@ -1028,6 +1045,7 @@ async function callFluxStructural(params: {
   faceImageUrl: string;
   promptText: string;
   designId: string;
+  engine: "bfl-canny" | "bfl-depth";
   controlType: "canny" | "depth";
   guidance: number;
   steps: number;
@@ -1052,9 +1070,12 @@ async function callFluxStructural(params: {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
+  const model = params.engine === "bfl-depth" ? FLUX_DEPTH_MODEL : FLUX_CANNY_MODEL;
+
   console.log(
-    `[flux-structural] start designId=${params.designId} controlType=${params.controlType} ` +
-      `guidance=${params.guidance} steps=${params.steps} styleLabel=${params.styleLabel ?? "-"}`,
+    `[flux-structural] start designId=${params.designId} engine=${params.engine} model=${model} ` +
+      `controlType=${params.controlType} guidance=${params.guidance} steps=${params.steps} ` +
+      `styleLabel=${params.styleLabel ?? "-"}`,
   );
 
   // Step 1: bg-remove the original photo → RGBA cutout.
@@ -1111,7 +1132,7 @@ async function callFluxStructural(params: {
 
   let prepared: { bytes: Uint8Array; width: number; height: number };
   try {
-    prepared = await prepareControlImage(cutoutBytes, 0x7f7f7f);
+    prepared = await prepareControlImage(cutoutBytes, 0x7f7f7f, params.controlType);
   } catch (e) {
     return {
       ok: false,
@@ -1141,15 +1162,15 @@ async function callFluxStructural(params: {
     .getPublicUrl(ctrlPath);
   const controlImageUrl = ctrlPub.publicUrl;
   console.log(
-    `[flux-structural] control image ready designId=${params.designId} ` +
-      `controlImageBytes=${flatBytes.length} controlImageDims=${prepared.width}x${prepared.height} ` +
+    `[flux-structural] control image ready designId=${params.designId} engine=${params.engine} ` +
+      `controlType=${params.controlType} controlImageBytes=${flatBytes.length} ` +
+      `controlImageDims=${prepared.width}x${prepared.height} ` +
       `styleLabel=${params.styleLabel ?? "-"} guidance=${params.guidance} steps=${params.steps} ` +
       `url=${controlImageUrl}`,
   );
 
   // Step 3: call BFL flux-{canny|depth}-pro with control_image + prompt.
-  const model =
-    params.controlType === "depth" ? FLUX_DEPTH_MODEL : FLUX_CANNY_MODEL;
+  // Model picked by `engine` (set above from caller).
   const fluxStart = await fetch(
     `https://api.replicate.com/v1/models/${model}/predictions`,
     {
@@ -1374,10 +1395,10 @@ Deno.serve(async (req) => {
       subjectKind === "removeBackground" &&
       fluxEnabledHandler &&
       hasFluxStyle;
+    const structuralEngineHint =
+      body?.structuralConditioning?.engine === "bfl-depth" ? "bfl-depth" : "bfl-canny";
     const structuralModel =
-      body?.structuralConditioning?.controlType === "depth"
-        ? FLUX_DEPTH_MODEL
-        : FLUX_CANNY_MODEL;
+      structuralEngineHint === "bfl-depth" ? FLUX_DEPTH_MODEL : FLUX_CANNY_MODEL;
     const route =
       subjectKind === "human" ? "human-nano-banana"
       : subjectKind === "pet" ? "pet-nano-banana"
@@ -1424,12 +1445,14 @@ Deno.serve(async (req) => {
     // Server-side validation; falls back to nulls when missing/invalid.
     let structuralConditioning: {
       enabled: boolean;
+      engine: "bfl-canny" | "bfl-depth";
       controlType: "canny" | "depth";
       guidance: number;
       steps: number;
     } | null = null;
     const sc = body?.structuralConditioning;
     if (sc && typeof sc === "object" && sc.enabled === true) {
+      const eng = sc.engine === "bfl-depth" ? "bfl-depth" : "bfl-canny";
       const ct = sc.controlType === "depth" ? "depth" : "canny";
       const g = typeof sc.guidance === "number" && isFinite(sc.guidance)
         ? Math.max(0, Math.min(100, sc.guidance))
@@ -1437,7 +1460,7 @@ Deno.serve(async (req) => {
       const st = typeof sc.steps === "number" && isFinite(sc.steps)
         ? Math.max(15, Math.min(50, Math.round(sc.steps)))
         : 28;
-      structuralConditioning = { enabled: true, controlType: ct, guidance: g, steps: st };
+      structuralConditioning = { enabled: true, engine: eng, controlType: ct, guidance: g, steps: st };
     }
 
     const result =

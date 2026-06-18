@@ -179,6 +179,7 @@ export const aiPhotoDefaultsSchema = z.object({
   structuralConditioning: z
     .object({
       enabled: z.boolean(),
+      engine: z.enum(["bfl-canny", "bfl-depth"]).default("bfl-canny"),
       controlType: z.enum(["canny", "depth"]).default("canny"),
       controlStrength: z.number().min(0).max(1).optional(),
       guidance: z.number().min(0).max(100).default(50),
