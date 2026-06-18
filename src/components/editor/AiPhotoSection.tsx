@@ -46,14 +46,18 @@ const MAX_BYTES = 25 * 1024 * 1024;
 // Subject hints moved to i18n (aiPhoto.subjectHint*).
 
 /** Cache slot used in place of the admin reference URL for removeBackground.
- *  Including the style id keeps each style pick cached separately. */
+ *  Including the style id keeps each style pick cached separately.
+ *  When structural conditioning is active, controlType is appended so the
+ *  structural-path result doesn't collide with the legacy kontext-pro result. */
 function refSlotFor(
   subjectKind: string,
   refUrl: string | null,
   styleId: string | null,
+  controlType?: string | null,
 ): string {
   if (subjectKind === "removeBackground") {
-    return `no-ref::style:${styleId ?? "none"}`;
+    const base = `no-ref::style:${styleId ?? "none"}`;
+    return controlType ? `${base}::ctrl:${controlType}` : base;
   }
   return refUrl ?? "";
 }
@@ -238,7 +242,14 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
     startAiJob(jobId, { label: t("ai.creatingImage"), expectedSeconds, stage: t("ai.stagePrep") });
     try {
       const hash = await ensureHash();
-      const cacheRefSlot = refSlotFor(subjectKind, refUrl, selectedStyleId);
+      const structural = layer.defaults.structuralConditioning ?? null;
+      const structuralActive = !!(structural?.enabled && isRemoveBg);
+      const cacheRefSlot = refSlotFor(
+        subjectKind,
+        refUrl,
+        selectedStyleId,
+        structuralActive ? structural!.controlType : null,
+      );
       // Only use cache when the user hasn't explicitly asked for a regenerate.
       if (!opts.force && hash) {
         const cached = getCachedFaceSwap(layer.id, hash, cacheRefSlot);
@@ -264,6 +275,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         faceImageUrl,
         subjectKind,
         removeBackgroundStyleId: selectedPreset?.id ?? null,
+        structural: structuralActive ? structural : null,
         force: !!opts.force,
       });
       // Layer aspect ratio (visual width / height in CM) — passed to the
@@ -308,6 +320,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
           fillFrame: layer.defaults.fillFrame ?? null,
           preserveSubjectColors: layer.defaults.preserveSubjectColors ?? null,
           fluxStylePrompt: layer.defaults.fluxStylePrompt ?? null,
+          structuralConditioning: structuralActive ? structural : null,
         },
       });
       if (error) throw error;
@@ -476,8 +489,10 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
           <div className="grid grid-cols-3 gap-2">
             {visibleStyles.map((p) => {
               const isActive = selectedStyleId === p.id;
+              const structural = layer.defaults.structuralConditioning ?? null;
+              const ctrl = structural?.enabled ? structural.controlType : null;
               const cachedUrl = source?.hash
-                ? getCachedFaceSwap(layer.id, source.hash, refSlotFor("removeBackground", null, p.id))
+                ? getCachedFaceSwap(layer.id, source.hash, refSlotFor("removeBackground", null, p.id, ctrl))
                 : null;
               const thumbSrc = cachedUrl ?? p.thumbnailUrl ?? null;
               return (

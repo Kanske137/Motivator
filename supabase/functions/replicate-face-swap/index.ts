@@ -35,6 +35,7 @@
 // toast instead of crashing on a non-2xx.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { Image } from "https://deno.land/x/imagescript@1.2.17/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -484,6 +485,12 @@ async function runRemoveBackground(params: {
   designId: string;
   fluxStylePrompt: string | null;
   subjectKind: "removeBackground";
+  structuralConditioning: {
+    enabled: boolean;
+    controlType: "canny" | "depth";
+    guidance: number;
+    steps: number;
+  } | null;
 }) {
   // Detect whether the chosen AI style is a watercolor style. The colorful
   // dot/splatter ring is ONLY appropriate for watercolor — for any other
@@ -590,20 +597,27 @@ async function runRemoveBackground(params: {
   ].filter(Boolean).join("\n");
 
   const fluxEnabled = Deno.env.get("FLUX_REMOVEBG_ENABLED") === "true";
+  const useStructural =
+    params.subjectKind === "removeBackground" &&
+    !!params.structuralConditioning?.enabled &&
+    typeof params.fluxStylePrompt === "string" &&
+    params.fluxStylePrompt.trim().length > 0 &&
+    fluxEnabled;
   const useFlux =
+    !useStructural &&
     params.subjectKind === "removeBackground" &&
     typeof params.fluxStylePrompt === "string" &&
     params.fluxStylePrompt.trim().length > 0 &&
     fluxEnabled;
 
-  // Build a SEPARATE compact prompt for Flux Kontext Pro. Flux follows the
-  // first concrete instruction it sees, so the 4300-char Nano-Banana prompt
-  // (with "PRESERVE SUBJECT COLORS", "keep colors exactly", "FILL THE FRAME
-  // 90-95%", etc.) drowns out the customer's style. Mirrors diag6/stress/run.sh.
-  // Style words MUST come last so they win. Backdrop is mid-grey #7f7f7f
-  // (validated against 851-labs/background-remover); the bg-remover step
-  // strips it and returns RGBA, so the customer-facing backdropColor still
-  // applies in snapshot/preview.
+  // Build a SEPARATE compact prompt for Flux Kontext Pro / Flux-{canny|depth}-pro.
+  // Flux follows the first concrete instruction it sees, so the 4300-char Nano-
+  // Banana prompt (with "PRESERVE SUBJECT COLORS", "keep colors exactly",
+  // "FILL THE FRAME 90-95%", etc.) drowns out the customer's style. Mirrors
+  // diag6/stress/run.sh. Style words MUST come last so they win. Backdrop is
+  // mid-grey #7f7f7f (validated against 851-labs/background-remover); the
+  // bg-remover step strips it and returns RGBA, so the customer-facing
+  // backdropColor still applies in snapshot/preview.
   const styleLabelLower = (params.styleLabel ?? "").toLowerCase();
   const styleHaystackForBridge = `${styleLabelLower} ${(params.stylePrompt ?? "").toLowerCase()}`;
   const bridge = isWatercolorStyle
@@ -620,6 +634,10 @@ async function runRemoveBackground(params: {
               ? "The result must read as a vintage illustrated print, NOT a photograph: muted aged palette, slight grain, painterly/print texture, no photographic micro-detail."
               : "The result must read as an artistic illustration, NOT a photograph: clearly painterly/illustrative surface treatment, no photographic micro-detail.";
 
+  // fluxBase for the kontext-pro path keeps orientation language (model has
+  // to guess geometry from text). The structural path uses fluxBaseStructural
+  // below, which drops those rules because the control image fully locks
+  // orientation, angle, scale and mirroring.
   const fluxBase =
     "The subject is the main object in the input photo. Preserve its structure, " +
     "proportions and overall composition so it stays recognizable as the same subject. " +
@@ -630,6 +648,14 @@ async function runRemoveBackground(params: {
     "Completely isolate the subject on a perfectly flat mid-grey (#7f7f7f) studio backdrop. " +
     "ABSOLUTELY NO landscape, NO sky, NO trees, NO foliage, NO bushes, NO grass, NO ground, " +
     "NO shadow, NO surroundings, NO people, NO vehicles, NO text, NO watermark. " +
+    "The area outside the subject silhouette must be a single solid flat #7f7f7f, nothing else.";
+
+  const fluxBaseStructural =
+    "The control image already defines the subject's exact silhouette, orientation, " +
+    "facing direction, angle, position and scale — reproduce it faithfully. " +
+    "Render the subject isolated on a perfectly flat mid-grey (#7f7f7f) studio backdrop. " +
+    "ABSOLUTELY NO landscape, NO sky, NO trees, NO foliage, NO grass, NO ground, NO shadow, " +
+    "NO surroundings, NO people, NO vehicles, NO text, NO watermark. " +
     "The area outside the subject silhouette must be a single solid flat #7f7f7f, nothing else.";
 
   const fluxStyleTail = params.stylePrompt?.trim()
@@ -648,6 +674,11 @@ async function runRemoveBackground(params: {
     fluxStyleTail,
   ].filter(Boolean).join("\n\n");
 
+  const structuralPromptText = [
+    fluxMotifLine ? `${fluxBaseStructural} ${fluxMotifLine}` : fluxBaseStructural,
+    fluxStyleTail,
+  ].filter(Boolean).join("\n\n");
+
   console.log("[runRemoveBackground] config", {
     designId: params.designId,
     backdropHex,
@@ -660,8 +691,22 @@ async function runRemoveBackground(params: {
     fluxPromptLength: fluxPromptText.length,
     fluxEnabled,
     hasFluxStylePrompt: !!params.fluxStylePrompt?.trim(),
+    useStructural,
     useFlux,
+    structural: useStructural ? params.structuralConditioning : null,
   });
+
+  if (useStructural) {
+    console.log("[runRemoveBackground] structuralPromptText\n" + structuralPromptText);
+    return callFluxStructural({
+      faceImageUrl: params.faceImageUrl,
+      promptText: structuralPromptText,
+      designId: params.designId,
+      controlType: params.structuralConditioning!.controlType,
+      guidance: params.structuralConditioning!.guidance,
+      steps: params.structuralConditioning!.steps,
+    });
+  }
 
   if (useFlux) {
     console.log("[runRemoveBackground] fluxPromptText\n" + fluxPromptText);
@@ -844,6 +889,254 @@ async function callFluxRemoveBg(params: {
   return { ok: true, bytes, contentType, outputUrl: cutoutUrl };
 }
 
+// ---------- Route 3c: Structural conditioning via BFL flux-{canny|depth}-pro ----------
+// Pipeline:
+//   1. 851-labs/background-remover on the original photo (geometry comes from
+//      the actual pixels — orientation, angle, scale, mirroring are locked).
+//   2. Flatten the RGBA cutout over a solid #7f7f7f background and upload the
+//      result to print-files. This is the `control_image` the BFL model
+//      consumes; it generates its own canny / depth map internally.
+//   3. flux-canny-pro OR flux-depth-pro with guidance + steps from the
+//      template config. Style words come last so they dominate; orientation
+//      language is dropped because the control image already locks geometry.
+//   4. 851-labs/background-remover #2 to strip the #7f7f7f backdrop again
+//      and return RGBA bytes (same shape as Route 3b so the rest of the
+//      pipeline is unchanged).
+const FLUX_CANNY_MODEL = "black-forest-labs/flux-canny-pro";
+const FLUX_DEPTH_MODEL = "black-forest-labs/flux-depth-pro";
+
+async function flattenOverGrey(
+  rgbaPngBytes: Uint8Array,
+  hex: number, // 0xRRGGBB
+): Promise<Uint8Array> {
+  const img = await Image.decode(rgbaPngBytes);
+  const bg = new Image(img.width, img.height).fill(
+    Image.rgbaToColor(
+      (hex >> 16) & 0xff,
+      (hex >> 8) & 0xff,
+      hex & 0xff,
+      0xff,
+    ),
+  );
+  bg.composite(img, 0, 0);
+  return await bg.encode();
+}
+
+async function callFluxStructural(params: {
+  faceImageUrl: string;
+  promptText: string;
+  designId: string;
+  controlType: "canny" | "depth";
+  guidance: number;
+  steps: number;
+}): Promise<
+  | { ok: true; bytes: Uint8Array; contentType: string; outputUrl: string }
+  | { ok: false; response: Response }
+> {
+  const REPLICATE_API_TOKEN = Deno.env.get("REPLICATE_API_TOKEN");
+  if (!REPLICATE_API_TOKEN) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Tjänsten är tillfälligt otillgänglig. Försök igen senare.",
+        "REPLICATE_API_TOKEN not configured (structural path)",
+      ),
+    };
+  }
+
+  const supabaseAdmin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+
+  console.log(
+    `[flux-structural] start designId=${params.designId} controlType=${params.controlType} ` +
+      `guidance=${params.guidance} steps=${params.steps}`,
+  );
+
+  // Step 1: bg-remove the original photo → RGBA cutout.
+  const bg1Start = await fetch(`https://api.replicate.com/v1/predictions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      version: BG_REMOVER_VERSION,
+      input: {
+        image: params.faceImageUrl,
+        format: "png",
+        background_type: "rgba",
+      },
+    }),
+  });
+  const bg1Json = await bg1Start.json();
+  if (!bg1Start.ok || !bg1Json?.id) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
+        `Structural BG#1 start failed: ${bg1Start.status} ${JSON.stringify(bg1Json).slice(0, 300)}`,
+      ),
+    };
+  }
+  const bg1Poll = await pollReplicate(bg1Json.id, REPLICATE_API_TOKEN, 90, 2000, 4000);
+  if (!bg1Poll.ok) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte skapa bilden den här gången. Försök igen.",
+        `Structural BG#1 ${bg1Poll.reason}`,
+      ),
+    };
+  }
+  const cutoutUrl1 = bg1Poll.output;
+  console.log(`[flux-structural] bg#1 done designId=${params.designId} url=${cutoutUrl1}`);
+
+  // Step 2: fetch cutout, flatten over #7f7f7f, upload as control image.
+  const cutoutResp = await fetch(cutoutUrl1);
+  if (!cutoutResp.ok) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte hämta den genererade bilden. Försök igen.",
+        `Structural cutout#1 fetch ${cutoutResp.status}`,
+      ),
+    };
+  }
+  const cutoutBytes = new Uint8Array(await cutoutResp.arrayBuffer());
+
+  let flatBytes: Uint8Array;
+  try {
+    flatBytes = await flattenOverGrey(cutoutBytes, 0x7f7f7f);
+  } catch (e) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte förbereda bilden. Försök igen.",
+        `Structural flatten failed: ${e instanceof Error ? e.message : String(e)}`,
+      ),
+    };
+  }
+
+  const ctrlPath = `${params.designId}-ctrl.png`;
+  const { error: ctrlUpErr } = await supabaseAdmin.storage
+    .from("print-files")
+    .upload(ctrlPath, flatBytes, { contentType: "image/png", upsert: true });
+  if (ctrlUpErr) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte förbereda bilden. Försök igen.",
+        `Structural control upload failed: ${ctrlUpErr.message}`,
+      ),
+    };
+  }
+  const { data: ctrlPub } = supabaseAdmin.storage
+    .from("print-files")
+    .getPublicUrl(ctrlPath);
+  const controlImageUrl = ctrlPub.publicUrl;
+  console.log(`[flux-structural] control image ready designId=${params.designId} url=${controlImageUrl}`);
+
+  // Step 3: call BFL flux-{canny|depth}-pro with control_image + prompt.
+  const model =
+    params.controlType === "depth" ? FLUX_DEPTH_MODEL : FLUX_CANNY_MODEL;
+  const fluxStart = await fetch(
+    `https://api.replicate.com/v1/models/${model}/predictions`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        input: {
+          prompt: params.promptText,
+          control_image: controlImageUrl,
+          guidance: params.guidance,
+          steps: params.steps,
+          output_format: "png",
+          safety_tolerance: 2,
+          prompt_upsampling: false,
+        },
+      }),
+    },
+  );
+  const fluxJson = await fluxStart.json();
+  if (!fluxStart.ok || !fluxJson?.id) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
+        `Structural flux start failed (${model}): ${fluxStart.status} ${JSON.stringify(fluxJson).slice(0, 300)}`,
+      ),
+    };
+  }
+  const fluxPoll = await pollReplicate(fluxJson.id, REPLICATE_API_TOKEN, 120, 3000, 6000);
+  if (!fluxPoll.ok) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte skapa bilden den här gången. Försök igen.",
+        `Structural flux ${fluxPoll.reason} (${model})`,
+      ),
+    };
+  }
+  const fluxUrl = fluxPoll.output;
+  console.log(`[flux-structural] flux done designId=${params.designId} model=${model} url=${fluxUrl}`);
+
+  // Step 4: bg-remove the structural output → strip #7f7f7f, return RGBA.
+  const bg2Start = await fetch(`https://api.replicate.com/v1/predictions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      version: BG_REMOVER_VERSION,
+      input: { image: fluxUrl, format: "png", background_type: "rgba" },
+    }),
+  });
+  const bg2Json = await bg2Start.json();
+  if (!bg2Start.ok || !bg2Json?.id) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
+        `Structural BG#2 start failed: ${bg2Start.status} ${JSON.stringify(bg2Json).slice(0, 300)}`,
+      ),
+    };
+  }
+  const bg2Poll = await pollReplicate(bg2Json.id, REPLICATE_API_TOKEN, 90, 2000, 4000);
+  if (!bg2Poll.ok) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte skapa bilden den här gången. Försök igen.",
+        `Structural BG#2 ${bg2Poll.reason}`,
+      ),
+    };
+  }
+  const finalCutoutUrl = bg2Poll.output;
+  const finalResp = await fetch(finalCutoutUrl);
+  if (!finalResp.ok) {
+    return {
+      ok: false,
+      response: fallbackResponse(
+        "Vi kunde inte hämta den genererade bilden. Försök igen.",
+        `Structural final fetch ${finalResp.status}`,
+      ),
+    };
+  }
+  const finalBytes = new Uint8Array(await finalResp.arrayBuffer());
+  const finalContentType = finalResp.headers.get("content-type") ?? "image/png";
+  console.log(
+    `[flux-structural] done designId=${params.designId} bytes=${finalBytes.byteLength} ` +
+      `contentType=${finalContentType} url=${finalCutoutUrl}`,
+  );
+  return { ok: true, bytes: finalBytes, contentType: finalContentType, outputUrl: finalCutoutUrl };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -960,17 +1253,32 @@ Deno.serve(async (req) => {
     }
 
     const fluxEnabledHandler = Deno.env.get("FLUX_REMOVEBG_ENABLED") === "true";
-    const willUseFlux =
+    const hasFluxStyle =
+      typeof body?.fluxStylePrompt === "string" && body.fluxStylePrompt.trim().length > 0;
+    const willUseStructural =
       subjectKind === "removeBackground" &&
       fluxEnabledHandler &&
-      typeof body?.fluxStylePrompt === "string" &&
-      body.fluxStylePrompt.trim().length > 0;
+      hasFluxStyle &&
+      !!(body?.structuralConditioning?.enabled);
+    const willUseFlux =
+      !willUseStructural &&
+      subjectKind === "removeBackground" &&
+      fluxEnabledHandler &&
+      hasFluxStyle;
+    const structuralModel =
+      body?.structuralConditioning?.controlType === "depth"
+        ? FLUX_DEPTH_MODEL
+        : FLUX_CANNY_MODEL;
     const route =
       subjectKind === "human" ? "human-nano-banana"
       : subjectKind === "pet" ? "pet-nano-banana"
+      : willUseStructural ? "remove-bg-structural"
       : willUseFlux ? "remove-bg-flux"
       : "remove-bg-nano-banana";
-    const modelUsed = willUseFlux ? "black-forest-labs/flux-kontext-pro+851-labs/background-remover" : ANIMAL_MODEL;
+    const modelUsed =
+      willUseStructural ? `${structuralModel}+851-labs/background-remover`
+      : willUseFlux ? "black-forest-labs/flux-kontext-pro+851-labs/background-remover"
+      : ANIMAL_MODEL;
 
     console.log(
       `[face-swap] start route=${route} model=${modelUsed} ` +
@@ -1003,6 +1311,26 @@ Deno.serve(async (req) => {
         ? body.fluxStylePrompt
         : null;
 
+    // Optional structural conditioning block from the layer config.
+    // Server-side validation; falls back to nulls when missing/invalid.
+    let structuralConditioning: {
+      enabled: boolean;
+      controlType: "canny" | "depth";
+      guidance: number;
+      steps: number;
+    } | null = null;
+    const sc = body?.structuralConditioning;
+    if (sc && typeof sc === "object" && sc.enabled === true) {
+      const ct = sc.controlType === "depth" ? "depth" : "canny";
+      const g = typeof sc.guidance === "number" && isFinite(sc.guidance)
+        ? Math.max(0, Math.min(100, sc.guidance))
+        : 30;
+      const st = typeof sc.steps === "number" && isFinite(sc.steps)
+        ? Math.max(15, Math.min(50, Math.round(sc.steps)))
+        : 28;
+      structuralConditioning = { enabled: true, controlType: ct, guidance: g, steps: st };
+    }
+
     const result =
       subjectKind === "human"
         ? await runHumanSwap({
@@ -1028,6 +1356,7 @@ Deno.serve(async (req) => {
             designId,
             fluxStylePrompt,
             subjectKind: "removeBackground",
+            structuralConditioning,
           });
 
 
