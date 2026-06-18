@@ -1434,10 +1434,19 @@ Deno.serve(async (req) => {
       subjectKind === "removeBackground" &&
       fluxEnabledHandler &&
       hasFluxStyle;
-    const structuralEngineHint =
-      body?.structuralConditioning?.engine === "bfl-depth" ? "bfl-depth" : "bfl-canny";
+    const rawEngine = body?.structuralConditioning?.engine;
+    const structuralEngineHint: "bfl-canny" | "bfl-depth" | "sdxl-controlnet-lora" =
+      rawEngine === "bfl-depth"
+        ? "bfl-depth"
+        : rawEngine === "sdxl-controlnet-lora"
+        ? "sdxl-controlnet-lora"
+        : "bfl-canny";
     const structuralModel =
-      structuralEngineHint === "bfl-depth" ? FLUX_DEPTH_MODEL : FLUX_CANNY_MODEL;
+      structuralEngineHint === "sdxl-controlnet-lora"
+        ? SDXL_CN_LORA_MODEL
+        : structuralEngineHint === "bfl-depth"
+        ? FLUX_DEPTH_MODEL
+        : FLUX_CANNY_MODEL;
     const route =
       subjectKind === "human" ? "human-nano-banana"
       : subjectKind === "pet" ? "pet-nano-banana"
