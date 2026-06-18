@@ -596,6 +596,52 @@ async function runRemoveBackground(params: {
     params.fluxStylePrompt.trim().length > 0 &&
     fluxEnabled;
 
+  // Build a SEPARATE compact prompt for Flux Kontext Pro. Flux follows the
+  // first concrete instruction it sees, so the 4300-char Nano-Banana prompt
+  // (with "PRESERVE SUBJECT COLORS", "keep colors exactly", "FILL THE FRAME
+  // 90-95%", etc.) drowns out the customer's style. Mirrors diag6/stress/run.sh.
+  // Style words MUST come last so they win. Backdrop is mid-grey #7f7f7f
+  // (validated against 851-labs/background-remover); the bg-remover step
+  // strips it and returns RGBA, so the customer-facing backdropColor still
+  // applies in snapshot/preview.
+  const styleLabelLower = (params.styleLabel ?? "").toLowerCase();
+  const styleHaystackForBridge = `${styleLabelLower} ${(params.stylePrompt ?? "").toLowerCase()}`;
+  const bridge = isWatercolorStyle
+    ? ""
+    : /oil|olja|oljemålning|impasto/.test(styleHaystackForBridge)
+      ? "The result must read as an oil painting on canvas, NOT a photograph: visible thick impasto brush strokes, palette-knife texture, painterly broken edges, rich saturated pigment, no photographic micro-detail."
+      : /sketch|skiss|pencil|graphite/.test(styleHaystackForBridge)
+        ? "The result must read as a hand-drawn pencil sketch on paper, NOT a photograph: visible graphite strokes and cross-hatching, paper grain, no photographic micro-detail."
+        : /line|linje|ink|kontur/.test(styleHaystackForBridge)
+          ? "The result must read as a clean line-art illustration, NOT a photograph: crisp ink outlines, flat or minimal fill, no photographic micro-detail."
+          : /pop[\s-]?art|warhol/.test(styleHaystackForBridge)
+            ? "The result must read as a bold pop-art illustration, NOT a photograph: flat saturated color blocks, thick outlines, halftone dots, high contrast, no photographic micro-detail."
+            : /vintage|retro|aged/.test(styleHaystackForBridge)
+              ? "The result must read as a vintage illustrated print, NOT a photograph: muted aged palette, slight grain, painterly/print texture, no photographic micro-detail."
+              : "The result must read as an artistic illustration, NOT a photograph: clearly painterly/illustrative surface treatment, no photographic micro-detail.";
+
+  const fluxBase =
+    "The subject is the main object in the input photo. Preserve its structure, " +
+    "proportions and overall composition so it stays recognizable as the same subject. " +
+    "Completely isolate the subject on a perfectly flat mid-grey (#7f7f7f) studio backdrop. " +
+    "ABSOLUTELY NO landscape, NO sky, NO trees, NO foliage, NO bushes, NO grass, NO ground, " +
+    "NO shadow, NO surroundings, NO people, NO vehicles, NO text, NO watermark. " +
+    "The area outside the subject silhouette must be a single solid flat #7f7f7f, nothing else.";
+
+  const fluxStyleTail = params.stylePrompt?.trim()
+    ? [
+        bridge,
+        "Render the subject in the following art style. Apply it fully to the subject while keeping its structure and identity recognizable:",
+        params.stylePrompt.trim(),
+      ].filter(Boolean).join("\n")
+    : "";
+
+  const fluxPromptText = [
+    fluxBase,
+    params.fluxStylePrompt?.trim() ?? "",
+    fluxStyleTail,
+  ].filter(Boolean).join("\n\n");
+
   console.log("[runRemoveBackground] config", {
     designId: params.designId,
     backdropHex,
@@ -605,20 +651,22 @@ async function runRemoveBackground(params: {
     styleLabel: params.styleLabel,
     targetAspectRatio: params.targetAspectRatio,
     promptLength: promptText.length,
+    fluxPromptLength: fluxPromptText.length,
     fluxEnabled,
     hasFluxStylePrompt: !!params.fluxStylePrompt?.trim(),
     useFlux,
   });
-  console.log("[runRemoveBackground] promptText\n" + promptText);
 
   if (useFlux) {
+    console.log("[runRemoveBackground] fluxPromptText\n" + fluxPromptText);
     return callFluxRemoveBg({
       faceImageUrl: params.faceImageUrl,
-      promptText,
+      promptText: fluxPromptText,
       designId: params.designId,
     });
   }
 
+  console.log("[runRemoveBackground] promptText\n" + promptText);
   return callNanoBanana({
     promptText,
     imageUrls: [params.faceImageUrl],
@@ -905,11 +953,18 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "referenceImageUrl required for this subjectKind" }, 400);
     }
 
+    const fluxEnabledHandler = Deno.env.get("FLUX_REMOVEBG_ENABLED") === "true";
+    const willUseFlux =
+      subjectKind === "removeBackground" &&
+      fluxEnabledHandler &&
+      typeof body?.fluxStylePrompt === "string" &&
+      body.fluxStylePrompt.trim().length > 0;
     const route =
       subjectKind === "human" ? "human-nano-banana"
       : subjectKind === "pet" ? "pet-nano-banana"
+      : willUseFlux ? "remove-bg-flux"
       : "remove-bg-nano-banana";
-    const modelUsed = ANIMAL_MODEL;
+    const modelUsed = willUseFlux ? "black-forest-labs/flux-kontext-pro+851-labs/background-remover" : ANIMAL_MODEL;
 
     console.log(
       `[face-swap] start route=${route} model=${modelUsed} ` +
