@@ -725,6 +725,380 @@ async function pollReplicate(
   return { ok: false, reason: "timeout" };
 }
 
+// -------- Helpers for the Flux→bg-remover pipeline ---------------------------
+// Deterministic seed per (designId, attempt) so retries are reproducible and
+// caches stay valid. FNV-1a 32-bit, mod 2^31 (Replicate Flux accepts ints).
+function stableSeed(designId: string, attempt: number): number {
+  let h = 0x811c9dc5;
+  const s = `${designId}:${attempt}`;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return h & 0x7fffffff;
+}
+
+// Manual bitmap transforms (RGBA Uint8 layout, width*height*4). ImageScript's
+// flip/rotate behavior varies between versions; doing it ourselves is small
+// and unambiguous and works for both inverse-transform application (on the
+// real Flux output) and the 256-grid comparison.
+function flipH(bm: Uint8Array | Uint8ClampedArray, w: number, h: number): Uint8Array {
+  const out = new Uint8Array(bm.length);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const si = (y * w + x) * 4;
+      const di = (y * w + (w - 1 - x)) * 4;
+      out[di] = bm[si]; out[di + 1] = bm[si + 1]; out[di + 2] = bm[si + 2]; out[di + 3] = bm[si + 3];
+    }
+  }
+  return out;
+}
+function flipV(bm: Uint8Array | Uint8ClampedArray, w: number, h: number): Uint8Array {
+  const out = new Uint8Array(bm.length);
+  for (let y = 0; y < h; y++) {
+    const srcRow = y * w * 4;
+    const dstRow = (h - 1 - y) * w * 4;
+    out.set(bm.subarray(srcRow, srcRow + w * 4), dstRow);
+  }
+  return out;
+}
+// 90° clockwise. dst dims: (h, w).
+function rot90CW(bm: Uint8Array | Uint8ClampedArray, w: number, h: number): { out: Uint8Array; w: number; h: number } {
+  const nw = h, nh = w;
+  const out = new Uint8Array(bm.length);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const si = (y * w + x) * 4;
+      const nx = h - 1 - y;
+      const ny = x;
+      const di = (ny * nw + nx) * 4;
+      out[di] = bm[si]; out[di + 1] = bm[si + 1]; out[di + 2] = bm[si + 2]; out[di + 3] = bm[si + 3];
+    }
+  }
+  return { out, w: nw, h: nh };
+}
+function rot90CCW(bm: Uint8Array | Uint8ClampedArray, w: number, h: number): { out: Uint8Array; w: number; h: number } {
+  const nw = h, nh = w;
+  const out = new Uint8Array(bm.length);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const si = (y * w + x) * 4;
+      const nx = y;
+      const ny = w - 1 - x;
+      const di = (ny * nw + nx) * 4;
+      out[di] = bm[si]; out[di + 1] = bm[si + 1]; out[di + 2] = bm[si + 2]; out[di + 3] = bm[si + 3];
+    }
+  }
+  return { out, w: nw, h: nh };
+}
+function rot180(bm: Uint8Array | Uint8ClampedArray, w: number, h: number): Uint8Array {
+  const out = new Uint8Array(bm.length);
+  const total = w * h;
+  for (let i = 0; i < total; i++) {
+    const si = i * 4;
+    const di = (total - 1 - i) * 4;
+    out[di] = bm[si]; out[di + 1] = bm[si + 1]; out[di + 2] = bm[si + 2]; out[di + 3] = bm[si + 3];
+  }
+  return out;
+}
+
+// Decode + re-encode as PNG. ImageScript's PNG/JPEG decoders ignore EXIF
+// orientation, so re-encoding to PNG produces a file with the same raw pixel
+// orientation but no EXIF rotation flag — Replicate/Flux will read it the
+// same way our edge-correlation detector does.
+async function normalizeAndUpload(
+  sourceUrl: string,
+  supabase: ReturnType<typeof createClient>,
+  designId: string,
+): Promise<{ url: string; bytes: Uint8Array; w: number; h: number } | null> {
+  try {
+    const r = await fetch(sourceUrl);
+    if (!r.ok) return null;
+    const srcBytes = new Uint8Array(await r.arrayBuffer());
+    const img = await Image.decode(srcBytes);
+    const png = await img.encode();
+    const pngBytes = new Uint8Array(png);
+    const path = `flux-normalized/${designId}.png`;
+    const { error } = await supabase.storage
+      .from("cart-previews")
+      .upload(path, pngBytes, { contentType: "image/png", upsert: true });
+    if (error) {
+      console.warn(`[exif-normalize] upload failed: ${error.message}`);
+      return null;
+    }
+    const { data: pub } = supabase.storage.from("cart-previews").getPublicUrl(path);
+    console.log(
+      `[exif-normalize] designId=${designId} origBytes=${srcBytes.byteLength} outBytes=${pngBytes.byteLength} w=${img.width} h=${img.height}`,
+    );
+    return { url: pub.publicUrl, bytes: pngBytes, w: img.width, h: img.height };
+  } catch (e) {
+    console.warn("[exif-normalize] error", e instanceof Error ? e.message : String(e));
+    return null;
+  }
+}
+
+// Decode an image to a 256×256 zero-mean unit-variance Sobel-edge map.
+async function toEdgeGrid256(bytes: Uint8Array): Promise<Float32Array | null> {
+  try {
+    const img = await Image.decode(bytes);
+    const w = img.width, h = img.height;
+    const bm = img.bitmap; // Uint8ClampedArray, RGBA
+    // Stretch-resample to 256×256 grayscale via nearest neighbor (cheap, fine for edge detection).
+    const N = 256;
+    const gray = new Float32Array(N * N);
+    for (let ny = 0; ny < N; ny++) {
+      const sy = Math.min(h - 1, Math.floor((ny * h) / N));
+      for (let nx = 0; nx < N; nx++) {
+        const sx = Math.min(w - 1, Math.floor((nx * w) / N));
+        const i = (sy * w + sx) * 4;
+        gray[ny * N + nx] = 0.299 * bm[i] + 0.587 * bm[i + 1] + 0.114 * bm[i + 2];
+      }
+    }
+    // Sobel magnitude (3×3 kernels).
+    const edge = new Float32Array(N * N);
+    for (let y = 1; y < N - 1; y++) {
+      for (let x = 1; x < N - 1; x++) {
+        const tl = gray[(y - 1) * N + (x - 1)];
+        const tc = gray[(y - 1) * N + x];
+        const tr = gray[(y - 1) * N + (x + 1)];
+        const ml = gray[y * N + (x - 1)];
+        const mr = gray[y * N + (x + 1)];
+        const bl = gray[(y + 1) * N + (x - 1)];
+        const bc = gray[(y + 1) * N + x];
+        const br = gray[(y + 1) * N + (x + 1)];
+        const gx = -tl - 2 * ml - bl + tr + 2 * mr + br;
+        const gy = -tl - 2 * tc - tr + bl + 2 * bc + br;
+        edge[y * N + x] = Math.sqrt(gx * gx + gy * gy);
+      }
+    }
+    // Normalize to zero-mean unit-variance.
+    let mean = 0;
+    for (let i = 0; i < edge.length; i++) mean += edge[i];
+    mean /= edge.length;
+    let varSum = 0;
+    for (let i = 0; i < edge.length; i++) { const d = edge[i] - mean; varSum += d * d; }
+    const std = Math.sqrt(varSum / edge.length) || 1;
+    for (let i = 0; i < edge.length; i++) edge[i] = (edge[i] - mean) / std;
+    return edge;
+  } catch (e) {
+    console.warn("[edge-grid] decode failed", e instanceof Error ? e.message : String(e));
+    return null;
+  }
+}
+
+// Transform helpers on the 256×256 Float32 edge grid.
+function edgeIdentity(g: Float32Array): Float32Array { return g; }
+function edgeFlipH(g: Float32Array): Float32Array {
+  const N = 256; const out = new Float32Array(N * N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) out[y * N + (N - 1 - x)] = g[y * N + x];
+  return out;
+}
+function edgeFlipV(g: Float32Array): Float32Array {
+  const N = 256; const out = new Float32Array(N * N);
+  for (let y = 0; y < N; y++) out.set(g.subarray(y * N, (y + 1) * N), (N - 1 - y) * N);
+  return out;
+}
+function edgeRot90CW(g: Float32Array): Float32Array {
+  const N = 256; const out = new Float32Array(N * N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) out[x * N + (N - 1 - y)] = g[y * N + x];
+  return out;
+}
+function edgeRot180(g: Float32Array): Float32Array {
+  const N = 256; const out = new Float32Array(N * N);
+  for (let i = 0; i < N * N; i++) out[N * N - 1 - i] = g[i];
+  return out;
+}
+function edgeRot270CW(g: Float32Array): Float32Array {
+  const N = 256; const out = new Float32Array(N * N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) out[(N - 1 - x) * N + y] = g[y * N + x];
+  return out;
+}
+function ncc(a: Float32Array, b: Float32Array): number {
+  let s = 0;
+  for (let i = 0; i < a.length; i++) s += a[i] * b[i];
+  return s / a.length;
+}
+
+// Compare flux output against input under {identity, hflip, vflip, rot90, rot180, rot270}.
+// "transform" describes how the input maps to flux output. To correct we
+// apply the INVERSE to flux output.
+type OrientationDecision = {
+  accepted: boolean;
+  bestScore: number;
+  bestTransform: "identity" | "hflip" | "vflip" | "rot90" | "rot180" | "rot270";
+  scores: Record<string, number>;
+};
+async function detectOrientation(
+  inputBytes: Uint8Array,
+  fluxBytes: Uint8Array,
+): Promise<OrientationDecision> {
+  const NCC_PASS = 0.30;
+  const inEdge = await toEdgeGrid256(inputBytes);
+  const fxEdge = await toEdgeGrid256(fluxBytes);
+  if (!inEdge || !fxEdge) {
+    return { accepted: true, bestScore: 0, bestTransform: "identity", scores: {} };
+  }
+  const candidates: Array<{ name: OrientationDecision["bestTransform"]; tx: (g: Float32Array) => Float32Array }> = [
+    { name: "identity", tx: edgeIdentity },
+    { name: "hflip", tx: edgeFlipH },
+    { name: "vflip", tx: edgeFlipV },
+    { name: "rot90", tx: edgeRot90CW },
+    { name: "rot180", tx: edgeRot180 },
+    { name: "rot270", tx: edgeRot270CW },
+  ];
+  const scores: Record<string, number> = {};
+  let best = candidates[0];
+  let bestScore = -Infinity;
+  for (const c of candidates) {
+    const s = ncc(c.tx(inEdge), fxEdge);
+    scores[c.name] = s;
+    if (s > bestScore) { bestScore = s; best = c; }
+  }
+  return { accepted: bestScore >= NCC_PASS, bestScore, bestTransform: best.name, scores };
+}
+
+// Apply the INVERSE of `transform` to flux output PNG bytes, returning new PNG bytes.
+async function applyInverseTransform(
+  fluxBytes: Uint8Array,
+  transform: OrientationDecision["bestTransform"],
+): Promise<Uint8Array> {
+  if (transform === "identity") return fluxBytes;
+  const img = await Image.decode(fluxBytes);
+  const w = img.width, h = img.height;
+  const bm = img.bitmap;
+  let outBytes: Uint8Array, outW: number, outH: number;
+  switch (transform) {
+    case "hflip":
+      outBytes = flipH(bm, w, h); outW = w; outH = h; break;
+    case "vflip":
+      outBytes = flipV(bm, w, h); outW = w; outH = h; break;
+    case "rot180":
+      outBytes = rot180(bm, w, h); outW = w; outH = h; break;
+    case "rot90": {
+      // Flux output = input rotated 90° CW → undo with 90° CCW.
+      const r = rot90CCW(bm, w, h);
+      outBytes = r.out; outW = r.w; outH = r.h; break;
+    }
+    case "rot270": {
+      const r = rot90CW(bm, w, h);
+      outBytes = r.out; outW = r.w; outH = r.h; break;
+    }
+  }
+  const newImg = new Image(outW, outH);
+  newImg.bitmap.set(outBytes);
+  const encoded = await newImg.encode();
+  return new Uint8Array(encoded);
+}
+
+// Crop transparent margin, scale subject so longest side = TARGET_FILL × longest side
+// of the original canvas, center on a transparent canvas of the original dimensions.
+async function normalizeSubjectSize(
+  rgbaBytes: Uint8Array,
+  targetFill = 0.9,
+  designId = "?",
+): Promise<Uint8Array> {
+  try {
+    const img = await Image.decode(rgbaBytes);
+    const W = img.width, H = img.height;
+    const bm = img.bitmap;
+    // Alpha bbox.
+    let x0 = W, y0 = H, x1 = -1, y1 = -1;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const a = bm[(y * W + x) * 4 + 3];
+        if (a > 8) {
+          if (x < x0) x0 = x;
+          if (y < y0) y0 = y;
+          if (x > x1) x1 = x;
+          if (y > y1) y1 = y;
+        }
+      }
+    }
+    if (x1 < x0 || y1 < y0) {
+      console.warn(`[size-normalize] empty alpha designId=${designId} — skip`);
+      return rgbaBytes;
+    }
+    const bw = x1 - x0 + 1;
+    const bh = y1 - y0 + 1;
+    // Crop using ImageScript.
+    const cropped = img.clone().crop(x0, y0, bw, bh);
+    // Scale so longest side = targetFill × longest side of canvas.
+    const targetLong = Math.round(targetFill * Math.max(W, H));
+    const scale = targetLong / Math.max(bw, bh);
+    const newW = Math.max(1, Math.round(bw * scale));
+    const newH = Math.max(1, Math.round(bh * scale));
+    const scaled = cropped.resize(newW, newH);
+    // Composite onto a transparent canvas of the original dimensions.
+    const canvas = new Image(W, H); // ImageScript Image defaults to transparent (alpha=0).
+    // Make sure all pixels are fully transparent (some builds init to opaque black).
+    const cbm = canvas.bitmap;
+    for (let i = 0; i < cbm.length; i += 4) { cbm[i] = 0; cbm[i + 1] = 0; cbm[i + 2] = 0; cbm[i + 3] = 0; }
+    const ox = Math.floor((W - newW) / 2);
+    const oy = Math.floor((H - newH) / 2);
+    canvas.composite(scaled, ox, oy);
+    const encoded = await canvas.encode();
+    console.log(
+      `[size-normalize] designId=${designId} bbox=(${x0},${y0},${bw}x${bh}) scale=${scale.toFixed(3)} final=(${W}x${H}) subject=(${newW}x${newH}) offset=(${ox},${oy})`,
+    );
+    return new Uint8Array(encoded);
+  } catch (e) {
+    console.warn("[size-normalize] error", e instanceof Error ? e.message : String(e));
+    return rgbaBytes;
+  }
+}
+
+// Upload arbitrary PNG bytes to cart-previews and return a public URL —
+// used to hand a corrected (flipped/rotated) flux output to the bg-remover.
+async function uploadIntermediate(
+  bytes: Uint8Array,
+  supabase: ReturnType<typeof createClient>,
+  name: string,
+): Promise<string | null> {
+  const { error } = await supabase.storage
+    .from("cart-previews")
+    .upload(name, bytes, { contentType: "image/png", upsert: true });
+  if (error) {
+    console.warn(`[upload-intermediate] failed: ${error.message}`);
+    return null;
+  }
+  const { data: pub } = supabase.storage.from("cart-previews").getPublicUrl(name);
+  return pub.publicUrl;
+}
+
+// One Flux Kontext Pro call. Returns the predicted PNG URL on success.
+async function callFluxOnce(
+  inputImageUrl: string,
+  prompt: string,
+  seed: number,
+  token: string,
+): Promise<{ ok: true; url: string } | { ok: false; reason: string }> {
+  const startResp = await fetch(
+    `https://api.replicate.com/v1/models/${FLUX_KONTEXT_MODEL}/predictions`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        input: {
+          input_image: inputImageUrl,
+          prompt,
+          output_format: "png",
+          safety_tolerance: 2,
+          prompt_upsampling: false,
+          aspect_ratio: "match_input_image",
+          seed,
+        },
+      }),
+    },
+  );
+  const startJson = await startResp.json();
+  if (!startResp.ok || !startJson?.id) {
+    return { ok: false, reason: `start ${startResp.status}: ${JSON.stringify(startJson).slice(0, 200)}` };
+  }
+  const poll = await pollReplicate(startJson.id, token, 120, 3000, 6000);
+  if (!poll.ok) return { ok: false, reason: poll.reason };
+  return { ok: true, url: poll.output };
+}
+
 async function callFluxRemoveBg(params: {
   faceImageUrl: string;
   promptText: string;
@@ -746,49 +1120,120 @@ async function callFluxRemoveBg(params: {
 
   console.log(`[flux-removebg] start designId=${params.designId}`);
 
-  // Step 1: Flux Kontext Pro — restyle / isolate against flat backdrop.
-  const fluxStart = await fetch(
-    `https://api.replicate.com/v1/models/${FLUX_KONTEXT_MODEL}/predictions`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        input: {
-          input_image: params.faceImageUrl,
-          prompt: params.promptText,
-          output_format: "png",
-          safety_tolerance: 2,
-          prompt_upsampling: false,
-          aspect_ratio: "match_input_image",
-        },
-      }),
-    },
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
-  const fluxJson = await fluxStart.json();
-  if (!fluxStart.ok || !fluxJson?.id) {
-    return {
-      ok: false,
-      response: fallbackResponse(
-        "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
-        `Flux start failed: ${fluxStart.status} ${JSON.stringify(fluxJson).slice(0, 300)}`,
-      ),
-    };
+
+  // Step 0: EXIF-normalize the input — re-encode pixels as PNG without
+  // EXIF rotation so Flux receives the same orientation our detector sees.
+  const normalized = await normalizeAndUpload(params.faceImageUrl, supabase, params.designId);
+  const fluxInputUrl = normalized?.url ?? params.faceImageUrl;
+  const inputBytesForDetect = normalized?.bytes ?? null;
+
+  // Step 1: Flux Kontext Pro with seed-driven retry loop + orientation detector.
+  const MAX_ATTEMPTS = 3;
+  let bestAttempt: {
+    score: number;
+    transform: OrientationDecision["bestTransform"];
+    fluxUrl: string;
+    correctedBytes: Uint8Array;
+    seed: number;
+    accepted: boolean;
+  } | null = null;
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const seed = stableSeed(params.designId, attempt);
+    console.log(`[flux-removebg] attempt=${attempt} seed=${seed} designId=${params.designId}`);
+    const fluxRes = await callFluxOnce(fluxInputUrl, params.promptText, seed, REPLICATE_API_TOKEN);
+    if (!fluxRes.ok) {
+      // If first attempt fails to even start/finish, surface the failure;
+      // later-attempt failures fall back to the previous best.
+      if (attempt === 0 && !bestAttempt) {
+        return {
+          ok: false,
+          response: fallbackResponse(
+            "Vi kunde inte skapa bilden den här gången. Försök igen.",
+            `Flux ${fluxRes.reason}`,
+          ),
+        };
+      }
+      console.warn(`[flux-removebg] attempt=${attempt} failed: ${fluxRes.reason}`);
+      continue;
+    }
+    const fluxUrl = fluxRes.url;
+    // Download flux output bytes for detector + potential inverse-transform.
+    const fxResp = await fetch(fluxUrl);
+    if (!fxResp.ok) {
+      console.warn(`[flux-removebg] attempt=${attempt} flux fetch ${fxResp.status}`);
+      continue;
+    }
+    const fxBytes = new Uint8Array(await fxResp.arrayBuffer());
+
+    // Detector (skipped silently if we couldn't normalize input — treat as accepted).
+    const decision = inputBytesForDetect
+      ? await detectOrientation(inputBytesForDetect, fxBytes)
+      : { accepted: true, bestScore: 0, bestTransform: "identity" as const, scores: {} };
+    console.log(
+      `[orientation] designId=${params.designId} attempt=${attempt} seed=${seed} ` +
+        `bestTransform=${decision.bestTransform} score=${decision.bestScore.toFixed(3)} ` +
+        `accepted=${decision.accepted} scores=${JSON.stringify(
+          Object.fromEntries(Object.entries(decision.scores).map(([k, v]) => [k, Number(v.toFixed(3))])),
+        )}`,
+    );
+
+    // Apply inverse transform now so bestAttempt always holds usable bytes.
+    const correctedBytes = await applyInverseTransform(fxBytes, decision.bestTransform);
+
+    if (!bestAttempt || decision.bestScore > bestAttempt.score) {
+      bestAttempt = {
+        score: decision.bestScore,
+        transform: decision.bestTransform,
+        fluxUrl,
+        correctedBytes,
+        seed,
+        accepted: decision.accepted,
+      };
+    }
+    if (decision.accepted) break;
   }
-  const fluxPoll = await pollReplicate(fluxJson.id, REPLICATE_API_TOKEN, 120, 3000, 6000);
-  if (!fluxPoll.ok) {
+
+  if (!bestAttempt) {
     return {
       ok: false,
       response: fallbackResponse(
         "Vi kunde inte skapa bilden den här gången. Försök igen.",
-        `Flux ${fluxPoll.reason}`,
+        "Flux: no successful attempt",
       ),
     };
   }
-  const fluxUrl = fluxPoll.output;
-  console.log(`[flux-removebg] flux done designId=${params.designId} url=${fluxUrl}`);
+  if (!bestAttempt.accepted) {
+    console.warn(
+      `[orientation] FALLBACK designId=${params.designId} bestScore=${bestAttempt.score.toFixed(3)} ` +
+        `transform=${bestAttempt.transform} — no attempt cleared threshold`,
+    );
+  }
+
+  // If we applied a transform, upload corrected bytes so bg-remover can fetch them.
+  let bgInputUrl = bestAttempt.fluxUrl;
+  if (bestAttempt.transform !== "identity") {
+    const upUrl = await uploadIntermediate(
+      bestAttempt.correctedBytes,
+      supabase,
+      `flux-corrected/${params.designId}.png`,
+    );
+    if (!upUrl) {
+      return {
+        ok: false,
+        response: fallbackResponse(
+          "Vi kunde inte spara den genererade bilden. Försök igen.",
+          "flux-corrected upload failed",
+        ),
+      };
+    }
+    bgInputUrl = upUrl;
+    console.log(`[flux-removebg] using corrected url designId=${params.designId} url=${bgInputUrl}`);
+  }
 
   // Step 2: 851-labs/background-remover — RGBA PNG cutout.
   const bgStart = await fetch(`https://api.replicate.com/v1/predictions`, {
@@ -799,11 +1244,7 @@ async function callFluxRemoveBg(params: {
     },
     body: JSON.stringify({
       version: BG_REMOVER_VERSION,
-      input: {
-        image: fluxUrl,
-        format: "png",
-        background_type: "rgba",
-      },
+      input: { image: bgInputUrl, format: "png", background_type: "rgba" },
     }),
   });
   const bgJson = await bgStart.json();
@@ -828,7 +1269,6 @@ async function callFluxRemoveBg(params: {
   }
   const cutoutUrl = bgPoll.output;
 
-  // Fetch the RGBA bytes raw — no decode, no re-encode, alpha preserved.
   const cutoutResp = await fetch(cutoutUrl);
   if (!cutoutResp.ok) {
     return {
@@ -839,14 +1279,16 @@ async function callFluxRemoveBg(params: {
       ),
     };
   }
-  const ab = await cutoutResp.arrayBuffer();
-  const bytes = new Uint8Array(ab);
-  const contentType = cutoutResp.headers.get("content-type") ?? "image/png";
+  const cutoutBytes = new Uint8Array(await cutoutResp.arrayBuffer());
+
+  // Step 3: size normalization — alpha bbox + uniform scale to target fill.
+  const normalizedBytes = await normalizeSubjectSize(cutoutBytes, 0.9, params.designId);
+
   console.log(
-    `[flux-removebg] done designId=${params.designId} bytes=${bytes.byteLength} ` +
-      `contentType=${contentType} url=${cutoutUrl}`,
+    `[flux-removebg] done designId=${params.designId} bytes=${normalizedBytes.byteLength} ` +
+      `transform=${bestAttempt.transform} score=${bestAttempt.score.toFixed(3)} url=${cutoutUrl}`,
   );
-  return { ok: true, bytes, contentType, outputUrl: cutoutUrl };
+  return { ok: true, bytes: normalizedBytes, contentType: "image/png", outputUrl: cutoutUrl };
 }
 
 Deno.serve(async (req) => {
