@@ -347,7 +347,6 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
           fillFrame: layer.defaults.fillFrame ?? null,
           preserveSubjectColors: layer.defaults.preserveSubjectColors ?? null,
           fluxStylePrompt: layer.defaults.fluxStylePrompt ?? null,
-          fluxStylePrompt: layer.defaults.fluxStylePrompt ?? null,
           structuralConditioning: structuralActive
             ? {
                 ...structural,
