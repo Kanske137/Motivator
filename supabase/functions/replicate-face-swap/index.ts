@@ -485,6 +485,12 @@ async function runRemoveBackground(params: {
   designId: string;
   fluxStylePrompt: string | null;
   subjectKind: "removeBackground";
+  structuralConditioning: {
+    enabled: boolean;
+    controlType: "canny" | "depth";
+    guidance: number;
+    steps: number;
+  } | null;
 }) {
   // Detect whether the chosen AI style is a watercolor style. The colorful
   // dot/splatter ring is ONLY appropriate for watercolor — for any other
