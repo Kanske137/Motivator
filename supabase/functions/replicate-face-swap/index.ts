@@ -623,6 +623,10 @@ async function runRemoveBackground(params: {
   const fluxBase =
     "The subject is the main object in the input photo. Preserve its structure, " +
     "proportions and overall composition so it stays recognizable as the same subject. " +
+    "Keep the subject at the EXACT same orientation, facing direction, angle and " +
+    "position as in the input photo. NEVER mirror, flip, rotate or re-angle it. " +
+    "Do not output a mirror image. If the subject faces left in the input it must " +
+    "face left in the output; if it faces right it must face right. " +
     "Completely isolate the subject on a perfectly flat mid-grey (#7f7f7f) studio backdrop. " +
     "ABSOLUTELY NO landscape, NO sky, NO trees, NO foliage, NO bushes, NO grass, NO ground, " +
     "NO shadow, NO surroundings, NO people, NO vehicles, NO text, NO watermark. " +
@@ -631,14 +635,16 @@ async function runRemoveBackground(params: {
   const fluxStyleTail = params.stylePrompt?.trim()
     ? [
         bridge,
-        "Render the subject in the following art style. Apply it fully to the subject while keeping its structure and identity recognizable:",
+        "Render the subject in the following art style. Apply it fully to the subject while keeping its structure and identity recognizable. The style is a SURFACE TREATMENT only — it must not change the subject's orientation, facing direction, position or scale:",
         params.stylePrompt.trim(),
       ].filter(Boolean).join("\n")
     : "";
 
+  // Merge motif line into the same paragraph as fluxBase so the orientation
+  // and no-background rules stay bound to the motif description.
+  const fluxMotifLine = params.fluxStylePrompt?.trim() ?? "";
   const fluxPromptText = [
-    fluxBase,
-    params.fluxStylePrompt?.trim() ?? "",
+    fluxMotifLine ? `${fluxBase} ${fluxMotifLine}` : fluxBase,
     fluxStyleTail,
   ].filter(Boolean).join("\n\n");
 
