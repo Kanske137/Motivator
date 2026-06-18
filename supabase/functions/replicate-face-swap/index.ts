@@ -1296,6 +1296,26 @@ Deno.serve(async (req) => {
         ? body.fluxStylePrompt
         : null;
 
+    // Optional structural conditioning block from the layer config.
+    // Server-side validation; falls back to nulls when missing/invalid.
+    let structuralConditioning: {
+      enabled: boolean;
+      controlType: "canny" | "depth";
+      guidance: number;
+      steps: number;
+    } | null = null;
+    const sc = body?.structuralConditioning;
+    if (sc && typeof sc === "object" && sc.enabled === true) {
+      const ct = sc.controlType === "depth" ? "depth" : "canny";
+      const g = typeof sc.guidance === "number" && isFinite(sc.guidance)
+        ? Math.max(0, Math.min(100, sc.guidance))
+        : 30;
+      const st = typeof sc.steps === "number" && isFinite(sc.steps)
+        ? Math.max(15, Math.min(50, Math.round(sc.steps)))
+        : 28;
+      structuralConditioning = { enabled: true, controlType: ct, guidance: g, steps: st };
+    }
+
     const result =
       subjectKind === "human"
         ? await runHumanSwap({
@@ -1321,6 +1341,7 @@ Deno.serve(async (req) => {
             designId,
             fluxStylePrompt,
             subjectKind: "removeBackground",
+            structuralConditioning,
           });
 
 
