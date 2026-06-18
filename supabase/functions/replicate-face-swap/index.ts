@@ -592,28 +592,41 @@ async function runRemoveBackground(params: {
     aspectInstruction,
   ].filter(Boolean).join("\n");
 
+  // simpleStyleMode: short Kontext-Pro instruction, then bg-remove. Skips
+  // ALL the legacy prompt construction below.
+  if (params.simpleStyleMode) {
+    const instructionRaw = (params.styleInstruction?.trim() || params.stylePrompt?.trim()) ?? "";
+    if (instructionRaw.length > 0) {
+      console.log(
+        `[runRemoveBackground] simpleStyleMode active — routing to kontext-simple ` +
+          `styleLabel="${params.styleLabel}" instruction="${instructionRaw}"`,
+      );
+      return callKontextSimpleStyle({
+        faceImageUrl: params.faceImageUrl,
+        instruction: instructionRaw,
+        designId: params.designId,
+      });
+    }
+    console.warn(
+      `[runRemoveBackground] simpleStyleMode=true but no styleInstruction/prompt — falling back to Nano-Banana`,
+    );
+  }
+
   const fluxEnabled = Deno.env.get("FLUX_REMOVEBG_ENABLED") === "true";
-  const useStructural =
-    params.subjectKind === "removeBackground" &&
-    !!params.structuralConditioning?.enabled &&
-    typeof params.fluxStylePrompt === "string" &&
-    params.fluxStylePrompt.trim().length > 0 &&
-    fluxEnabled;
   const useFlux =
-    !useStructural &&
     params.subjectKind === "removeBackground" &&
     typeof params.fluxStylePrompt === "string" &&
     params.fluxStylePrompt.trim().length > 0 &&
     fluxEnabled;
 
-  // Build a SEPARATE compact prompt for Flux Kontext Pro / Flux-{canny|depth}-pro.
-  // Flux follows the first concrete instruction it sees, so the 4300-char Nano-
-  // Banana prompt (with "PRESERVE SUBJECT COLORS", "keep colors exactly",
-  // "FILL THE FRAME 90-95%", etc.) drowns out the customer's style. Mirrors
-  // diag6/stress/run.sh. Style words MUST come last so they win. Backdrop is
-  // mid-grey #7f7f7f (validated against 851-labs/background-remover); the
-  // bg-remover step strips it and returns RGBA, so the customer-facing
-  // backdropColor still applies in snapshot/preview.
+  // Build a SEPARATE compact prompt for Flux Kontext Pro. Flux follows the
+  // first concrete instruction it sees, so the 4300-char Nano-Banana prompt
+  // (with "PRESERVE SUBJECT COLORS", "keep colors exactly", "FILL THE FRAME
+  // 90-95%", etc.) drowns out the customer's style. Style words MUST come
+  // last so they win. Backdrop is mid-grey #7f7f7f (validated against
+  // 851-labs/background-remover); the bg-remover step strips it and returns
+  // RGBA, so the customer-facing backdropColor still applies in
+  // snapshot/preview.
   const styleLabelLower = (params.styleLabel ?? "").toLowerCase();
   const styleHaystackForBridge = `${styleLabelLower} ${(params.stylePrompt ?? "").toLowerCase()}`;
   const bridge =
@@ -631,10 +644,6 @@ async function runRemoveBackground(params: {
                 ? "screen printed 1950s poster illustration, flat shapes, limited palette, grain, not a photo"
                 : "artistic illustration, painterly surface, not a photo";
 
-  // fluxBase for the kontext-pro path keeps orientation language (model has
-  // to guess geometry from text). The structural path uses fluxBaseStructural
-  // below, which drops those rules because the control image fully locks
-  // orientation, angle, scale and mirroring.
   const fluxBase =
     "The subject is the main object in the input photo. Preserve its structure, " +
     "proportions and overall composition so it stays recognizable as the same subject. " +
@@ -647,14 +656,6 @@ async function runRemoveBackground(params: {
     "NO shadow, NO surroundings, NO people, NO vehicles, NO text, NO watermark. " +
     "The area outside the subject silhouette must be a single solid flat #7f7f7f, nothing else.";
 
-  const fluxBaseStructural =
-    "The control image already defines the subject's exact silhouette, orientation, " +
-    "facing direction, angle, position and scale — reproduce it faithfully. " +
-    "Render the subject isolated on a perfectly flat mid-grey (#7f7f7f) studio backdrop. " +
-    "ABSOLUTELY NO landscape, NO sky, NO trees, NO foliage, NO grass, NO ground, NO shadow, " +
-    "NO surroundings, NO people, NO vehicles, NO text, NO watermark. " +
-    "The area outside the subject silhouette must be a single solid flat #7f7f7f, nothing else.";
-
   const fluxStyleTail = params.stylePrompt?.trim()
     ? [
         bridge,
@@ -663,24 +664,10 @@ async function runRemoveBackground(params: {
       ].filter(Boolean).join("\n")
     : "";
 
-  // Merge motif line into the same paragraph as fluxBase so the orientation
-  // and no-background rules stay bound to the motif description.
   const fluxMotifLine = params.fluxStylePrompt?.trim() ?? "";
   const fluxPromptText = [
     fluxMotifLine ? `${fluxBase} ${fluxMotifLine}` : fluxBase,
     fluxStyleTail,
-  ].filter(Boolean).join("\n\n");
-
-  // Structural path: control image already locks geometry, so the
-  //   "SURFACE TREATMENT only / do not re-angle" framing just dilutes the
-  //   style. Put the style FIRST so flux treats it as the primary instruction,
-  //   then the motif/isolation rules.
-  const structuralStyleHead = params.stylePrompt?.trim()
-    ? [bridge, params.stylePrompt.trim()].filter(Boolean).join("\n")
-    : "";
-  const structuralPromptText = [
-    structuralStyleHead,
-    fluxMotifLine ? `${fluxBaseStructural} ${fluxMotifLine}` : fluxBaseStructural,
   ].filter(Boolean).join("\n\n");
 
   console.log("[runRemoveBackground] config", {
@@ -695,53 +682,8 @@ async function runRemoveBackground(params: {
     fluxPromptLength: fluxPromptText.length,
     fluxEnabled,
     hasFluxStylePrompt: !!params.fluxStylePrompt?.trim(),
-    useStructural,
     useFlux,
-    structural: useStructural ? params.structuralConditioning : null,
   });
-
-  if (useStructural) {
-    console.log("[runRemoveBackground] structuralPromptText\n" + structuralPromptText);
-    const sc = params.structuralConditioning!;
-    if (sc.engine === "sdxl-controlnet-lora") {
-      if (!sc.loraUrl) {
-        console.warn(
-          `[runRemoveBackground] engine=sdxl-controlnet-lora but no loraUrl on style "${params.styleLabel}" — falling back to BFL flux-canny-pro`,
-        );
-        return callFluxStructural({
-          faceImageUrl: params.faceImageUrl,
-          promptText: structuralPromptText,
-          designId: params.designId,
-          engine: "bfl-canny",
-          controlType: sc.controlType,
-          guidance: sc.guidance,
-          steps: sc.steps,
-          styleLabel: params.styleLabel,
-        });
-      }
-      return callSdxlControlnetLora({
-        faceImageUrl: params.faceImageUrl,
-        promptText: structuralPromptText,
-        designId: params.designId,
-        controlType: sc.controlType,
-        controlnetScale: sc.controlnetScale,
-        loraUrl: sc.loraUrl,
-        loraScale: sc.loraScale,
-        loraTrigger: sc.loraTrigger,
-        styleLabel: params.styleLabel,
-      });
-    }
-    return callFluxStructural({
-      faceImageUrl: params.faceImageUrl,
-      promptText: structuralPromptText,
-      designId: params.designId,
-      engine: sc.engine as "bfl-canny" | "bfl-depth",
-      controlType: sc.controlType,
-      guidance: sc.guidance,
-      steps: sc.steps,
-      styleLabel: params.styleLabel,
-    });
-  }
 
   if (useFlux) {
     console.log("[runRemoveBackground] fluxPromptText\n" + fluxPromptText);
