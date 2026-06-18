@@ -487,6 +487,7 @@ async function runRemoveBackground(params: {
   subjectKind: "removeBackground";
   structuralConditioning: {
     enabled: boolean;
+    engine: "bfl-canny" | "bfl-depth";
     controlType: "canny" | "depth";
     guidance: number;
     steps: number;
@@ -620,19 +621,20 @@ async function runRemoveBackground(params: {
   // backdropColor still applies in snapshot/preview.
   const styleLabelLower = (params.styleLabel ?? "").toLowerCase();
   const styleHaystackForBridge = `${styleLabelLower} ${(params.stylePrompt ?? "").toLowerCase()}`;
-  const bridge = isWatercolorStyle
-    ? ""
-    : /oil|olja|oljemålning|impasto/.test(styleHaystackForBridge)
-      ? "The result must read as an oil painting on canvas, NOT a photograph: visible thick impasto brush strokes, palette-knife texture, painterly broken edges, rich saturated pigment, no photographic micro-detail."
-      : /sketch|skiss|pencil|graphite/.test(styleHaystackForBridge)
-        ? "The result must read as a hand-drawn pencil sketch on paper, NOT a photograph: visible graphite strokes and cross-hatching, paper grain, no photographic micro-detail."
-        : /line|linje|ink|kontur/.test(styleHaystackForBridge)
-          ? "The result must read as a clean line-art illustration, NOT a photograph: crisp ink outlines, flat or minimal fill, no photographic micro-detail."
-          : /pop[\s-]?art|warhol/.test(styleHaystackForBridge)
-            ? "The result must read as a bold pop-art illustration, NOT a photograph: flat saturated color blocks, thick outlines, halftone dots, high contrast, no photographic micro-detail."
-            : /vintage|retro|aged/.test(styleHaystackForBridge)
-              ? "The result must read as a vintage illustrated print, NOT a photograph: muted aged palette, slight grain, painterly/print texture, no photographic micro-detail."
-              : "The result must read as an artistic illustration, NOT a photograph: clearly painterly/illustrative surface treatment, no photographic micro-detail.";
+  const bridge =
+    /water\s*colou?r|akvarell|aquarelle/.test(styleHaystackForBridge)
+      ? "soft watercolor painting, wet-on-wet washes, pigment bleed, visible paper grain, not a photo"
+      : /oil|olja|oljemålning|impasto/.test(styleHaystackForBridge)
+        ? "oil painting, impasto, brush strokes, canvas texture, not a photo"
+        : /sketch|skiss|pencil|graphite/.test(styleHaystackForBridge)
+          ? "pencil drawing, graphite strokes, paper grain, cross hatching, not a photo"
+          : /line|linje|ink|kontur/.test(styleHaystackForBridge)
+            ? "black ink line drawing, minimal fill, white paper, not a photo"
+            : /pop[\s-]?art|warhol/.test(styleHaystackForBridge)
+              ? "flat comic poster, halftone, hard outlines, saturated color blocks, not a photo"
+              : /vintage|retro|aged/.test(styleHaystackForBridge)
+                ? "screen printed 1950s poster illustration, flat shapes, limited palette, grain, not a photo"
+                : "artistic illustration, painterly surface, not a photo";
 
   // fluxBase for the kontext-pro path keeps orientation language (model has
   // to guess geometry from text). The structural path uses fluxBaseStructural
