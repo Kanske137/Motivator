@@ -1,107 +1,48 @@
-# Plan: simpleStyleMode via Flux Kontext Pro + städning av övergivna styling-grenar
+# Fix: tomma textrutor återställs till mall-placeholder i printfil & preview
 
-Två sammanhängande delar. Del 1 är additiv och gated bakom en ny flagga — befintliga mallar är opåverkade tills någon slår på flaggan. Del 2 rensar bort canny/depth/SDXL-LoRA-koden som inte längre används.
+## Problem
+När kunden raderar all text i en textruta:
+- Editorns canvas (live `MapPreview`) → tom ✅
+- Mockup-galleriet + printfilen + cart-thumbnail → visar fortfarande mallens default-text ❌
 
-## Del 1 — Nytt läge `simpleStyleMode`
+## Rotorsak
+`src/lib/template-snapshot.ts` rad 302:
 
-### Schema (`src/lib/template-schema.ts`)
+```ts
+const text = liveText || d.text;
+```
 
-På `aiPhotoLayerSchema.defaults` (samma block där `structuralConditioning` ligger):
+`||` behandlar `""` som "saknas" och faller tillbaka på `d.text` (template-placeholder). Den efterföljande guarden `if (!text.trim()) return;` på rad 310 hinner aldrig kicka in.
 
-- Lägg till `simpleStyleMode: z.boolean().optional()` (default = false / undefined).
-  Doc-kommentar: "removeBackground only. När true: skippa hela den långa Nano-Banana/Flux-prompten och kör enbart `flux-kontext-pro` med `preset.styleInstruction` som prompt. Bakgrundsborttagning körs sedan på resultatet. Alla övriga prompt-fält (fluxStylePrompt, preset.prompt, preserveSubjectColors, fillFrame, backdropColor, swapPrompt) ignoreras av edge-funktionen i detta läge."
+Anroparen på rad 762–764 bygger redan effektiv text via `buildEffectiveTextWithSpans(layer.defaults, place, overrideText)` som korrekt returnerar `""` när `overrideText === ""`. Snapshot-funktionen skriver alltså över ett korrekt tomt resultat.
 
-På `aiStylePresetSchema`:
+## Fix (Del 1 — minimal, säker)
 
-- Lägg till `styleInstruction: z.string().optional()`.
-  Doc: "Kort Kontext-Pro-instruktion, t.ex. 'make this in oil styling'. Används BARA när lagrets `simpleStyleMode === true`. Tom/saknad ⇒ fallback till `preset.prompt`."
+I `drawTextLayer` (snapshot-pipeline):
 
-### Defaults (`src/lib/ai-style-defaults.ts`)
+```ts
+// Före
+const text = liveText || d.text;
 
-Lägg till `styleInstruction` på varje preset enligt spec:
+// Efter
+const text = liveText; // caller har redan resolverat (override "" = medvetet tomt)
+```
 
-| id | styleInstruction |
-| --- | --- |
-| watercolor | `make this in watercolor styling` |
-| oil | `make this in oil styling` |
-| sketch | `make this in sketch styling` |
-| pop-art | `make this in pop-art styling` |
-| lineart | `make this in line art styling` |
-| vintage-poster | `make this in vintage art styling` |
+Detta är säkert eftersom enda anroparen alltid skickar in resultatet från `buildEffectiveTextWithSpans`, som garanterar en sträng.
 
-Befintliga mallar i DB påverkas inte (defaults gäller bara nya mallar). Granskaren patchar bilposter/mc separat via SQL.
+Efter ändringen: `if (!text.trim()) return;` (rad 310) — som redan finns — gör att inget ritas, ingen bakgrund/dekoration heller (vi flyttar `hasBg`-blocket nedanför guarden så att tom textruta inte lämnar tomt bakgrundsblock i tryck).
 
-### Edge function (`supabase/functions/replicate-face-swap/index.ts`)
+## Verifiering
+1. Öppna en bilposter-mall i editorn.
+2. Radera all text i en textruta → editorn blir tom (oförändrat beteende).
+3. Vänta in mockup-galleriets uppdatering → previewbilderna ska nu också vara tomma på den rutan.
+4. Lägg i varukorg → öppna cart-thumbnail + verifiera printfile-URL (öppna den i ny flik) → texten ska saknas.
+5. Skriv tillbaka något → texten dyker upp igen i alla tre vyer.
+6. Karttavla-flödet: sök ny stad → auto-text fylls i på nytt (regression-skydd för "kartan vinner alltid").
 
-1. Body-validering (~rad 1737): läs ut `simpleStyleMode: boolean` och `styleInstruction: string|null` från payload.
-2. I `runRemoveBackground`: NY FÖRSTA gren — om `subjectKind === "removeBackground" && simpleStyleMode === true && hasNonEmptyStyleInstruction`, kör en ny funktion `callKontextSimpleStyle({ faceImageUrl, instruction, designId })`:
-   - Steg A: `flux-kontext-pro` på kundens uppladdade bild med `prompt: instruction` som ENDA textinput. Inget annat — ingen base-prompt, ingen `fluxBase`, ingen `fluxStylePrompt`, ingen `bridge`, inget negative.
-   - Steg B: kör befintlig `851-labs/background-remover` (samma `BG_REMOVER_VERSION`) på Kontext-outputen och returnera RGBA-PNG-bytena raw — exakt samma envelope som `callFluxRemoveBg` så uppladdnings-/dim-check-pipelinen efteråt är oförändrad.
-   - Logga `[kontext-simple] start designId=… instruction="…"` och `[kontext-simple] done …` i samma stil som övriga grenar.
-3. Routing-loggen (rad 1700-1709): lägg till `"remove-bg-simple"` som ny route när simple-grenen valdes; `modelUsed = "black-forest-labs/flux-kontext-pro+851-labs/background-remover"`.
-4. När `simpleStyleMode !== true` ⇒ INGEN ändring i existerande gren (Nano-Banana/Flux/struktur). Allt bakåtkompatibelt.
-5. Fallback: om `simpleStyleMode === true` men `styleInstruction` saknas/är tom på vald preset ⇒ försök `preset.prompt`; om även det saknas ⇒ loga warning och fall tillbaka till befintlig Nano-Banana-väg (ingen "skicka tom prompt").
+## Filer som ändras
+- `src/lib/template-snapshot.ts` — `drawTextLayer`: byt `liveText || d.text` mot `liveText` och flytta `hasBg`-blocket under `if (!text.trim()) return;`.
 
-### Klient (`src/components/editor/AiPhotoSection.tsx`)
-
-- Skicka `simpleStyleMode: layer.defaults.simpleStyleMode === true` och `styleInstruction: selectedPreset?.styleInstruction ?? null` i `body` till edge-funktionen.
-- Cache-nyckel: lägg till `::simple:1` (eller `::si:<hash>` av instruktionen) i `refSlotFor` när simpleStyleMode är aktivt, så simple-resultat inte krockar med tidigare Nano-Banana-cache för samma stil-id.
-- Ingen UI-ändring för kunden — stilrutorna ser likadana ut.
-
-### Admin-UI
-
-**`src/components/admin/LayerInspector.tsx`** (i `isRemoveBg`-blocket nära `fillFrame`/`preserveSubjectColors`, rad ~820):
-
-- Lägg till en Switch "Enkelt stil-läge (Kontext)" som styr `simpleStyleMode`. Hjälptext: "På = kör flux-kontext-pro direkt med stilens korta instruktion. Av = befintligt flöde."
-
-**`src/components/admin/ProductOptionsSection.tsx`** (i `AiStyleRow`, rad ~628 efter `prompt`-textarean):
-
-- Lägg till ett kort `Input` för `styleInstruction` med placeholder "Kontext-instruktion (t.ex. make this in oil styling)". Bara visuellt; värdet sparas på presetet oavsett om simpleStyleMode är aktivt på lagret.
-
-## Del 2 — Städning av övergivna grenar
-
-Endast efter att Del 1 verifierats funka i preview (förslag: kör Olja på bilposter med `simpleStyleMode=true` + `styleInstruction="make this in oil styling"`).
-
-### Edge function
-
-- Ta bort hela `callFluxStructural` (BFL canny/depth) inkl. `FLUX_DEPTH_MODEL`/`FLUX_CANNY_MODEL`-konstanter.
-- Ta bort hela `callSdxlControlnetLora` och `SDXL_CN_LORA_MODEL`/`SDXL_CN_LORA_VERSION`-konstanter.
-- Ta bort `prepareControlImage` om den inte används någon annanstans (greppa först).
-- Ta bort `useStructural`-grenen, `structuralPromptText`, `structuralStyleHead`, `bridge`, `fluxBaseStructural` ur `runRemoveBackground`.
-- Ta bort `structuralConditioning`-blocket från body-validering (rad 1742-1793) och från handler-loggen.
-- Behåll `callFluxRemoveBg` + `useFlux`-grenen tills vidare (separat, äldre Kontext-väg som fortfarande funkar för icke-fordon).
-
-### Schema (`src/lib/template-schema.ts`)
-
-- Ta bort hela `structuralConditioning`-fältet från `aiPhotoLayerSchema.defaults`.
-- Ta bort `loraUrl`/`loraScale`/`loraTrigger` från `aiStylePresetSchema`.
-- Migrationsstrategi: zod-fälten är optional ⇒ existerande DB-rader som råkar ha dessa fält kvar parseas fortfarande utan fel (extra-fält strippas tyst av zod). Ingen DB-migration krävs från Lovables sida.
-
-### Klient
-
-- `src/components/editor/AiPhotoSection.tsx`: ta bort `structural`/`engineForCache`/`loraTagForCache`-blocket och `loraTagOf`-helpern. `refSlotFor`-signaturen förenklas till `(subjectKind, refUrl, styleId, simpleTag?)`.
-- `src/components/admin/ProductOptionsSection.tsx`: ta bort hela "SDXL style-LoRA"-blocket i `AiStyleRow` (rad ~635-675).
-- `src/components/admin/LayerInspector.tsx`: ta bort eventuella structuralConditioning-fält (grep visar inga — bara `fillFrame`/`preserveSubjectColors`/`backdropColor` påverkas inte).
-
-### Vad som INTE rörs
-
-- `runHumanSwap`, `runPetSwap`, `callNanoBanana`, `cdingram/face-swap`-flödet — orört.
-- `multi-face-swap` edge-funktion — orörd.
-- `replicate-style` edge-funktion — orörd (används av AiStyleSection för foto-till-konst-lager utan removeBackground).
-- `851-labs/background-remover`-anropet och `BG_REMOVER_VERSION` — orörda; återanvänds av simple-grenen.
-- Typografi-/karta-/text-lager — orörda.
-
-## Rapport tillbaka efter implementering
-
-- Fältet för kontext-instruktionen heter **`styleInstruction`** på `aiStylePresetSchema` och `simpleStyleMode` (boolean) på `aiPhotoLayer.defaults`.
-- `simpleStyleMode` är helt gated — när false/saknas är beteendet bit-identiskt med idag.
-- Bg-borttagningen i enkelt läge körs på output från `flux-kontext-pro` (samma `851-labs/background-remover`-version som befintlig flux-väg).
-- Granskaren behöver SQL för att slå på `simpleStyleMode=true` på `bilposter`/`mc` aiPhoto-lagrets defaults och fylla i `styleInstruction` på respektive preset (defaults gäller bara nya mallar).
-
-## Implementation-ordning
-
-1. Del 1 schema + defaults + edge function (kontext-simple-grenen) + klient-payload + admin-UI.
-2. Verifiera i preview med en testkörning på Olja/bilposter (granskaren patchar SQL).
-3. Del 2 städning när Del 1 är bekräftad.
-
-Båda delarna kan shippas i samma turn om vi är säkra; jag rekommenderar att göra Del 1 + Del 2 i en svit eftersom de övergivna grenarna ändå är döda när simpleStyleMode är den nya vägen framåt.
+## Inget annat rörs
+- `MapPreview.tsx`, `TextLayerView.tsx`, `ControlPanel.tsx`, `editorStore.ts`, `text-typography.ts` är redan korrekta — ingen ändring behövs.
+- Edge-funktionen `generate-print-file/index.ts` används inte längre av huvudflödet (print-pipeline går klient-sida via `renderHiresTemplateSnapshotSafe`).
