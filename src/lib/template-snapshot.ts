@@ -299,7 +299,11 @@ function drawTextLayer(
   liveFontSizePt: number | null = null,
 ): void {
   const d = layer.defaults;
-  const text = liveText || d.text;
+  // Caller resolverar effektiv text via buildEffectiveTextWithSpans, så
+  // overrideText === "" (medvetet tomt) MÅSTE respekteras. Använd INTE
+  // `liveText || d.text` här — det skulle falla tillbaka på placeholder.
+  const text = liveText;
+  if (!text.trim()) return;
   const hasBg = !!d.backgroundColor && d.backgroundColor !== "transparent";
   if (hasBg) {
     ctx.save();
@@ -307,7 +311,7 @@ function drawTextLayer(
     ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
     ctx.restore();
   }
-  if (!text.trim()) return;
+
   const lines = text.split("\n");
   // pt-based size when present (A4 reference); else legacy %-of-height.
   // A4 short = 595.276pt. Customer override (liveFontSizePt) wins.
