@@ -25,8 +25,10 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
   const sections = useAvailableSections();
   const [activeId, setActiveId] = useState<SectionId | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [snap, setSnap] = useState<number | string | null>("content");
   const isAiBusy = useIsAnyAiBusy();
   const { visibleTop, visibleHeight } = useParentViewport();
+
 
   useEffect(() => {
     if (sections.length === 0) {
