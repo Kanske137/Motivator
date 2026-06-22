@@ -304,5 +304,18 @@
       "label": "Show move and resize handles",
       "hint": "Turn off for a clean preview without handles on the layers."
     }
+  },
+  "onboarding": {
+    "bild": "Upload a photo to get started.",
+    "forvandling": {
+      "faceSingle": "Upload a photo where the face is clearly visible, facing the camera.",
+      "multiFace": "Upload one portrait per face – each slot is separate. Clear, front-facing faces give the best result.",
+      "aiPhoto": "Upload a photo and pick a style – then press Create."
+    },
+    "karta": "Search an address or move the map to the right spot.",
+    "stil": "Pick a layout design – they change both composition and look.",
+    "text": "Tap the text field to edit. Leave empty to hide a line.",
+    "format": "Choose size and frame, if any.",
+    "lager": "Add images, text or shapes."
   }
 }

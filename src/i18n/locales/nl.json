@@ -304,5 +304,18 @@
       "label": "Toon verplaats- en formaathandvatten",
       "hint": "Schakel uit voor een schone preview zonder handvatten op de lagen."
     }
+  },
+  "onboarding": {
+    "bild": "Upload een foto om te beginnen.",
+    "forvandling": {
+      "faceSingle": "Upload een foto waarop het gezicht duidelijk en recht van voren zichtbaar is.",
+      "multiFace": "Upload één portret per gezicht – elke plek is apart. Duidelijke gezichten recht van voren geven het beste resultaat.",
+      "aiPhoto": "Upload een foto en kies een stijl – druk daarna op Maken."
+    },
+    "karta": "Zoek een adres of verplaats de kaart naar de juiste plek.",
+    "stil": "Kies een lay-out – ze veranderen compositie en uiterlijk.",
+    "text": "Tik op het tekstveld om te wijzigen. Laat leeg om een regel te verbergen.",
+    "format": "Kies maat en eventueel lijst.",
+    "lager": "Voeg afbeeldingen, tekst of vormen toe."
   }
 }

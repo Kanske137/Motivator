@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import type { SectionMeta, SectionId } from "./ControlPanel";
+import { useOnboarding } from "@/hooks/useOnboarding";
 
 interface Props {
   sections: SectionMeta[];
@@ -13,6 +14,7 @@ interface Props {
 
 export function NavRail({ sections, activeId, onSelect, orientation = "vertical", className }: Props) {
   const { t } = useTranslation();
+  const { activeHintSection } = useOnboarding();
   const isVertical = orientation === "vertical";
   return (
     <nav
@@ -28,6 +30,7 @@ export function NavRail({ sections, activeId, onSelect, orientation = "vertical"
         const Icon = s.icon;
         const active = s.id === activeId;
         const label = t(s.labelKey);
+        const showHint = activeHintSection === s.id;
         return (
           <button
             key={s.id}
@@ -51,7 +54,18 @@ export function NavRail({ sections, activeId, onSelect, orientation = "vertical"
                 active ? "opacity-100" : "opacity-0",
               )}
             />
-            <Icon className="h-[18px] w-[18px]" />
+            <div className="relative">
+              <Icon className="h-[18px] w-[18px]" />
+              {showHint && (
+                <span
+                  aria-hidden
+                  className="absolute -right-1.5 -top-1.5 inline-flex h-2.5 w-2.5"
+                >
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+                </span>
+              )}
+            </div>
             <span className="text-[10px] font-medium leading-none tracking-wide">{label}</span>
           </button>
         );

@@ -304,5 +304,18 @@
       "label": "Afficher les poignées de déplacement et de redimensionnement",
       "hint": "Désactivez pour un aperçu propre sans poignées sur les calques."
     }
+  },
+  "onboarding": {
+    "bild": "Téléchargez une photo pour commencer.",
+    "forvandling": {
+      "faceSingle": "Téléchargez une photo où le visage est clairement visible, de face.",
+      "multiFace": "Téléchargez un portrait par visage – chaque emplacement est séparé. Des visages clairs et de face donnent le meilleur résultat.",
+      "aiPhoto": "Téléchargez une photo et choisissez un style, puis appuyez sur Créer."
+    },
+    "karta": "Cherchez une adresse ou déplacez la carte au bon endroit.",
+    "stil": "Choisissez un design de mise en page – ils changent la composition et l'apparence.",
+    "text": "Touchez le champ pour modifier. Laissez vide pour masquer une ligne.",
+    "format": "Choisissez la taille et le cadre éventuel.",
+    "lager": "Ajoutez images, texte ou formes."
   }
 }

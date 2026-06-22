@@ -304,5 +304,18 @@
       "label": "Mostra maniglie di spostamento e ridimensionamento",
       "hint": "Disattiva per un'anteprima pulita senza maniglie sui livelli."
     }
+  },
+  "onboarding": {
+    "bild": "Carica una foto per iniziare.",
+    "forvandling": {
+      "faceSingle": "Carica una foto in cui il volto sia chiaramente visibile, di fronte.",
+      "multiFace": "Carica un ritratto per ogni volto – ogni slot è separato. Volti chiari e frontali danno il miglior risultato.",
+      "aiPhoto": "Carica una foto e scegli uno stile, poi premi Crea."
+    },
+    "karta": "Cerca un indirizzo o sposta la mappa nel punto giusto.",
+    "stil": "Scegli un design – cambiano composizione e aspetto.",
+    "text": "Tocca il campo per modificare. Lascia vuoto per nascondere una riga.",
+    "format": "Scegli misura e cornice se prevista.",
+    "lager": "Aggiungi immagini, testo o forme."
   }
 }

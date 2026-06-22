@@ -304,5 +304,18 @@
       "label": "Visa flytta- och storleks-handtag",
       "hint": "Stäng av för en ren förhandsvisning utan handtag på lagren."
     }
+  },
+  "onboarding": {
+    "bild": "Ladda upp en bild för att komma igång.",
+    "forvandling": {
+      "faceSingle": "Ladda upp en bild där ansiktet syns tydligt rakt framifrån.",
+      "multiFace": "Ladda upp ett porträtt per ansikte – varje slot är separat. Tydligt ansikte rakt framifrån ger bäst resultat.",
+      "aiPhoto": "Ladda upp en bild och välj en stil – tryck sedan Skapa."
+    },
+    "karta": "Sök en adress eller flytta kartan till rätt plats.",
+    "stil": "Välj en layout-design – de byter både komposition och utseende.",
+    "text": "Klicka i textrutan för att ändra. Lämna tomt för att dölja en rad.",
+    "format": "Välj storlek och eventuell ram.",
+    "lager": "Lägg till bilder, text eller former."
   }
 }

@@ -304,5 +304,18 @@
       "label": "Mostrar tiradores de mover y redimensionar",
       "hint": "Desactiva para una vista previa limpia sin tiradores en las capas."
     }
+  },
+  "onboarding": {
+    "bild": "Sube una foto para empezar.",
+    "forvandling": {
+      "faceSingle": "Sube una foto donde el rostro se vea claramente, de frente.",
+      "multiFace": "Sube un retrato por cara – cada espacio es separado. Caras claras y de frente dan el mejor resultado.",
+      "aiPhoto": "Sube una foto y elige un estilo, luego pulsa Crear."
+    },
+    "karta": "Busca una dirección o mueve el mapa al lugar correcto.",
+    "stil": "Elige un diseño – cambian composición y aspecto.",
+    "text": "Toca el campo para editar. Déjalo vacío para ocultar una línea.",
+    "format": "Elige tamaño y marco si aplica.",
+    "lager": "Añade imágenes, texto o formas."
   }
 }

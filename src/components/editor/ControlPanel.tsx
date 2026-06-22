@@ -30,6 +30,7 @@ import type { TemplateLayer, Template } from "@/lib/template-schema";
 import { getAllLayouts, DEFAULT_LAYOUT_ID } from "@/lib/template-schema";
 import TemplateThumbnail from "@/components/admin/TemplateThumbnail";
 import { MAP_ICONS, MAP_ICON_INITIAL_COUNT, getMapIcon } from "@/lib/map-icon-catalog";
+import { OnboardingHint } from "./OnboardingHint";
 
 /** Per-layer slider that scales a layer up/down while preserving aspect ratio.
  *  Shown in the customer editor for any layer where `locks.size === false`.
@@ -208,7 +209,8 @@ export function ControlPanel({ configs, activeHandle, activeProductType, onProdu
   const allLayouts = template ? getAllLayouts(template) : [];
   const productType = config.product_type ?? null;
 
-  switch (sectionId) {
+  const renderSection = () => {
+    switch (sectionId) {
     case "lager":
       return <LayersSection />;
     case "bild":
@@ -317,7 +319,15 @@ export function ControlPanel({ configs, activeHandle, activeProductType, onProdu
       );
     default:
       return null;
-  }
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <OnboardingHint sectionId={sectionId} />
+      {renderSection()}
+    </div>
+  );
 }
 
 // ---------------- map tabs (place + style merged) ----------------
