@@ -1,48 +1,52 @@
-# Fix: tomma textrutor återställs till mall-placeholder i printfil & preview
-
 ## Problem
-När kunden raderar all text i en textruta:
-- Editorns canvas (live `MapPreview`) → tom ✅
-- Mockup-galleriet + printfilen + cart-thumbnail → visar fortfarande mallens default-text ❌
 
-## Rotorsak
-`src/lib/template-snapshot.ts` rad 302:
+Mobil-drawern öppnas alltid ~85% av synliga ytan, oavsett hur lite innehåll fliken har. Resultat: stora tomma områden under det faktiska innehållet, och man måste ändå scrolla i vissa flikar.
 
-```ts
-const text = liveText || d.text;
-```
+Orsak i `EditorShell.tsx`:
+- Inre scrollcontainern har `flex-1` ⇒ tar all kvarvarande höjd upp till `maxHeight`
+- `maxHeight` är hårdkodad till `visibleHeight * 0.85`
+- Det finns ingen "shrink-to-content"-logik
 
-`||` behandlar `""` som "saknas" och faller tillbaka på `d.text` (template-placeholder). Den efterföljande guarden `if (!text.trim()) return;` på rad 310 hinner aldrig kicka in.
+## Lösning (rekommenderad): Innehållsdriven höjd + snap points
 
-Anroparen på rad 762–764 bygger redan effektiv text via `buildEffectiveTextWithSpans(layer.defaults, place, overrideText)` som korrekt returnerar `""` när `overrideText === ""`. Snapshot-funktionen skriver alltså över ett korrekt tomt resultat.
+Vauls inbyggda `snapPoints` är state-of-the-art för mobila bottom sheets (Apple Maps, Spotify, Notion m.fl. använder samma mönster). Drawer öppnas på "lagom" höjd och kan dras upp till full höjd om kunden vill.
 
-## Fix (Del 1 — minimal, säker)
+### Ändringar i `src/components/editor/EditorShell.tsx`
 
-I `drawTextLayer` (snapshot-pipeline):
+1. **Ta bort `flex-1` och `min-h-0`** från inre scroll-divern. Behåll `overflow-y-auto` + `overscrollBehavior: contain` — då växer drawern bara till innehållets höjd, upp till `maxHeight`.
 
-```ts
-// Före
-const text = liveText || d.text;
+2. **Lägg till snap points** på `Drawer`:
+   ```tsx
+   const [snap, setSnap] = useState<number | string | null>("content");
+   <Drawer
+     open={...}
+     snapPoints={["content", 0.95]}
+     activeSnapPoint={snap}
+     setActiveSnapPoint={setSnap}
+   >
+   ```
+   - Första snap = `"content"` → exakt innehållets höjd (Vaul mäter automatiskt)
+   - Andra snap = `0.95` → nästan full höjd (för långa flikar som "Text"/"Lager")
+   - Användaren kan dra handtaget uppåt för att expandera
 
-// Efter
-const text = liveText; // caller har redan resolverat (override "" = medvetet tomt)
-```
+3. **Återställ snap** till `"content"` varje gång drawern öppnas, så varje flikbyte startar kompakt:
+   ```tsx
+   useEffect(() => { if (mobileOpen) setSnap("content"); }, [mobileOpen, activeId]);
+   ```
 
-Detta är säkert eftersom enda anroparen alltid skickar in resultatet från `buildEffectiveTextWithSpans`, som garanterar en sträng.
+4. **Behåll ankringen** till `visibleTop`/`visibleHeight` från `useParentViewport` så drawern fortsatt placeras inom mobilens synliga del av iframen. `maxHeight` blir taket för snap `0.95`.
 
-Efter ändringen: `if (!text.trim()) return;` (rad 310) — som redan finns — gör att inget ritas, ingen bakgrund/dekoration heller (vi flyttar `hasBg`-blocket nedanför guarden så att tom textruta inte lämnar tomt bakgrundsblock i tryck).
+5. **Inget annat ändras** — `Drawer`/`DrawerContent` (vaul) stödjer redan snap points; ingen ny dependency, inga ändringar i Shopify-snippet, ingen ändring i desktop-layout, ingen ändring i affärslogik.
 
-## Verifiering
-1. Öppna en bilposter-mall i editorn.
-2. Radera all text i en textruta → editorn blir tom (oförändrat beteende).
-3. Vänta in mockup-galleriets uppdatering → previewbilderna ska nu också vara tomma på den rutan.
-4. Lägg i varukorg → öppna cart-thumbnail + verifiera printfile-URL (öppna den i ny flik) → texten ska saknas.
-5. Skriv tillbaka något → texten dyker upp igen i alla tre vyer.
-6. Karttavla-flödet: sök ny stad → auto-text fylls i på nytt (regression-skydd för "kartan vinner alltid").
+### Resultat
+- Korta flikar (t.ex. "Format", "Stil") → drawer = exakt innehållshöjd, ingen tom yta.
+- Långa flikar → drawer öppnas på innehållshöjd (eller `maxHeight`-tak) och kan dras upp till 95% med ett enda drag i handtaget.
+- Drawerns scrollyta fungerar fortsatt oberoende av iframens scroll (`overscroll-behavior: contain`).
 
-## Filer som ändras
-- `src/lib/template-snapshot.ts` — `drawTextLayer`: byt `liveText || d.text` mot `liveText` och flytta `hasBg`-blocket under `if (!text.trim()) return;`.
+## Alternativ (om du föredrar enklare)
 
-## Inget annat rörs
-- `MapPreview.tsx`, `TextLayerView.tsx`, `ControlPanel.tsx`, `editorStore.ts`, `text-typography.ts` är redan korrekta — ingen ändring behövs.
-- Edge-funktionen `generate-print-file/index.ts` används inte längre av huvudflödet (print-pipeline går klient-sida via `renderHiresTemplateSnapshotSafe`).
+**A. Alltid full höjd:** Sätt `top = visibleTop + 40`, `height = visibleHeight - 40`. Enkelt, men korta flikar får ändå tom yta längst ner.
+
+**B. Endast innehållsdriven (utan snap):** Bara steg 1 ovan. Inga snap points, ingen drag-att-expandera — drawer = innehållshöjd upp till 85%-taket. Enklare, men långa flikar kräver intern scroll direkt.
+
+Min rekommendation är huvudplanen (snap points) — det är mönstret moderna native-appar använder och löser båda fallen på en gång.
