@@ -319,7 +319,15 @@ export function ControlPanel({ configs, activeHandle, activeProductType, onProdu
       );
     default:
       return null;
-  }
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <OnboardingHint sectionId={sectionId} />
+      {renderSection()}
+    </div>
+  );
 }
 
 // ---------------- map tabs (place + style merged) ----------------
