@@ -25,8 +25,10 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
   const sections = useAvailableSections();
   const [activeId, setActiveId] = useState<SectionId | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [snap, setSnap] = useState<number | string | null>("content");
   const isAiBusy = useIsAnyAiBusy();
   const { visibleTop, visibleHeight } = useParentViewport();
+
 
   useEffect(() => {
     if (sections.length === 0) {
@@ -53,11 +55,18 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
     if (isAiBusy && mobileOpen) setMobileOpen(false);
   }, [isAiBusy, mobileOpen]);
 
+  // Återställ snap till "content" varje gång drawern öppnas eller fliken byts,
+  // så drawern alltid startar i kompakt innehållshöjd.
+  useEffect(() => {
+    if (mobileOpen) setSnap("content");
+  }, [mobileOpen, activeId]);
+
   const onSelectMobile = (id: SectionId) => {
     if (isAiBusy) return;
     setActiveId(id);
     setMobileOpen(true);
   };
+
 
   const activeMeta = sections.find((s) => s.id === activeId);
   const activeLabel = activeMeta ? t(activeMeta.labelKey) : "";
@@ -123,16 +132,22 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
           synlig oavsett var i iframen kunden står. Innehållet har egen
           scroll och `overscroll-behavior: contain` stoppar scroll-chaining
           till parent. */}
-      <Drawer open={mobileOpen && !isAiBusy} onOpenChange={(o) => !isAiBusy && setMobileOpen(o)}>
+      <Drawer
+        open={mobileOpen && !isAiBusy}
+        onOpenChange={(o) => !isAiBusy && setMobileOpen(o)}
+        snapPoints={["content", 0.95]}
+        activeSnapPoint={snap}
+        setActiveSnapPoint={setSnap}
+      >
         <DrawerContent
-          className={cn("lg:hidden focus:outline-none flex flex-col")}
+          className={cn("lg:hidden flex flex-col")}
           style={
             visibleHeight > 0
               ? {
                   position: "fixed",
-                  top: Math.round(visibleTop + Math.max(40, visibleHeight * 0.15)),
+                  top: Math.round(visibleTop + 40),
                   bottom: "auto",
-                  maxHeight: Math.round(visibleHeight * 0.85),
+                  maxHeight: Math.round(visibleHeight - 40),
                   height: "auto",
                 }
               : undefined
@@ -150,7 +165,7 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
             </button>
           </div>
           <div
-            className="px-5 pb-6 overflow-y-auto flex-1 min-h-0"
+            className="px-5 pb-6 overflow-y-auto"
             style={{ overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" }}
           >
             {sectionContent}
@@ -164,3 +179,4 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
     </div>
   );
 }
+
