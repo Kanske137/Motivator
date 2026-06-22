@@ -55,11 +55,18 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
     if (isAiBusy && mobileOpen) setMobileOpen(false);
   }, [isAiBusy, mobileOpen]);
 
+  // Återställ snap till "content" varje gång drawern öppnas eller fliken byts,
+  // så drawern alltid startar i kompakt innehållshöjd.
+  useEffect(() => {
+    if (mobileOpen) setSnap("content");
+  }, [mobileOpen, activeId]);
+
   const onSelectMobile = (id: SectionId) => {
     if (isAiBusy) return;
     setActiveId(id);
     setMobileOpen(true);
   };
+
 
   const activeMeta = sections.find((s) => s.id === activeId);
   const activeLabel = activeMeta ? t(activeMeta.labelKey) : "";
