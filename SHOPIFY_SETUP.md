@@ -2,7 +2,7 @@
 
 Följ stegen i ordning. Allt sker i din Shopify Admin — ingen Dev Dashboard, ingen CLI.
 
-> **Uppdaterar du befintligt snippet?** Steg 1 nedan innehåller nu `locale`, `currency`, `rate` och `country` i iframe-URL:en + en `pushContext()`-funktion som skickar `SHOP_CONTEXT` till editorn. Klistra över den gamla `personlig-karta-editor`-snippeten med blocket nedan så får editorn automatiskt rätt språk + valuta för varje kund.
+> **Uppdaterar du befintligt snippet?** Steg 1 nedan innehåller nu `locale`, `currency`, `rate` och `country` i iframe-URL:en + en `pushContext()`-funktion som skickar `SHOP_CONTEXT` till editorn + en `pushViewport()`-funktion som rapporterar parent-fönstrets synliga del till editorn (så att mobil-drawers ankras till det som faktiskt syns på skärmen och kan scrollas separat utan att stängas). Klistra över den gamla `personlig-karta-editor`-snippeten med blocket nedan.
 
 ---
 
@@ -45,15 +45,49 @@ Följ stegen i ordning. Allt sker i din Shopify Admin — ingen Dev Dashboard, i
       country: {{ localization.country.iso_code | json }}
     },'*');
   }
-  iframe && iframe.addEventListener('load', pushContext);
+
+  // Rapportera vilken del av iframen som faktiskt syns i kundens fönster,
+  // så att overlays (t.ex. mobil-drawern) kan ankras till det synliga
+  // området och scrollas separat istället för att hamna utanför skärmen.
+  var vpRaf = 0;
+  function pushViewport(){
+    if(!iframe || !iframe.contentWindow) return;
+    var rect = iframe.getBoundingClientRect();
+    var vv = window.visualViewport;
+    var winTop = vv ? vv.offsetTop : 0;
+    var winH = vv ? vv.height : window.innerHeight;
+    var visTopInWin = Math.max(winTop, rect.top);
+    var visBottomInWin = Math.min(winTop + winH, rect.bottom);
+    var visibleHeight = Math.max(0, visBottomInWin - visTopInWin);
+    var iframeVisibleTop = Math.max(0, visTopInWin - rect.top);
+    iframe.contentWindow.postMessage({
+      type:'SHOP_VIEWPORT',
+      iframeVisibleTop: iframeVisibleTop,
+      visibleHeight: visibleHeight
+    },'*');
+  }
+  function schedulePushViewport(){
+    if(vpRaf) return;
+    vpRaf = window.requestAnimationFrame(function(){ vpRaf = 0; pushViewport(); });
+  }
+
+  iframe && iframe.addEventListener('load', function(){ pushContext(); pushViewport(); });
   document.addEventListener('visibilitychange', function(){
-    if(document.visibilityState==='visible') pushContext();
+    if(document.visibilityState==='visible'){ pushContext(); pushViewport(); }
   });
+  window.addEventListener('scroll', schedulePushViewport, { passive: true });
+  window.addEventListener('resize', schedulePushViewport);
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', schedulePushViewport);
+    window.visualViewport.addEventListener('scroll', schedulePushViewport);
+  }
 
   window.addEventListener('message', function(e){
     var d = e.data; if(!d || typeof d!=='object') return;
     if(d.type==='EDITOR_RESIZE' && typeof d.height==='number' && iframe){
-      iframe.style.height = Math.max(600,d.height)+'px'; return;
+      iframe.style.height = Math.max(600,d.height)+'px';
+      schedulePushViewport();
+      return;
     }
     if(d.type!=='ADD_TO_CART') return;
     if(d.handle && d.handle!=='{{ product.handle }}') return;

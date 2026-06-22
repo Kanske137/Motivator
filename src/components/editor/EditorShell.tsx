@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { postEditorResize } from "@/lib/iframe-resize";
 import { AiBusyOverlay } from "./AiBusyOverlay";
 import { useIsAnyAiBusy } from "@/stores/aiBusyStore";
+import { useParentViewport } from "@/hooks/useParentViewport";
 
 interface Props {
   configs: ProductConfig[];
@@ -25,6 +26,7 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
   const [activeId, setActiveId] = useState<SectionId | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const isAiBusy = useIsAnyAiBusy();
+  const { visibleTop, visibleHeight } = useParentViewport();
 
   useEffect(() => {
     if (sections.length === 0) {
@@ -116,10 +118,27 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
       {/* CTA — flex row i botten, inte fixed */}
       <div className="shrink-0">{cta}</div>
 
-      {/* Mobil bottom sheet — overlay utanför .editor-root */}
+      {/* Mobil bottom sheet — ankras till parent-fönstrets synliga del
+          (via SHOP_VIEWPORT från Shopify-temat) så drawern alltid är fullt
+          synlig oavsett var i iframen kunden står. Innehållet har egen
+          scroll och `overscroll-behavior: contain` stoppar scroll-chaining
+          till parent. */}
       <Drawer open={mobileOpen && !isAiBusy} onOpenChange={(o) => !isAiBusy && setMobileOpen(o)}>
-        <DrawerContent className={cn("lg:hidden max-h-[85vh] focus:outline-none")}>
-          <div className="flex items-center justify-between px-5 pt-2 pb-3">
+        <DrawerContent
+          className={cn("lg:hidden focus:outline-none flex flex-col")}
+          style={
+            visibleHeight > 0
+              ? {
+                  position: "fixed",
+                  top: Math.round(visibleTop + Math.max(40, visibleHeight * 0.15)),
+                  bottom: "auto",
+                  maxHeight: Math.round(visibleHeight * 0.85),
+                  height: "auto",
+                }
+              : undefined
+          }
+        >
+          <div className="flex items-center justify-between px-5 pt-2 pb-3 shrink-0">
             <DrawerTitle className="font-serif-display text-xl font-semibold">{activeLabel}</DrawerTitle>
             <button
               type="button"
@@ -130,7 +149,12 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
               <X className="h-5 w-5" />
             </button>
           </div>
-          <div className="px-5 pb-6 overflow-y-auto">{sectionContent}</div>
+          <div
+            className="px-5 pb-6 overflow-y-auto flex-1 min-h-0"
+            style={{ overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" }}
+          >
+            {sectionContent}
+          </div>
         </DrawerContent>
       </Drawer>
       </div>
