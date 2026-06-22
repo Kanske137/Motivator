@@ -8,6 +8,7 @@ import { formatPrice, formatMoney } from "@/lib/format-price";
 import { useShopifyPriceMap, priceFromMap } from "@/hooks/useShopifyPriceMap";
 import { translateVariantName } from "@/lib/variant-labels";
 import { useEditorStore } from "@/stores/editorStore";
+import { useOnboardingStore } from "@/stores/onboardingStore";
 import {
   loadAllConfigs,
   resolveConfigForHandle,
@@ -224,6 +225,8 @@ export default function EditorPage() {
     nextParams.set("type", nextTypeParam);
     setParams(nextParams, { replace: true });
     setConfig(next);
+    // Ny mall → börja om onboarding-guidningen.
+    useOnboardingStore.getState().reset();
   };
 
   const frameColor = config?.product_type === "posters" ? FRAME_COLORS[variant ?? "Ingen"] : "";
