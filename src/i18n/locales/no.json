@@ -304,5 +304,18 @@
       "label": "Vis flytte- og størrelseshåndtak",
       "hint": "Slå av for en ren forhåndsvisning uten håndtak på lagene."
     }
+  },
+  "onboarding": {
+    "bild": "Last opp et bilde for å komme i gang.",
+    "forvandling": {
+      "faceSingle": "Last opp et bilde der ansiktet er tydelig og rett forfra.",
+      "multiFace": "Last opp ett portrett per ansikt – hver plass er separat. Tydelige ansikter rett forfra gir best resultat.",
+      "aiPhoto": "Last opp et bilde og velg en stil – trykk så Lag."
+    },
+    "karta": "Søk en adresse eller flytt kartet til riktig sted.",
+    "stil": "Velg en layout-design – de endrer både komposisjon og utseende.",
+    "text": "Klikk i tekstfeltet for å endre. La være tomt for å skjule en linje.",
+    "format": "Velg størrelse og evt. ramme.",
+    "lager": "Legg til bilder, tekst eller former."
   }
 }

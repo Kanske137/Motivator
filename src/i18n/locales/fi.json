@@ -304,5 +304,18 @@
       "label": "Näytä siirto- ja koonmuutoskahvat",
       "hint": "Sammuta saadaksesi siistin esikatselun ilman tasojen kahvoja."
     }
+  },
+  "onboarding": {
+    "bild": "Lataa kuva aloittaaksesi.",
+    "forvandling": {
+      "faceSingle": "Lataa kuva, jossa kasvot näkyvät selvästi suoraan edestä.",
+      "multiFace": "Lataa yksi muotokuva kasvoa kohden – jokainen paikka on erillinen. Selkeät, edestä otetut kasvot antavat parhaan tuloksen.",
+      "aiPhoto": "Lataa kuva ja valitse tyyli – paina sitten Luo."
+    },
+    "karta": "Hae osoite tai siirrä kartta oikeaan kohtaan.",
+    "stil": "Valitse asettelumalli – ne muuttavat sekä sommittelua että ulkoasua.",
+    "text": "Napauta tekstikenttää muokataksesi. Jätä tyhjäksi piilottaaksesi rivin.",
+    "format": "Valitse koko ja kehys.",
+    "lager": "Lisää kuvia, tekstiä tai muotoja."
   }
 }

@@ -304,5 +304,18 @@
       "label": "Vis flytte- og størrelseshåndtag",
       "hint": "Slå fra for en ren forhåndsvisning uden håndtag på lagene."
     }
+  },
+  "onboarding": {
+    "bild": "Upload et billede for at komme i gang.",
+    "forvandling": {
+      "faceSingle": "Upload et billede, hvor ansigtet er tydeligt og lige forfra.",
+      "multiFace": "Upload ét portræt pr. ansigt – hver plads er separat. Tydelige ansigter forfra giver det bedste resultat.",
+      "aiPhoto": "Upload et billede og vælg en stil – tryk derefter Opret."
+    },
+    "karta": "Søg en adresse eller flyt kortet til det rigtige sted.",
+    "stil": "Vælg et layout-design – de ændrer både komposition og udseende.",
+    "text": "Klik i tekstfeltet for at ændre. Lad være tomt for at skjule en linje.",
+    "format": "Vælg størrelse og evt. ramme.",
+    "lager": "Tilføj billeder, tekst eller former."
   }
 }
