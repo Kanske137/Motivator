@@ -98,5 +98,5 @@ export function useOnboarding() {
     return "";
   };
 
-  return { activeHintSection, hintTextKey, markCompleted, dismiss };
+  return { activeHintSection, hintTextKey, markCompleted, dismiss, hasAnyCompleted };
 }
