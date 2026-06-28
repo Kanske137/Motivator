@@ -419,8 +419,18 @@ export default function EditorPage() {
     />
   );
 
+  const { activeHintSection } = useOnboarding();
+  const showCartHint = activeHintSection === null;
+
   const ctaNode = (
-    <StickyCta price={displayPrice} summary={summary} loading={isAdding || isPreparing} disabled={!canAddToCart} onAdd={handleAddToCart} />
+    <StickyCta
+      price={displayPrice}
+      summary={summary}
+      loading={isAdding || isPreparing}
+      disabled={!canAddToCart}
+      onAdd={handleAddToCart}
+      showCartHint={showCartHint}
+    />
   );
 
   const standalone = window.self === window.top;
