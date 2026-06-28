@@ -21,14 +21,15 @@ export function OnboardingHint({ sectionId }: Props) {
   const { activeHintSection, hintTextKey, markCompleted, dismiss } = useOnboarding();
   const isActive = activeHintSection === sectionId;
 
-  // För flikar utan state-baserad completion: markera som klar efter
-  // 5 sekunders dwell — kunden har då sett hinten och hunnit läsa.
+  // För flikar utan state-baserad completion (stil/text/format/lager):
+  // markera som klar så fort fliken öppnas — badgen ska hoppa vidare direkt.
+  // Aktiva flikar (bild/forvandling/karta) markeras endast när kund-state
+  // är uppfyllt (hanteras i useOnboarding).
   useEffect(() => {
     if (!isActive) return;
     const passive: SectionId[] = ["stil", "text", "format", "lager"];
     if (!passive.includes(sectionId)) return;
-    const timer = window.setTimeout(() => markCompleted(sectionId), 5000);
-    return () => window.clearTimeout(timer);
+    markCompleted(sectionId);
   }, [isActive, sectionId, markCompleted]);
 
   if (!isActive) return null;
