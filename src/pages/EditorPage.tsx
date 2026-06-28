@@ -421,8 +421,6 @@ export default function EditorPage() {
     />
   );
 
-  const { activeHintSection } = useOnboarding();
-  const showCartHint = activeHintSection === null;
 
   const ctaNode = (
     <StickyCta
