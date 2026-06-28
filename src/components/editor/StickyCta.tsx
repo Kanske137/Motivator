@@ -9,19 +9,30 @@ interface Props {
   loading?: boolean;
   disabled?: boolean;
   onAdd: () => void;
+  /** Show a pulsing "Är du nöjd?"-badge above the cart button (mobile only). */
+  showCartHint?: boolean;
   className?: string;
 }
 
-export function StickyCta({ price, summary, loading, disabled, onAdd, className }: Props) {
+export function StickyCta({ price, summary, loading, disabled, onAdd, showCartHint, className }: Props) {
   const { t } = useTranslation();
+  const hintVisible = !!showCartHint && !loading && !disabled;
   return (
     <div
       className={cn(
-        "w-full bg-foreground text-background border-t border-foreground/20",
+        "relative w-full bg-foreground text-background border-t border-foreground/20",
         "flex items-center gap-3 px-4 py-3",
         className,
       )}
     >
+      {hintVisible && (
+        <span
+          aria-hidden
+          className="md:hidden pointer-events-none absolute right-6 -top-3 z-10 whitespace-nowrap rounded-sm bg-primary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground shadow-md origin-center animate-pulse-scale"
+        >
+          {t("cart.readyHint")}
+        </span>
+      )}
       <div className="min-w-0 flex-1">
         {summary && (
           <div className="text-[10px] uppercase tracking-wider opacity-60 truncate">{summary}</div>
