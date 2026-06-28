@@ -1,59 +1,75 @@
 ## Mål
-Behåll exakt samma logik för vilken flik som är "nästa steg" (drivs redan av `useOnboarding` → `activeHintSection`). Byt bara ut den blinkande pricken i `NavRail` mot en liten textetikett:
+1. Gör flikarnas onboarding-badge ("Börja här" / "Fortsätt här") mjukt pulserande (skalar lätt upp/ned).
+2. På mobil: lägg en pulserande badge ovanför cart-knappen i `StickyCta` med texten "Är du nöjd? Lägg till i kundvagnen" — visas bara när onboardingen är klar.
 
-- Första oklara fliken i ordningen → "Börja här"
-- Alla efterföljande oklara flikar (när tidigare är klara/dismissade) → "Fortsätt här"
+## Min åsikt (UX)
+Pulserande badges drar blicken bra, men för många samtidigt blir det stressigt. Därför:
 
-Inget annat beteende ändras: dismiss, auto-complete, dwell-timer och `OnboardingHint`-bubblan inuti panelen behålls oförändrade.
+- **Cart-badgen visas bara när `activeHintSection === null`** (alla flik-steg är klara/dismissade). Då tar den naturligt över rollen som "nästa steg" istället för att tävla med flik-badgarna.
+- **Pulsen ska vara subtil** (skala ~1.0 → ~1.06, ~1.6 s, ease-in-out), inte aggressiv som `animate-ping`. Stora hopp eller snabb takt upplevs som en felnotis.
+- **Endast en badge åt gången på mobil**: när cart-badgen syns finns inga flik-badgar kvar, så det blir aldrig dubbel-blink.
+- Cart-badgen göms automatiskt så fort kunden trycker "Lägg i varukorg" (loading/disabled) eller har lagt till — driver vi via `loading`-prop som redan finns.
+
+Rekommendationen: ja, det är klokt under dessa villkor. Om vi visade cart-badgen hela tiden eller med kraftig animation skulle det kännas "spammy" och tappa effekt.
 
 ## Ändringar
 
-### 1. `src/components/editor/NavRail.tsx`
-- Ta bort den blinkande prick-noden (`animate-ping` + `bg-primary`) som renderas när `showHint` är true.
-- Lägg istället till en liten text-badge ovanför/under ikonen när `showHint` är true. Texten kommer från i18n-nyckel:
-  - `onboarding.startHere` när det är första fliken i `sections`-listan (index 0)
-  - `onboarding.continueHere` annars
-- Stil: mycket liten (text-[9px] eller text-[10px]), uppercase tracking, `text-primary`, ev. mjuk `animate-fade-in`. Placeras så att den inte bryter rail-layouten (absolut positionerad ovanför ikonen, eller som extra rad under labeln). Förslag: absolut positionerad badge `top-1` (vertikal rail) / motsvarande på horisontell, så befintlig ikon+label-layout inte rubbas.
-- Horisontell mobile-rail: samma badge, positionerad t.ex. `top-0.5 right-1`.
+### 1. `tailwind.config.ts`
+Lägg till en mjuk pulserande skala-animation som inte krockar med Tailwinds inbyggda `animate-pulse` (opacity):
 
-Note: vi behöver veta vilken position fliken har för att välja text. Enklast: skicka in `sections`-indexet, eller jämför `s.id` med `sections[0].id` inne i map-callbacken (vi har redan `sections` i scope).
-
-Detalj för "Börja här vs Fortsätt här": det är inte flikens position i `sections` som avgör — det är om kunden har slutfört/dismissat tidigare flikar. Bättre regel:
-- Om INGEN annan flik har `completed[id]` true → "Börja här"
-- Annars → "Fortsätt här"
-
-Det matchar kundupplevelsen: helt orörd editor visar "Börja här" på bild-fliken; efter att man laddat upp en bild flyttas hinten till nästa flik och visar "Fortsätt här".
-
-### 2. `useOnboarding` (`src/hooks/useOnboarding.ts`)
-Lägg till en härledd flagga `hasAnyCompleted` (true om något i `completed` är true) och exportera den, så `NavRail` kan välja rätt etikett utan att duplicera logik. Alternativt: exportera `isFirstStep: boolean` direkt.
-
-### 3. i18n
-Lägg till nycklar i alla locales (`sv` källa + `en/de/no/da/fi/fr/es/it/nl/pl`):
-
-```
-onboarding.startHere     // sv: "Börja här"
-onboarding.continueHere  // sv: "Fortsätt här"
+```ts
+keyframes: {
+  "pulse-scale": {
+    "0%, 100%": { transform: "scale(1)" },
+    "50%":      { transform: "scale(1.06)" },
+  },
+},
+animation: {
+  "pulse-scale": "pulse-scale 1.6s ease-in-out infinite",
+},
 ```
 
-Översättningar per språk (förslag):
-- en: Start here / Continue here
-- de: Hier starten / Hier weiter
-- no: Start her / Fortsett her
-- da: Start her / Fortsæt her
-- fi: Aloita tästä / Jatka tästä
-- fr: Commencer ici / Continuer ici
-- es: Empieza aquí / Continúa aquí
-- it: Inizia qui / Continua qui
-- nl: Begin hier / Ga verder hier
-- pl: Zacznij tutaj / Kontynuuj tutaj
+### 2. `src/components/editor/NavRail.tsx`
+Lägg `animate-pulse-scale` på badge-spannet (behåller `animate-fade-in` vid mount via en yttre wrapper, eller byter helt till `animate-pulse-scale` — enklast: byt klassen). `transform-origin: center` är default, så skalningen blir centrerad.
 
-### 4. Oförändrat
-- `OnboardingHint` (bubblan i panelen) – ingen ändring.
-- `useOnboardingStore`, auto-complete-effekter, dwell-timer – ingen ändring.
-- "Skapa själv"-flödet (layers-onboarding-dialog) – ingen ändring.
+### 3. `src/components/editor/StickyCta.tsx`
+- Lägg till en valfri prop `showCartHint?: boolean`.
+- När true: rendera en absolut positionerad badge ovanför komponenten (t.ex. `absolute -top-3 right-4` eller centrerad över knappen), endast på mobil (`md:hidden`), med samma stil som flik-badgen (primary bg, vit text, liten uppercase, `animate-pulse-scale`, `animate-fade-in`).
+- Text via i18n-nyckel `cart.readyHint` ("Är du nöjd? Lägg till i kundvagnen").
+- Gör `StickyCta`-roten `relative` så badgen kan position:absolute mot den.
+
+### 4. EditorShell (callsite för `StickyCta`)
+Beräkna `showCartHint`:
+```ts
+const { activeHintSection } = useOnboarding();
+const showCartHint = activeHintSection === null && !loading;
+```
+Skicka `showCartHint` till `StickyCta`. (Gäller både onboard- och "skapa själv"-flödena — i "skapa själv" finns ingen nav-rail-onboarding, så `activeHintSection` är null direkt och badgen visas så fort något är tillagt — det är önskvärt.)
+
+### 5. i18n
+Lägg till i alla 11 locales under `cart`:
+```
+cart.readyHint
+```
+Översättningar:
+- sv: "Är du nöjd? Lägg till i kundvagnen"
+- en: "Happy with it? Add to cart"
+- de: "Zufrieden? In den Warenkorb"
+- no: "Fornøyd? Legg i handlekurven"
+- da: "Tilfreds? Læg i kurven"
+- fi: "Tyytyväinen? Lisää ostoskoriin"
+- fr: "Satisfait ? Ajouter au panier"
+- es: "¿Te gusta? Añadir al carrito"
+- it: "Soddisfatto? Aggiungi al carrello"
+- nl: "Tevreden? In winkelwagen"
+- pl: "Zadowolony? Dodaj do koszyka"
+
+## Oförändrat
+- Logiken i `useOnboarding`, `useOnboardingStore`, dwell-timer, OnboardingHint-bubblan, "skapa själv"-dialogen.
+- Cart-knappens funktion och layout — bara en ny badge ovanför, ingen layout-shift (absolut positionerad).
 
 ## Verifiering
-- Öppna editor på en standardmall: bild-fliken visar "Börja här" istället för prick.
-- Ladda upp en bild → bild-fliken tappar badge, nästa flik visar "Fortsätt här".
-- Dismiss-knappen i `OnboardingHint` fortsätter dölja både bubblan och nav-rail-badgen för den fliken.
-- Inget visuellt ändras för flikar utan aktiv hint.
+- Mobil-preview: badge "Börja här" pulserar mjukt på första fliken. Ladda upp bild → flyttas till nästa flik som "Fortsätt här", fortsatt mjuk puls.
+- Slutför alla steg → flik-badgar försvinner, cart-badge "Är du nöjd? Lägg till i kundvagnen" tonar in ovanför knappen och pulserar.
+- Klicka "Lägg i varukorg" → cart-badge försvinner under loading.
+- Desktop: ingen cart-badge (md:hidden), flik-badgarna i sidorailen pulserar som tidigare.
