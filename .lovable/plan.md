@@ -1,24 +1,13 @@
-# Fix: "Visa som kund" kraschar editorn
+## Problem
+På mobil renderas Format-flikens innehåll i drawerns scroll-container (`EditorShell.tsx`, raden `<div className="px-5 pb-6 overflow-y-auto" ...>`). Orienterings­knapparna ligger sist i listan, men `pb-6` (24 px) räcker inte — på iOS/Safari äter hem-indikatorn + browser-UI upp botten, så de sista pillsen hamnar precis vid kanten och kan inte scrollas in i synfältet.
 
-## Orsak
-Senaste ändringen (cart-hint badge) lade till `const { activeHintSection } = useOnboarding();` på rad 422 i `src/pages/EditorPage.tsx` — *efter* den tidiga returneringen `if (loading || !config) return <Loader2 …/>` på rad 403.
+## Lösning
+Endast ett ställe behöver röras: scroll-containerns bottenpadding i `src/components/editor/EditorShell.tsx` (rad 167–170).
 
-Vid första render är `loading=true` → komponenten returnerar innan `useOnboarding()` anropas. När configen sedan laddats körs en hook till än föregående render. React kastar "Rendered more hooks than during the previous render" och hela editorn avmonteras — vilket är exakt det "inget visas"-beteende du ser när du öppnar `/editor?handle=…&preview=draft` via *Visa som kund*.
+- Ändra `pb-6` → `pb-24` så det alltid finns ~96 px luft under sista elementet på mobil.
+- Lägg till `paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 6rem)'` i `style`-objektet så vi respekterar iOS safe-area utöver de 6rem.
 
-## Åtgärd
-Flytta `useOnboarding()` och `showCartHint`-beräkningen upp till de andra top-level hooks (bredvid `useShopifyPriceMap`, `useCartStore` osv), så att alla hooks alltid körs i samma ordning oavsett `loading`/`config`-state. `ctaNode` kan fortsätta byggas efter early-return — det är bara hook-anropet som måste flyttas.
+Inget annat påverkas: gäller bara mobil-drawerns innehåll (desktop-aside har egen layout), och alla flik-innehåll får samma extra utrymme — vilket även hjälper om någon annan flik råkar ligga nära kanten.
 
-## Tekniska detaljer
-- Fil: `src/pages/EditorPage.tsx`
-- Ta bort raderna nära 422:
-  ```ts
-  const { activeHintSection } = useOnboarding();
-  const showCartHint = activeHintSection === null;
-  ```
-- Lägg in dem tidigt i komponenten, t.ex. direkt efter `const { map: shopifyPriceMap, derivedFx } = useShopifyPriceMap();`.
-- Inga övriga ändringar krävs — `StickyCta`-anropet behåller `showCartHint={showCartHint}`.
-
-## Verifiering
-1. Öppna `/editor?handle=<handle>&preview=draft` i ny flik → editorn renderar normalt.
-2. Konsolen ska inte längre visa "Rendered more hooks than during the previous render".
-3. Cart-hint-badgen på mobil fungerar som tidigare när alla onboarding-steg är klara.
+## Fil
+- `src/components/editor/EditorShell.tsx` — uppdatera className + style på scroll-divet i `DrawerContent`.

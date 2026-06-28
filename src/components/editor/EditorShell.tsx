@@ -165,8 +165,12 @@ export function EditorShell({ configs, activeHandle, activeProductType, onProduc
             </button>
           </div>
           <div
-            className="px-5 pb-6 overflow-y-auto"
-            style={{ overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" }}
+            className="px-5 pb-24 overflow-y-auto"
+            style={{
+              overscrollBehavior: "contain",
+              WebkitOverflowScrolling: "touch",
+              paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 6rem)",
+            }}
           >
             {sectionContent}
           </div>
