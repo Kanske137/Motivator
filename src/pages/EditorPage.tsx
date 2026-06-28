@@ -19,6 +19,7 @@ import {
 import { MapPreview } from "@/components/editor/MapPreview";
 import { EditorShell } from "@/components/editor/EditorShell";
 import { StickyCta } from "@/components/editor/StickyCta";
+import { useOnboarding } from "@/hooks/useOnboarding";
 import { MockupGallery } from "@/components/editor/MockupGallery";
 import { postEditorResize } from "@/lib/iframe-resize";
 import { useCartStore } from "@/stores/cartStore";
