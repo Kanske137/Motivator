@@ -95,6 +95,8 @@ export default function EditorPage() {
   const isAdding = useCartStore((s) => s.isLoading);
   const [isPreparing, setIsPreparing] = useState(false);
   const { map: shopifyPriceMap, derivedFx } = useShopifyPriceMap();
+  const { activeHintSection } = useOnboarding();
+  const showCartHint = activeHintSection === null;
   const livePrice = priceFromMap(shopifyPriceMap, size, variant);
   const displayPrice = livePrice
     ? formatMoney(livePrice.amount, livePrice.currencyCode, shopCtx.locale)
@@ -419,8 +421,6 @@ export default function EditorPage() {
     />
   );
 
-  const { activeHintSection } = useOnboarding();
-  const showCartHint = activeHintSection === null;
 
   const ctaNode = (
     <StickyCta
