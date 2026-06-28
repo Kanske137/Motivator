@@ -23,7 +23,8 @@
     "title": "Winkelwagen",
     "empty": "Je winkelwagen is leeg",
     "total": "Totaal",
-    "checkout": "Afrekenen"
+    "checkout": "Afrekenen",
+    "readyHint": "Tevreden? In winkelwagen"
   },
   "orientation": {
     "portrait": "Staand",

@@ -23,7 +23,8 @@
     "title": "Warenkorb",
     "empty": "Dein Warenkorb ist leer",
     "total": "Gesamt",
-    "checkout": "Zur Kasse"
+    "checkout": "Zur Kasse",
+    "readyHint": "Zufrieden? In den Warenkorb"
   },
   "orientation": {
     "portrait": "Hochformat",

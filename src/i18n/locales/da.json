@@ -23,7 +23,8 @@
     "title": "Kurv",
     "empty": "Din kurv er tom",
     "total": "I alt",
-    "checkout": "Til kassen"
+    "checkout": "Til kassen",
+    "readyHint": "Tilfreds? Læg i kurven"
   },
   "orientation": {
     "portrait": "Stående",

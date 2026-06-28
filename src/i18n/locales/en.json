@@ -23,7 +23,8 @@
     "title": "Cart",
     "empty": "Your cart is empty",
     "total": "Total",
-    "checkout": "Checkout"
+    "checkout": "Checkout",
+    "readyHint": "Happy with it? Add to cart"
   },
   "orientation": {
     "portrait": "Portrait",

@@ -23,7 +23,8 @@
     "title": "Carrito",
     "empty": "Tu carrito está vacío",
     "total": "Total",
-    "checkout": "Pagar"
+    "checkout": "Pagar",
+    "readyHint": "¿Te gusta? Añadir al carrito"
   },
   "orientation": {
     "portrait": "Vertical",

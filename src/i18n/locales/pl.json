@@ -23,7 +23,8 @@
     "title": "Koszyk",
     "empty": "Twój koszyk jest pusty",
     "total": "Razem",
-    "checkout": "Do kasy"
+    "checkout": "Do kasy",
+    "readyHint": "Zadowolony? Dodaj do koszyka"
   },
   "orientation": {
     "portrait": "Pionowo",
