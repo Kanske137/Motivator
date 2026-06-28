@@ -14,7 +14,7 @@ interface Props {
 
 export function NavRail({ sections, activeId, onSelect, orientation = "vertical", className }: Props) {
   const { t } = useTranslation();
-  const { activeHintSection } = useOnboarding();
+  const { activeHintSection, hasAnyCompleted } = useOnboarding();
   const isVertical = orientation === "vertical";
   return (
     <nav
