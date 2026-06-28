@@ -316,6 +316,8 @@
     "stil": "Valitse asettelumalli – ne muuttavat sekä sommittelua että ulkoasua.",
     "text": "Napauta tekstikenttää muokataksesi. Jätä tyhjäksi piilottaaksesi rivin.",
     "format": "Valitse koko ja kehys.",
-    "lager": "Lisää kuvia, tekstiä tai muotoja."
+    "lager": "Lisää kuvia, tekstiä tai muotoja.",
+    "startHere": "Aloita tästä",
+    "continueHere": "Jatka tästä"
   }
 }

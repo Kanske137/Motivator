@@ -316,6 +316,8 @@
     "stil": "Pick a layout design – they change both composition and look.",
     "text": "Tap the text field to edit. Leave empty to hide a line.",
     "format": "Choose size and frame, if any.",
-    "lager": "Add images, text or shapes."
+    "lager": "Add images, text or shapes.",
+    "startHere": "Start here",
+    "continueHere": "Continue here"
   }
 }

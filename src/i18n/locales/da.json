@@ -316,6 +316,8 @@
     "stil": "Vælg et layout-design – de ændrer både komposition og udseende.",
     "text": "Klik i tekstfeltet for at ændre. Lad være tomt for at skjule en linje.",
     "format": "Vælg størrelse og evt. ramme.",
-    "lager": "Tilføj billeder, tekst eller former."
+    "lager": "Tilføj billeder, tekst eller former.",
+    "startHere": "Start her",
+    "continueHere": "Fortsæt her"
   }
 }
