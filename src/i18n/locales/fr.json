@@ -316,6 +316,8 @@
     "stil": "Choisissez un design de mise en page – ils changent la composition et l'apparence.",
     "text": "Touchez le champ pour modifier. Laissez vide pour masquer une ligne.",
     "format": "Choisissez la taille et le cadre éventuel.",
-    "lager": "Ajoutez images, texte ou formes."
+    "lager": "Ajoutez images, texte ou formes.",
+    "startHere": "Commencer ici",
+    "continueHere": "Continuer ici"
   }
 }

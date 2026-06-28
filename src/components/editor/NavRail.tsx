@@ -14,7 +14,7 @@ interface Props {
 
 export function NavRail({ sections, activeId, onSelect, orientation = "vertical", className }: Props) {
   const { t } = useTranslation();
-  const { activeHintSection } = useOnboarding();
+  const { activeHintSection, hasAnyCompleted } = useOnboarding();
   const isVertical = orientation === "vertical";
   return (
     <nav
@@ -59,10 +59,9 @@ export function NavRail({ sections, activeId, onSelect, orientation = "vertical"
               {showHint && (
                 <span
                   aria-hidden
-                  className="absolute -right-1.5 -top-1.5 inline-flex h-2.5 w-2.5"
+                  className="pointer-events-none absolute left-1/2 -top-3 -translate-x-1/2 whitespace-nowrap rounded-sm bg-primary px-1 py-px text-[8px] font-semibold uppercase tracking-wide text-primary-foreground shadow-sm animate-fade-in"
                 >
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+                  {t(hasAnyCompleted ? "onboarding.continueHere" : "onboarding.startHere")}
                 </span>
               )}
             </div>

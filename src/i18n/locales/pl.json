@@ -316,6 +316,8 @@
     "stil": "Wybierz układ – zmienia kompozycję i wygląd.",
     "text": "Kliknij pole tekstowe, aby edytować. Zostaw puste, aby ukryć wiersz.",
     "format": "Wybierz rozmiar i ewentualnie ramę.",
-    "lager": "Dodaj obrazy, tekst lub kształty."
+    "lager": "Dodaj obrazy, tekst lub kształty.",
+    "startHere": "Zacznij tutaj",
+    "continueHere": "Kontynuuj tutaj"
   }
 }

@@ -316,6 +316,8 @@
     "stil": "Välj en layout-design – de byter både komposition och utseende.",
     "text": "Klicka i textrutan för att ändra. Lämna tomt för att dölja en rad.",
     "format": "Välj storlek och eventuell ram.",
-    "lager": "Lägg till bilder, text eller former."
+    "lager": "Lägg till bilder, text eller former.",
+    "startHere": "Börja här",
+    "continueHere": "Fortsätt här"
   }
 }

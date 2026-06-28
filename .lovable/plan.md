@@ -1,52 +1,59 @@
-## Problem
+## Mål
+Behåll exakt samma logik för vilken flik som är "nästa steg" (drivs redan av `useOnboarding` → `activeHintSection`). Byt bara ut den blinkande pricken i `NavRail` mot en liten textetikett:
 
-Mobil-drawern öppnas alltid ~85% av synliga ytan, oavsett hur lite innehåll fliken har. Resultat: stora tomma områden under det faktiska innehållet, och man måste ändå scrolla i vissa flikar.
+- Första oklara fliken i ordningen → "Börja här"
+- Alla efterföljande oklara flikar (när tidigare är klara/dismissade) → "Fortsätt här"
 
-Orsak i `EditorShell.tsx`:
-- Inre scrollcontainern har `flex-1` ⇒ tar all kvarvarande höjd upp till `maxHeight`
-- `maxHeight` är hårdkodad till `visibleHeight * 0.85`
-- Det finns ingen "shrink-to-content"-logik
+Inget annat beteende ändras: dismiss, auto-complete, dwell-timer och `OnboardingHint`-bubblan inuti panelen behålls oförändrade.
 
-## Lösning (rekommenderad): Innehållsdriven höjd + snap points
+## Ändringar
 
-Vauls inbyggda `snapPoints` är state-of-the-art för mobila bottom sheets (Apple Maps, Spotify, Notion m.fl. använder samma mönster). Drawer öppnas på "lagom" höjd och kan dras upp till full höjd om kunden vill.
+### 1. `src/components/editor/NavRail.tsx`
+- Ta bort den blinkande prick-noden (`animate-ping` + `bg-primary`) som renderas när `showHint` är true.
+- Lägg istället till en liten text-badge ovanför/under ikonen när `showHint` är true. Texten kommer från i18n-nyckel:
+  - `onboarding.startHere` när det är första fliken i `sections`-listan (index 0)
+  - `onboarding.continueHere` annars
+- Stil: mycket liten (text-[9px] eller text-[10px]), uppercase tracking, `text-primary`, ev. mjuk `animate-fade-in`. Placeras så att den inte bryter rail-layouten (absolut positionerad ovanför ikonen, eller som extra rad under labeln). Förslag: absolut positionerad badge `top-1` (vertikal rail) / motsvarande på horisontell, så befintlig ikon+label-layout inte rubbas.
+- Horisontell mobile-rail: samma badge, positionerad t.ex. `top-0.5 right-1`.
 
-### Ändringar i `src/components/editor/EditorShell.tsx`
+Note: vi behöver veta vilken position fliken har för att välja text. Enklast: skicka in `sections`-indexet, eller jämför `s.id` med `sections[0].id` inne i map-callbacken (vi har redan `sections` i scope).
 
-1. **Ta bort `flex-1` och `min-h-0`** från inre scroll-divern. Behåll `overflow-y-auto` + `overscrollBehavior: contain` — då växer drawern bara till innehållets höjd, upp till `maxHeight`.
+Detalj för "Börja här vs Fortsätt här": det är inte flikens position i `sections` som avgör — det är om kunden har slutfört/dismissat tidigare flikar. Bättre regel:
+- Om INGEN annan flik har `completed[id]` true → "Börja här"
+- Annars → "Fortsätt här"
 
-2. **Lägg till snap points** på `Drawer`:
-   ```tsx
-   const [snap, setSnap] = useState<number | string | null>("content");
-   <Drawer
-     open={...}
-     snapPoints={["content", 0.95]}
-     activeSnapPoint={snap}
-     setActiveSnapPoint={setSnap}
-   >
-   ```
-   - Första snap = `"content"` → exakt innehållets höjd (Vaul mäter automatiskt)
-   - Andra snap = `0.95` → nästan full höjd (för långa flikar som "Text"/"Lager")
-   - Användaren kan dra handtaget uppåt för att expandera
+Det matchar kundupplevelsen: helt orörd editor visar "Börja här" på bild-fliken; efter att man laddat upp en bild flyttas hinten till nästa flik och visar "Fortsätt här".
 
-3. **Återställ snap** till `"content"` varje gång drawern öppnas, så varje flikbyte startar kompakt:
-   ```tsx
-   useEffect(() => { if (mobileOpen) setSnap("content"); }, [mobileOpen, activeId]);
-   ```
+### 2. `useOnboarding` (`src/hooks/useOnboarding.ts`)
+Lägg till en härledd flagga `hasAnyCompleted` (true om något i `completed` är true) och exportera den, så `NavRail` kan välja rätt etikett utan att duplicera logik. Alternativt: exportera `isFirstStep: boolean` direkt.
 
-4. **Behåll ankringen** till `visibleTop`/`visibleHeight` från `useParentViewport` så drawern fortsatt placeras inom mobilens synliga del av iframen. `maxHeight` blir taket för snap `0.95`.
+### 3. i18n
+Lägg till nycklar i alla locales (`sv` källa + `en/de/no/da/fi/fr/es/it/nl/pl`):
 
-5. **Inget annat ändras** — `Drawer`/`DrawerContent` (vaul) stödjer redan snap points; ingen ny dependency, inga ändringar i Shopify-snippet, ingen ändring i desktop-layout, ingen ändring i affärslogik.
+```
+onboarding.startHere     // sv: "Börja här"
+onboarding.continueHere  // sv: "Fortsätt här"
+```
 
-### Resultat
-- Korta flikar (t.ex. "Format", "Stil") → drawer = exakt innehållshöjd, ingen tom yta.
-- Långa flikar → drawer öppnas på innehållshöjd (eller `maxHeight`-tak) och kan dras upp till 95% med ett enda drag i handtaget.
-- Drawerns scrollyta fungerar fortsatt oberoende av iframens scroll (`overscroll-behavior: contain`).
+Översättningar per språk (förslag):
+- en: Start here / Continue here
+- de: Hier starten / Hier weiter
+- no: Start her / Fortsett her
+- da: Start her / Fortsæt her
+- fi: Aloita tästä / Jatka tästä
+- fr: Commencer ici / Continuer ici
+- es: Empieza aquí / Continúa aquí
+- it: Inizia qui / Continua qui
+- nl: Begin hier / Ga verder hier
+- pl: Zacznij tutaj / Kontynuuj tutaj
 
-## Alternativ (om du föredrar enklare)
+### 4. Oförändrat
+- `OnboardingHint` (bubblan i panelen) – ingen ändring.
+- `useOnboardingStore`, auto-complete-effekter, dwell-timer – ingen ändring.
+- "Skapa själv"-flödet (layers-onboarding-dialog) – ingen ändring.
 
-**A. Alltid full höjd:** Sätt `top = visibleTop + 40`, `height = visibleHeight - 40`. Enkelt, men korta flikar får ändå tom yta längst ner.
-
-**B. Endast innehållsdriven (utan snap):** Bara steg 1 ovan. Inga snap points, ingen drag-att-expandera — drawer = innehållshöjd upp till 85%-taket. Enklare, men långa flikar kräver intern scroll direkt.
-
-Min rekommendation är huvudplanen (snap points) — det är mönstret moderna native-appar använder och löser båda fallen på en gång.
+## Verifiering
+- Öppna editor på en standardmall: bild-fliken visar "Börja här" istället för prick.
+- Ladda upp en bild → bild-fliken tappar badge, nästa flik visar "Fortsätt här".
+- Dismiss-knappen i `OnboardingHint` fortsätter dölja både bubblan och nav-rail-badgen för den fliken.
+- Inget visuellt ändras för flikar utan aktiv hint.

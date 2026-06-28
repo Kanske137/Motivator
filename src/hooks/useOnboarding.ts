@@ -77,6 +77,11 @@ export function useOnboarding() {
     return null;
   }, [sections, completed, dismissed]);
 
+  const hasAnyCompleted = useMemo(
+    () => Object.values(completed).some(Boolean),
+    [completed],
+  );
+
   const hintTextKey = (section: SectionId): string => {
     if (section === "forvandling") {
       const aiPhoto = layers.find((l) => l.type === "aiPhoto") as any;
@@ -93,5 +98,5 @@ export function useOnboarding() {
     return "";
   };
 
-  return { activeHintSection, hintTextKey, markCompleted, dismiss };
+  return { activeHintSection, hintTextKey, markCompleted, dismiss, hasAnyCompleted };
 }
