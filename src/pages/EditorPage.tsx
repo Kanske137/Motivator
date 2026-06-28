@@ -19,6 +19,7 @@ import {
 import { MapPreview } from "@/components/editor/MapPreview";
 import { EditorShell } from "@/components/editor/EditorShell";
 import { StickyCta } from "@/components/editor/StickyCta";
+import { useOnboarding } from "@/hooks/useOnboarding";
 import { MockupGallery } from "@/components/editor/MockupGallery";
 import { postEditorResize } from "@/lib/iframe-resize";
 import { useCartStore } from "@/stores/cartStore";
@@ -418,8 +419,18 @@ export default function EditorPage() {
     />
   );
 
+  const { activeHintSection } = useOnboarding();
+  const showCartHint = activeHintSection === null;
+
   const ctaNode = (
-    <StickyCta price={displayPrice} summary={summary} loading={isAdding || isPreparing} disabled={!canAddToCart} onAdd={handleAddToCart} />
+    <StickyCta
+      price={displayPrice}
+      summary={summary}
+      loading={isAdding || isPreparing}
+      disabled={!canAddToCart}
+      onAdd={handleAddToCart}
+      showCartHint={showCartHint}
+    />
   );
 
   const standalone = window.self === window.top;

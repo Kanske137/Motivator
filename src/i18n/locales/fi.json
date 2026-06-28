@@ -23,7 +23,8 @@
     "title": "Ostoskori",
     "empty": "Ostoskorisi on tyhjä",
     "total": "Yhteensä",
-    "checkout": "Kassalle"
+    "checkout": "Kassalle",
+    "readyHint": "Tyytyväinen? Lisää ostoskoriin"
   },
   "orientation": {
     "portrait": "Pystysuora",

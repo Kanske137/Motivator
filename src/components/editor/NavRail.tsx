@@ -59,7 +59,7 @@ export function NavRail({ sections, activeId, onSelect, orientation = "vertical"
               {showHint && (
                 <span
                   aria-hidden
-                  className="pointer-events-none absolute left-1/2 -top-3 -translate-x-1/2 whitespace-nowrap rounded-sm bg-primary px-1 py-px text-[8px] font-semibold uppercase tracking-wide text-primary-foreground shadow-sm animate-fade-in"
+                  className="pointer-events-none absolute left-1/2 -top-3 -translate-x-1/2 whitespace-nowrap rounded-sm bg-primary px-1 py-px text-[8px] font-semibold uppercase tracking-wide text-primary-foreground shadow-sm origin-center animate-pulse-scale"
                 >
                   {t(hasAnyCompleted ? "onboarding.continueHere" : "onboarding.startHere")}
                 </span>

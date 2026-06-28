@@ -23,7 +23,8 @@
     "title": "Varukorg",
     "empty": "Varukorgen är tom",
     "total": "Totalt",
-    "checkout": "Till kassan"
+    "checkout": "Till kassan",
+    "readyHint": "Är du nöjd? Lägg till i kundvagnen"
   },
   "orientation": {
     "portrait": "Stående",

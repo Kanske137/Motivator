@@ -23,7 +23,8 @@
     "title": "Handlekurv",
     "empty": "Handlekurven er tom",
     "total": "Totalt",
-    "checkout": "Til kassen"
+    "checkout": "Til kassen",
+    "readyHint": "Fornøyd? Legg i handlekurven"
   },
   "orientation": {
     "portrait": "Stående",

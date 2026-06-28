@@ -23,7 +23,8 @@
     "title": "Panier",
     "empty": "Votre panier est vide",
     "total": "Total",
-    "checkout": "Commander"
+    "checkout": "Commander",
+    "readyHint": "Satisfait ? Ajouter au panier"
   },
   "orientation": {
     "portrait": "Portrait",

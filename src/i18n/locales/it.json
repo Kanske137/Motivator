@@ -23,7 +23,8 @@
     "title": "Carrello",
     "empty": "Il tuo carrello è vuoto",
     "total": "Totale",
-    "checkout": "Cassa"
+    "checkout": "Cassa",
+    "readyHint": "Soddisfatto? Aggiungi al carrello"
   },
   "orientation": {
     "portrait": "Verticale",
