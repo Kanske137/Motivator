@@ -11,3 +11,7 @@ verify_jwt = false
 # Gelato anropar webhooken utan Lovable-JWT — vi auth:ar via shared secret.
 [functions.gelato-webhook]
 verify_jwt = false
+
+# Temporär engångs-reveal — auth via x-reveal-token-header.
+[functions.reveal-gelato-secret]
+verify_jwt = false
