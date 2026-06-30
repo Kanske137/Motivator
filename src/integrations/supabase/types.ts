@@ -16,36 +16,63 @@ export type Database = {
     Tables: {
       gelato_orders: {
         Row: {
+          carrier: string | null
           created_at: string
+          delivered_at: string | null
           error: string | null
+          fulfilled_at: string | null
           gelato_order_id: string | null
           id: string
+          last_status: string | null
           payload: Json | null
+          raw: Json | null
+          shopify_fulfillment_gid: string | null
+          shopify_order_gid: string | null
           shopify_order_id: string
           shopify_order_name: string | null
           status: string
+          tracking_code: string | null
+          tracking_url: string | null
           updated_at: string
         }
         Insert: {
+          carrier?: string | null
           created_at?: string
+          delivered_at?: string | null
           error?: string | null
+          fulfilled_at?: string | null
           gelato_order_id?: string | null
           id?: string
+          last_status?: string | null
           payload?: Json | null
+          raw?: Json | null
+          shopify_fulfillment_gid?: string | null
+          shopify_order_gid?: string | null
           shopify_order_id: string
           shopify_order_name?: string | null
           status?: string
+          tracking_code?: string | null
+          tracking_url?: string | null
           updated_at?: string
         }
         Update: {
+          carrier?: string | null
           created_at?: string
+          delivered_at?: string | null
           error?: string | null
+          fulfilled_at?: string | null
           gelato_order_id?: string | null
           id?: string
+          last_status?: string | null
           payload?: Json | null
+          raw?: Json | null
+          shopify_fulfillment_gid?: string | null
+          shopify_order_gid?: string | null
           shopify_order_id?: string
           shopify_order_name?: string | null
           status?: string
+          tracking_code?: string | null
+          tracking_url?: string | null
           updated_at?: string
         }
         Relationships: []
