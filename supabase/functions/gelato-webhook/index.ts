@@ -1,16 +1,28 @@
 // Gelato → Shopify fulfillment & leveranssync.
 //
-// Tar emot Gelatos order-status-webhook och, beroende på status:
-//   1) "shipped"          → skapar Shopify-fulfillment + tracking, mejlar kund
-//   2) "in_transit" / "out_for_delivery" / "delivered" → postar fulfillment-event
-//   3) övrigt (created/printed/etc.) → loggas bara
+// Verifierad mot Gelatos webhook-docs:
+// https://dashboard.gelato.com/docs/webhooks/
+//
+// Event-typer vi hanterar:
+//   * order_status_updated              → huvudflödet; skapar Shopify-fulfillment
+//                                         + tracking + kund-mejl när status=shipped.
+//                                         Postar även fulfillment-event för
+//                                         in_transit/out_for_delivery/delivered.
+//   * order_item_tracking_code_updated  → tracking-info på root; uppdaterar
+//                                         tracking-kolumner och postar event
+//                                         om vi redan har en fulfillment.
+//   * order_item_status_updated         → för granulärt för fulfillment;
+//                                         loggas bara i gelato_orders.
+//   * order_delivery_estimate_updated   → loggas bara.
 //
 // Auth: shared secret via ?secret=... eller header x-gelato-secret.
 // JWT-verifiering är AVSTÄNGD (publik webhook, se supabase/config.toml).
 //
 // Idempotens:
-//   - gelato_orders.last_status === status ⇒ no-op
-//   - shopify_fulfillment_gid återanvänds när det redan finns
+//   - Samma Gelato-event id (raw.id) ⇒ no-op.
+//   - Samma last_status som redan är satt ⇒ no-op för status-transitions.
+//   - shopify_fulfillment_gid återanvänds när det redan finns.
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import { shopifyAdmin } from "../_shared/shopify-admin.ts";
 
@@ -20,17 +32,16 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-gelato-secret",
 };
 
-// --- CONFIRM mot riktig Gelato-payload --------------------------------------
-// Gelatos webhooks levererar olika fält beroende på event-typ. Verifiera
-// nedanstående status-strängar och fältnamn med en riktig payload, justera vid
-// behov. Allt är skrivet defensivt så det går att byta utan att omforma flödet.
-const SHIP_STATUSES = new Set(["shipped"]);
+// Gelato-statuses som vi behandlar som "skickad" och därmed triggar fulfillment.
+// Se https://dashboard.gelato.com/docs/orders/order_details/#order-statuses
+const SHIP_STATUSES = new Set(["shipped", "shipped_to_recipient"]);
+
+// Gelato-status → Shopify FulfillmentEvent-status.
 const EVENT_MAP: Record<string, string> = {
   in_transit: "IN_TRANSIT",
   out_for_delivery: "OUT_FOR_DELIVERY",
   delivered: "DELIVERED",
 };
-// ----------------------------------------------------------------------------
 
 const OPEN_FOS = `
   query($id: ID!) {
@@ -62,6 +73,85 @@ interface TrackingInfo {
   number: string | null;
   url: string | null;
   company: string | null;
+}
+
+interface ParsedEvent {
+  eventType: string;           // Gelatos event-namn, t.ex. "order_status_updated"
+  eventId: string | null;      // Gelatos event-id, t.ex. "os_5e5680ce494f6"
+  status: string;              // fulfillmentStatus / status (lower-case)
+  gelatoOrderId: string | null;
+  shopifyOrderName: string | null; // vår orderReferenceId (ex "#1042")
+  trackingInfo: TrackingInfo;
+  fulfillmentCount: number;    // för loggning
+}
+
+function pickTracking(event: any): { info: TrackingInfo; count: number } {
+  // order_item_tracking_code_updated: allt på root.
+  if (event?.event === "order_item_tracking_code_updated") {
+    return {
+      info: {
+        number: event.trackingCode ?? null,
+        url: event.trackingUrl ?? null,
+        company: event.shipmentMethodName ?? "Gelato",
+      },
+      count: event.trackingCode ? 1 : 0,
+    };
+  }
+
+  // order_status_updated: items[].fulfillments[]
+  let count = 0;
+  let first: any = null;
+  const items = Array.isArray(event?.items) ? event.items : [];
+  for (const item of items) {
+    const fs = Array.isArray(item?.fulfillments) ? item.fulfillments : [];
+    for (const f of fs) {
+      count += 1;
+      if (!first && f?.trackingCode) first = f;
+    }
+  }
+  if (!first && items[0]?.fulfillments?.[0]) first = items[0].fulfillments[0];
+
+  return {
+    info: {
+      number: first?.trackingCode ?? null,
+      url: first?.trackingUrl ?? null,
+      company: first?.shipmentMethodName ?? "Gelato",
+    },
+    count,
+  };
+}
+
+function parseGelatoEvent(event: any): ParsedEvent {
+  const eventType = String(event?.event ?? "").trim();
+  const eventId = event?.id ? String(event.id) : null;
+
+  // Status per event-typ:
+  //   order_status_updated       → fulfillmentStatus
+  //   order_item_status_updated  → status
+  //   order_item_tracking_code_updated → alltid "shipped"-ish (använd eventType)
+  //   order_delivery_estimate_updated  → ingen status
+  const status = String(
+    event?.fulfillmentStatus ?? event?.status ?? "",
+  )
+    .toLowerCase()
+    .trim();
+
+  const gelatoOrderId = event?.orderId ? String(event.orderId) : null;
+  const shopifyOrderName = event?.orderReferenceId
+    ? String(event.orderReferenceId)
+    : null;
+
+  const { info: trackingInfo, count: fulfillmentCount } = pickTracking(event);
+
+  return {
+    eventType,
+    eventId,
+    status,
+    gelatoOrderId,
+    shopifyOrderName,
+    trackingInfo,
+    fulfillmentCount,
+  };
 }
 
 async function ensureFulfillment(
@@ -144,54 +234,27 @@ async function postEvent(fulfillmentGid: string, status: string) {
   }
 }
 
-function parseGelatoEvent(event: any): {
-  status: string;
-  gelatoOrderId: string | null;
-  shopifyOrderName: string | null;
-  shopifyOrderId: string | null;
-  trackingInfo: TrackingInfo;
-} {
-  // CONFIRM: justera fältsökvägar när du sett en riktig Gelato-webhook.
-  const status = String(
-    event?.fulfillmentStatus ?? event?.event ?? event?.status ?? "",
-  )
-    .toLowerCase()
-    .trim();
-
-  const gelatoOrderId =
-    event?.orderId ?? event?.id ?? event?.order?.id ?? null;
-
-  // Vi sätter orderReferenceId = shopifyOrderName (ex "#1042") och
-  // customerReferenceId = shopifyOrderId (numeriskt) i shopify-order-webhook.
-  const shopifyOrderName = event?.orderReferenceId ?? event?.order?.orderReferenceId ?? null;
-  const shopifyOrderId = event?.customerReferenceId ?? event?.order?.customerReferenceId ?? null;
-
-  // Shipment-info kan finnas på roten, i fulfillments[0] eller i shipment.
-  const ship =
-    (Array.isArray(event?.fulfillments) && event.fulfillments[0]) ||
-    event?.shipment ||
-    (Array.isArray(event?.shipment?.fulfillments) && event.shipment.fulfillments[0]) ||
-    event ||
-    {};
-
-  const trackingInfo: TrackingInfo = {
-    number: ship.trackingCode ?? ship.trackingNumber ?? event?.trackingCode ?? null,
-    url: ship.trackingUrl ?? event?.trackingUrl ?? null,
-    company:
-      ship.shipmentMethodName ??
-      ship.carrier ??
-      ship.carrierName ??
-      event?.shipmentMethodName ??
-      "Gelato",
-  };
-
-  return {
-    status,
-    gelatoOrderId: gelatoOrderId ? String(gelatoOrderId) : null,
-    shopifyOrderName: shopifyOrderName ? String(shopifyOrderName) : null,
-    shopifyOrderId: shopifyOrderId ? String(shopifyOrderId) : null,
-    trackingInfo,
-  };
+async function findLink(
+  supabase: ReturnType<typeof createClient>,
+  parsed: ParsedEvent,
+): Promise<any | null> {
+  if (parsed.gelatoOrderId) {
+    const r = await supabase
+      .from("gelato_orders")
+      .select("*")
+      .eq("gelato_order_id", parsed.gelatoOrderId)
+      .maybeSingle();
+    if (r.data) return r.data;
+  }
+  if (parsed.shopifyOrderName) {
+    const r = await supabase
+      .from("gelato_orders")
+      .select("*")
+      .eq("shopify_order_name", parsed.shopifyOrderName)
+      .maybeSingle();
+    if (r.data) return r.data;
+  }
+  return null;
 }
 
 Deno.serve(async (req) => {
@@ -218,11 +281,14 @@ Deno.serve(async (req) => {
 
     const parsed = parseGelatoEvent(event);
     console.log(
-      `[gelato-webhook] received status=${parsed.status} gelatoOrderId=${parsed.gelatoOrderId} ref=${parsed.shopifyOrderName} cust=${parsed.shopifyOrderId}`,
+      `[gelato-webhook] event=${parsed.eventType} id=${parsed.eventId} ` +
+        `status=${parsed.status || "-"} gelatoOrderId=${parsed.gelatoOrderId} ` +
+        `ref=${parsed.shopifyOrderName} fulfillments=${parsed.fulfillmentCount} ` +
+        `tracking=${parsed.trackingInfo.number ?? "-"}`,
     );
 
-    if (!parsed.status) {
-      return new Response("no status", { status: 200, headers: corsHeaders });
+    if (!parsed.eventType) {
+      return new Response("no event type", { status: 200, headers: corsHeaders });
     }
 
     const supabase = createClient(
@@ -230,51 +296,84 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // 2) Hitta vår länk-rad. Sök primärt på gelato_order_id, fall tillbaka på
-    //    shopify_order_id/shopify_order_name.
-    let link: any = null;
-    if (parsed.gelatoOrderId) {
-      const r = await supabase
-        .from("gelato_orders")
-        .select("*")
-        .eq("gelato_order_id", parsed.gelatoOrderId)
-        .maybeSingle();
-      link = r.data ?? null;
-    }
-    if (!link && parsed.shopifyOrderId) {
-      const r = await supabase
-        .from("gelato_orders")
-        .select("*")
-        .eq("shopify_order_id", parsed.shopifyOrderId)
-        .maybeSingle();
-      link = r.data ?? null;
-    }
-    if (!link && parsed.shopifyOrderName) {
-      const r = await supabase
-        .from("gelato_orders")
-        .select("*")
-        .eq("shopify_order_name", parsed.shopifyOrderName)
-        .maybeSingle();
-      link = r.data ?? null;
-    }
-
+    // 2) Hitta vår länk-rad. Sök på gelato_order_id → shopify_order_name.
+    const link = await findLink(supabase, parsed);
     if (!link) {
-      console.warn(`[gelato-webhook] no gelato_orders row matched event`);
+      console.warn(
+        `[gelato-webhook] no gelato_orders row matched event ` +
+          `(orderId=${parsed.gelatoOrderId}, ref=${parsed.shopifyOrderName})`,
+      );
       return new Response("no link", { status: 200, headers: corsHeaders });
     }
 
-    // 3) Idempotens
-    if (link.last_status === parsed.status) {
-      return new Response("duplicate status", { status: 200, headers: corsHeaders });
+    // 3) Idempotens per Gelato-event id.
+    const lastEventId = (link.raw as any)?.id ?? null;
+    if (parsed.eventId && lastEventId === parsed.eventId) {
+      return new Response("duplicate event id", { status: 200, headers: corsHeaders });
     }
 
     const shopifyOrderGid =
       link.shopify_order_gid ?? `gid://shopify/Order/${link.shopify_order_id}`;
 
+    // ------------------------------------------------------------------
+    // 4) Route på event-typ
+    // ------------------------------------------------------------------
+
+    // 4a) Rena logg-events (ingen Shopify-action).
+    if (
+      parsed.eventType === "order_item_status_updated" ||
+      parsed.eventType === "order_delivery_estimate_updated"
+    ) {
+      await supabase
+        .from("gelato_orders")
+        .update({
+          raw: event,
+          shopify_order_gid: shopifyOrderGid,
+          ...(parsed.gelatoOrderId && !link.gelato_order_id
+            ? { gelato_order_id: parsed.gelatoOrderId }
+            : {}),
+        })
+        .eq("id", link.id);
+      return new Response("recorded", { status: 200, headers: corsHeaders });
+    }
+
+    // 4b) Tracking-only event: uppdatera tracking + posta event om vi har en fulfillment.
+    if (parsed.eventType === "order_item_tracking_code_updated") {
+      const patch: Record<string, unknown> = {
+        raw: event,
+        shopify_order_gid: shopifyOrderGid,
+        tracking_code: parsed.trackingInfo.number ?? link.tracking_code,
+        tracking_url: parsed.trackingInfo.url ?? link.tracking_url,
+        carrier: parsed.trackingInfo.company ?? link.carrier,
+      };
+      if (parsed.gelatoOrderId && !link.gelato_order_id) {
+        patch.gelato_order_id = parsed.gelatoOrderId;
+      }
+      // Om vi redan skapat fulfillment: posta ett IN_TRANSIT-event så att kunden
+      // ser tracking-uppdateringen i Shopifys order-timeline.
+      if (link.shopify_fulfillment_gid) {
+        await postEvent(link.shopify_fulfillment_gid, "IN_TRANSIT");
+      }
+      await supabase.from("gelato_orders").update(patch).eq("id", link.id);
+      return new Response("tracking updated", { status: 200, headers: corsHeaders });
+    }
+
+    // 4c) order_status_updated: huvudflödet.
+    if (parsed.eventType !== "order_status_updated") {
+      // Okänd event-typ — logga och bail. Vi vill inte råka posta något fel.
+      console.warn(`[gelato-webhook] unhandled event type: ${parsed.eventType}`);
+      return new Response("unhandled event", { status: 200, headers: corsHeaders });
+    }
+
+    // Idempotens på status-transition.
+    if (parsed.status && link.last_status === parsed.status) {
+      return new Response("duplicate status", { status: 200, headers: corsHeaders });
+    }
+
     const isShip = SHIP_STATUSES.has(parsed.status);
     const eventStatus = EVENT_MAP[parsed.status];
 
-    // 4) Statuses we don't act on — bara logga
+    // 4c-i) Statuses vi inte agerar på (created/printed/in_production…) — logga bara.
     if (!isShip && !eventStatus) {
       await supabase
         .from("gelato_orders")
@@ -290,7 +389,7 @@ Deno.serve(async (req) => {
       return new Response("recorded", { status: 200, headers: corsHeaders });
     }
 
-    // 5) Säkerställ fulfillment (skapas + mejlas kund första gången)
+    // 4c-ii) Säkerställ fulfillment (skapas + mejlas kund första gången).
     const fulfillmentGid = await ensureFulfillment(
       shopifyOrderGid,
       parsed.trackingInfo,
@@ -309,19 +408,19 @@ Deno.serve(async (req) => {
       return new Response("no open fulfillment orders", { status: 200, headers: corsHeaders });
     }
 
-    // 6) Post status-event om sådan mappning finns
+    // 4c-iii) Post status-event om sådan mappning finns.
     if (eventStatus) {
       await postEvent(fulfillmentGid, eventStatus);
     }
 
-    // 7) Persist
+    // 4c-iv) Persist.
     const patch: Record<string, unknown> = {
       shopify_order_gid: shopifyOrderGid,
       shopify_fulfillment_gid: fulfillmentGid,
       last_status: parsed.status,
-      tracking_code: parsed.trackingInfo.number,
-      tracking_url: parsed.trackingInfo.url,
-      carrier: parsed.trackingInfo.company,
+      tracking_code: parsed.trackingInfo.number ?? link.tracking_code,
+      tracking_url: parsed.trackingInfo.url ?? link.tracking_url,
+      carrier: parsed.trackingInfo.company ?? link.carrier,
       raw: event,
     };
     if (parsed.gelatoOrderId && !link.gelato_order_id) {

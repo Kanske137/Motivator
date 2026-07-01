@@ -1,30 +1,45 @@
-## Plan: engångs-reveal av `GELATO_WEBHOOK_SECRET`
+## Fix: Gelato-webhook parser mot verklig doc-spec
 
-### Vad jag bygger
-En temporär edge-function `reveal-gelato-secret` som returnerar `GELATO_WEBHOOK_SECRET` + den färdiga webhook-URL:en, skyddad så att bara du kan anropa den.
+### Bakgrund
+Gelatos test-webhook (`order_item_status_updated`, ref=`{{MyOrderId}}`) landade och autentiserades korrekt — men vår `parseGelatoEvent` har fel fältvägar mot den riktiga payloaden (verifierat mot [Gelato webhooks docs](https://dashboard.gelato.com/docs/webhooks/)). Utan fix skulle första riktiga `shipped`-eventet skapa en Shopify-fulfillment **utan tracking**.
 
-### Skydd
-Function-en kräver header `x-reveal-token: <RANDOM>` där `<RANDOM>` matchar en ny secret `REVEAL_TOKEN` som jag genererar via `generate_secret` (64 tecken). Två lager:
-1. Endast korrekt `x-reveal-token` → returnerar värdet.
-2. Allt annat → 401.
+### Vad jag ändrar
+Enda filen som rörs: **`supabase/functions/gelato-webhook/index.ts`**.
 
-Jag exponerar inte `REVEAL_TOKEN` heller i klartext, utan anropar functionen åt dig via `supabase--curl_edge_functions` direkt här i chatten och klistrar in svaret. Då har du URL:en på en rad och ingenting läcker via en publik request.
+**1. Route på `event`-fältet, inte `fulfillmentStatus`.**
+Gelato skickar fyra event-typer, och `fulfillmentStatus` finns bara på en av dem. Ny switch på `event.event`:
+- `order_status_updated` → huvudflödet (fulfillment + eventuellt event).
+- `order_item_tracking_code_updated` → tracking-only update (post fulfillment-event, uppdatera tracking-kolumner).
+- `order_item_status_updated` → logga bara status per item, ingen Shopify-action (för granulär för fulfillment).
+- `order_delivery_estimate_updated` → logga bara.
 
-### Steg jag kör (i build mode)
-1. `generate_secret` → `REVEAL_TOKEN` (64 tecken).
-2. Skapa `supabase/functions/reveal-gelato-secret/index.ts`:
-   - Läser `GELATO_WEBHOOK_SECRET` och `REVEAL_TOKEN` från env.
-   - Kollar `x-reveal-token`-header.
-   - Returnerar JSON: `{ url: "https://ptzmnusfgdwcqpjpbyco.supabase.co/functions/v1/gelato-webhook?secret=..." }`.
-   - JWT-verify av: `verify_jwt = false` i `supabase/config.toml` (annars behövs inloggad användare också, vilket inte hjälper här).
-3. Deploya functionen.
-4. Anropa den via `supabase--curl_edge_functions` med rätt header.
-5. Klistra in den färdiga URL:en till dig i chatten.
-6. **Direkt efter att du bekräftat att du kopierat värdet**: ta bort functionen (`delete_edge_functions`) och radera `REVEAL_TOKEN` (`delete_secret`). Då finns ingen kvarvarande exponering.
+**2. Läs tracking från rätt path.**
+```ts
+// order_status_updated: event.items[0].fulfillments[0]
+// order_item_tracking_code_updated: root-level
+```
+Plocka första fulfillment med `trackingCode` (items kan ha flera paket — vi använder första och loggar om det finns fler).
 
-### Vad du gör
-- Vänta tills jag postar URL:en.
-- Kopiera den, klistra in i Gelatos `URL`-fält.
-- Säg "klar, ta bort" så river jag functionen och secreten.
+**3. Ta bort död `customerReferenceId`-läsning.**
+Docs bekräftar: den finns inte i webhook-payloads. Matcha bara på `orderId` (primärt) och `orderReferenceId` (fallback). `shopify_order_id` finns redan i vår `gelato_orders`-rad via `shopify-order-webhook`.
 
-Godkänn så kör jag steg 1–5 i ett svep.
+**4. Bredda `SHIP_STATUSES`.**
+Enligt Gelatos order-status-lista räknas även `shipped_to_recipient` etc. som skeppning. Håller `shipped` + `shipped_to_recipient` för att vara säkra; övriga (`printed`, `in_production` …) fortsätter till logg-only.
+
+**5. Idempotens per event-id.**
+Lägger till kontroll `raw?.id === event.id` för att inte dubbelposta samma event om Gelato retryr. Behåller nuvarande `last_status`-check för status-transitions.
+
+**6. Bättre loggar.**
+Logga `event.event` + `event.id` + antal items/fulfillments så nästa debug tar 10 sekunder.
+
+### Vad jag INTE ändrar
+- `shopify-order-webhook` (skickar redan `orderReferenceId` korrekt).
+- Frontend / DB-schema / config.toml.
+- Idempotens-modellen mot Shopify (`shopify_fulfillment_gid`-återanvändning).
+
+### Verifiering
+1. Skicka Gelatos test-webhook igen från Dashboard → loggen ska visa `event=order_item_status_updated` och svaret `no link` (fortfarande OK — dummy-ordern finns inte i vår DB).
+2. När första riktiga ordern går till `shipped`: loggen visar `event=order_status_updated`, tracking hittas, Shopify-fulfillment skapas med `trackingInfo`, kund får mejl med spårlänk.
+3. Om det ändå går fel: exakt payload finns i `gelato_orders.raw` + edge-function-loggarna — snabb-fix från riktig data.
+
+Godkänn så byter jag till build mode och kör ändringarna.
