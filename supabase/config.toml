@@ -1,4 +1,4 @@
-project_id = "ptzmnusfgdwcqpjpbyco"
+project_id = "qmqcvatfrcrgkcjblmyq"
 
 # Shopify OAuth callback — Shopify cannot send a Lovable JWT.
 [functions.shopify-oauth-callback]
