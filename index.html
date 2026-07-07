@@ -3,6 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Shopify App Bridge — MUST be the first <script> in <head> for the
+         embedded admin to mint session tokens. data-api-key is substituted by
+         Vite from VITE_SHOPIFY_API_KEY at build time. Inert outside Shopify admin. -->
+    <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js" data-api-key="%VITE_SHOPIFY_API_KEY%"></script>
     <!-- TODO: Set the document title to the name of your application -->
     <title>Lovable App</title>
     <meta name="description" content="Skapa personliga posters och canvastavlor med en intuitiv online-editor.">
