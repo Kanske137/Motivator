@@ -12,8 +12,16 @@
 // - Online Store sales channel: published via publishablePublish.
 // - On update we sync productOptions (so newly-added sizes/frames actually
 //   become valid option-values BEFORE we try to bulk-create variants for them).
-import { corsHeaders } from "https://esm.sh/@supabase/supabase-js@2.95.0/cors";
 import skuMap from "../_shared/gelato-sku-map.json" with { type: "json" };
+
+// Local CORS headers — MUST allow the x-shopify-session-token header so the
+// browser's preflight passes (the shared esm.sh corsHeaders doesn't list it).
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-shopify-session-token",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 import {
   makeShopifyAdmin,
   type ShopifyAdminClient,
