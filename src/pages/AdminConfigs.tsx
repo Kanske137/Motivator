@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { type ProductConfig } from "@/lib/product-config";
-import { invokeAdmin } from "@/lib/admin-api";
+import { invokeAdmin, invokeWithSession } from "@/lib/admin-api";
 import { Loader2, ExternalLink, Zap, Pencil, Plus, CheckCircle2, AlertCircle, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -108,8 +108,8 @@ export default function AdminConfigs() {
     let okCount = 0;
     const failures: string[] = [];
     for (const cfg of configs) {
-      const { data, error } = await supabase.functions.invoke("shopify-sync-template", {
-        body: { handle: cfg.shopify_handle },
+      const { data, error } = await invokeWithSession("shopify-sync-template", {
+        handle: cfg.shopify_handle,
       });
       if (error || !data?.ok) {
         failures.push(`${cfg.shopify_handle}: ${error?.message ?? data?.error ?? "fel"}`);

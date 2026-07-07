@@ -57,3 +57,25 @@ export async function invokeAdmin<T = AdminResponse>(
   }
   return res as T;
 }
+
+/**
+ * Invoke any tenant-scoped edge function with the Shopify session token
+ * attached. Returns the raw `{ data, error }` from supabase-js so callers keep
+ * their existing response handling. On missing App Bridge / token it resolves
+ * with an `error` (never throws) so call sites don't need extra try/catch.
+ */
+export async function invokeWithSession(
+  name: string,
+  body: Record<string, unknown> = {},
+): Promise<{ data: any; error: any }> {
+  let token: string;
+  try {
+    token = await getAdminSessionToken();
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e : new Error(String(e)) };
+  }
+  return supabase.functions.invoke(name, {
+    body,
+    headers: { "X-Shopify-Session-Token": token },
+  });
+}

@@ -21,6 +21,8 @@ import { SessionTokenError, verifyShopifySessionToken } from "./shopify-session-
 export interface InstallationContext {
   shop: string;
   installationId: string;
+  /** This shop's offline Admin API access token (for Shopify Admin calls). */
+  accessToken: string;
   supabase: SupabaseClient;
 }
 
@@ -75,7 +77,7 @@ export async function requireInstallation(req: Request): Promise<InstallationCon
   const supabase = createClient(url, srk);
   const { data, error } = await supabase
     .from("shopify_app_installations")
-    .select("id")
+    .select("id, access_token")
     .eq("shop_domain", shop)
     .maybeSingle();
 
@@ -87,7 +89,12 @@ export async function requireInstallation(req: Request): Promise<InstallationCon
     throw new AuthError(403, "not_installed", `Ingen aktiv installation för ${shop}.`);
   }
 
-  return { shop, installationId: data.id as string, supabase };
+  return {
+    shop,
+    installationId: data.id as string,
+    accessToken: data.access_token as string,
+    supabase,
+  };
 }
 
 /** Render an {@link AuthError} as a JSON Response. */

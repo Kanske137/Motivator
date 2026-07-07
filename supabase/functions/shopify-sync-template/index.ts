@@ -13,13 +13,17 @@
 // - On update we sync productOptions (so newly-added sizes/frames actually
 //   become valid option-values BEFORE we try to bulk-create variants for them).
 import { corsHeaders } from "https://esm.sh/@supabase/supabase-js@2.95.0/cors";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import skuMap from "../_shared/gelato-sku-map.json" with { type: "json" };
 import {
-  ensureShopifyAuth,
-  shopifyAdmin,
+  makeShopifyAdmin,
+  type ShopifyAdminClient,
   type ShopifyAuthError,
 } from "../_shared/shopify-admin.ts";
+import {
+  AuthError,
+  authErrorResponse,
+  requireInstallation,
+} from "../_shared/require-installation.ts";
 
 // Mirrors src/lib/pricing.ts — used by the live "Personlig Karta" products.
 // Speglar src/lib/pricing.ts. Hängare ingår som extra ramvärden under
@@ -400,22 +404,18 @@ function buildVariantInput(
   };
 }
 
-let cachedPublications: { id: string; name: string }[] | null = null;
-
-async function getAllPublications(): Promise<{ id: string; name: string }[]> {
-  if (cachedPublications) return cachedPublications;
+async function getAllPublications(
+  admin: ShopifyAdminClient,
+): Promise<{ id: string; name: string }[]> {
   try {
-    const r = await shopifyAdmin<{
+    const r = await admin<{
       publications: { nodes: { id: string; name: string }[] };
     }>(PUBLICATIONS_QUERY);
-    cachedPublications = r.publications.nodes ?? [];
-    console.log(
-      `[publications] found ${cachedPublications.length}: ${cachedPublications.map((p) => p.name).join(", ")}`,
-    );
-    return cachedPublications;
+    const pubs = r.publications.nodes ?? [];
+    console.log(`[publications] found ${pubs.length}: ${pubs.map((p) => p.name).join(", ")}`);
+    return pubs;
   } catch (e) {
     console.warn("publications query failed", e);
-    cachedPublications = [];
     return [];
   }
 }
@@ -430,15 +430,16 @@ async function getAllPublications(): Promise<{ id: string; name: string }[]> {
  * legacy "personlig-karta" returned null from Storefront.
  */
 async function publishToAllChannels(
+  admin: ShopifyAdminClient,
   productId: string,
+  pubs: { id: string; name: string }[],
 ): Promise<{ published: string[]; failed: string[] }> {
-  const pubs = await getAllPublications();
   if (!pubs.length) return { published: [], failed: [] };
   const published: string[] = [];
   const failed: string[] = [];
   for (const p of pubs) {
     try {
-      const r = await shopifyAdmin<{
+      const r = await admin<{
         publishablePublish: { userErrors: { message: string }[] };
       }>(PUBLISHABLE_PUBLISH, { id: productId, input: [{ publicationId: p.id }] });
       if (r.publishablePublish.userErrors.length) {
@@ -460,6 +461,7 @@ async function publishToAllChannels(
  *  Without this, productVariantsBulkCreate fails with "Option value 'Vit'
  *  is not allowed". */
 async function syncProductOptions(
+  admin: ShopifyAdminClient,
   productId: string,
   existing: {
     options: {
@@ -493,7 +495,7 @@ async function syncProductOptions(
     // the explicit variant-delete step below.
     if (missing.length === 0) continue;
     try {
-      const r = await shopifyAdmin<{
+      const r = await admin<{
         productOptionUpdate: { userErrors: { message: string; code?: string }[] };
       }>(PRODUCT_OPTION_UPDATE, {
         productId,
@@ -548,6 +550,21 @@ function fullComboFingerprint(selected: { name: string; value: string }[]): stri
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  // Verify the Shopify session token -> THIS shop's installation + Admin token.
+  let ctx;
+  try {
+    ctx = await requireInstallation(req);
+  } catch (e) {
+    if (e instanceof AuthError) return authErrorResponse(e, corsHeaders);
+    const msg = e instanceof Error ? e.message : String(e);
+    return new Response(JSON.stringify({ ok: false, error: msg }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  const { installationId, shop, accessToken, supabase } = ctx;
+  const admin = makeShopifyAdmin(shop, accessToken);
+
   try {
     const body = (await req.json()) as SyncBody;
     if (!body?.handle) {
@@ -557,18 +574,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    await ensureShopifyAuth();
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
-
     const { data: cfg, error } = await supabase
       .from("product_configs")
       .select(
         "id,title,shopify_handle,template_slug,template,tags,category_gid,status,sales_channels,description_html,seo_title,seo_description,is_consolidated,enabled_product_types",
       )
+      .eq("installation_id", installationId)
       .eq("shopify_handle", body.handle)
       .maybeSingle();
     if (error || !cfg) {
@@ -626,6 +637,7 @@ Deno.serve(async (req) => {
     const { data: syncStateRow } = await supabase
       .from("shopify_sync_state")
       .select("id,last_synced_payload")
+      .eq("installation_id", installationId)
       .eq("product_config_id", cfgMeta.id)
       .maybeSingle();
     const lastSynced = (syncStateRow?.last_synced_payload ?? {}) as Record<
@@ -635,6 +647,8 @@ Deno.serve(async (req) => {
 
     const results: any[] = [];
     const nextSyncedPayload: Record<string, Record<string, unknown>> = {};
+    // Fetch this shop's publications once (was a cross-shop module cache before).
+    const pubs = await getAllPublications(admin);
 
     for (const group of groups) {
       const baseHandleHasNoSuffix = !/-(poster|posters|canvas|aluminum|acrylic)$/i.test(cfg.shopify_handle);
@@ -666,7 +680,7 @@ Deno.serve(async (req) => {
       const seoTitle = cfgMeta.seo_title ?? titleForKind;
       const seoDescription = cfgMeta.seo_description ?? null;
 
-      const existing = (await shopifyAdmin<{
+      const existing = (await admin<{
         productByHandle: null | {
           id: string;
           options: { id: string; name: string; values: string[] }[];
@@ -687,7 +701,7 @@ Deno.serve(async (req) => {
         // CREATE — write product shell with options. Shopify auto-creates one
         // variant per option combination; we then refetch and fall through to
         // the update branch so price/SKU/etc. get set via bulkUpdate.
-        const created = await shopifyAdmin<{
+        const created = await admin<{
           productCreate: { product: { id: string }; userErrors: { message: string }[] };
         }>(PRODUCT_CREATE, {
           input: {
@@ -715,7 +729,7 @@ Deno.serve(async (req) => {
         mode = "create";
 
         // Refetch to get option IDs + auto-created variant IDs.
-        const refetched = (await shopifyAdmin<{
+        const refetched = (await admin<{
           productByHandle: null | {
             id: string;
             options: { id: string; name: string; values: string[] }[];
@@ -733,7 +747,7 @@ Deno.serve(async (req) => {
         // Diff-protect text fields. Pull current Shopify state and compare to
         // last_synced_payload; if Shopify diverged, the merchant edited the
         // field in Shopify Admin and we must not overwrite it.
-        const currentResp = await shopifyAdmin<{
+        const currentResp = await admin<{
           product: {
             title: string;
             descriptionHtml: string;
@@ -789,7 +803,7 @@ Deno.serve(async (req) => {
           current?.category?.id ?? categoryGid,
         );
 
-        await shopifyAdmin(PRODUCT_UPDATE, {
+        await admin(PRODUCT_UPDATE, {
           input: {
             id: productId,
             title: safeTitle,
@@ -806,7 +820,7 @@ Deno.serve(async (req) => {
         // Shopify-produkten till rätt mall även om handle/titel byts manuellt
         // i Shopify Admin. Tyst miss-failed (loggas) — sync ska inte falla.
         try {
-          const metaRes = await shopifyAdmin<{
+          const metaRes = await admin<{
             metafieldsSet: { userErrors: { message: string; field?: string[] }[] };
           }>(METAFIELDS_SET, {
             metafields: [
@@ -830,7 +844,7 @@ Deno.serve(async (req) => {
         }
 
         // Variants/options/SKU are ALWAYS source-of-truth from Lovable.
-        await syncProductOptions(productId, existing, group);
+        await syncProductOptions(admin, productId, existing, group);
 
         const existingByKey = new Map<string, typeof existing.variants.nodes[number]>();
         const existingByCombo = new Map<string, typeof existing.variants.nodes[number]>();
@@ -893,7 +907,7 @@ Deno.serve(async (req) => {
 
 
         if (toCreate.length) {
-          const r = await shopifyAdmin<{
+          const r = await admin<{
             productVariantsBulkCreate: {
               productVariants: { id: string }[];
               userErrors: { message: string; field?: string[] }[];
@@ -909,7 +923,7 @@ Deno.serve(async (req) => {
           variantsCreated = r.productVariantsBulkCreate.productVariants.length;
         }
         if (toUpdate.length) {
-          const r = await shopifyAdmin<{
+          const r = await admin<{
             productVariantsBulkUpdate: {
               productVariants: { id: string }[];
               userErrors: { message: string; field?: string[] }[];
@@ -923,7 +937,7 @@ Deno.serve(async (req) => {
         if (toDelete.length) {
           const remaining = existing.variants.nodes.length - toDelete.length + toCreate.length;
           if (remaining >= 1) {
-            await shopifyAdmin(PRODUCT_VARIANTS_BULK_DELETE, {
+            await admin(PRODUCT_VARIANTS_BULK_DELETE, {
               productId,
               variantsIds: toDelete,
             });
@@ -939,7 +953,7 @@ Deno.serve(async (req) => {
         "online_store",
       );
       const publishResult = wantsOnlineStore
-        ? await publishToAllChannels(productId)
+        ? await publishToAllChannels(admin, productId, pubs)
         : { published: [], failed: [] };
 
       // Snapshot what we just sent — this is what next sync will compare against.
@@ -978,9 +992,11 @@ Deno.serve(async (req) => {
           last_synced_at: new Date().toISOString(),
           last_synced_payload: nextSyncedPayload,
         })
+        .eq("installation_id", installationId)
         .eq("id", syncStateRow.id);
     } else {
       await supabase.from("shopify_sync_state").insert({
+        installation_id: installationId,
         product_config_id: cfgMeta.id,
         last_synced_at: new Date().toISOString(),
         last_synced_payload: nextSyncedPayload,

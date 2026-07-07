@@ -24,7 +24,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { invokeAdmin } from "@/lib/admin-api";
+import { invokeAdmin, invokeWithSession } from "@/lib/admin-api";
 import { type ProductConfig } from "@/lib/product-config";
 import { resolveTemplate } from "@/lib/template-migrate";
 import {
@@ -103,8 +103,8 @@ export default function DesignerPage() {
   async function syncToShopify() {
     if (!handle) return;
     setSyncing(true);
-    const { data, error } = await supabase.functions.invoke("shopify-sync-template", {
-      body: { handle },
+    const { data, error } = await invokeWithSession("shopify-sync-template", {
+      handle,
     });
     setSyncing(false);
     const code = (data as { code?: string } | null)?.code;

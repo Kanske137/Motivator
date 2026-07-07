@@ -28,3 +28,10 @@ verify_jwt = false
 
 [functions.shopify-oauth-status]
 verify_jwt = false
+
+# Mall-synk/radering: vi verifierar Shopify session-token själva i funktionen.
+[functions.shopify-sync-template]
+verify_jwt = false
+
+[functions.shopify-delete-template]
+verify_jwt = false

@@ -202,3 +202,52 @@ export async function shopifyAdmin<T>(
   }
   return json.data as T;
 }
+
+// ---------------------------------------------------------------------------
+// Multi-tenant: a Shopify Admin GraphQL client bound to ONE shop + token.
+// No shared module state → safe under concurrent requests from different shops.
+// Prefer this in tenant-scoped functions (derive shop+token from the session
+// token via requireInstallation). The globals above stay for the single-tenant
+// Gelato/order webhooks that resolve a token from env.
+// ---------------------------------------------------------------------------
+export type ShopifyAdminClient = <T>(
+  query: string,
+  variables?: Record<string, unknown>,
+) => Promise<T>;
+
+export function makeShopifyAdmin(shop: string, token: string): ShopifyAdminClient {
+  const domain = shop.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  return async function boundAdmin<T>(
+    query: string,
+    variables: Record<string, unknown> = {},
+  ): Promise<T> {
+    const r = await fetch(
+      `https://${domain}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Shopify-Access-Token": token,
+        },
+        body: JSON.stringify({ query, variables }),
+      },
+    );
+
+    const raw = await r.text();
+    let json: any = null;
+    try { json = raw ? JSON.parse(raw) : null; } catch { /* keep raw */ }
+
+    if (r.status === 401 || r.status === 403) {
+      throw makeAuthError(
+        "invalid_token",
+        `Shopify Admin-token avvisades (${r.status}) för ${domain}.`,
+        { status: r.status, body: json ?? raw, domain },
+      );
+    }
+    if (!r.ok || json?.errors) {
+      const detail = json?.errors ?? json ?? raw;
+      throw new Error(`Shopify API ${r.status}: ${JSON.stringify(detail).slice(0, 500)}`);
+    }
+    return json.data as T;
+  };
+}

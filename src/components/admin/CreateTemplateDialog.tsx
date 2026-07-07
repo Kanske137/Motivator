@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
-import { invokeAdmin } from "@/lib/admin-api";
+import { invokeAdmin, invokeWithSession } from "@/lib/admin-api";
 import { DEFAULT_PRODUCT_VARIANTS } from "@/lib/product-defaults";
 import type { Template } from "@/lib/template-schema";
 import type { ProductType } from "@/lib/product-config";
@@ -176,9 +176,9 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
     }
 
     // Synka till Shopify (best-effort).
-    const { data: syncData, error: syncErr } = await supabase.functions.invoke(
+    const { data: syncData, error: syncErr } = await invokeWithSession(
       "shopify-sync-template",
-      { body: { handle: templateSlug } },
+      { handle: templateSlug },
     );
     setSaving(false);
     if (syncErr || !syncData?.ok) {
