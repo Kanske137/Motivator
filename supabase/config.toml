@@ -20,3 +20,11 @@ verify_jwt = false
 # Supabase-JWT), så Supabase-gatewayns JWT-koll måste vara av.
 [functions.admin-templates]
 verify_jwt = false
+
+# OAuth install/status anropas från den inbäddade appen med publishable-nyckeln
+# (inte en JWT), så gatewayns JWT-koll måste vara av.
+[functions.shopify-oauth-install]
+verify_jwt = false
+
+[functions.shopify-oauth-status]
+verify_jwt = false

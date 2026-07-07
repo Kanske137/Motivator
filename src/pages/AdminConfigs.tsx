@@ -44,7 +44,10 @@ export default function AdminConfigs() {
   const [searchParams] = useSearchParams();
 
   const refreshInstallStatus = async () => {
-    const { data, error } = await supabase.functions.invoke("shopify-oauth-status");
+    const shop = new URLSearchParams(window.location.search).get("shop");
+    const { data, error } = await supabase.functions.invoke("shopify-oauth-status", {
+      body: { shop },
+    });
     if (!error && data) setInstallStatus(data as InstallStatus);
   };
 
@@ -81,8 +84,9 @@ export default function AdminConfigs() {
   const startInstall = async () => {
     setInstalling(true);
     try {
+      const shop = new URLSearchParams(window.location.search).get("shop");
       const { data, error } = await supabase.functions.invoke("shopify-oauth-install", {
-        body: {},
+        body: { shop },
       });
       if (error || !data?.installUrl) {
         toast.error("Kunde inte starta installationen", {

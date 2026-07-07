@@ -6,7 +6,7 @@
 import { corsHeaders } from "https://esm.sh/@supabase/supabase-js@2.95.0/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 
-const APP_REDIRECT_FALLBACK = "https://artful-create-studio-87.lovable.app/admin/configs";
+const APP_REDIRECT_FALLBACK = "https://motivator-8uw.pages.dev/admin/configs";
 
 async function verifyHmac(params: URLSearchParams, secret: string): Promise<boolean> {
   const hmacFromShopify = params.get("hmac");

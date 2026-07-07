@@ -1,6 +1,5 @@
-// Generates the Shopify install URL for the Dev Dashboard app.
-// Frontend calls this to get a URL to redirect the merchant to so they can
-// authorize the app on their store. We embed a CSRF nonce in `state`.
+// Generates the Shopify install URL for the app. Frontend calls this to get a
+// URL to redirect the merchant to authorize the app. Embeds a nonce in state.
 import { corsHeaders } from "https://esm.sh/@supabase/supabase-js@2.95.0/cors";
 
 const CALLBACK_PATH = "/functions/v1/shopify-oauth-callback";
@@ -14,7 +13,6 @@ function getCallbackUrl(): string {
 function normalizeShop(input: string): string {
   let s = input.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "");
   if (!s.endsWith(".myshopify.com")) {
-    // allow bare store name
     if (!s.includes(".")) s = `${s}.myshopify.com`;
   }
   if (!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(s)) {
@@ -39,9 +37,13 @@ Deno.serve(async (req) => {
 
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const url = new URL(req.url);
-    const shopRaw = body.shop ?? url.searchParams.get("shop")
-      ?? Deno.env.get("SHOPIFY_STORE_PERMANENT_DOMAIN")
-      ?? "wdxugd-yq.myshopify.com";
+    const shopRaw = body.shop ?? url.searchParams.get("shop");
+    if (!shopRaw) {
+      return new Response(
+        JSON.stringify({ error: "shop krävs (t.ex. din-butik.myshopify.com)" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     const shop = normalizeShop(shopRaw);
     const redirectUri = getCallbackUrl();

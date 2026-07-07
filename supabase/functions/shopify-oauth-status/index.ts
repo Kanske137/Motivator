@@ -1,24 +1,30 @@
-// Returns whether the Shopify app is installed for the configured shop.
-// Used by the admin UI to show "Installed ✓" vs "Install app".
+// Returns whether the Shopify app is installed for a given shop.
+// Used by the admin UI to show "Installed" vs "Install app". Shop is taken from
+// the request (multi-tenant) — the embedded admin passes its own shop domain.
 import { corsHeaders } from "https://esm.sh/@supabase/supabase-js@2.95.0/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
-
-function getShop(): string {
-  const d = Deno.env.get("SHOPIFY_STORE_PERMANENT_DOMAIN")
-    ?? Deno.env.get("SHOPIFY_STORE_DOMAIN")
-    ?? "wdxugd-yq.myshopify.com";
-  return d.replace(/^https?:\/\//, "").replace(/\/$/, "");
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const shop = getShop();
+    const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+    const urlObj = new URL(req.url);
+    let shop = (body.shop ?? urlObj.searchParams.get("shop") ?? "").trim().toLowerCase();
+    shop = shop.replace(/^https?:\/\//, "").replace(/\/$/, "");
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
+
+    if (!shop) {
+      return new Response(
+        JSON.stringify({ shop: null, installed: false, scopes: null, installedAt: null }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const { data, error } = await supabase
       .from("shopify_app_installations")
       .select("shop_domain, scopes, installed_at, updated_at")
