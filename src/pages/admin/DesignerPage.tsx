@@ -25,7 +25,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { invokeAdmin } from "@/lib/admin-api";
-import { loadConfig, type ProductConfig } from "@/lib/product-config";
+import { type ProductConfig } from "@/lib/product-config";
 import { resolveTemplate } from "@/lib/template-migrate";
 import {
   parseTemplate,
@@ -165,7 +165,19 @@ export default function DesignerPage() {
     if (!handle) return;
     (async () => {
       setLoading(true);
-      const cfg = await loadConfig(handle);
+      // Load via the tenant-scoped guard (not the anon client) so DRAFT
+      // templates are visible to the admin — RLS only exposes ACTIVE to anon.
+      let cfg: ProductConfig | null = null;
+      try {
+        const res = await invokeAdmin<{ config: ProductConfig | null }>("get", { handle });
+        cfg = res.config ?? null;
+      } catch (e) {
+        toast.error("Kunde inte ladda mallen", {
+          description: e instanceof Error ? e.message : String(e),
+        });
+        setLoading(false);
+        return;
+      }
       if (!cfg) {
         toast.error("Hittade ingen produkt med detta handle");
         setLoading(false);

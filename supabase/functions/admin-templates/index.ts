@@ -90,6 +90,20 @@ Deno.serve(async (req) => {
         return json({ ok: true, configs: data ?? [] });
       }
 
+      // ---- get (single template by handle, this shop, incl. DRAFT) --------
+      case "get": {
+        const handle = String((body as { handle?: string }).handle ?? "").trim();
+        if (!handle) return json({ ok: false, error: "handle krävs" }, 400);
+        const { data, error } = await supabase
+          .from("product_configs")
+          .select("*")
+          .eq("installation_id", installationId)
+          .eq("shopify_handle", handle)
+          .maybeSingle();
+        if (error) throw error;
+        return json({ ok: true, config: data ?? null });
+      }
+
       // ---- create ---------------------------------------------------------
       case "create": {
         const p = body as unknown as CreatePayload;
