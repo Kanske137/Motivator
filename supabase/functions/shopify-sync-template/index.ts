@@ -88,14 +88,11 @@ function getUid(kind: Kind, size: string, variant: string): string | null {
   return block[`${size}|${variant}`]?.portrait ?? null;
 }
 
-function getPrice(kind: Kind, size: string, variant: string): number {
-  const table =
-    kind === "poster" ? POSTER_PRICES
-    : kind === "canvas" ? CANVAS_PRICES
-    : kind === "aluminum" ? ALUMINUM_PRICES
-    : ACRYLIC_PRICES;
-  return table[size]?.[variant] ?? 0;
-}
+// Effective price lookup: per-template override ?? per-tenant global default.
+// Returns 0 → variant is skipped as "no price". Prices are data-driven now
+// (pricing_rules + template.priceOverrides); the hardcoded *_PRICES tables above
+// are no longer used by sync.
+type PriceLookup = (material: string, size: string, variant: string) => number;
 
 interface SyncBody {
   handle: string;
@@ -148,7 +145,7 @@ function mergedPosterFrames(saved: string[] | undefined): string[] {
   return out;
 }
 
-function plan(template: any): PlannedGroup[] {
+function plan(template: any, priceOf: PriceLookup): PlannedGroup[] {
   const groups: PlannedGroup[] = [];
   const opts = template?.productOptions ?? {};
 
@@ -173,7 +170,7 @@ function plan(template: any): PlannedGroup[] {
     for (const size of sizes) {
       for (const v of variants) {
         const sku = getUid(kind, size, v);
-        const price = getPrice(kind, size, v);
+        const price = priceOf(kind, size, v);
         if (!sku) { g.skipped.push({ size, variant: v, reason: "no Gelato SKU" }); continue; }
         if (!price) { g.skipped.push({ size, variant: v, reason: "no price" }); continue; }
         g.variants.push({ size, variant: v, sku, price });
@@ -220,7 +217,7 @@ const PRODUCT_TYPE_FROM_INTERNAL: Record<string, Kind> = {
 };
 
 /** Konsoliderad: bygg EN PlannedGroup med 3 axlar (Produkttyp/Storlek/Utförande). */
-function planConsolidated(template: any, enabledTypes: string[]): PlannedGroup {
+function planConsolidated(template: any, enabledTypes: string[], priceOf: PriceLookup): PlannedGroup {
   const opts = template?.productOptions ?? {};
   const variants: PlannedVariant[] = [];
   const skipped: PlannedGroup["skipped"] = [];
@@ -247,7 +244,7 @@ function planConsolidated(template: any, enabledTypes: string[]): PlannedGroup {
       sizesUnion.add(size);
       for (const v of block.names) {
         const sku = getUid(kind, size, v);
-        const price = getPrice(kind, size, v);
+        const price = priceOf(kind, size, v);
         if (!sku) { skipped.push({ size: `${label}/${size}`, variant: v, reason: "no Gelato SKU" }); continue; }
         if (!price) { skipped.push({ size: `${label}/${size}`, variant: v, reason: "no price" }); continue; }
         variantsUnion.add(v);
@@ -604,9 +601,28 @@ Deno.serve(async (req) => {
 
     const isConsolidated = !!(cfg as { is_consolidated?: boolean }).is_consolidated;
     const enabledTypes = ((cfg as { enabled_product_types?: string[] }).enabled_product_types ?? []);
+
+    // Data-driven prices: this shop's global defaults + this template's overrides.
+    const { data: priceRows } = await supabase
+      .from("pricing_rules")
+      .select("material,size,variant,price")
+      .eq("installation_id", installationId);
+    const globalPrices: Record<string, Record<string, Record<string, number>>> = {};
+    for (const r of priceRows ?? []) {
+      ((globalPrices[r.material] ??= {})[r.size] ??= {})[r.variant] = Number(r.price);
+    }
+    const overrides = ((cfg as { template?: { priceOverrides?: unknown } }).template?.priceOverrides
+      ?? {}) as Record<string, Record<string, Record<string, number>>>;
+    const priceOf: PriceLookup = (material, size, variant) => {
+      const o = overrides?.[material]?.[size]?.[variant];
+      if (typeof o === "number" && o > 0) return o;
+      const g = globalPrices?.[material]?.[size]?.[variant];
+      return typeof g === "number" ? g : 0;
+    };
+
     const groups: PlannedGroup[] = isConsolidated
-      ? [planConsolidated(cfg.template, enabledTypes)]
-      : plan(cfg.template);
+      ? [planConsolidated(cfg.template, enabledTypes, priceOf)]
+      : plan(cfg.template, priceOf);
     const totalVariants = groups.reduce((n, g) => n + g.variants.length, 0);
     const allSkipped = groups.flatMap((g) =>
       g.skipped.map((s) => ({ kind: g.kind, ...s })),
