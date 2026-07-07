@@ -1,0 +1,8 @@
+# Cloudflare Pages response headers.
+# Shopify embeds the app inside its admin iframe, so we must ALLOW framing from
+# Shopify (never send X-Frame-Options: DENY) and instead scope it with CSP
+# frame-ancestors. Covers both the classic (*.myshopify.com/admin) and the new
+# unified (admin.shopify.com) admin.
+/*
+  Content-Security-Policy: frame-ancestors https://*.myshopify.com https://admin.shopify.com;
+  X-Content-Type-Options: nosniff

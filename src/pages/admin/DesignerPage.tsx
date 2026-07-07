@@ -24,6 +24,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { invokeAdmin } from "@/lib/admin-api";
 import { loadConfig, type ProductConfig } from "@/lib/product-config";
 import { resolveTemplate } from "@/lib/template-migrate";
 import {
@@ -344,76 +345,36 @@ export default function DesignerPage() {
       .filter((s) => s.enabled !== false)
       .map((s) => s.id);
 
-    // Write to current row first (template + Shopify-meta belong to this product)
-    const { error } = await supabase
-      .from("product_configs")
-      .update({
-        template: finalTemplate as unknown as never,
-        tags: config.tags ?? [],
-        category_gid: config.category_gid ?? null,
-        status: config.status ?? "DRAFT",
-        sales_channels: config.sales_channels ?? ["online_store"],
-        description_html: config.description_html ?? null,
-        seo_title: config.seo_title ?? null,
-        seo_description: config.seo_description ?? null,
-        is_freeform: config.is_freeform ?? false,
-        map_styles: enabledMapStyleIds.length > 0 ? (enabledMapStyleIds as unknown as never) : ([] as unknown as never),
-      })
-      .eq("shopify_handle", handle);
-
-    // Propagate the shared template (layouts, dekor, AI-/karta-stilar) to
-    // sibling rows with the same template_slug — but PRESERVE each sibling's
-    // own `productOptions.poster` / `productOptions.canvas` (per-rad).
-    // Annars skriver canvas-radens disable av poster-blocket över
-    // poster-radens egna storlekar/ramar och vice versa.
-    const slug = config.template_slug;
-    if (!error && slug) {
-      const { data: siblings } = await supabase
-        .from("product_configs")
-        .select("shopify_handle, template")
-        .eq("template_slug", slug)
-        .neq("shopify_handle", handle);
-
-      if (siblings && siblings.length > 0) {
-        await Promise.all(
-          siblings.map((s) => {
-            const sibTemplate = (s.template ?? {}) as Template;
-            // Per-row layouts must NOT cross-contaminate: poster siblings
-            // own `defaultLayout`, canvas siblings own `canvasLayout`. We
-            // only propagate the layout block matching THIS row's product
-            // type and otherwise keep the sibling's existing block.
-            const isCurrentCanvas = isCanvasProduct;
-            const mergedSibling: Template = {
-              ...finalTemplate,
-              defaultLayout: isCurrentCanvas
-                ? (sibTemplate.defaultLayout ?? finalTemplate.defaultLayout)
-                : finalTemplate.defaultLayout,
-              canvasLayout: isCurrentCanvas
-                ? finalTemplate.canvasLayout
-                : (sibTemplate.canvasLayout ?? finalTemplate.canvasLayout),
-              productOptions: {
-                ...(finalTemplate.productOptions ?? {}),
-                poster: sibTemplate.productOptions?.poster ?? finalTemplate.productOptions?.poster,
-                canvas: sibTemplate.productOptions?.canvas ?? finalTemplate.productOptions?.canvas,
-              },
-            };
-            return supabase
-              .from("product_configs")
-              .update({
-                template: mergedSibling as unknown as never,
-                map_styles: enabledMapStyleIds.length > 0 ? (enabledMapStyleIds as unknown as never) : ([] as unknown as never),
-              })
-              .eq("shopify_handle", s.shopify_handle);
-          }),
-        );
-      }
-    }
-    setSaving(false);
-
-    if (error) {
-      toast.error("Kunde inte spara", { description: error.message });
+    // Persist via the tenant-scoped edge function — direct client writes are
+    // denied by RLS. The function stamps installation_id from the verified
+    // Shopify session token and propagates the shared template to sibling rows
+    // (same template_slug) server-side, preserving each sibling's per-type block.
+    try {
+      await invokeAdmin("save", {
+        handle,
+        template: finalTemplate,
+        template_slug: config.template_slug ?? null,
+        map_styles: enabledMapStyleIds,
+        isCanvas: isCanvasProduct,
+        meta: {
+          tags: config.tags ?? [],
+          category_gid: config.category_gid ?? null,
+          status: config.status ?? "DRAFT",
+          sales_channels: config.sales_channels ?? ["online_store"],
+          description_html: config.description_html ?? null,
+          seo_title: config.seo_title ?? null,
+          seo_description: config.seo_description ?? null,
+          is_freeform: config.is_freeform ?? false,
+        },
+      });
+    } catch (e) {
+      setSaving(false);
+      toast.error("Kunde inte spara", {
+        description: e instanceof Error ? e.message : String(e),
+      });
       return;
     }
+    setSaving(false);
     setTemplate(finalTemplate);
     toast.success(opts.publish ? "Publicerad" : "Sparad som draft");
   }

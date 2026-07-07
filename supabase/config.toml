@@ -15,3 +15,8 @@ verify_jwt = false
 # Temporär engångs-reveal — auth via x-reveal-token-header.
 [functions.reveal-gelato-secret]
 verify_jwt = false
+
+# Admin CRUD — vi verifierar Shopify App Bridge session-token själva (inte en
+# Supabase-JWT), så Supabase-gatewayns JWT-koll måste vara av.
+[functions.admin-templates]
+verify_jwt = false

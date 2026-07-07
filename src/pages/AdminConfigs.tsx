@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { loadAllConfigsRaw, type ProductConfig } from "@/lib/product-config";
+import { type ProductConfig } from "@/lib/product-config";
+import { invokeAdmin } from "@/lib/admin-api";
 import { Loader2, ExternalLink, Zap, Pencil, Plus, CheckCircle2, AlertCircle, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -49,14 +50,23 @@ export default function AdminConfigs() {
 
   useEffect(() => {
     (async () => {
-      const all = await loadAllConfigsRaw();
-      const enriched = all.map((c) => {
-        const raw = (c as unknown as { template?: unknown }).template;
-        const { template } = resolveTemplate(c, raw);
-        return { ...c, __template: template };
-      });
-      setConfigs(enriched);
-      setLoading(false);
+      try {
+        // Admin needs DRAFT rows too, which RLS hides from the anon client —
+        // load them through the tenant-scoped edge function (session-token auth).
+        const res = await invokeAdmin<{ configs: ProductConfig[] }>("list");
+        const enriched = (res.configs ?? []).map((c) => {
+          const raw = (c as unknown as { template?: unknown }).template;
+          const { template } = resolveTemplate(c, raw);
+          return { ...c, __template: template };
+        });
+        setConfigs(enriched);
+      } catch (e) {
+        toast.error("Kunde inte ladda mallar", {
+          description: e instanceof Error ? e.message : String(e),
+        });
+      } finally {
+        setLoading(false);
+      }
     })();
     refreshInstallStatus();
   }, []);

@@ -1,0 +1,4 @@
+# SPA fallback: the app uses client-side routing (e.g. /admin/designer/:handle).
+# Serve index.html for any path that isn't a real static file, with 200 (not a
+# redirect) so deep links and Shopify's embedded entry URL work.
+/*    /index.html   200

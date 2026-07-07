@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
+import { invokeAdmin } from "@/lib/admin-api";
 import { DEFAULT_PRODUCT_VARIANTS } from "@/lib/product-defaults";
 import type { Template } from "@/lib/template-schema";
 import type { ProductType } from "@/lib/product-config";
@@ -154,23 +155,23 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
     } as unknown as never;
     const baseStyles = ["light-v11", "dark-v11", "outdoors-v12", "satellite-v9"] as unknown as never;
 
-    const { error } = await supabase.from("product_configs").insert({
-      title: title.trim(),
-      shopify_handle: templateSlug,
-      template_slug: templateSlug,
-      product_type: "multi" as unknown as never,
-      is_consolidated: true,
-      enabled_product_types: enabledProductTypes as unknown as never,
-      template: tpl as unknown as never,
-      layouts: {} as unknown as never,
-      map_styles: baseStyles,
-      text_config: baseTextConfig,
-      sizes: [] as unknown as never,
-      gelato_sku_map: {} as unknown as never,
-    });
-    if (error) {
+    // Direct client writes are denied by RLS — go through the tenant-scoped
+    // edge function, which stamps installation_id from the verified session token.
+    try {
+      await invokeAdmin("create", {
+        title: title.trim(),
+        handle: templateSlug,
+        template_slug: templateSlug,
+        enabled_product_types: enabledProductTypes,
+        template: tpl,
+        map_styles: baseStyles,
+        text_config: baseTextConfig,
+      });
+    } catch (e) {
       setSaving(false);
-      toast.error("Kunde inte skapa", { description: error.message });
+      toast.error("Kunde inte skapa", {
+        description: e instanceof Error ? e.message : String(e),
+      });
       return;
     }
 
