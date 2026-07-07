@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { type ProductConfig } from "@/lib/product-config";
 import { invokeAdmin, invokeWithSession } from "@/lib/admin-api";
-import { Loader2, ExternalLink, Zap, Pencil, Plus, CheckCircle2, AlertCircle, Download } from "lucide-react";
+import { Loader2, ExternalLink, Zap, Pencil, Plus, CheckCircle2, AlertCircle, Download, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { resolveTemplate } from "@/lib/template-migrate";
@@ -137,6 +137,12 @@ export default function AdminConfigs() {
               <p className="text-sm text-muted-foreground">Layouter, kartstilar, storlekar och Gelato-mappning</p>
             </div>
             <div className="flex items-center gap-2">
+              <Button asChild variant="outline">
+                <Link to="/admin/settings">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Priser
+                </Link>
+              </Button>
               <Button variant="outline" onClick={() => setCreateOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Skapa ny mall

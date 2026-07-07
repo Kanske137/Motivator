@@ -8,6 +8,7 @@ import NotFound from "./pages/NotFound.tsx";
 import EditorPage from "./pages/EditorPage.tsx";
 import AdminConfigs from "./pages/AdminConfigs.tsx";
 import DesignerPage from "./pages/admin/DesignerPage.tsx";
+import SettingsPage from "./pages/admin/SettingsPage.tsx";
 
 import { useCartSync } from "./hooks/useCartSync";
 import { useShopContextBootstrap } from "./hooks/useShopContextBootstrap";
@@ -24,6 +25,7 @@ const AppRoutes = () => {
       <Route path="/editor" element={<EditorPage />} />
       <Route path="/admin/configs" element={<AdminConfigs />} />
       <Route path="/admin/designer/:handle" element={<DesignerPage />} />
+      <Route path="/admin/settings" element={<SettingsPage />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
