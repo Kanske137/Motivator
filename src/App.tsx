@@ -12,6 +12,7 @@ import SettingsPage from "./pages/admin/SettingsPage.tsx";
 
 import { useCartSync } from "./hooks/useCartSync";
 import { useShopContextBootstrap } from "./hooks/useShopContextBootstrap";
+import { isEmbedded } from "./lib/shopify-app-bridge";
 
 const queryClient = new QueryClient();
 
@@ -19,7 +20,16 @@ const AppRoutes = () => {
   useCartSync();
   useShopContextBootstrap();
   return (
-    <Routes>
+    <>
+      {/* App Bridge renders these as the Wallery app's sub-tabs in Shopify admin.
+          Only in the embedded admin (not the storefront editor). */}
+      {isEmbedded() && (
+        <ui-nav-menu>
+          <a href="/admin/configs" rel="home">Mallar</a>
+          <a href="/admin/settings">Priser</a>
+        </ui-nav-menu>
+      )}
+      <Routes>
       <Route path="/" element={<AdminConfigs />} />
       <Route path="/home" element={<Index />} />
       <Route path="/editor" element={<EditorPage />} />
@@ -27,7 +37,8 @@ const AppRoutes = () => {
       <Route path="/admin/designer/:handle" element={<DesignerPage />} />
       <Route path="/admin/settings" element={<SettingsPage />} />
       <Route path="*" element={<NotFound />} />
-    </Routes>
+      </Routes>
+    </>
   );
 };
 
