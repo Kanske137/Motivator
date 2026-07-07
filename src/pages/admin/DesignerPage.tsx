@@ -40,6 +40,7 @@ import type { ShapeKind } from "@/lib/template-schema";
 import { Sparkles } from "lucide-react";
 import ProductOptionsSection from "@/components/admin/ProductOptionsSection";
 import PriceOverrideSection from "@/components/admin/PriceOverrideSection";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import ShopifyPublishingSection from "@/components/admin/ShopifyPublishingSection";
 import LayerCanvas from "@/components/admin/LayerCanvas";
 import LayerList, { toggleAllLocks } from "@/components/admin/LayerList";
@@ -518,27 +519,35 @@ export default function DesignerPage() {
           onChange={(productOptions) => commitTemplate({ ...template, productOptions })}
         />
 
-        <Card className="p-5 space-y-3">
-          <div>
-            <h2 className="text-base font-semibold">Prisöverstyrning (denna mall)</h2>
-            <p className="text-xs text-muted-foreground">
-              Ändra enstaka variantpriser för just den här mallen. Globala standardpriser
-              sätts i Priser-fliken.
-            </p>
-          </div>
-          {pricesLoading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> Laddar priser…
-            </div>
-          ) : (
-            <PriceOverrideSection
-              productOptions={template.productOptions}
-              overrides={template.priceOverrides ?? {}}
-              globalPrices={globalPrices}
-              currency={currency}
-              onChange={(priceOverrides) => commitTemplate({ ...template, priceOverrides })}
-            />
-          )}
+        <Card className="p-0 overflow-hidden">
+          <Accordion type="single" collapsible defaultValue="">
+            <AccordionItem value="price-overrides" className="border-0">
+              <AccordionTrigger className="px-5 py-4 hover:no-underline">
+                <div className="text-left">
+                  <h2 className="text-base font-semibold">Prisöverstyrning (denna mall)</h2>
+                  <p className="text-xs text-muted-foreground font-normal">
+                    Ändra enstaka variantpriser för just den här mallen. Globala standardpriser
+                    sätts i Priser-fliken.
+                  </p>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-5 pb-5">
+                {pricesLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Laddar priser…
+                  </div>
+                ) : (
+                  <PriceOverrideSection
+                    productOptions={template.productOptions}
+                    overrides={template.priceOverrides ?? {}}
+                    globalPrices={globalPrices}
+                    currency={currency}
+                    onChange={(priceOverrides) => commitTemplate({ ...template, priceOverrides })}
+                  />
+                )}
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </Card>
 
         <ShopifyPublishingSection config={config} onChange={updateConfigMeta} />
