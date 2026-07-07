@@ -55,11 +55,17 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [active, setActive] = useState(MATERIALS[0].key);
+  const [currency, setCurrency] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await invokeAdmin<{ prices: PriceRow[] }>("prices-list", {}, "admin-settings");
+        const res = await invokeAdmin<{ prices: PriceRow[]; currency: string | null }>(
+          "prices-list",
+          {},
+          "admin-settings",
+        );
+        setCurrency(res.currency ?? null);
         const map: PriceMap = {};
         for (const r of res.prices ?? []) {
           ((map[r.material] ??= {})[r.size] ??= {})[r.variant] = String(r.price);
@@ -144,7 +150,9 @@ export default function SettingsPage() {
             <div className="min-w-0">
               <h1 className="text-xl font-bold">Prisinställningar</h1>
               <p className="text-sm text-muted-foreground">
-                Globala standardpriser per material och variant. Tomma fält = erbjuds ej.
+                Globala standardpriser per material och variant, i{" "}
+                <span className="font-medium">{currency ?? "butikens valuta"}</span>{" "}
+                (butikens valuta — kan inte ändras). Tomma fält = erbjuds ej.
               </p>
             </div>
           </div>
@@ -190,7 +198,7 @@ export default function SettingsPage() {
                       className="text-left text-xs text-muted-foreground font-normal px-2 pb-2"
                       colSpan={activeMaterial.variants.length}
                     >
-                      {activeMaterial.variantLabel} · pris i butikens valuta
+                      {activeMaterial.variantLabel} · pris i {currency ?? "butikens valuta"}
                     </th>
                   </tr>
                 </thead>

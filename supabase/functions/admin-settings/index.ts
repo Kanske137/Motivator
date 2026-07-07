@@ -16,6 +16,7 @@ import {
   authErrorResponse,
   requireInstallation,
 } from "../_shared/require-installation.ts";
+import { makeShopifyAdmin } from "../_shared/shopify-admin.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -49,7 +50,7 @@ Deno.serve(async (req) => {
     if (e instanceof AuthError) return authErrorResponse(e, corsHeaders);
     throw e;
   }
-  const { installationId, supabase } = ctx;
+  const { installationId, shop, accessToken, supabase } = ctx;
 
   const body = (await req.json().catch(() => ({}))) as { action?: string } & Record<string, unknown>;
   const action = body.action;
@@ -65,7 +66,17 @@ Deno.serve(async (req) => {
           .order("size")
           .order("variant");
         if (error) throw error;
-        return json({ ok: true, prices: data ?? [] });
+        // The shop's currency is fixed (prices are always in it). Fetch it so
+        // the UI can show it. Non-fatal if the Shopify call fails.
+        let currency: string | null = null;
+        try {
+          const admin = makeShopifyAdmin(shop, accessToken);
+          const r = await admin<{ shop: { currencyCode: string } }>(`{ shop { currencyCode } }`);
+          currency = r.shop?.currencyCode ?? null;
+        } catch (e) {
+          console.warn("[admin-settings] currency fetch failed:", (e as Error).message);
+        }
+        return json({ ok: true, prices: data ?? [], currency });
       }
 
       case "prices-upsert": {
