@@ -28,9 +28,10 @@ interface AdminResponse {
 export async function invokeAdmin<T = AdminResponse>(
   action: string,
   payload: Record<string, unknown> = {},
+  fnName = "admin-templates",
 ): Promise<T> {
   const token = await getAdminSessionToken();
-  const { data, error } = await supabase.functions.invoke("admin-templates", {
+  const { data, error } = await supabase.functions.invoke(fnName, {
     body: { action, ...payload },
     headers: { "X-Shopify-Session-Token": token },
   });

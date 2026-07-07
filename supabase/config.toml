@@ -35,3 +35,7 @@ verify_jwt = false
 
 [functions.shopify-delete-template]
 verify_jwt = false
+
+# Admin-inställningar (priser m.m.): session-token verifieras i funktionen.
+[functions.admin-settings]
+verify_jwt = false
