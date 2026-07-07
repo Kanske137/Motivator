@@ -39,6 +39,7 @@ import { createDefaultLayout, createLayer, createShapeLayer, moveLayer, normalis
 import type { ShapeKind } from "@/lib/template-schema";
 import { Sparkles } from "lucide-react";
 import ProductOptionsSection from "@/components/admin/ProductOptionsSection";
+import PriceOverrideSection from "@/components/admin/PriceOverrideSection";
 import ShopifyPublishingSection from "@/components/admin/ShopifyPublishingSection";
 import LayerCanvas from "@/components/admin/LayerCanvas";
 import LayerList, { toggleAllLocks } from "@/components/admin/LayerList";
@@ -52,6 +53,11 @@ export default function DesignerPage() {
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [config, setConfig] = useState<ProductConfig | null>(null);
+  // Global default prices (from the Priser tab) + shop currency, shown as
+  // reference/placeholder in the per-template price-override editor.
+  const [globalPrices, setGlobalPrices] = useState<Record<string, Record<string, Record<string, number>>>>({});
+  const [currency, setCurrency] = useState<string | null>(null);
+  const [pricesLoading, setPricesLoading] = useState(true);
   const [template, setTemplate] = useState<Template | null>(null);
   const [orientation, setOrientation] = useState<Orientation>("portrait");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -195,6 +201,27 @@ export default function DesignerPage() {
       setLoading(false);
     })();
   }, [handle]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await invokeAdmin<{
+          prices: { material: string; size: string; variant: string; price: number }[];
+          currency: string | null;
+        }>("prices-list", {}, "admin-settings");
+        const map: Record<string, Record<string, Record<string, number>>> = {};
+        for (const r of res.prices ?? []) {
+          ((map[r.material] ??= {})[r.size] ??= {})[r.variant] = Number(r.price);
+        }
+        setGlobalPrices(map);
+        setCurrency(res.currency ?? null);
+      } catch {
+        // Non-fatal — overrides still work, just without reference defaults.
+      } finally {
+        setPricesLoading(false);
+      }
+    })();
+  }, []);
 
   // For canvas products we edit `canvasLayout` (separate from poster).
   // Konsoliderade mallar väljer via `designMode`-toggle istället för product_type.
@@ -490,6 +517,29 @@ export default function DesignerPage() {
           value={template.productOptions}
           onChange={(productOptions) => commitTemplate({ ...template, productOptions })}
         />
+
+        <Card className="p-5 space-y-3">
+          <div>
+            <h2 className="text-base font-semibold">Prisöverstyrning (denna mall)</h2>
+            <p className="text-xs text-muted-foreground">
+              Ändra enstaka variantpriser för just den här mallen. Globala standardpriser
+              sätts i Priser-fliken.
+            </p>
+          </div>
+          {pricesLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Laddar priser…
+            </div>
+          ) : (
+            <PriceOverrideSection
+              productOptions={template.productOptions}
+              overrides={template.priceOverrides ?? {}}
+              globalPrices={globalPrices}
+              currency={currency}
+              onChange={(priceOverrides) => commitTemplate({ ...template, priceOverrides })}
+            />
+          )}
+        </Card>
 
         <ShopifyPublishingSection config={config} onChange={updateConfigMeta} />
 

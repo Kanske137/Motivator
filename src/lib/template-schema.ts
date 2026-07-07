@@ -502,6 +502,12 @@ export const templateSchema = z
     /** Optional thumbnail URL for the Standard layout shown in the "Stil"-row. */
     defaultLayoutThumbnailUrl: z.string().url().optional(),
     sizeOverrides: z.record(z.string(), sizeOverrideSchema).default({}),
+    /** Per-template price overrides: material -> size -> variant -> price (in the
+     *  shop's currency). Falls back to the tenant's global default (pricing_rules)
+     *  when a combo isn't overridden here. */
+    priceOverrides: z
+      .record(z.string(), z.record(z.string(), z.record(z.string(), z.number())))
+      .optional(),
     /** Extra named layouts ("Stilar") in addition to the implicit
      *  "Standard"-layout backed by `defaultLayout`/`canvasLayout`. When the
      *  customer switches stil, the renderer reads the matching block via
