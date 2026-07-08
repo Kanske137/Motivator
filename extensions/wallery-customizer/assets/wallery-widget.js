@@ -193,54 +193,76 @@
       ? "<h3>" + esc(heading) + "</h3><p>" + esc(subtext) + "</p>"
       : "";
 
+    var pencil =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+
     var shadow = host.attachShadow({ mode: "open" });
     shadow.innerHTML =
       "<style>" +
       ":host{all:initial;display:block;}" +
+      "*{box-sizing:border-box;}" +
       ".w{font-family:" + font + ";color:" + tokens.text + ";" +
       "--p:" + accent + ";--pt:" + tokens.primaryText + ";--r:" + radius + ";" +
-      "box-sizing:border-box;width:100%;border:1px solid rgba(0,0,0,.12);" +
-      "border-radius:var(--r);padding:" + padding + ";margin:16px 0;}" +
-      ".w h3{margin:0 0 6px;font-size:1.15em;}" +
-      ".w p{margin:0 0 16px;opacity:.7;font-size:.9em;}" +
-      ".w button{font:inherit;font-weight:600;cursor:pointer;border:0;background:var(--p);" +
-      "color:var(--pt);border-radius:var(--r);padding:12px 22px;width:100%;}" +
-      "@media(min-width:600px){.w button{width:auto;}}" +
-      ".w img[data-preview]{display:none;width:100%;height:auto;border-radius:var(--r);margin-bottom:14px;}" +
+      "width:100%;background:#fff;border:1px solid rgba(0,0,0,.07);" +
+      "border-radius:calc(var(--r) + 4px);padding:" + padding + ";margin:16px 0;" +
+      "box-shadow:0 1px 2px rgba(0,0,0,.04),0 6px 20px rgba(0,0,0,.06);}" +
+      ".preview{position:relative;display:none;width:100%;cursor:pointer;border-radius:var(--r);" +
+      "overflow:hidden;margin-bottom:16px;background:rgba(0,0,0,.03);box-shadow:0 1px 3px rgba(0,0,0,.12);}" +
+      ".preview img{display:block;width:100%;height:auto;}" +
+      ".preview .hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;" +
+      "background:rgba(20,20,20,0);opacity:0;transition:opacity .18s ease;}" +
+      ".preview:hover .hint{opacity:1;background:rgba(20,20,20,.28);}" +
+      ".preview .hint span{display:inline-flex;align-items:center;gap:6px;background:#fff;color:#1a1a1a;" +
+      "font-size:.82em;font-weight:600;padding:8px 14px;border-radius:999px;box-shadow:0 2px 10px rgba(0,0,0,.25);}" +
+      ".preview .hint svg{width:15px;height:15px;}" +
+      ".w h3{margin:0 0 4px;font-size:1.1em;font-weight:600;letter-spacing:-.01em;}" +
+      ".w p{margin:0 0 16px;opacity:.62;font-size:.9em;line-height:1.45;}" +
+      ".w button{font:inherit;font-weight:600;cursor:pointer;border:0;background:var(--p);color:var(--pt);" +
+      "border-radius:var(--r);padding:13px 22px;width:100%;display:inline-flex;align-items:center;" +
+      "justify-content:center;gap:8px;transition:transform .08s ease,filter .15s ease;}" +
+      ".w button:hover{filter:brightness(.94);}" +
+      ".w button:active{transform:translateY(1px);}" +
+      ".w button svg{width:18px;height:18px;}" +
       "</style>" +
-      '<div class="w"><img data-preview alt="" />' + textsHtml +
-      '<button type="button" data-open>' + esc(buttonLabel) + "</button></div>";
+      '<div class="w">' +
+      '<div class="preview" data-open><img data-preview alt="" />' +
+      '<div class="hint"><span>' + pencil + esc(buttonLabel) + "</span></div></div>" +
+      textsHtml +
+      '<button type="button" data-open>' + pencil + "<span>" + esc(buttonLabel) + "</span></button>" +
+      "</div>";
 
-    shadow.querySelector("[data-open]").addEventListener("click", function () {
-      openOverlay(host);
+    // Open the customizer from either the button OR the preview image.
+    shadow.querySelectorAll("[data-open]").forEach(function (el) {
+      el.addEventListener("click", function () { openOverlay(host); });
     });
 
-    // Show the design motif in the card. The editor posts WALLERY_PREVIEW when it
-    // renders (default design) and when we request one on close. We cache the last
-    // one so the motif shows immediately on the customer's NEXT visit too.
+    var previewBox = shadow.querySelector(".preview");
     var img = shadow.querySelector("[data-preview]");
     host._walleryImg = img;
+    function showPreview(src) {
+      img.src = src;
+      previewBox.style.display = "block";
+    }
+
+    // Motif in the card: cached default (repeat visit) or the admin-generated
+    // default the block passes (first visit); updated live while editing. The
+    // editor posts WALLERY_PREVIEW on render + on close.
     var cacheKey = "wallery_preview_" + (host.dataset.templateSlug || host.dataset.productHandle || "");
     var shown = false;
     try {
       var cached = localStorage.getItem(cacheKey);
-      if (cached) { img.src = cached; img.style.display = "block"; shown = true; }
+      if (cached) { showPreview(cached); shown = true; }
     } catch (e) { /* storage disabled */ }
-    // First visit (empty cache): show the admin-generated generic default that
-    // the block passes from the product's metafield.
-    if (!shown && host.dataset.previewUrl) {
-      img.src = host.dataset.previewUrl;
-      img.style.display = "block";
-    }
+    if (!shown && host.dataset.previewUrl) showPreview(host.dataset.previewUrl);
 
     window.addEventListener("message", function (e) {
       var d = e.data;
       if (!d || d.type !== "WALLERY_PREVIEW" || !d.image) return;
-      img.src = d.image;
-      img.style.display = "block";
-      // Cache ONLY the default design (not the customer's in-session edits), so a
-      // fresh page load shows the generic default — consistent with what the
-      // editor opens to. Edits update the card live but don't persist across loads.
+      showPreview(d.image);
+      // Cache ONLY the default design (not in-session edits), so a fresh page load
+      // shows the generic default — consistent with what the editor opens to.
       if (d.isDefault) {
         try { localStorage.setItem(cacheKey, d.image); } catch (e2) { /* quota */ }
       }
