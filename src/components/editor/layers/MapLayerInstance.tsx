@@ -112,6 +112,34 @@ export function MapLayerInstance({
 
       mapRef.current = map;
       onMapReady?.(map);
+
+      // `moveend` only fires on USER pans, so the initial/default center never
+      // gets its city/country resolved — [[city]]/[[country]] would render empty
+      // and only the coordinates show. Resolve the current center once on load
+      // so the default place is complete in the editor (and in the snapshot it
+      // feeds). Runs once per map mount; center is left unchanged.
+      (async () => {
+        try {
+          // Skip if this map already has a resolved place — only backfill the
+          // missing default, so we never re-run applyPlaceInternal on a template
+          // that already has city/country (which would clear a linked override).
+          const mv0 = useEditorStore.getState().layerValues?.[layerId];
+          if (mv0 && mv0.kind === "map" && (mv0.city || mv0.country)) return;
+          const c0 = map.getCenter();
+          const r = await reverseGeocode(c0.lng, c0.lat);
+          if (r && !cancelled) {
+            useEditorStore.getState().updateMapLayerFromPan(layerId, {
+              placeName: r.place_name,
+              center: [c0.lng, c0.lat],
+              city: r.city,
+              country: r.country,
+            });
+          }
+        } catch {
+          /* non-fatal — falls back to coordinates only */
+        }
+      })();
+
       setTimeout(() => map.resize(), 50);
       setTimeout(() => map.resize(), 250);
       setTimeout(() => map.resize(), 600);
