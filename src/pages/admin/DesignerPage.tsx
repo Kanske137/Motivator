@@ -441,7 +441,7 @@ export default function DesignerPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b sticky top-0 bg-background z-20">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <div className="flex items-center gap-3 min-w-0">
             <Button asChild variant="ghost" size="icon">
               <Link to="/admin/configs" aria-label="Tillbaka">
@@ -456,7 +456,7 @@ export default function DesignerPage() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Button asChild variant="ghost" size="sm">
               <a
                 href={`/editor?handle=${handle}&preview=draft`}
