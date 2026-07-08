@@ -315,8 +315,30 @@ export default function EditorPage() {
       if (e?.data?.type === "WALLERY_REQUEST_PREVIEW") postPreview(false);
     };
     window.addEventListener("message", onMsg);
+
+    // One-way variant reflection: tell the storefront which variant is chosen so
+    // the theme's native PRICE (and the checkout variant) follow the editor.
+    const postVariant = () => {
+      const s = useEditorStore.getState();
+      window.parent.postMessage(
+        { type: "WALLERY_VARIANT", productType: s.config?.product_type, size: s.size, variant: s.variant },
+        "*",
+      );
+    };
+    let lastVar = "";
+    const varTimer = window.setTimeout(postVariant, 1200); // initial alignment
+    const unsubVar = useEditorStore.subscribe(() => {
+      const s = useEditorStore.getState();
+      const k = [s.config?.product_type, s.size, s.variant].join("|");
+      if (k === lastVar) return;
+      lastVar = k;
+      postVariant();
+    });
+
     return () => {
       window.clearTimeout(timer);
+      window.clearTimeout(varTimer);
+      unsubVar();
       window.removeEventListener("message", onMsg);
     };
   }, [loading, template]);

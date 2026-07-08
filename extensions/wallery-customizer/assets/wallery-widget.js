@@ -183,6 +183,43 @@
       });
   }
 
+  // --- Reflect the editor's variant choice into the theme (one-way) so the
+  //     theme's NATIVE price display + checkout variant follow the editor. -----
+  var PT_TO_OPTION = { poster: "Poster", canvas: "Canvas", aluminum: "Metallposter", acrylic: "Plexiglas" };
+  function pickerForm() {
+    var i = document.querySelector('form[action*="/cart/add"] [name="id"], [name="id"]');
+    return (
+      (i && i.form) ||
+      document.querySelector(".variant-picker, variant-selects, variant-radios, product-form, form[action*='/cart/add']")
+    );
+  }
+  function setThemeVariant(values) {
+    var form = pickerForm();
+    if (!form) return;
+    values.forEach(function (val) {
+      if (val == null || val === "") return;
+      var radios = form.querySelectorAll('input[type="radio"]');
+      for (var i = 0; i < radios.length; i++) {
+        if (String(radios[i].value) === String(val) && !radios[i].checked) {
+          radios[i].checked = true;
+          radios[i].dispatchEvent(new Event("input", { bubbles: true }));
+          radios[i].dispatchEvent(new Event("change", { bubbles: true }));
+          break;
+        }
+      }
+      var selects = form.querySelectorAll("select");
+      for (var j = 0; j < selects.length; j++) {
+        for (var o = 0; o < selects[j].options.length; o++) {
+          if (String(selects[j].options[o].value) === String(val) && selects[j].value !== selects[j].options[o].value) {
+            selects[j].value = selects[j].options[o].value;
+            selects[j].dispatchEvent(new Event("change", { bubbles: true }));
+            break;
+          }
+        }
+      }
+    });
+  }
+
   // --- Route the theme's native Add-to-cart / Buy-now through the customizer -
   var _loading = null;
   function showLoading() {
@@ -202,21 +239,21 @@
   }
 
   function routeThemeAdd(host, buyNow) {
-    var ov = host._walleryOverlay;
-    if (ov) {
-      // Editor already rendered (customer opened it) → run the SAME flow.
-      showLoading();
+    var existed = !!host._walleryOverlay;
+    // Show the editor: it MUST be rendered (visible) to build the print file
+    // reliably, and it gives the customer feedback + surfaces any error.
+    openOverlay(host);
+    if (existed) {
+      // Editor already loaded → run the exact same add-to-cart flow now.
       try {
-        ov.el.querySelector("iframe").contentWindow.postMessage(
+        host._walleryOverlay.el.querySelector("iframe").contentWindow.postMessage(
           { type: "WALLERY_TRIGGER_ADD", buyNow: !!buyNow },
           "*"
         );
-      } catch (e) { hideLoading(); }
-      window.setTimeout(hideLoading, 12000); // safety if nothing comes back
-    } else {
-      // Never opened → open the customizer so they design first (no empty orders).
-      openOverlay(host);
+      } catch (e) { /* cross-origin timing */ }
     }
+    // If it didn't exist yet, this is the first open — the customer designs and
+    // uses the customizer's own CTA (no empty orders).
   }
 
   function interceptThemeButtons(host) {
@@ -313,7 +350,17 @@
     // ADD_TO_CART fires only while the editor is open, so a single listener is fine.
     window.addEventListener("message", function (e) {
       var d = e.data;
-      if (!d || d.type !== "ADD_TO_CART") return;
+      if (!d) return;
+      // Editor → theme: reflect the chosen variant so the theme's price updates.
+      if (d.type === "WALLERY_VARIANT") {
+        var vals = [];
+        if (d.productType && PT_TO_OPTION[d.productType]) vals.push(PT_TO_OPTION[d.productType]);
+        if (d.size) vals.push(d.size);
+        if (d.variant) vals.push(d.variant);
+        setThemeVariant(vals);
+        return;
+      }
+      if (d.type !== "ADD_TO_CART") return;
       close.disabled = true;
       addToCart(d)
         .then(function () {
