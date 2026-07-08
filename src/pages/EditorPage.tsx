@@ -300,6 +300,7 @@ export default function EditorPage() {
           hangerColor: hangerC ?? undefined,
           canvasWrap: isCanvasP,
           acrylicCorners: cfg.product_type === "acrylic",
+          hires: true,
         });
         window.parent.postMessage({ type: "WALLERY_PREVIEW", image: dataUrl }, "*");
       } catch (e) {
@@ -307,7 +308,9 @@ export default function EditorPage() {
       }
     }
 
-    const timer = window.setTimeout(postPreview, 500);
+    // Longer initial delay so map tiles/text have rendered before the first
+    // (default-design) snapshot; on-request snapshots (on close) are already ready.
+    const timer = window.setTimeout(postPreview, 1800);
     const onMsg = (e: MessageEvent) => {
       if (e?.data?.type === "WALLERY_REQUEST_PREVIEW") postPreview();
     };

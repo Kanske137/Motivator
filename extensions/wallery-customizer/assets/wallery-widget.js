@@ -96,8 +96,12 @@
 
     var overlay = document.createElement("div");
     overlay.setAttribute("data-wallery-overlay", "");
+    // Kept mounted + RENDERED at all times (off-screen when closed, not
+    // display:none) so the editor inside can actually render the map/design and
+    // produce a complete default preview before the customer ever opens it.
     overlay.style.cssText =
-      "position:fixed;inset:0;z-index:2147483000;background:#fff;display:none;flex-direction:column;";
+      "position:fixed;top:0;left:-100000px;width:100%;height:100%;z-index:2147483000;" +
+      "background:#fff;display:flex;flex-direction:column;";
 
     var bar = document.createElement("div");
     bar.style.cssText =
@@ -125,7 +129,7 @@
     document.body.appendChild(overlay);
 
     function hide() {
-      overlay.style.display = "none";
+      overlay.style.left = "-100000px";
       document.documentElement.style.overflow = "";
       // Ask the editor for a fresh preview reflecting the customer's edits.
       try {
@@ -156,7 +160,7 @@
 
   function openOverlay(host) {
     var o = getOverlay(host);
-    o.el.style.display = "flex";
+    o.el.style.left = "0";
     document.documentElement.style.overflow = "hidden";
   }
 
