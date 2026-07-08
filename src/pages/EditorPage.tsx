@@ -246,6 +246,77 @@ export default function EditorPage() {
     .join(" · ");
 
   const hiddenLayerIds = useEditorStore((s) => s.hiddenLayerIds);
+
+  // Storefront preview: when embedded in the Wallery block overlay, render a
+  // snapshot of the CURRENT design (incl. frame/wrap) and post it to the parent
+  // so the product-page card can show the motif. Fires once the editor is ready
+  // (default/empty design) and again whenever the parent requests it (on close,
+  // reflecting the customer's edits).
+  useEffect(() => {
+    if (loading || !template) return;
+    if (window.self === window.top) return; // only inside the overlay iframe
+
+    async function postPreview() {
+      const st = useEditorStore.getState();
+      const cfg = st.config;
+      const tpl = st.template;
+      if (!cfg || !tpl) return;
+      const v = st.variant;
+      const isCanvasP = cfg.product_type === "canvas";
+      const frameC = cfg.product_type === "posters" ? FRAME_COLORS[v ?? "Ingen"] : "";
+      const hangerC = cfg.product_type === "posters" ? hangerColorFromVariant(v) : null;
+      const hidden = st.hiddenLayerIds ?? {};
+      try {
+        const printable = Object.keys(hidden).length
+          ? mutateActiveLayoutBlock(tpl, cfg.product_type, st.layoutId, st.orientation, (ls) =>
+              ls.filter((l) => !hidden[l.id]),
+            )
+          : tpl;
+        const dataUrl = await renderTemplateSnapshot({
+          template: printable,
+          orientation: st.orientation,
+          productType: cfg.product_type,
+          layoutId: st.layoutId,
+          size: st.size,
+          layerValues: st.layerValues,
+          layerTransforms: st.layerTransforms,
+          whiteMarginEnabled: st.whiteMarginEnabled,
+          livePosterBgColor: st.posterBgColor,
+          liveMapCenter: st.mapCenter,
+          liveMapZoom: st.mapZoom,
+          liveMapStyleId: st.mapStyleId,
+          liveMapShape: st.mapShape,
+          liveShowLabels: st.showLabels,
+          liveText: st.text,
+          liveTextFont: st.textFont,
+          liveTextVisible: st.textVisible,
+          wrapCm: isCanvasP ? (v?.match(/(\d+)/)?.[1] ? parseInt(v.match(/(\d+)/)![1], 10) : 2) : 0,
+          bleedCm: isCanvasP ? 0.3 : 0,
+          photoOverlays: st.getPhotoOverlays(),
+          aiPhotoResults: st.aiPhotoResults,
+          aiPhotoSelectedRefUrl: st.aiPhotoSelectedRefUrl,
+          frameColor: !isCanvasP ? frameC : undefined,
+          frameWidthCm: !isCanvasP ? FRAME_WIDTH_CM : undefined,
+          hangerColor: hangerC ?? undefined,
+          canvasWrap: isCanvasP,
+          acrylicCorners: cfg.product_type === "acrylic",
+        });
+        window.parent.postMessage({ type: "WALLERY_PREVIEW", image: dataUrl }, "*");
+      } catch (e) {
+        console.warn("[wallery] preview snapshot failed", e);
+      }
+    }
+
+    const timer = window.setTimeout(postPreview, 500);
+    const onMsg = (e: MessageEvent) => {
+      if (e?.data?.type === "WALLERY_REQUEST_PREVIEW") postPreview();
+    };
+    window.addEventListener("message", onMsg);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("message", onMsg);
+    };
+  }, [loading, template]);
   const hasDesignContent = useEditorStore((s) => s.hasDesignContent);
   const isFreeform = Boolean(config?.is_freeform);
   const canAddToCart = !isFreeform || hasDesignContent();

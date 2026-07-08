@@ -127,6 +127,10 @@
     function hide() {
       overlay.style.display = "none";
       document.documentElement.style.overflow = "";
+      // Ask the editor for a fresh preview reflecting the customer's edits.
+      try {
+        iframe.contentWindow.postMessage({ type: "WALLERY_REQUEST_PREVIEW" }, "*");
+      } catch (e) { /* cross-origin timing */ }
     }
     close.addEventListener("click", hide);
 
@@ -190,13 +194,31 @@
       ".w button{font:inherit;font-weight:600;cursor:pointer;border:0;background:var(--p);" +
       "color:var(--pt);border-radius:var(--r);padding:12px 22px;width:100%;}" +
       "@media(min-width:600px){.w button{width:auto;}}" +
+      ".w img[data-preview]{display:none;width:100%;height:auto;border-radius:var(--r);margin-bottom:14px;}" +
       "</style>" +
-      '<div class="w">' + textsHtml +
+      '<div class="w"><img data-preview alt="" />' + textsHtml +
       '<button type="button" data-open>' + esc(buttonLabel) + "</button></div>";
 
     shadow.querySelector("[data-open]").addEventListener("click", function () {
       openOverlay(host);
     });
+
+    // Show the design motif in the card. The editor posts WALLERY_PREVIEW: its
+    // default design once ready, and an updated snapshot when the overlay closes.
+    var img = shadow.querySelector("[data-preview]");
+    window.addEventListener("message", function (e) {
+      var d = e.data;
+      if (!d || d.type !== "WALLERY_PREVIEW" || !d.image) return;
+      img.src = d.image;
+      img.style.display = "block";
+    });
+
+    // Preload the editor (hidden) so the default preview appears from the start
+    // — and so opening it is instant. Deferred to idle so it doesn't block the
+    // product page's first paint.
+    var preload = function () { getOverlay(host); };
+    if (window.requestIdleCallback) window.requestIdleCallback(preload, { timeout: 3000 });
+    else window.setTimeout(preload, 1500);
   }
 
   function init() {
