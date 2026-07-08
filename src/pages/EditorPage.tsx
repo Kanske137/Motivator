@@ -469,6 +469,18 @@ export default function EditorPage() {
     });
   };
 
+  // #: the theme's native "Add to cart" / "Buy now" routes through the SAME flow
+  // (the widget intercepts them). MUST be above the early returns below so the
+  // hook order never changes between renders (React error #310).
+  useEffect(() => {
+    if (window.self === window.top) return;
+    const onMsg = (e: MessageEvent) => {
+      if (e?.data?.type === "WALLERY_TRIGGER_ADD") handleAddToCart(e.data.buyNow === true);
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, [handleAddToCart]);
+
   if (!loading && notFound) {
     return (
       <div className="min-h-[400px] flex flex-col items-center justify-center bg-background gap-2 p-6 text-center">
@@ -497,17 +509,6 @@ export default function EditorPage() {
     />
   );
 
-
-  // #: let the theme's native "Add to cart" / "Buy now" route through the SAME
-  // add-to-cart flow (the widget intercepts them and triggers this).
-  useEffect(() => {
-    if (window.self === window.top) return;
-    const onMsg = (e: MessageEvent) => {
-      if (e?.data?.type === "WALLERY_TRIGGER_ADD") handleAddToCart(e.data.buyNow === true);
-    };
-    window.addEventListener("message", onMsg);
-    return () => window.removeEventListener("message", onMsg);
-  }, [handleAddToCart]);
 
   const ctaNode = (
     <StickyCta
