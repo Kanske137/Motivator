@@ -311,12 +311,58 @@ export default function EditorPage() {
     // Longer initial delay so map tiles/text have rendered before the first
     // (default-design) snapshot; on-request snapshots (on close) are already ready.
     const timer = window.setTimeout(() => postPreview(true), 1800);
+
+    // #3: two-way variant sync with the theme's picker.
+    let applying = false; // true while applying a picker-driven change (no echo)
+    let prevTimer: number | undefined;
+    const key = () => {
+      const s = useEditorStore.getState();
+      return [s.config?.product_type, s.size, s.variant].join("|");
+    };
+    let lastKey = key();
+    const schedulePreview = () => {
+      window.clearTimeout(prevTimer);
+      prevTimer = window.setTimeout(() => postPreview(false), 600);
+    };
+    const unsub = useEditorStore.subscribe(() => {
+      const k = key();
+      if (k === lastKey) return;
+      lastKey = k;
+      schedulePreview(); // refresh the card/gallery for the new size/frame
+      if (applying) return; // don't echo a change the picker just pushed to us
+      const s = useEditorStore.getState();
+      window.parent.postMessage(
+        { type: "WALLERY_VARIANT", productType: s.config?.product_type, size: s.size, variant: s.variant },
+        "*",
+      );
+    });
+
     const onMsg = (e: MessageEvent) => {
-      if (e?.data?.type === "WALLERY_REQUEST_PREVIEW") postPreview(false);
+      const d = e?.data;
+      if (!d) return;
+      if (d.type === "WALLERY_REQUEST_PREVIEW") {
+        postPreview(false);
+        return;
+      }
+      if (d.type === "WALLERY_SET_VARIANT") {
+        applying = true;
+        const s = useEditorStore.getState();
+        if (d.productType && s.config && d.productType !== s.config.product_type) {
+          onProductChange(s.config.shopify_handle, d.productType);
+        }
+        if (d.size) useEditorStore.getState().setSize(d.size);
+        if (d.variant) useEditorStore.getState().setVariant(d.variant);
+        window.setTimeout(() => {
+          applying = false;
+          lastKey = key();
+        }, 150);
+      }
     };
     window.addEventListener("message", onMsg);
     return () => {
       window.clearTimeout(timer);
+      window.clearTimeout(prevTimer);
+      unsub();
       window.removeEventListener("message", onMsg);
     };
   }, [loading, template]);

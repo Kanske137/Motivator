@@ -183,6 +183,64 @@
       });
   }
 
+  // --- #3: variant sync between the theme's picker and the editor -----------
+  // productType (editor) <-> Produkttyp option value (theme), per the sync labels.
+  var PT_TO_OPTION = { poster: "Poster", canvas: "Canvas", aluminum: "Metallposter", acrylic: "Plexiglas" };
+  function optionToPt(val) {
+    var l = String(val == null ? "" : val).toLowerCase();
+    for (var k in PT_TO_OPTION) if (PT_TO_OPTION[k].toLowerCase() === l) return k;
+    return null;
+  }
+
+  var _product = null;
+  function loadProduct(handle) {
+    if (_product) return Promise.resolve(_product);
+    return fetch("/products/" + encodeURIComponent(handle) + ".js", { headers: { Accept: "application/json" } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (p) { _product = p; return p; })
+      .catch(function () { return null; });
+  }
+
+  function variantIdInput() {
+    return document.querySelector('form[action*="/cart/add"] [name="id"], [name="id"]');
+  }
+  function pickerForm() {
+    var i = variantIdInput();
+    return (
+      (i && i.form) ||
+      document.querySelector(".variant-picker, variant-selects, variant-radios, product-form, form[action*='/cart/add']")
+    );
+  }
+
+  // Check the radios/selects that match the given option values + fire change so
+  // the theme resolves the variant (price, availability, [name=id]).
+  function setPicker(values) {
+    var form = pickerForm();
+    if (!form) return;
+    values.forEach(function (val) {
+      if (val == null || val === "") return;
+      var radios = form.querySelectorAll('input[type="radio"]');
+      for (var i = 0; i < radios.length; i++) {
+        if (String(radios[i].value) === String(val) && !radios[i].checked) {
+          radios[i].checked = true;
+          radios[i].dispatchEvent(new Event("input", { bubbles: true }));
+          radios[i].dispatchEvent(new Event("change", { bubbles: true }));
+          break;
+        }
+      }
+      var selects = form.querySelectorAll("select");
+      for (var j = 0; j < selects.length; j++) {
+        for (var o = 0; o < selects[j].options.length; o++) {
+          if (String(selects[j].options[o].value) === String(val) && selects[j].value !== selects[j].options[o].value) {
+            selects[j].value = selects[j].options[o].value;
+            selects[j].dispatchEvent(new Event("change", { bubbles: true }));
+            break;
+          }
+        }
+      }
+    });
+  }
+
   // --- Fullscreen in-page overlay hosting the editor -------------------------
   // Built once per host and kept in the DOM (iframe stays alive) so the
   // customer's in-progress design survives closing + reopening. Close hides it;
@@ -242,10 +300,57 @@
     }
     close.addEventListener("click", requestHideWithPreview);
 
-    // ADD_TO_CART fires only while the editor is open, so a single listener is fine.
+    // #3 variant sync: watch the theme picker → tell the editor (loop-guarded).
+    var slug = host.dataset.templateSlug || host.dataset.productHandle || "";
+    var applyingPicker = false;
+    var lastVariantId = null;
+    function pushPickerToEditor() {
+      var inp = variantIdInput();
+      if (!inp || !inp.value || inp.value === lastVariantId) return;
+      lastVariantId = inp.value;
+      if (applyingPicker) return; // this change came from us (editor → picker)
+      loadProduct(slug).then(function (p) {
+        if (!p || !p.variants) return;
+        var v = null;
+        for (var i = 0; i < p.variants.length; i++) {
+          if (String(p.variants[i].id) === String(inp.value)) { v = p.variants[i]; break; }
+        }
+        if (!v) return;
+        var opts = v.options || [];
+        var pt = optionToPt(opts[0]);
+        var size = pt ? opts[1] : opts[0]; // consolidated [type,size,frame] vs [size,frame]
+        var frame = pt ? opts[2] : opts[1];
+        try {
+          iframe.contentWindow.postMessage(
+            { type: "WALLERY_SET_VARIANT", productType: pt, size: size, variant: frame },
+            "*"
+          );
+        } catch (e2) { /* cross-origin timing */ }
+      });
+    }
+    var pf = pickerForm();
+    if (pf) pf.addEventListener("change", function () { window.setTimeout(pushPickerToEditor, 60); });
+    window.setInterval(pushPickerToEditor, 800); // fallback for themes without a bubbling change
+
     window.addEventListener("message", function (e) {
       var d = e.data;
-      if (!d || d.type !== "ADD_TO_CART") return;
+      if (!d) return;
+      // editor → picker: reflect the editor's choice in the theme (price/checkout).
+      if (d.type === "WALLERY_VARIANT") {
+        applyingPicker = true;
+        var vals = [];
+        if (d.productType && PT_TO_OPTION[d.productType]) vals.push(PT_TO_OPTION[d.productType]);
+        if (d.size) vals.push(d.size);
+        if (d.variant) vals.push(d.variant);
+        setPicker(vals);
+        window.setTimeout(function () {
+          applyingPicker = false;
+          var inp = variantIdInput();
+          lastVariantId = inp ? inp.value : lastVariantId;
+        }, 400);
+        return;
+      }
+      if (d.type !== "ADD_TO_CART") return;
       close.disabled = true;
       addToCart(d)
         .then(function () {
