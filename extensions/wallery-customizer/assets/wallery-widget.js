@@ -243,29 +243,19 @@
 
   function routeThemeAdd(host, buyNow) {
     var ov = host._walleryOverlay;
+    // The design's map only renders while the editor is VISIBLE (Mapbox pauses on
+    // display:none), so a hidden generation produces a BLANK design. We therefore
+    // show the editor briefly during the add (it displays the design + progress).
+    openOverlay(host);
     if (ov) {
-      // Already designed (editor alive) → add the design DIRECTLY, no re-open.
-      showLoading();
-      host._walleryAddPending = true;
       try {
         ov.el.querySelector("iframe").contentWindow.postMessage(
           { type: "WALLERY_TRIGGER_ADD", buyNow: !!buyNow },
           "*"
         );
-      } catch (e) { hideLoading(); }
-      // Fallback: if nothing was added within 8s (e.g. generation hiccup), open
-      // the editor so the customer can finish it themselves.
-      window.setTimeout(function () {
-        if (host._walleryAddPending) {
-          host._walleryAddPending = false;
-          hideLoading();
-          openOverlay(host);
-        }
-      }, 8000);
-    } else {
-      // Never opened → open the customizer so they design first (no empty orders).
-      openOverlay(host);
+      } catch (e) { /* cross-origin timing */ }
     }
+    // If it didn't exist yet → first open; the customer designs + uses the CTA.
   }
 
   function interceptThemeButtons(host) {
