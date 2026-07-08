@@ -38,6 +38,7 @@
       ".product-gallery__image img",
       ".product-gallery img",
     ],
+    horizon: [".product-media__image", "media-gallery .product-media__image"],
     prestige: [".Product__SlideshowContainer img", ".Product__Slideshow img"],
     impulse: [".product__photo img", ".product-single__photo img", ".product__main-photos img"],
     motion: [".product__slide img", ".product-single__media img"],
@@ -64,11 +65,20 @@
       }
     }
     selectors = selectors.concat(THEME_MEDIA._default);
+    var fallback = null;
     for (var i = 0; i < selectors.length; i++) {
-      var el = document.querySelector(selectors[i]);
-      if (el && el.tagName === "IMG") return el;
+      var els = document.querySelectorAll(selectors[i]);
+      for (var j = 0; j < els.length; j++) {
+        var el = els[j];
+        if (el.tagName !== "IMG") continue;
+        var r = el.getBoundingClientRect();
+        // Galleries keep hidden placeholder/duplicate slides (0x0) — pick the
+        // VISIBLE, reasonably-sized image, not just the first DOM match.
+        if (r.width >= 80 && r.height >= 80) return el;
+        if (!fallback) fallback = el;
+      }
     }
-    return null;
+    return fallback;
   }
 
   // Replace the theme's main product image with the design preview. Returns true
@@ -305,12 +315,28 @@
     var img = shadow.querySelector("[data-preview]");
     host._walleryImg = img;
     var useProductImage = host.dataset.useProductImage === "true";
+    var lastPreview = null;
+    function applyGallery() {
+      if (!useProductImage || !lastPreview) return false;
+      if (swapGallery(lastPreview)) {
+        previewBox.style.display = "none";
+        return true;
+      }
+      return false;
+    }
     function showPreview(src) {
+      lastPreview = src;
       img.src = src;
-      // #2: inject into the theme's product image area when enabled; if no target
-      // is found, gracefully fall back to showing the block's own preview box.
-      var inGallery = useProductImage && swapGallery(src);
-      if (!inGallery) previewBox.style.display = "block";
+      // #2: inject into the theme's product image when enabled; fall back to the
+      // block's own preview box if no media target is found.
+      if (!applyGallery()) previewBox.style.display = "block";
+    }
+    // The theme's gallery may lay out / lazy-load after we mount — retry a few
+    // times so the injection lands (and survives late media rendering).
+    if (useProductImage) {
+      [300, 800, 1500, 2500].forEach(function (d) {
+        window.setTimeout(applyGallery, d);
+      });
     }
 
     // Motif in the card: cached default (repeat visit) or the admin-generated
