@@ -43,3 +43,7 @@ verify_jwt = false
 # Mapbox-token returneras till klienten (admin- + kund-editor) — publik pk-token.
 [functions.get-mapbox-token]
 verify_jwt = false
+
+# Schemalagd storage-städning (triggas av pg_cron); egen secret-check i funktionen.
+[functions.cleanup-previews]
+verify_jwt = false
