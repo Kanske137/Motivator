@@ -28,6 +28,7 @@ export interface ShopifyPriceMapResult {
 export function useShopifyPriceMap(): ShopifyPriceMapResult {
   const { config, template, productOptions } = useEditorStore();
   const country = useShopContextStore((s) => s.country) ?? "SE";
+  const shop = useShopContextStore((s) => s.shop);
   const [map, setMap] = useState<Map<string, ShopifyMoney>>(new Map());
   const [derivedFx, setDerivedFx] = useState<DerivedFx | null>(null);
 
@@ -55,6 +56,7 @@ export function useShopifyPriceMap(): ShopifyPriceMapResult {
       config.shopify_handle,
       country,
       combos.map((c) => ({ size: c.size, variant: c.variant })),
+      shop,
     ).then((m) => {
       if (cancelled) return;
       setMap(m);
@@ -73,7 +75,7 @@ export function useShopifyPriceMap(): ShopifyPriceMapResult {
     return () => {
       cancelled = true;
     };
-  }, [config, country, combos, productOptions, template]);
+  }, [config, country, shop, combos, productOptions, template]);
 
   return { map, derivedFx };
 }

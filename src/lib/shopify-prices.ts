@@ -54,8 +54,8 @@ const TTL_MS = 5 * 60 * 1000;
 const cache = new Map<string, CacheEntry>();
 const inflight = new Map<string, Promise<VariantNode[] | null>>();
 
-function key(handle: string, country: string) {
-  return `${handle}|${country.toUpperCase()}`;
+function key(handle: string, country: string, shop: string | null) {
+  return `${handle}|${country.toUpperCase()}|${shop ?? ""}`;
 }
 
 export function clearShopifyPriceCache() {
@@ -63,8 +63,12 @@ export function clearShopifyPriceCache() {
   inflight.clear();
 }
 
-async function fetchVariants(handle: string, country: string): Promise<VariantNode[] | null> {
-  const k = key(handle, country);
+async function fetchVariants(
+  handle: string,
+  country: string,
+  shop: string | null,
+): Promise<VariantNode[] | null> {
+  const k = key(handle, country, shop);
   const cached = cache.get(k);
   if (cached && Date.now() - cached.ts < TTL_MS) return cached.variants;
   const existing = inflight.get(k);
@@ -74,12 +78,13 @@ async function fetchVariants(handle: string, country: string): Promise<VariantNo
     try {
       const [sourceRes, contextRes] = await Promise.all([
         supabase.functions.invoke("shopify-storefront", {
-          body: { query: SOURCE_QUERY, variables: { handle } },
+          body: { query: SOURCE_QUERY, variables: { handle }, shop },
         }),
         supabase.functions.invoke("shopify-storefront", {
           body: {
             query: CONTEXTUAL_QUERY,
             variables: { handle, country: country.toUpperCase() },
+            shop,
           },
         }),
       ]);
@@ -162,8 +167,9 @@ export async function getShopifyPrice(
   country: string,
   size: string,
   variantName: string,
+  shop: string | null,
 ): Promise<ShopifyMoney | null> {
-  const variants = await fetchVariants(handle, country);
+  const variants = await fetchVariants(handle, country, shop);
   if (!variants) return null;
   const v = findVariant(variants, size, variantName);
   if (!v) return null;
@@ -175,8 +181,9 @@ export async function getShopifyPrices(
   handle: string,
   country: string,
   combos: Array<{ size: string; variant: string }>,
+  shop: string | null,
 ): Promise<Map<string, ShopifyMoney>> {
-  const variants = await fetchVariants(handle, country);
+  const variants = await fetchVariants(handle, country, shop);
   const out = new Map<string, ShopifyMoney>();
   if (!variants) return out;
   for (const c of combos) {

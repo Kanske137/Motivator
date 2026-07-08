@@ -56,6 +56,7 @@ export function useShopContextBootstrap() {
       currency: initialCurrency,
       rate: initialRate,
       country: initialCountry,
+      shop: params.get("shop") || null,
     });
     void i18n.changeLanguage(initialLocale);
     syncContextToUrl({

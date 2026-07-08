@@ -24,6 +24,9 @@ export interface ShopContext {
   rate: number;
   /** ISO country code, e.g. "SE", "DE". Used for tax hints if needed. */
   country: string | null;
+  /** The shop's myshopify domain (from the storefront), so the price proxy can
+   *  fetch THIS shop's live variant prices. Null in standalone/admin contexts. */
+  shop: string | null;
 }
 
 interface ShopContextStore extends ShopContext {
@@ -35,6 +38,7 @@ const DEFAULT_CONTEXT: ShopContext = {
   currency: "SEK",
   rate: 1,
   country: "SE",
+  shop: null,
 };
 
 export const useShopContextStore = create<ShopContextStore>((set) => ({

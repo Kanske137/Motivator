@@ -40,6 +40,8 @@
     params.set("handle", slug);
     params.set("embedded", "1");
     if (host.dataset.currency) params.set("currency", host.dataset.currency);
+    if (host.dataset.locale) params.set("locale", host.dataset.locale);
+    if (host.dataset.shop) params.set("shop", host.dataset.shop);
     return APP_ORIGIN + "/editor?" + params.toString();
   }
 
@@ -79,11 +81,16 @@
   }
 
   // --- Fullscreen in-page overlay hosting the editor -------------------------
-  function openOverlay(host) {
+  // Built once per host and kept in the DOM (iframe stays alive) so the
+  // customer's in-progress design survives closing + reopening. Close hides it;
+  // open shows it again.
+  function getOverlay(host) {
+    if (host._walleryOverlay) return host._walleryOverlay;
+
     var overlay = document.createElement("div");
     overlay.setAttribute("data-wallery-overlay", "");
     overlay.style.cssText =
-      "position:fixed;inset:0;z-index:2147483000;background:#fff;display:flex;flex-direction:column;";
+      "position:fixed;inset:0;z-index:2147483000;background:#fff;display:none;flex-direction:column;";
 
     var bar = document.createElement("div");
     bar.style.cssText =
@@ -109,22 +116,20 @@
     overlay.appendChild(bar);
     overlay.appendChild(iframe);
     document.body.appendChild(overlay);
-    document.documentElement.style.overflow = "hidden";
 
-    function cleanup() {
-      window.removeEventListener("message", onMessage);
+    function hide() {
+      overlay.style.display = "none";
       document.documentElement.style.overflow = "";
-      overlay.remove();
     }
-    close.addEventListener("click", cleanup);
+    close.addEventListener("click", hide);
 
-    function onMessage(e) {
+    // ADD_TO_CART fires only while the editor is open, so a single listener is fine.
+    window.addEventListener("message", function (e) {
       var d = e.data;
       if (!d || d.type !== "ADD_TO_CART") return;
       close.disabled = true;
       addToCart(d)
         .then(function () {
-          cleanup();
           window.location.href = "/cart";
         })
         .catch(function (err) {
@@ -132,8 +137,16 @@
           console.error("[wallery] add to cart failed", err);
           alert("Kunde inte lägga i varukorgen: " + (err && err.message ? err.message : err));
         });
-    }
-    window.addEventListener("message", onMessage);
+    });
+
+    host._walleryOverlay = { el: overlay, hide: hide };
+    return host._walleryOverlay;
+  }
+
+  function openOverlay(host) {
+    var o = getOverlay(host);
+    o.el.style.display = "flex";
+    document.documentElement.style.overflow = "hidden";
   }
 
   // --- Themed entry card on the product page ---------------------------------
