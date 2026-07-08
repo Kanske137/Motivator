@@ -25,8 +25,8 @@ const AppRoutes = () => {
           Only in the embedded admin (not the storefront editor). */}
       {isEmbedded() && (
         <ui-nav-menu>
-          <a href="/admin/configs" rel="home">Mallar</a>
-          <a href="/admin/settings">Priser</a>
+          <a href="/admin/configs" rel="home">Templates</a>
+          <a href="/admin/settings">Pricing</a>
         </ui-nav-menu>
       )}
       <Routes>
