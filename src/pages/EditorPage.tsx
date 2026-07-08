@@ -256,7 +256,7 @@ export default function EditorPage() {
     if (loading || !template) return;
     if (window.self === window.top) return; // only inside the overlay iframe
 
-    async function postPreview() {
+    async function postPreview(isDefault: boolean) {
       const st = useEditorStore.getState();
       const cfg = st.config;
       const tpl = st.template;
@@ -302,7 +302,7 @@ export default function EditorPage() {
           acrylicCorners: cfg.product_type === "acrylic",
           hires: true,
         });
-        window.parent.postMessage({ type: "WALLERY_PREVIEW", image: dataUrl }, "*");
+        window.parent.postMessage({ type: "WALLERY_PREVIEW", image: dataUrl, isDefault }, "*");
       } catch (e) {
         console.warn("[wallery] preview snapshot failed", e);
       }
@@ -310,9 +310,9 @@ export default function EditorPage() {
 
     // Longer initial delay so map tiles/text have rendered before the first
     // (default-design) snapshot; on-request snapshots (on close) are already ready.
-    const timer = window.setTimeout(postPreview, 1800);
+    const timer = window.setTimeout(() => postPreview(true), 1800);
     const onMsg = (e: MessageEvent) => {
-      if (e?.data?.type === "WALLERY_REQUEST_PREVIEW") postPreview();
+      if (e?.data?.type === "WALLERY_REQUEST_PREVIEW") postPreview(false);
     };
     window.addEventListener("message", onMsg);
     return () => {

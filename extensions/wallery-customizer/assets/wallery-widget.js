@@ -231,7 +231,12 @@
       if (!d || d.type !== "WALLERY_PREVIEW" || !d.image) return;
       img.src = d.image;
       img.style.display = "block";
-      try { localStorage.setItem(cacheKey, d.image); } catch (e2) { /* quota */ }
+      // Cache ONLY the default design (not the customer's in-session edits), so a
+      // fresh page load shows the generic default — consistent with what the
+      // editor opens to. Edits update the card live but don't persist across loads.
+      if (d.isDefault) {
+        try { localStorage.setItem(cacheKey, d.image); } catch (e2) { /* quota */ }
+      }
       // If a close is pending (snapshot-on-close), the fresh preview has arrived
       // while still visible — now hide.
       if (host._walleryPendingHide) {
