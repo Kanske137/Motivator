@@ -844,19 +844,28 @@ Deno.serve(async (req) => {
         // Shopify-produkten till rätt mall även om handle/titel byts manuellt
         // i Shopify Admin. Tyst miss-failed (loggas) — sync ska inte falla.
         try {
+          const previewUrl = (body as { previewUrl?: string }).previewUrl;
+          const metafields = [
+            {
+              ownerId: productId,
+              namespace: "custom",
+              key: "template_slug",
+              type: "single_line_text_field",
+              value: cfg.shopify_handle,
+            },
+          ];
+          if (previewUrl) {
+            metafields.push({
+              ownerId: productId,
+              namespace: "custom",
+              key: "wallery_preview",
+              type: "single_line_text_field",
+              value: previewUrl,
+            });
+          }
           const metaRes = await admin<{
             metafieldsSet: { userErrors: { message: string; field?: string[] }[] };
-          }>(METAFIELDS_SET, {
-            metafields: [
-              {
-                ownerId: productId,
-                namespace: "custom",
-                key: "template_slug",
-                type: "single_line_text_field",
-                value: cfg.shopify_handle,
-              },
-            ],
-          });
+          }>(METAFIELDS_SET, { metafields });
           if (metaRes.metafieldsSet.userErrors.length) {
             console.warn(
               "[sync] metafieldsSet warnings:",

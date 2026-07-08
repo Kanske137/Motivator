@@ -107,11 +107,80 @@ export default function DesignerPage() {
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Generate the template's DEFAULT design preview (map + text with resolved
+  // city/country) and upload it, so the storefront card can show the generic
+  // default on the very first visit (before the customer opens the editor).
+  // Best-effort — never blocks sync.
+  async function generateDefaultPreview(): Promise<string | undefined> {
+    if (!template || !config) return undefined;
+    try {
+      const { renderTemplateSnapshot } = await import("@/lib/template-snapshot");
+      const { uploadCartPreview } = await import("@/lib/upload-preview");
+      const pt = productType ?? "posters";
+      const allowedSizes =
+        template.productOptions.poster?.allowedSizes ??
+        template.productOptions.canvas?.allowedSizes ??
+        template.productOptions.aluminum?.allowedSizes ??
+        template.productOptions.acrylic?.allowedSizes ??
+        [];
+      const size = allowedSizes[0] ?? "30x40";
+      const layers = template.defaultLayout.portrait.layers;
+      const mapLayer = layers.find((l) => l.type === "map");
+      const mapDefaults = mapLayer && mapLayer.type === "map" ? mapLayer.defaults : null;
+      const center: [number, number] = mapDefaults?.center ?? [18.0686, 59.3293];
+
+      // Resolve city/country so [[city]]/[[country]] render (stored default or geocode).
+      let city = mapDefaults?.city;
+      let country = mapDefaults?.country;
+      let placeName = mapDefaults?.placeName;
+      if (mapLayer && !city && !country) {
+        try {
+          const { reverseGeocode } = await import("@/lib/mapbox");
+          const r = await reverseGeocode(center[0], center[1]);
+          if (r) {
+            city = r.city;
+            country = r.country;
+            placeName = r.place_name;
+          }
+        } catch {
+          /* fall back to coordinates only */
+        }
+      }
+      const layerValues = mapLayer
+        ? { [mapLayer.id]: { kind: "map", center, placeName, city, country } }
+        : {};
+
+      const dataUrl = await renderTemplateSnapshot({
+        template: { ...template, extraLayouts: [] },
+        orientation: "portrait",
+        size,
+        productType: pt,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        layerValues: layerValues as any,
+        whiteMarginEnabled: true,
+        livePosterBgColor: template.defaultLayout.portrait.background.color,
+        liveMapCenter: center,
+        liveMapZoom: mapDefaults?.zoom ?? 12,
+        liveMapStyleId: mapDefaults?.styleId ?? "light-v11",
+        liveMapShape: mapDefaults?.shape ?? "circle",
+        liveShowLabels: mapDefaults?.showLabels ?? false,
+        liveTextVisible: true,
+        hires: true,
+      });
+      return await uploadCartPreview(dataUrl, `tmpl-preview-${handle}-${Date.now()}`);
+    } catch (e) {
+      console.warn("[default-preview] generation failed", e);
+      return undefined;
+    }
+  }
+
   async function syncToShopify() {
     if (!handle) return;
     setSyncing(true);
+    const previewUrl = await generateDefaultPreview();
     const { data, error } = await invokeWithSession("shopify-sync-template", {
       handle,
+      previewUrl,
     });
     setSyncing(false);
     const code = (data as { code?: string } | null)?.code;

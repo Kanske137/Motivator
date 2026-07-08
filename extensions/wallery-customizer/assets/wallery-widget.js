@@ -221,10 +221,17 @@
     var img = shadow.querySelector("[data-preview]");
     host._walleryImg = img;
     var cacheKey = "wallery_preview_" + (host.dataset.templateSlug || host.dataset.productHandle || "");
+    var shown = false;
     try {
       var cached = localStorage.getItem(cacheKey);
-      if (cached) { img.src = cached; img.style.display = "block"; }
+      if (cached) { img.src = cached; img.style.display = "block"; shown = true; }
     } catch (e) { /* storage disabled */ }
+    // First visit (empty cache): show the admin-generated generic default that
+    // the block passes from the product's metafield.
+    if (!shown && host.dataset.previewUrl) {
+      img.src = host.dataset.previewUrl;
+      img.style.display = "block";
+    }
 
     window.addEventListener("message", function (e) {
       var d = e.data;
