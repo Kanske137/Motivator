@@ -223,6 +223,51 @@
     });
   }
 
+  // Is there a real variant picker on the page (even if hidden via CSS)? If so,
+  // setThemeVariant drives the theme's NATIVE price. If the merchant removed it
+  // entirely, we fall back to setting the price ourselves below.
+  function hasThemePicker() {
+    if (document.querySelector("variant-picker, variant-selects, variant-radios, .variant-picker")) return true;
+    var form = (document.querySelector('form[action*="/cart/add"] [name="id"], [name="id"]') || {}).form;
+    return !!(form && form.querySelector('input[type="radio"], select'));
+  }
+
+  // Direct price fallback (best-effort): when NO picker exists, resolve the chosen
+  // variant's price and write it into the common product-price elements ourselves.
+  // Price markup varies by theme, so the reliable path is keeping the picker in
+  // the DOM (hidden) — but this covers a fully-removed picker.
+  var _prodCache = {};
+  function getProductData(handle) {
+    if (!handle) return Promise.resolve(null);
+    if (_prodCache[handle]) return Promise.resolve(_prodCache[handle]);
+    return fetch("/products/" + encodeURIComponent(handle) + ".js", { headers: { Accept: "application/json" } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (p) { if (p) _prodCache[handle] = p; return p; });
+  }
+  function fmtMoney(cents, currency) {
+    try {
+      return new Intl.NumberFormat(undefined, { style: "currency", currency: currency || "USD" }).format(cents / 100);
+    } catch (e) { return (cents / 100).toFixed(2); }
+  }
+  function updatePriceFallback(host, msg) {
+    getProductData(host.dataset.productHandle).then(function (product) {
+      if (!product) return;
+      var want = [msg.size, msg.variant].filter(Boolean).map(String);
+      var match = (product.variants || []).find(function (v) {
+        var opts = (v.options || []).map(String);
+        return want.every(function (w) { return opts.indexOf(w) !== -1; });
+      });
+      if (!match) return;
+      var text = fmtMoney(match.price, host.dataset.currency);
+      var els = document.querySelectorAll(
+        ".price-item--regular, .price__current, [data-product-price], .product__price, .price__sale .price-item--sale, .price .money",
+      );
+      for (var i = 0; i < els.length; i++) {
+        if (!els[i].querySelector("*")) els[i].textContent = text; // leaf nodes only
+      }
+    });
+  }
+
   // --- Route the theme's native Add-to-cart / Buy-now through the customizer -
   var _loading = null;
   function showLoading() {
@@ -360,6 +405,9 @@
         if (d.size) vals.push(d.size);
         if (d.variant) vals.push(d.variant);
         setThemeVariant(vals);
+        // If the merchant fully removed the picker, nothing native updates the
+        // price — set it ourselves.
+        if (!hasThemePicker()) updatePriceFallback(host, d);
         return;
       }
       if (d.type !== "ADD_TO_CART") return;
