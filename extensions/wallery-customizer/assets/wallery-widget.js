@@ -183,6 +183,74 @@
       });
   }
 
+  // --- Route the theme's native Add-to-cart / Buy-now through the customizer -
+  var _loading = null;
+  function showLoading() {
+    if (_loading) return;
+    _loading = document.createElement("div");
+    _loading.style.cssText =
+      "position:fixed;inset:0;z-index:2147483001;background:rgba(255,255,255,.75);" +
+      "display:flex;align-items:center;justify-content:center;";
+    _loading.innerHTML =
+      '<div style="width:42px;height:42px;border:3px solid rgba(0,0,0,.15);border-top-color:#1a1a1a;' +
+      'border-radius:50%;animation:wlry-spin .8s linear infinite;"></div>' +
+      "<style>@keyframes wlry-spin{to{transform:rotate(360deg)}}</style>";
+    document.body.appendChild(_loading);
+  }
+  function hideLoading() {
+    if (_loading) { _loading.remove(); _loading = null; }
+  }
+
+  function routeThemeAdd(host, buyNow) {
+    var ov = host._walleryOverlay;
+    if (ov) {
+      // Editor already rendered (customer opened it) → run the SAME flow.
+      showLoading();
+      try {
+        ov.el.querySelector("iframe").contentWindow.postMessage(
+          { type: "WALLERY_TRIGGER_ADD", buyNow: !!buyNow },
+          "*"
+        );
+      } catch (e) { hideLoading(); }
+      window.setTimeout(hideLoading, 12000); // safety if nothing comes back
+    } else {
+      // Never opened → open the customizer so they design first (no empty orders).
+      openOverlay(host);
+    }
+  }
+
+  function interceptThemeButtons(host) {
+    var form = document.querySelector('form[action*="/cart/add"]');
+    if (form && !form._walleryHooked) {
+      form._walleryHooked = true;
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        routeThemeAdd(host, false);
+      }, true);
+      var addBtn = form.querySelector('[name="add"], [type="submit"]');
+      if (addBtn) {
+        addBtn.addEventListener("click", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          routeThemeAdd(host, false);
+        }, true);
+      }
+    }
+    // Buy now (dynamic checkout). Best-effort — some render as cross-origin iframes.
+    document.querySelectorAll(
+      '.shopify-payment-button button, .shopify-payment-button__button, [data-shopify="payment-button"] button'
+    ).forEach(function (b) {
+      if (b._walleryHooked) return;
+      b._walleryHooked = true;
+      b.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        routeThemeAdd(host, true);
+      }, true);
+    });
+  }
+
   // --- Fullscreen in-page overlay hosting the editor -------------------------
   // Built once per host and kept in the DOM (iframe stays alive) so the
   // customer's in-progress design survives closing + reopening. Close hides it;
@@ -249,9 +317,11 @@
       close.disabled = true;
       addToCart(d)
         .then(function () {
-          window.location.href = "/cart";
+          hideLoading();
+          window.location.href = d.buyNow ? "/checkout" : "/cart";
         })
         .catch(function (err) {
+          hideLoading();
           close.disabled = false;
           console.error("[wallery] add to cart failed", err);
           alert("Kunde inte lägga i varukorgen: " + (err && err.message ? err.message : err));
@@ -333,6 +403,11 @@
     shadow.querySelectorAll("[data-open]").forEach(function (el) {
       el.addEventListener("click", function () { openOverlay(host); });
     });
+
+    // Route the theme's native "Add to cart" / "Buy now" through the customizer
+    // (re-hooked periodically so async-rendered buttons + re-rendered forms stick).
+    interceptThemeButtons(host);
+    window.setInterval(function () { interceptThemeButtons(host); }, 1500);
 
     var previewBox = shadow.querySelector(".preview");
     var img = shadow.querySelector("[data-preview]");

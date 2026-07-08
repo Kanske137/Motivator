@@ -324,7 +324,8 @@ export default function EditorPage() {
   const isFreeform = Boolean(config?.is_freeform);
   const canAddToCart = !isFreeform || hasDesignContent();
 
-  const handleAddToCart = async () => {
+  const handleAddToCart = async (buyNow = false) => {
+    const isBuyNow = buyNow === true; // guard: an onClick handler passes an event, not `true`
     if (!config || !size || !variant) return;
     if (isFreeform && !hasDesignContent()) {
       toast.error(t("cartAdd.freeformEmpty"), {
@@ -435,6 +436,7 @@ export default function EditorPage() {
           variant,
           quantity: 1,
           properties,
+          buyNow: isBuyNow,
         },
         "*",
       );
@@ -495,6 +497,17 @@ export default function EditorPage() {
     />
   );
 
+
+  // #: let the theme's native "Add to cart" / "Buy now" route through the SAME
+  // add-to-cart flow (the widget intercepts them and triggers this).
+  useEffect(() => {
+    if (window.self === window.top) return;
+    const onMsg = (e: MessageEvent) => {
+      if (e?.data?.type === "WALLERY_TRIGGER_ADD") handleAddToCart(e.data.buyNow === true);
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, [handleAddToCart]);
 
   const ctaNode = (
     <StickyCta
