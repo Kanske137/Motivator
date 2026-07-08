@@ -20,7 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { supabase } from "@/integrations/supabase/client";
+import { invokeWithSession } from "@/lib/admin-api";
 
 interface DeleteTemplateDialogProps {
   productConfigId: string;
@@ -46,8 +46,9 @@ export default function DeleteTemplateDialog({
     if (!matches || busy) return;
     setBusy(true);
     try {
-      const { data, error } = await supabase.functions.invoke("shopify-delete-template", {
-        body: { product_config_id: productConfigId, confirm: "RADERA" },
+      const { data, error } = await invokeWithSession("shopify-delete-template", {
+        product_config_id: productConfigId,
+        confirm: "RADERA",
       });
       if (error || !data?.ok) {
         toast.error(t("adminDelete.error"), {
