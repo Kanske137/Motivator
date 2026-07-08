@@ -22,6 +22,69 @@
       .replace(/>/g, "&gt;");
   }
 
+  // --- Theme adapters (#2): where the main product image lives, per theme, with
+  //     a generic OS 2.0 fallback. Shopify exposes the theme name at runtime, so
+  //     we auto-pick overrides for popular paid themes and fall back otherwise. --
+  var THEME_MEDIA = {
+    _default: [
+      ".product__media img",
+      "[id^='MediaGallery'] img",
+      "media-gallery img",
+      "[data-product-media] img",
+      ".product__media-item img",
+      ".product__media-list img",
+      ".product-single__media img",
+      ".product-media img",
+      ".product-gallery__image img",
+      ".product-gallery img",
+    ],
+    prestige: [".Product__SlideshowContainer img", ".Product__Slideshow img"],
+    impulse: [".product__photo img", ".product-single__photo img", ".product__main-photos img"],
+    motion: [".product__slide img", ".product-single__media img"],
+    warehouse: [".product-gallery__image img"],
+    symmetry: [".product-gallery img"],
+    empire: [".product__photo img"],
+    broadcast: [".product__media img", ".product-gallery img"],
+  };
+
+  function themeName() {
+    try {
+      return ((window.Shopify && window.Shopify.theme && window.Shopify.theme.name) || "").toLowerCase();
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function getMediaImg() {
+    var name = themeName();
+    var selectors = [];
+    for (var k in THEME_MEDIA) {
+      if (k !== "_default" && name && name.indexOf(k) !== -1) {
+        selectors = selectors.concat(THEME_MEDIA[k]);
+      }
+    }
+    selectors = selectors.concat(THEME_MEDIA._default);
+    for (var i = 0; i < selectors.length; i++) {
+      var el = document.querySelector(selectors[i]);
+      if (el && el.tagName === "IMG") return el;
+    }
+    return null;
+  }
+
+  // Replace the theme's main product image with the design preview. Returns true
+  // if a target was found (else the caller falls back to the block's own box).
+  function swapGallery(src) {
+    var img = getMediaImg();
+    if (!img) return false;
+    var pic = img.closest && img.closest("picture");
+    if (pic) pic.querySelectorAll("source").forEach(function (s) { s.remove(); });
+    img.removeAttribute("srcset");
+    img.removeAttribute("data-srcset");
+    img.srcset = "";
+    img.src = src;
+    return true;
+  }
+
   // --- Inherit the theme's design tokens (so the entry card fits the store) --
   function readThemeTokens() {
     var body = getComputedStyle(document.body);
@@ -241,9 +304,13 @@
     var previewBox = shadow.querySelector(".preview");
     var img = shadow.querySelector("[data-preview]");
     host._walleryImg = img;
+    var useProductImage = host.dataset.useProductImage === "true";
     function showPreview(src) {
       img.src = src;
-      previewBox.style.display = "block";
+      // #2: inject into the theme's product image area when enabled; if no target
+      // is found, gracefully fall back to showing the block's own preview box.
+      var inGallery = useProductImage && swapGallery(src);
+      if (!inGallery) previewBox.style.display = "block";
     }
 
     // Motif in the card: cached default (repeat visit) or the admin-generated

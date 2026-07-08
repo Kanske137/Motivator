@@ -16,6 +16,7 @@
     data-product-id="{{ product.id }}"
     data-template-slug="{{ wallery_slug }}"
     data-preview-url="{{ product.metafields.custom.wallery_preview.value }}"
+    data-use-product-image="{{ block.settings.use_product_image }}"
     data-shop="{{ shop.permanent_domain }}"
     data-currency="{{ cart.currency.iso_code }}"
     data-locale="{{ request.locale.iso_code }}"
@@ -56,6 +57,13 @@
     },
     { "type": "text", "id": "button_label", "label": "Button label", "default": "Open customizer" },
     { "type": "text", "id": "overlay_title", "label": "Title inside the customizer", "default": "Customize your design" },
+    {
+      "type": "checkbox",
+      "id": "use_product_image",
+      "label": "Show the design in the product image area",
+      "info": "Best-effort: replaces the theme's main product image with the live preview (works on Dawn + most 2.0 themes). Falls back to this block's own preview when it can't. Tip: place the block just below the product media.",
+      "default": false
+    },
     { "type": "header", "content": "Appearance" },
     {
       "type": "range",
