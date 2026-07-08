@@ -3,10 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Shopify App Bridge — MUST be the first <script> in <head> for the
-         embedded admin to mint session tokens. data-api-key is substituted by
-         Vite from VITE_SHOPIFY_API_KEY at build time. Inert outside Shopify admin. -->
-    <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js" data-api-key="%VITE_SHOPIFY_API_KEY%"></script>
+    <!-- Shopify App Bridge — load ONLY in the embedded admin, detected by the
+         `host` param Shopify always passes. It must be the first <script> in
+         <head> there to mint session tokens (document.write keeps it synchronous
+         + first). NEVER load it on the storefront customer editor (/editor): with
+         no admin host to handshake, App Bridge hangs the app in the theme iframe
+         (endless spinner). data-api-key is substituted by Vite at build time. -->
+    <script>
+      if (new URLSearchParams(window.location.search).has("host")) {
+        document.write(
+          '<script src="https://cdn.shopify.com/shopifycloud/app-bridge.js" data-api-key="%VITE_SHOPIFY_API_KEY%"><\/script>'
+        );
+      }
+    </script>
     <!-- TODO: Set the document title to the name of your application -->
     <title>Lovable App</title>
     <meta name="description" content="Skapa personliga posters och canvastavlor med en intuitiv online-editor.">
