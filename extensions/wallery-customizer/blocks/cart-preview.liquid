@@ -1,0 +1,14 @@
+{% comment %}
+  Wallery cart preview — an APP EMBED (enable it once under Theme settings →
+  App embeds). Loads globally on every page and swaps cart line-item images
+  (cart page + drawer + mini-cart) with the customer's saved design preview.
+{% endcomment %}
+<script src="{{ 'cart-image-swap.js' | asset_url }}" defer></script>
+
+{% schema %}
+{
+  "name": "Wallery cart preview",
+  "target": "body",
+  "settings": []
+}
+{% endschema %}
