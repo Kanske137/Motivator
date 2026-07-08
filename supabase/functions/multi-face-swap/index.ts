@@ -25,8 +25,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const AI_GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODEL = "google/gemini-3.1-flash-image-preview";
+const NANO_BANANA_URL =
+  "https://api.replicate.com/v1/models/google/nano-banana/predictions";
+const MODEL = "google/nano-banana";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -62,110 +63,106 @@ async function callNanoBananaOnce(params: {
   | { ok: true; bytes: Uint8Array; contentType: string; outputUrl: string }
   | { ok: false; retriable: boolean; status: number; reason: string; userMessage: string }
 > {
-  const content: Array<Record<string, unknown>> = [
-    { type: "text", text: params.promptText },
-  ];
-  for (const url of params.imageUrls) {
-    content.push({ type: "image_url", image_url: { url } });
-  }
-
-  const res = await fetch(AI_GATEWAY_URL, {
+  // Replicate-hosted Nano Banana (google/nano-banana): text prompt + an array of
+  // reference image URLs → one generated image URL.
+  const start = await fetch(NANO_BANANA_URL, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${params.apiKey}`,
       "Content-Type": "application/json",
+      Prefer: "wait=55",
     },
     body: JSON.stringify({
-      model: MODEL,
-      modalities: ["image", "text"],
-      messages: [{ role: "user", content }],
+      input: {
+        prompt: params.promptText,
+        image_input: params.imageUrls,
+        output_format: "png",
+      },
     }),
   });
 
-  if (!res.ok) {
-    const errBody = await res.text();
-    console.error("[multi-face-swap] AI gateway error", res.status, errBody);
-    if (res.status === 429) {
+  let prediction = await start.json();
+  if (!start.ok) {
+    const status = start.status;
+    console.error("[multi-face-swap] Replicate nano-banana error", status, JSON.stringify(prediction).slice(0, 300));
+    if (status === 429) {
       return {
         ok: false, retriable: true, status: 429,
-        reason: "Lovable AI rate-limited (429)",
+        reason: "Replicate rate-limited (429)",
         userMessage: "AI-tjänsten är överbelastad just nu. Vänta 10–15 sekunder och försök igen.",
       };
     }
-    if (res.status === 402) {
+    if (status === 402) {
       return {
         ok: false, retriable: false, status: 402,
-        reason: "Lovable AI payment required (402)",
+        reason: "Replicate credits exhausted (402)",
         userMessage: "AI-krediten är slut. Kontakta supporten så löser vi det.",
       };
     }
-    const retriable = res.status >= 500;
     return {
-      ok: false, retriable, status: res.status,
-      reason: `AI gateway error ${res.status}: ${errBody.slice(0, 200)}`,
+      ok: false, retriable: status >= 500, status,
+      reason: `Replicate error ${status}: ${JSON.stringify(prediction).slice(0, 200)}`,
       userMessage: "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
     };
   }
 
-  const data = await res.json();
-  const usage = data?.usage;
-  if (usage) {
-    console.log(
-      `[multi-face-swap] AI usage prompt=${usage.prompt_tokens ?? "?"} ` +
-      `completion=${usage.completion_tokens ?? "?"} total=${usage.total_tokens ?? "?"}`,
-    );
+  const deadline = Date.now() + 60_000;
+  while (
+    prediction.status !== "succeeded" &&
+    prediction.status !== "failed" &&
+    prediction.status !== "canceled" &&
+    Date.now() < deadline
+  ) {
+    await new Promise((r) => setTimeout(r, 1500));
+    const poll = await fetch(prediction.urls.get, {
+      headers: { Authorization: `Bearer ${params.apiKey}` },
+    });
+    prediction = await poll.json();
   }
 
-  const msg = data?.choices?.[0]?.message;
-  const imageUrl: string | undefined =
-    msg?.images?.[0]?.image_url?.url ??
-    msg?.images?.[0]?.url ??
-    (typeof msg?.content === "string" && msg.content.startsWith("data:") ? msg.content : undefined);
-
-  if (!imageUrl) {
-    console.error("[multi-face-swap] AI returned no image", JSON.stringify(data).slice(0, 500));
+  if (prediction.status !== "succeeded") {
     return {
       ok: false, retriable: true, status: 200,
-      reason: "AI gateway response missing image",
+      reason: `Replicate ${prediction.status}: ${prediction.error ?? "timeout"}`,
       userMessage: "AI-modellen returnerade ingen bild den här gången. Försök igen.",
     };
   }
 
-  let bytes: Uint8Array;
-  let contentType = "image/png";
-  if (imageUrl.startsWith("data:")) {
-    const mimeMatch = imageUrl.match(/^data:([^;]+);base64,/);
-    if (mimeMatch) contentType = mimeMatch[1];
-    bytes = base64ToBytes(imageUrl);
-  } else {
-    const r = await fetch(imageUrl);
-    if (!r.ok) {
-      return {
-        ok: false, retriable: r.status >= 500, status: r.status,
-        reason: `AI image fetch failed ${r.status}`,
-        userMessage: "Vi kunde inte hämta den genererade bilden. Försök igen.",
-      };
-    }
-    bytes = new Uint8Array(await r.arrayBuffer());
-    contentType = r.headers.get("content-type") ?? contentType;
+  const imageUrl: string | undefined = Array.isArray(prediction.output)
+    ? prediction.output[0]
+    : prediction.output;
+
+  if (!imageUrl || typeof imageUrl !== "string") {
+    console.error("[multi-face-swap] Replicate produced no image", JSON.stringify(prediction).slice(0, 400));
+    return {
+      ok: false, retriable: true, status: 200,
+      reason: "Replicate response missing image",
+      userMessage: "AI-modellen returnerade ingen bild den här gången. Försök igen.",
+    };
   }
 
-  return {
-    ok: true,
-    bytes,
-    contentType,
-    outputUrl: imageUrl.startsWith("data:") ? "(inline base64)" : imageUrl,
-  };
+  const r = await fetch(imageUrl);
+  if (!r.ok) {
+    return {
+      ok: false, retriable: r.status >= 500, status: r.status,
+      reason: `AI image fetch failed ${r.status}`,
+      userMessage: "Vi kunde inte hämta den genererade bilden. Försök igen.",
+    };
+  }
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  const contentType = r.headers.get("content-type") ?? "image/png";
+
+  return { ok: true, bytes, contentType, outputUrl: imageUrl };
 }
 
 async function callNanoBanana(params: { promptText: string; imageUrls: string[] }) {
-  const apiKey = Deno.env.get("LOVABLE_API_KEY");
+  const apiKey = Deno.env.get("REPLICATE_API_TOKEN");
   if (!apiKey) {
     return {
       ok: false as const,
       response: fallbackResponse(
         "Tjänsten är tillfälligt otillgänglig. Försök igen senare.",
-        "LOVABLE_API_KEY not configured",
+        "REPLICATE_API_TOKEN not configured",
       ),
     };
   }
