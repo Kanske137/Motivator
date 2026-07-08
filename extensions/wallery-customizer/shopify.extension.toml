@@ -1,0 +1,5 @@
+# Wallery Customizer — Shopify Theme App Extension (Online Store 2.0).
+# Merchants add the "Wallery Customizer" app block to their product template in
+# the theme editor. It renders only on products created via a Wallery template.
+name = "wallery-customizer"
+type = "theme"

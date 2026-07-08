@@ -1,0 +1,60 @@
+{% comment %}
+  Wallery Customizer app block. Add it to the product template in the theme
+  editor. It renders ONLY for products created via a Wallery template — detected
+  via the `custom.template_slug` product metafield that the sync sets. The block
+  outputs a mount point + context; wallery-widget.js mounts the customizer into a
+  shadow DOM (isolated from the theme) and inherits the theme's fonts/colours.
+{% endcomment %}
+
+{%- assign wallery_slug = product.metafields.custom.template_slug.value -%}
+
+{%- if wallery_slug != blank -%}
+  <div
+    data-wallery-root
+    id="wallery-{{ block.id }}"
+    data-product-handle="{{ product.handle }}"
+    data-product-id="{{ product.id }}"
+    data-template-slug="{{ wallery_slug }}"
+    data-shop="{{ shop.permanent_domain }}"
+    data-currency="{{ cart.currency.iso_code }}"
+    data-accent="{{ block.settings.accent_color }}"
+    data-radius="{{ block.settings.corner_radius }}"
+    data-inherit-fonts="{{ block.settings.inherit_fonts }}"
+    {{ block.shopify_attributes }}
+  ></div>
+  <script src="{{ 'wallery-widget.js' | asset_url }}" defer></script>
+{%- else -%}
+  {%- comment -%} Not a Wallery product — render nothing. {%- endcomment -%}
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "Wallery Customizer",
+  "target": "section",
+  "settings": [
+    { "type": "header", "content": "Utseende" },
+    {
+      "type": "checkbox",
+      "id": "inherit_fonts",
+      "label": "Ärv temats typsnitt",
+      "default": true
+    },
+    {
+      "type": "color",
+      "id": "accent_color",
+      "label": "Accentfärg",
+      "info": "Lämna tom för att ärva temats köpknapp."
+    },
+    {
+      "type": "range",
+      "id": "corner_radius",
+      "label": "Hörnradie",
+      "min": 0,
+      "max": 24,
+      "step": 2,
+      "unit": "px",
+      "default": 8
+    }
+  ]
+}
+{% endschema %}
