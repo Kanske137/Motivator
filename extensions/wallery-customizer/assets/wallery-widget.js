@@ -96,12 +96,10 @@
 
     var overlay = document.createElement("div");
     overlay.setAttribute("data-wallery-overlay", "");
-    // Kept mounted + RENDERED at all times (off-screen when closed, not
-    // display:none) so the editor inside can actually render the map/design and
-    // produce a complete default preview before the customer ever opens it.
+    // Kept mounted (iframe stays alive → design survives close+reopen), hidden
+    // with display:none when closed. We only ever snapshot while it's VISIBLE.
     overlay.style.cssText =
-      "position:fixed;top:0;left:-100000px;width:100%;height:100%;z-index:2147483000;" +
-      "background:#fff;display:flex;flex-direction:column;";
+      "position:fixed;inset:0;z-index:2147483000;background:#fff;display:none;flex-direction:column;";
 
     var bar = document.createElement("div");
     bar.style.cssText =
@@ -129,14 +127,24 @@
     document.body.appendChild(overlay);
 
     function hide() {
-      overlay.style.left = "-100000px";
+      overlay.style.display = "none";
       document.documentElement.style.overflow = "";
-      // Ask the editor for a fresh preview reflecting the customer's edits.
+    }
+    // On close: snapshot the design while the editor is STILL VISIBLE (rendered),
+    // then hide as soon as the fresh preview arrives (or after a short fallback).
+    // Capturing while visible is what makes the card update on the first close.
+    function requestHideWithPreview() {
+      host._walleryPendingHide = true;
       try {
         iframe.contentWindow.postMessage({ type: "WALLERY_REQUEST_PREVIEW" }, "*");
       } catch (e) { /* cross-origin timing */ }
+      if (host._walleryHideTimer) clearTimeout(host._walleryHideTimer);
+      host._walleryHideTimer = setTimeout(function () {
+        host._walleryPendingHide = false;
+        hide();
+      }, 1400);
     }
-    close.addEventListener("click", hide);
+    close.addEventListener("click", requestHideWithPreview);
 
     // ADD_TO_CART fires only while the editor is open, so a single listener is fine.
     window.addEventListener("message", function (e) {
@@ -160,7 +168,7 @@
 
   function openOverlay(host) {
     var o = getOverlay(host);
-    o.el.style.left = "0";
+    o.el.style.display = "flex";
     document.documentElement.style.overflow = "hidden";
   }
 
@@ -207,22 +215,31 @@
       openOverlay(host);
     });
 
-    // Show the design motif in the card. The editor posts WALLERY_PREVIEW: its
-    // default design once ready, and an updated snapshot when the overlay closes.
+    // Show the design motif in the card. The editor posts WALLERY_PREVIEW when it
+    // renders (default design) and when we request one on close. We cache the last
+    // one so the motif shows immediately on the customer's NEXT visit too.
     var img = shadow.querySelector("[data-preview]");
+    host._walleryImg = img;
+    var cacheKey = "wallery_preview_" + (host.dataset.templateSlug || host.dataset.productHandle || "");
+    try {
+      var cached = localStorage.getItem(cacheKey);
+      if (cached) { img.src = cached; img.style.display = "block"; }
+    } catch (e) { /* storage disabled */ }
+
     window.addEventListener("message", function (e) {
       var d = e.data;
       if (!d || d.type !== "WALLERY_PREVIEW" || !d.image) return;
       img.src = d.image;
       img.style.display = "block";
+      try { localStorage.setItem(cacheKey, d.image); } catch (e2) { /* quota */ }
+      // If a close is pending (snapshot-on-close), the fresh preview has arrived
+      // while still visible — now hide.
+      if (host._walleryPendingHide) {
+        host._walleryPendingHide = false;
+        if (host._walleryHideTimer) clearTimeout(host._walleryHideTimer);
+        if (host._walleryOverlay) host._walleryOverlay.hide();
+      }
     });
-
-    // Preload the editor (hidden) so the default preview appears from the start
-    // — and so opening it is instant. Deferred to idle so it doesn't block the
-    // product page's first paint.
-    var preload = function () { getOverlay(host); };
-    if (window.requestIdleCallback) window.requestIdleCallback(preload, { timeout: 3000 });
-    else window.setTimeout(preload, 1500);
   }
 
   function init() {
