@@ -15,6 +15,13 @@
   // The hosted Wallery app (editor). Later: custom domain.
   var APP_ORIGIN = "https://motivator-8uw.pages.dev";
 
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
   // --- Inherit the theme's design tokens (so the entry card fits the store) --
   function readThemeTokens() {
     var body = getComputedStyle(document.body);
@@ -97,7 +104,7 @@
       "flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:8px;" +
       "padding:8px 12px;background:#fff;border-bottom:1px solid rgba(0,0,0,.08);";
     var label = document.createElement("span");
-    label.textContent = "Anpassa din design";
+    label.textContent = host.dataset.overlayTitle || "Customize your design";
     label.style.cssText = "font:600 15px/1.2 system-ui,-apple-system,sans-serif;color:#1a1a1a;";
     var close = document.createElement("button");
     close.type = "button";
@@ -159,6 +166,17 @@
     var radius = host.dataset.radius ? host.dataset.radius + "px" : tokens.radius;
     var font = host.dataset.inheritFonts !== "false" ? tokens.font : "system-ui, -apple-system, sans-serif";
 
+    // Merchant-configurable content (theme editor), with English defaults.
+    var padding = (host.dataset.padding || "20") + "px";
+    var showTexts = host.dataset.showTexts !== "false";
+    var heading = host.dataset.heading || "Make it yours";
+    var subtext = host.dataset.subtext || "Create your personal design before adding to cart.";
+    var buttonLabel = host.dataset.buttonLabel || "Open customizer";
+
+    var textsHtml = showTexts
+      ? "<h3>" + esc(heading) + "</h3><p>" + esc(subtext) + "</p>"
+      : "";
+
     var shadow = host.attachShadow({ mode: "open" });
     shadow.innerHTML =
       "<style>" +
@@ -166,16 +184,15 @@
       ".w{font-family:" + font + ";color:" + tokens.text + ";" +
       "--p:" + accent + ";--pt:" + tokens.primaryText + ";--r:" + radius + ";" +
       "box-sizing:border-box;width:100%;border:1px solid rgba(0,0,0,.12);" +
-      "border-radius:var(--r);padding:20px;margin:16px 0;}" +
+      "border-radius:var(--r);padding:" + padding + ";margin:16px 0;}" +
       ".w h3{margin:0 0 6px;font-size:1.15em;}" +
       ".w p{margin:0 0 16px;opacity:.7;font-size:.9em;}" +
       ".w button{font:inherit;font-weight:600;cursor:pointer;border:0;background:var(--p);" +
       "color:var(--pt);border-radius:var(--r);padding:12px 22px;width:100%;}" +
       "@media(min-width:600px){.w button{width:auto;}}" +
       "</style>" +
-      '<div class="w"><h3>Gör den till din</h3>' +
-      "<p>Skapa din personliga design innan du lägger i varukorgen.</p>" +
-      '<button type="button" data-open>Öppna anpassaren</button></div>';
+      '<div class="w">' + textsHtml +
+      '<button type="button" data-open>' + esc(buttonLabel) + "</button></div>";
 
     shadow.querySelector("[data-open]").addEventListener("click", function () {
       openOverlay(host);

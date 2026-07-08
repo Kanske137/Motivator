@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import type mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useEditorStore, type PhotoLayerValue } from "@/stores/editorStore";
@@ -254,6 +255,7 @@ export function MapPreview({
   wrapCm = 0,
   layersIncludeWrap = false,
 }: Props) {
+  const { t } = useTranslation();
   const frameRef = useRef<HTMLDivElement>(null);
   /** Per-layer Mapbox instance refs, populated by `MapLayerInstance` via
    *  `onMapReady`. Used by `MapIconsOverlay` to project geo-anchored icons. */
@@ -872,7 +874,7 @@ export function MapPreview({
                 zIndex: 42,
               }}
             >
-              Synlig framsida · innehållet här viks om på sidorna
+              {t("canvas.wrapHint", { defaultValue: "Visible front · content wraps around the sides" })}
             </span>
           </div>
         )}

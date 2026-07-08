@@ -1,4 +1,7 @@
 {
+  "canvas": {
+    "wrapHint": "Synlig framsida · innehållet viks runt sidorna"
+  },
   "editorError": {
     "templateNotFoundTitle": "Mallen kunde inte hittas",
     "templateNotFoundBody": "Vi hittade ingen mall för den här produkten. Kontakta support om problemet kvarstår."

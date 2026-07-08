@@ -21,6 +21,12 @@
     data-accent="{{ block.settings.accent_color }}"
     data-radius="{{ block.settings.corner_radius }}"
     data-inherit-fonts="{{ block.settings.inherit_fonts }}"
+    data-padding="{{ block.settings.padding }}"
+    data-show-texts="{{ block.settings.show_texts }}"
+    data-heading="{{ block.settings.heading | escape }}"
+    data-subtext="{{ block.settings.subtext | escape }}"
+    data-button-label="{{ block.settings.button_label | escape }}"
+    data-overlay-title="{{ block.settings.overlay_title | escape }}"
     {{ block.shopify_attributes }}
   ></div>
   <script src="{{ 'wallery-widget.js' | asset_url }}" defer></script>
@@ -33,7 +39,33 @@
   "name": "Wallery Customizer",
   "target": "section",
   "settings": [
+    { "type": "header", "content": "Innehåll" },
+    {
+      "type": "checkbox",
+      "id": "show_texts",
+      "label": "Visa texter (rubrik + undertext)",
+      "default": true
+    },
+    { "type": "text", "id": "heading", "label": "Rubrik", "default": "Make it yours" },
+    {
+      "type": "text",
+      "id": "subtext",
+      "label": "Undertext",
+      "default": "Create your personal design before adding to cart."
+    },
+    { "type": "text", "id": "button_label", "label": "Knapptext", "default": "Open customizer" },
+    { "type": "text", "id": "overlay_title", "label": "Rubrik i anpassaren", "default": "Customize your design" },
     { "type": "header", "content": "Utseende" },
+    {
+      "type": "range",
+      "id": "padding",
+      "label": "Padding",
+      "min": 0,
+      "max": 48,
+      "step": 2,
+      "unit": "px",
+      "default": 20
+    },
     {
       "type": "checkbox",
       "id": "inherit_fonts",
