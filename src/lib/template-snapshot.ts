@@ -98,9 +98,12 @@ function pickHiresMaxPx(): number {
   const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
   const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
   const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(ua);
-  if (isMobile) return 2800;
-  if (dpr >= 2) return 4800;
-  return 4200;
+  // Print files: push resolution as high as the browser canvas reliably allows
+  // (~150 DPI for the largest sizes; smaller sizes hit the full 60 px/cm ≈ 152
+  // DPI). True 300 DPI for large formats needs server-side rendering (per-POD).
+  if (isMobile) return 3400;
+  if (dpr >= 2) return 6400;
+  return 5600;
 }
 
 function parseSize(size: string, orientation: "portrait" | "landscape") {
@@ -629,7 +632,7 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
   const wCm = frontWcm + 2 * extraCm;
   const hCm = frontHcm + 2 * extraCm;
 
-  const PX_PER_CM = input.hires ? 48 : 24;
+  const PX_PER_CM = input.hires ? 60 : 24;
   const MAX_PX = input.maxPxOverride ?? (input.hires ? pickHiresMaxPx() : 1800);
   const longestPx = Math.max(wCm, hCm) * PX_PER_CM;
   const scale = longestPx > MAX_PX ? MAX_PX / longestPx : 1;
@@ -1023,7 +1026,8 @@ export async function renderHiresTemplateSnapshotSafe(
   const t0 = performance.now();
   let lastErr: unknown = null;
   const initialMax = pickHiresMaxPx();
-  const attempts = [initialMax, Math.round(initialMax * 0.7)];
+  // Step down on canvas failures (Safari caps total canvas area ~16.7 MP).
+  const attempts = [initialMax, Math.round(initialMax * 0.72), Math.round(initialMax * 0.5)];
   for (const maxPx of attempts) {
     try {
       const dataUrl = await renderTemplateSnapshot({

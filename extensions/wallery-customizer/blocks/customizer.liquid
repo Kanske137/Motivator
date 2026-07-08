@@ -32,6 +32,20 @@
     {{ block.shopify_attributes }}
   ></div>
   <script src="{{ 'wallery-widget.js' | asset_url }}" defer></script>
+  {%- if block.settings.hide_buy_now -%}
+    {%- comment -%}
+      Hide the theme's express-checkout ("Buy now") on Wallery products. It renders
+      as <shopify-accelerated-checkout> (shadow DOM) so we can't inject the design
+      into it — customers must use "Add to cart" (which we route through the
+      customizer). Targets the structure, not text → language/theme independent.
+    {%- endcomment -%}
+    <style>
+      .shopify-payment-button,
+      [data-shopify="payment-button"],
+      shopify-accelerated-checkout,
+      shopify-payment-terms { display: none !important; }
+    </style>
+  {%- endif -%}
 {%- else -%}
   {%- comment -%} Not a Wallery product — render nothing. {%- endcomment -%}
 {%- endif -%}
@@ -63,6 +77,13 @@
       "label": "Show the design in the product image area",
       "info": "Best-effort: replaces the theme's main product image with the live preview (works on Dawn + most 2.0 themes). Falls back to this block's own preview when it can't. Tip: place the block just below the product media.",
       "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "hide_buy_now",
+      "label": "Hide the theme's \"Buy now\" button",
+      "info": "Recommended. The express checkout can't include the customer's design, so they should use \"Add to cart\" (which does).",
+      "default": true
     },
     { "type": "header", "content": "Appearance" },
     {
