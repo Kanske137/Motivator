@@ -82,15 +82,30 @@
     return best;
   }
 
-  // ALL of the theme's product-media images (main gallery + zoom/lightbox
-  // duplicates) so the design shows everywhere the product image appears.
+  // Sections whose product images must NEVER be swapped. Recommended / related /
+  // upsell blocks reuse the SAME theme media classes as the main gallery, so a
+  // page-wide selector would overwrite OTHER products' cards with THIS design.
+  var MEDIA_EXCLUDE =
+    'header, nav, footer, [class*="header" i], [class*="footer" i], ' +
+    '[class*="recommend" i], [class*="related" i], [class*="complementary" i], ' +
+    '[class*="upsell" i], [class*="cross-sell" i], [class*="you-may" i], ' +
+    '[class*="also-like" i], product-recommendations';
+  function inExcludedSection(el) {
+    return !!(el.closest && el.closest(MEDIA_EXCLUDE));
+  }
+
+  // ALL of the MAIN product's media images (main gallery + zoom/lightbox
+  // duplicates) so the design shows everywhere the product image appears —
+  // but NEVER the recommended/related product cards.
   function galleryImgs() {
     var sels = mediaSelectors();
     var out = [];
     for (var i = 0; i < sels.length; i++) {
       var els = document.querySelectorAll(sels[i]);
       for (var j = 0; j < els.length; j++) {
-        if (els[j].tagName === "IMG" && out.indexOf(els[j]) < 0) out.push(els[j]);
+        if (els[j].tagName === "IMG" && !inExcludedSection(els[j]) && out.indexOf(els[j]) < 0) {
+          out.push(els[j]);
+        }
       }
     }
     if (out.length === 0) {
