@@ -3,3 +3,4 @@
 # the theme editor. It renders only on products created via a Wallery template.
 name = "wallery-customizer"
 type = "theme"
+uid = "1fe54d97-4c70-dc32-4234-d5e47490c941ba1af3e6"
