@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Rnd } from "react-rnd";
 import type { Aspect, TemplateLayer } from "@/lib/template-schema";
+import { buildShapeClipPath, type ClipShape } from "@/lib/shape-clip";
 import {
   clampLayerBounds,
   snapPct,
@@ -156,8 +157,9 @@ export default function LayerCanvas({
       case "shape":
         return <ShapeLayerView layer={layer} canvasShortPx={Math.min(size.w, size.h)} />;
       case "photo": {
-        const clipPath =
-          layer.defaults.shape === "circle" ? "circle(50% at 50% 50%)" : undefined;
+        // Same per-shape clip as the customer editor (circle/heart/star), not
+        // circle-only — otherwise heart/star show as a rectangle in admin.
+        const clipPath = buildShapeClipPath(layer.defaults.shape as ClipShape, wPx, hPx);
         const src = layer.defaults.placeholderUrl;
         return (
           <div className="absolute inset-0 overflow-hidden" style={{ clipPath }}>
@@ -179,9 +181,11 @@ export default function LayerCanvas({
         );
       }
       case "aiPhoto": {
-        const clipPath =
-          layer.defaults.shape === "circle" ? "circle(50% at 50% 50%)" : undefined;
-        const src = layer.defaults.referenceImageUrl;
+        const clipPath = buildShapeClipPath(layer.defaults.shape as ClipShape, wPx, hPx);
+        // Resolve the source like the customer editor (multi-ref array first,
+        // legacy single field as fallback) so both show the same reference.
+        const aiRefs = layer.defaults.referenceImages ?? [];
+        const src = aiRefs[0]?.url ?? layer.defaults.referenceImageUrl;
         const isRemoveBg = layer.defaults.subjectKind === "removeBackground";
         const placeholderText = isRemoveBg
           ? "✨ AI-bild (bakgrund tas bort)"
