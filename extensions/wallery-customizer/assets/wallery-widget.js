@@ -56,42 +56,65 @@
     }
   }
 
-  function getMediaImg() {
+  function mediaSelectors() {
     var name = themeName();
     var selectors = [];
     for (var k in THEME_MEDIA) {
-      if (k !== "_default" && name && name.indexOf(k) !== -1) {
-        selectors = selectors.concat(THEME_MEDIA[k]);
-      }
+      if (k !== "_default" && name && name.indexOf(k) !== -1) selectors = selectors.concat(THEME_MEDIA[k]);
     }
-    selectors = selectors.concat(THEME_MEDIA._default);
-    var fallback = null;
-    for (var i = 0; i < selectors.length; i++) {
-      var els = document.querySelectorAll(selectors[i]);
-      for (var j = 0; j < els.length; j++) {
-        var el = els[j];
-        if (el.tagName !== "IMG") continue;
-        var r = el.getBoundingClientRect();
-        // Galleries keep hidden placeholder/duplicate slides (0x0) — pick the
-        // VISIBLE, reasonably-sized image, not just the first DOM match.
-        if (r.width >= 80 && r.height >= 80) return el;
-        if (!fallback) fallback = el;
-      }
-    }
-    return fallback;
+    return selectors.concat(THEME_MEDIA._default);
   }
 
-  // Replace the theme's main product image with the design preview. Returns true
-  // if a target was found (else the caller falls back to the block's own box).
+  // Theme-agnostic last resort: the largest visible image in the product area
+  // (excludes header/nav/footer/related/cards/modals). Lets unknown themes work.
+  function heuristicMainImg() {
+    var best = null, bestArea = 0;
+    var imgs = document.querySelectorAll("img");
+    for (var i = 0; i < imgs.length; i++) {
+      var img = imgs[i];
+      if (img.closest('header,nav,footer,[class*="header" i],[class*="nav" i],[class*="footer" i],[class*="recommend" i],[class*="related" i],[class*="card" i],[class*="modal" i],[class*="drawer" i]')) continue;
+      var r = img.getBoundingClientRect();
+      if (r.width < 200 || r.height < 200) continue;
+      if (r.top > window.innerHeight * 1.5) continue; // product image sits near the top
+      var area = r.width * r.height;
+      if (area > bestArea) { bestArea = area; best = img; }
+    }
+    return best;
+  }
+
+  // ALL of the theme's product-media images (main gallery + zoom/lightbox
+  // duplicates) so the design shows everywhere the product image appears.
+  function galleryImgs() {
+    var sels = mediaSelectors();
+    var out = [];
+    for (var i = 0; i < sels.length; i++) {
+      var els = document.querySelectorAll(sels[i]);
+      for (var j = 0; j < els.length; j++) {
+        if (els[j].tagName === "IMG" && out.indexOf(els[j]) < 0) out.push(els[j]);
+      }
+    }
+    if (out.length === 0) {
+      var h = heuristicMainImg();
+      if (h) out.push(h);
+    }
+    return out;
+  }
+
+  // Replace ALL product-media images (main + zoom/lightbox) with the design.
+  // Returns true if the theme has a product gallery (so the block can hide its
+  // own fallback box). Skips images already showing our design.
   function swapGallery(src) {
-    var img = getMediaImg();
-    if (!img) return false;
-    var pic = img.closest && img.closest("picture");
-    if (pic) pic.querySelectorAll("source").forEach(function (s) { s.remove(); });
-    img.removeAttribute("srcset");
-    img.removeAttribute("data-srcset");
-    img.srcset = "";
-    img.src = src;
+    var imgs = galleryImgs();
+    if (!imgs.length) return false;
+    imgs.forEach(function (img) {
+      if (img.src === src) return;
+      var pic = img.closest && img.closest("picture");
+      if (pic) pic.querySelectorAll("source").forEach(function (s) { s.remove(); });
+      img.removeAttribute("srcset");
+      img.removeAttribute("data-srcset");
+      img.srcset = "";
+      img.src = src;
+    });
     return true;
   }
 
@@ -337,7 +360,19 @@
       [300, 800, 1500, 2500].forEach(function (d) {
         window.setTimeout(applyGallery, d);
       });
+      // Re-inject when the theme renders more media on demand (lightbox/zoom
+      // opens, variant re-render). Debounced; swapGallery skips already-swapped.
+      var gt = null;
+      try {
+        new MutationObserver(function () {
+          if (gt) return;
+          gt = window.setTimeout(function () { gt = null; applyGallery(); }, 250);
+        }).observe(document.documentElement, { childList: true, subtree: true });
+      } catch (e) {
+        /* observer unavailable */
+      }
     }
+
 
     // Motif in the card: cached default (repeat visit) or the admin-generated
     // default the block passes (first visit); updated live while editing. The
