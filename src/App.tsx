@@ -9,6 +9,7 @@ import EditorPage from "./pages/EditorPage.tsx";
 import AdminConfigs from "./pages/AdminConfigs.tsx";
 import DesignerPage from "./pages/admin/DesignerPage.tsx";
 import SettingsPage from "./pages/admin/SettingsPage.tsx";
+import AiLibraryPage from "./pages/admin/AiLibraryPage.tsx";
 
 import { useCartSync } from "./hooks/useCartSync";
 import { useShopContextBootstrap } from "./hooks/useShopContextBootstrap";
@@ -27,6 +28,7 @@ const AppRoutes = () => {
         <ui-nav-menu>
           <a href="/admin/configs" rel="home">Templates</a>
           <a href="/admin/settings">Pricing</a>
+          <a href="/admin/ai">AI</a>
         </ui-nav-menu>
       )}
       <Routes>
@@ -36,6 +38,7 @@ const AppRoutes = () => {
       <Route path="/admin/configs" element={<AdminConfigs />} />
       <Route path="/admin/designer/:handle" element={<DesignerPage />} />
       <Route path="/admin/settings" element={<SettingsPage />} />
+      <Route path="/admin/ai" element={<AiLibraryPage />} />
       <Route path="*" element={<NotFound />} />
       </Routes>
     </>
