@@ -36,6 +36,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { replicatePredict } from "../_shared/replicate.ts";
+import { runRecipe, type ExecRecipe } from "../_shared/ai-models.ts";
 
 
 const corsHeaders = {
@@ -941,6 +942,69 @@ Deno.serve(async (req) => {
       : "human") as "human" | "pet" | "removeBackground";
     const designId: string =
       typeof body?.designId === "string" ? body.designId : crypto.randomUUID();
+
+    // ── Recipe executor path (Step 2b). Runs ONLY when the request carries a
+    //    `recipe`; the legacy subjectKind routing below is untouched. Same
+    //    response shape → client + pipelines see no difference. ────────────────
+    if (body?.recipe && typeof body.recipe === "object") {
+      const RECIPE_TOKEN = Deno.env.get("REPLICATE_API_TOKEN");
+      if (!RECIPE_TOKEN) {
+        return fallbackResponse(
+          "Tjänsten är tillfälligt otillgänglig. Försök igen senare.",
+          "REPLICATE_API_TOKEN not configured (recipe)",
+        );
+      }
+      const customerImageUrls: string[] = Array.isArray(body.customerImageUrls)
+        ? body.customerImageUrls.filter((u: unknown) => typeof u === "string")
+        : faceImageUrl ? [faceImageUrl] : [];
+      const referenceImageUrls: string[] = Array.isArray(body.referenceImageUrls)
+        ? body.referenceImageUrls.filter((u: unknown) => typeof u === "string")
+        : referenceImageUrl ? [referenceImageUrl] : [];
+      const optionValues: Record<string, string> =
+        body.optionValues && typeof body.optionValues === "object" ? body.optionValues : {};
+
+      const recipe = body.recipe as ExecRecipe;
+      console.log(
+        `[face-swap] recipe run model=${recipe.model} steps=${recipe.steps?.length ?? 0} ` +
+          `customer=${customerImageUrls.length} ref=${referenceImageUrls.length} designId=${designId}`,
+      );
+      const rec = await runRecipe(
+        recipe,
+        { customerImageUrls, referenceImageUrls, optionValues },
+        RECIPE_TOKEN,
+      );
+      if (!rec.ok) {
+        return fallbackResponse(
+          "Vi kunde inte skapa bilden den här gången. Försök igen.",
+          `recipe ${recipe.model}: ${rec.error}`,
+        );
+      }
+      const supabase = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      );
+      const ext = rec.contentType.includes("png") ? "png" : "jpg";
+      const path = `${designId}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("print-files")
+        .upload(path, rec.bytes, { contentType: rec.contentType, upsert: true });
+      if (upErr) {
+        return fallbackResponse(
+          "Vi kunde inte spara den genererade bilden. Försök igen.",
+          `recipe upload failed: ${upErr.message}`,
+        );
+      }
+      const { data: pub } = supabase.storage.from("print-files").getPublicUrl(path);
+      const printFileUrl = pub.publicUrl;
+      return jsonResponse({
+        output: printFileUrl,
+        previewUrl: printFileUrl,
+        printFileUrl,
+        replicateOutputUrl: rec.outputUrl,
+        modelUsed: recipe.model,
+        route: "recipe",
+      });
+    }
 
     // -------- Fas 0 stub: skip all models, return a known transparent PNG --
     // Trigger: ?engine=flux&stub=1 with subjectKind=removeBackground.
