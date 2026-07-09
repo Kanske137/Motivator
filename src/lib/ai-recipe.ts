@@ -9,6 +9,7 @@
 //   - AiRecipe (the how)   → model + prompt + params. Reusable; shop-level library.
 //   - MediaLayerAi (the what) → a layer points at a recipe + supplies references.
 import { z } from "zod";
+import { DEFAULT_AI_STYLES } from "./ai-style-defaults";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Model catalog — curated. We own the Replicate identifiers + params. Merchants
@@ -79,12 +80,14 @@ export const MODEL_CATALOG: Record<ModelId, ModelSpec> = {
   cutout: {
     id: "cutout",
     label: "Cutout (remove background)",
-    blurb: "Clean background removal; pairs with a backdrop/ring step.",
+    blurb: "Clean background removal to a transparent PNG; the template's own background shows through.",
     replicate: "851-labs/background-remover",
     usesPrompt: false,
     customerImages: { min: 1, max: 1 },
     referenceImages: { min: 0, max: 0 },
-    params: ["backdropColor", "outputFormat"],
+    // No backdropColor: the adapter always returns transparent RGBA. A solid
+    // backdrop is the template's job, not the model's.
+    params: ["outputFormat"],
     costTier: "low",
   },
 };
@@ -203,9 +206,29 @@ export const aiStyleSchema = z.object({
 export type AiStyle = z.infer<typeof aiStyleSchema>;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Built-in starter recipes — reproduce today's five modes. Prompts are finalized
+// Built-in starter recipes — reproduce today's modes. Prompts are finalized
 // against the current edge-function prompts when the executor is wired (2c/2d).
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** The starter style palette as customerOption choices.
+ *
+ *  `pick` chooses which text reaches the model. Alone, art-style takes the long
+ *  descriptive `prompt`. In the style→cutout chain it takes the short
+ *  `styleInstruction` — that is what the legacy `simpleStyleMode` path feeds
+ *  Kontext, and terse instructions survive the later cutout far better. */
+function styleChoices(pick: "prompt" | "styleInstruction") {
+  return DEFAULT_AI_STYLES.map((s) => ({
+    id: s.id,
+    label: s.label,
+    value: (pick === "styleInstruction" ? s.styleInstruction : s.prompt) || s.prompt,
+    thumbnailUrl: s.thumbnailUrl,
+  }));
+}
+
+function styleOption(pick: "prompt" | "styleInstruction"): CustomerOption {
+  return { id: "style", label: "Choose a style", injectAs: "style", choices: styleChoices(pick) };
+}
+
 export const BUILTIN_RECIPES: AiRecipe[] = [
   {
     id: "builtin-face-swap",
@@ -227,10 +250,11 @@ export const BUILTIN_RECIPES: AiRecipe[] = [
   },
   {
     id: "builtin-cutout",
-    name: "Cutout on a backdrop",
-    description: "Remove the background and place the subject on a clean backdrop.",
+    name: "Cutout (transparent)",
+    description:
+      "Remove the background and keep the subject on transparency, over the template's own background.",
     model: "cutout",
-    params: { backdropColor: "#FFFFFF" },
+    params: { outputFormat: "png" },
     builtIn: true,
   },
   {
@@ -239,9 +263,24 @@ export const BUILTIN_RECIPES: AiRecipe[] = [
     description: "Let the customer restyle their photo with one of your styles.",
     model: "art-style",
     prompt: "{style}",
-    customerOptions: [
-      { id: "style", label: "Choose a style", injectAs: "style", choices: [] },
-    ],
+    params: { aspectRatio: "match_customer", outputFormat: "jpg" },
+    customerOptions: [styleOption("prompt")],
+    builtIn: true,
+  },
+  {
+    // Mirrors the legacy `simpleStyleMode` route: Kontext restyles, then the
+    // background-remover cuts the styled subject out. Style FIRST — running the
+    // cutout first would hand Kontext a transparent PNG and it would repaint the
+    // background back in.
+    id: "builtin-style-cutout",
+    name: "Art style + cutout",
+    description:
+      "Restyle the customer's photo, then remove the background — the styled subject lands on your template's background.",
+    model: "art-style",
+    prompt: "{style}",
+    params: { aspectRatio: "match_customer", outputFormat: "png" },
+    customerOptions: [styleOption("styleInstruction")],
+    steps: [{ model: "cutout", input: "previous", params: { outputFormat: "png" } }],
     builtIn: true,
   },
 ];
