@@ -56,9 +56,9 @@ export const MODEL_CATALOG: Record<ModelId, ModelSpec> = {
     id: "ai-edit",
     label: "AI photo edit",
     blurb: "Prompted multi-image edits — pet portraits, full-head swaps, scene compositing.",
-    // Verified live as google/nano-banana. APPROVED upgrade to validate when the
-    // executor runs: google/nano-banana-2 (Gemini 3.1 = the original app's model).
-    replicate: "google/nano-banana",
+    // Nano Banana 2 (Gemini 3.1) — the original app's model. cdingram can't do
+    // animals, so pets / prompted edits run here.
+    replicate: "google/nano-banana-2",
     usesPrompt: true,
     customerImages: { min: 1, max: 4 },
     referenceImages: { min: 0, max: 3 },

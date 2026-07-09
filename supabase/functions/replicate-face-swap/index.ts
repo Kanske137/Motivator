@@ -52,8 +52,8 @@ const FACE_SWAP_MODEL_NAME = "cdingram/face-swap";
 // Nano Banana (Gemini image) via Replicate — same REPLICATE_API_TOKEN as the
 // other models, so ALL AI now runs through Replicate (no Lovable gateway).
 const NANO_BANANA_URL =
-  "https://api.replicate.com/v1/models/google/nano-banana/predictions";
-const ANIMAL_MODEL = "google/nano-banana";
+  "https://api.replicate.com/v1/models/google/nano-banana-2/predictions";
+const ANIMAL_MODEL = "google/nano-banana-2";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

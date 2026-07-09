@@ -27,8 +27,8 @@ const corsHeaders = {
 };
 
 const NANO_BANANA_URL =
-  "https://api.replicate.com/v1/models/google/nano-banana/predictions";
-const MODEL = "google/nano-banana";
+  "https://api.replicate.com/v1/models/google/nano-banana-2/predictions";
+const MODEL = "google/nano-banana-2";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

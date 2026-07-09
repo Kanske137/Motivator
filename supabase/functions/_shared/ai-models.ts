@@ -16,7 +16,7 @@ const PREDICTIONS_URL = "https://api.replicate.com/v1/predictions";
 const FACE_SWAP_VERSION =
   "d1d6ea8c8be89d664a07a457526f7128109dee7030fdac424788d762c71ed111";
 const NANO_BANANA_URL =
-  "https://api.replicate.com/v1/models/google/nano-banana/predictions";
+  "https://api.replicate.com/v1/models/google/nano-banana-2/predictions";
 const FLUX_KONTEXT_URL =
   "https://api.replicate.com/v1/models/black-forest-labs/flux-kontext-pro/predictions";
 const BG_REMOVER_VERSION =
