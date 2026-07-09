@@ -35,6 +35,7 @@
 // toast instead of crashing on a non-2xx.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { replicatePredict } from "../_shared/replicate.ts";
 
 
 const corsHeaders = {
@@ -134,50 +135,52 @@ async function runReplicateFaceSwap(params: {
     };
   }
 
-  const start = await fetch(`https://api.replicate.com/v1/predictions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
-      "Content-Type": "application/json",
-      Prefer: "wait=30",
-    },
-    body: JSON.stringify({
+  // Adapter: Replicate cdingram/face-swap via the shared prediction runner.
+  const res = await replicatePredict({
+    apiKey: REPLICATE_API_TOKEN,
+    endpoint: "https://api.replicate.com/v1/predictions",
+    body: {
       version: FACE_SWAP_MODEL_VERSION.split(":")[1],
       input: {
         input_image: params.referenceImageUrl,
         swap_image: params.faceImageUrl,
       },
-    }),
+    },
+    waitSeconds: 30,
+    deadlineMs: 90_000,
   });
 
-  let prediction = await start.json();
-  if (!start.ok) {
-    console.error("[face-swap] replicate start failed", prediction);
-    return {
-      ok: false,
-      response: fallbackResponse(
-        "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
-        `Replicate start failed: ${prediction?.detail ?? start.status}`,
-      ),
-    };
-  }
-
-  const deadline = Date.now() + 90_000;
-  while (
-    prediction.status !== "succeeded" &&
-    prediction.status !== "failed" &&
-    prediction.status !== "canceled" &&
-    Date.now() < deadline
-  ) {
-    await new Promise((r) => setTimeout(r, 1500));
-    const poll = await fetch(prediction.urls.get, {
-      headers: { Authorization: `Bearer ${REPLICATE_API_TOKEN}` },
-    });
-    prediction = await poll.json();
-  }
-
-  if (prediction.status !== "succeeded") {
-    const errStr = String(prediction.error ?? "").toLowerCase();
+  if (!res.ok) {
+    if (res.stage === "start") {
+      console.error("[face-swap] replicate start failed", res.error);
+      return {
+        ok: false,
+        response: fallbackResponse(
+          "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
+          `Replicate start failed: ${res.status}`,
+        ),
+      };
+    }
+    if (res.stage === "output") {
+      return {
+        ok: false,
+        response: fallbackResponse(
+          "Vi kunde inte hitta något tydligt ansikte i din bild. Prova en annan bild med tydligt ansikte och bra ljus.",
+          "Replicate succeeded but produced no output URL",
+        ),
+      };
+    }
+    if (res.stage === "fetch") {
+      return {
+        ok: false,
+        response: fallbackResponse(
+          "Vi kunde inte hämta den genererade bilden. Försök igen.",
+          `Replicate image fetch failed ${res.status}`,
+        ),
+      };
+    }
+    // stage "poll": failed / canceled / timeout — usually a missing face.
+    const errStr = res.error.toLowerCase();
     const noFace =
       errStr.includes("no face") ||
       errStr.includes("face not detected") ||
@@ -188,37 +191,12 @@ async function runReplicateFaceSwap(params: {
         noFace
           ? "Vi kunde inte hitta något ansikte i din bild. Prova en annan bild med tydligt ansikte och bra ljus."
           : "Vi kunde inte skapa bilden den här gången. Prova en annan bild eller försök igen.",
-        `Replicate ${prediction.status}: ${prediction.error || "timeout"}`,
+        `Replicate poll: ${res.error}`,
       ),
     };
   }
 
-  const output = Array.isArray(prediction.output)
-    ? prediction.output[0]
-    : prediction.output;
-  if (!output) {
-    return {
-      ok: false,
-      response: fallbackResponse(
-        "Vi kunde inte hitta något tydligt ansikte i din bild. Prova en annan bild med tydligt ansikte och bra ljus.",
-        "Replicate succeeded but produced no output URL",
-      ),
-    };
-  }
-
-  const imgRes = await fetch(output);
-  if (!imgRes.ok) {
-    return {
-      ok: false,
-      response: fallbackResponse(
-        "Vi kunde inte hämta den genererade bilden. Försök igen.",
-        `Replicate image fetch failed ${imgRes.status}`,
-      ),
-    };
-  }
-  const bytes = new Uint8Array(await imgRes.arrayBuffer());
-  const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
-  return { ok: true, bytes, contentType, outputUrl: output };
+  return { ok: true, bytes: res.bytes, contentType: res.contentType, outputUrl: res.outputUrl };
 }
 
 // ---------- Shared helper: call Nano Banana 2 via Lovable AI Gateway ----------
