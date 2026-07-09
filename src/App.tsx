@@ -26,9 +26,12 @@ const AppRoutes = () => {
           Only in the embedded admin (not the storefront editor). */}
       {isEmbedded() && (
         <ui-nav-menu>
-          <a href="/admin/configs" rel="home">Templates</a>
+          {/* App Bridge treats the rel="home" link as the app title, not a tab —
+              Template needs its own entry to actually show up. */}
+          <a href="/" rel="home">Motiv</a>
+          <a href="/admin/configs">Template</a>
           <a href="/admin/settings">Pricing</a>
-          <a href="/admin/ai">AI</a>
+          <a href="/admin/ai">AI recipes</a>
         </ui-nav-menu>
       )}
       <Routes>
