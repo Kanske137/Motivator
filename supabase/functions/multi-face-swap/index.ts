@@ -19,6 +19,7 @@
 // toast instead of crashing on a non-2xx.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { replicatePredict } from "../_shared/replicate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -63,36 +64,35 @@ async function callNanoBananaOnce(params: {
   | { ok: true; bytes: Uint8Array; contentType: string; outputUrl: string }
   | { ok: false; retriable: boolean; status: number; reason: string; userMessage: string }
 > {
-  // Replicate-hosted Nano Banana (google/nano-banana): text prompt + an array of
-  // reference image URLs → one generated image URL.
-  const start = await fetch(NANO_BANANA_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${params.apiKey}`,
-      "Content-Type": "application/json",
-      Prefer: "wait=55",
-    },
-    body: JSON.stringify({
+  // Adapter: Replicate google/nano-banana via the shared prediction runner.
+  const res = await replicatePredict({
+    apiKey: params.apiKey,
+    endpoint: NANO_BANANA_URL,
+    body: {
       input: {
         prompt: params.promptText,
         image_input: params.imageUrls,
         output_format: "png",
       },
-    }),
+    },
+    waitSeconds: 55,
+    deadlineMs: 60_000,
   });
 
-  let prediction = await start.json();
-  if (!start.ok) {
-    const status = start.status;
-    console.error("[multi-face-swap] Replicate nano-banana error", status, JSON.stringify(prediction).slice(0, 300));
-    if (status === 429) {
+  if (res.ok) {
+    return { ok: true, bytes: res.bytes, contentType: res.contentType, outputUrl: res.outputUrl };
+  }
+
+  if (res.stage === "start") {
+    console.error("[multi-face-swap] Replicate nano-banana error", res.status, res.error);
+    if (res.status === 429) {
       return {
         ok: false, retriable: true, status: 429,
         reason: "Replicate rate-limited (429)",
         userMessage: "AI-tjänsten är överbelastad just nu. Vänta 10–15 sekunder och försök igen.",
       };
     }
-    if (status === 402) {
+    if (res.status === 402) {
       return {
         ok: false, retriable: false, status: 402,
         reason: "Replicate credits exhausted (402)",
@@ -100,59 +100,26 @@ async function callNanoBananaOnce(params: {
       };
     }
     return {
-      ok: false, retriable: status >= 500, status,
-      reason: `Replicate error ${status}: ${JSON.stringify(prediction).slice(0, 200)}`,
+      ok: false, retriable: res.status >= 500, status: res.status,
+      reason: `Replicate error ${res.status}: ${res.error}`,
       userMessage: "Vi kunde inte skapa bilden just nu. Försök igen om en stund.",
     };
   }
 
-  const deadline = Date.now() + 60_000;
-  while (
-    prediction.status !== "succeeded" &&
-    prediction.status !== "failed" &&
-    prediction.status !== "canceled" &&
-    Date.now() < deadline
-  ) {
-    await new Promise((r) => setTimeout(r, 1500));
-    const poll = await fetch(prediction.urls.get, {
-      headers: { Authorization: `Bearer ${params.apiKey}` },
-    });
-    prediction = await poll.json();
-  }
-
-  if (prediction.status !== "succeeded") {
+  if (res.stage === "fetch") {
     return {
-      ok: false, retriable: true, status: 200,
-      reason: `Replicate ${prediction.status}: ${prediction.error ?? "timeout"}`,
-      userMessage: "AI-modellen returnerade ingen bild den här gången. Försök igen.",
-    };
-  }
-
-  const imageUrl: string | undefined = Array.isArray(prediction.output)
-    ? prediction.output[0]
-    : prediction.output;
-
-  if (!imageUrl || typeof imageUrl !== "string") {
-    console.error("[multi-face-swap] Replicate produced no image", JSON.stringify(prediction).slice(0, 400));
-    return {
-      ok: false, retriable: true, status: 200,
-      reason: "Replicate response missing image",
-      userMessage: "AI-modellen returnerade ingen bild den här gången. Försök igen.",
-    };
-  }
-
-  const r = await fetch(imageUrl);
-  if (!r.ok) {
-    return {
-      ok: false, retriable: r.status >= 500, status: r.status,
-      reason: `AI image fetch failed ${r.status}`,
+      ok: false, retriable: res.status >= 500, status: res.status,
+      reason: `AI image fetch failed ${res.status}`,
       userMessage: "Vi kunde inte hämta den genererade bilden. Försök igen.",
     };
   }
-  const bytes = new Uint8Array(await r.arrayBuffer());
-  const contentType = r.headers.get("content-type") ?? "image/png";
 
-  return { ok: true, bytes, contentType, outputUrl: imageUrl };
+  console.error("[multi-face-swap] Replicate produced no image", res.error);
+  return {
+    ok: false, retriable: true, status: 200,
+    reason: `Replicate ${res.stage}: ${res.error}`,
+    userMessage: "AI-modellen returnerade ingen bild den här gången. Försök igen.",
+  };
 }
 
 async function callNanoBanana(params: { promptText: string; imageUrls: string[] }) {

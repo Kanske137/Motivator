@@ -2,6 +2,7 @@
 // Output laddas upp till `print-files` bucket DIREKT så att klienten har en
 // färdig print-URL att skicka in i Shopify cart properties (single pipeline).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { replicatePredict } from "../_shared/replicate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,15 +24,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Starta prediction
-    const start = await fetch("https://api.replicate.com/v1/models/black-forest-labs/flux-kontext-pro/predictions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
-        "Content-Type": "application/json",
-        Prefer: "wait=30",
-      },
-      body: JSON.stringify({
+    // Adapter: Flux Kontext Pro via the shared prediction runner.
+    const res = await replicatePredict({
+      apiKey: REPLICATE_API_TOKEN,
+      endpoint: "https://api.replicate.com/v1/models/black-forest-labs/flux-kontext-pro/predictions",
+      body: {
         input: {
           input_image: imageUrl,
           prompt,
@@ -39,36 +36,12 @@ Deno.serve(async (req) => {
           aspect_ratio: "match_input_image",
           safety_tolerance: 2,
         },
-      }),
+      },
+      waitSeconds: 30,
+      deadlineMs: 60_000,
     });
-
-    let prediction = await start.json();
-    if (!start.ok) {
-      console.error("Replicate start failed", prediction);
-      throw new Error(prediction?.detail || "Replicate request failed");
-    }
-
-    // Polla om inte klar
-    const deadline = Date.now() + 60_000;
-    while (
-      prediction.status !== "succeeded" &&
-      prediction.status !== "failed" &&
-      prediction.status !== "canceled" &&
-      Date.now() < deadline
-    ) {
-      await new Promise((r) => setTimeout(r, 1500));
-      const poll = await fetch(prediction.urls.get, {
-        headers: { Authorization: `Bearer ${REPLICATE_API_TOKEN}` },
-      });
-      prediction = await poll.json();
-    }
-
-    if (prediction.status !== "succeeded") {
-      throw new Error(`Replicate ${prediction.status}: ${prediction.error || "timeout"}`);
-    }
-
-    const output = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
-    if (!output) throw new Error("Replicate succeeded but produced no output URL");
+    if (!res.ok) throw new Error(`Replicate ${res.stage}: ${res.error}`);
+    const output = res.outputUrl;
 
     // Pass-through to print-files bucket so the client can use the public URL
     // directly as `_print_file_url` in the Shopify cart.
@@ -80,13 +53,9 @@ Deno.serve(async (req) => {
     const id = (designId && typeof designId === "string" ? designId : crypto.randomUUID());
     const path = `${id}.jpg`;
 
-    const imgRes = await fetch(output);
-    if (!imgRes.ok) throw new Error(`Replicate image fetch failed ${imgRes.status}`);
-    const imgBlob = await imgRes.blob();
-
     const { error: upErr } = await supabase.storage
       .from("print-files")
-      .upload(path, imgBlob, { contentType: "image/jpeg", upsert: true });
+      .upload(path, res.bytes, { contentType: "image/jpeg", upsert: true });
     if (upErr) throw new Error(`Print upload failed: ${upErr.message}`);
 
     const { data: pub } = supabase.storage.from("print-files").getPublicUrl(path);
