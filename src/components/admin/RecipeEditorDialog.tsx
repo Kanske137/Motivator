@@ -1,14 +1,22 @@
-// Recipe editor (Step 3b) — the "tweaker" depth of the AI library.
+// Recipe editor (Step 3b/3d) — the "tweaker" depth of the AI library.
 //
 // Merchant-facing surface, deliberately shallow: name, model, prompt. Model
 // params hide under Advanced, driven by the catalog's `params` list so a model
-// only ever shows the knobs it actually has. Chained `steps[]` and
-// `customerOptions` are not edited here yet — they round-trip untouched.
+// only ever shows the knobs it actually has.
+//
+// Two things earn their place on the main surface. The background-removal
+// FINISH, because "style it, then cut it out" is a flow merchants ask for and
+// they cannot express it otherwise. And CUSTOMER CHOICES, because a prompt
+// token without them silently ships `{style}` to the model.
+//
+// The finish hangs off the styling model, never off `cutout` — the chain only
+// works style-first (a cutout first hands Kontext a transparent PNG and it
+// paints a background back in).
 //
 // The Test panel runs the recipe through `admin-ai-recipes` → the same
 // `runRecipe` executor the customer path uses, so the preview is truthful.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Play, Upload, X } from "lucide-react";
+import { Loader2, Play, Plus, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -31,6 +39,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -38,8 +47,16 @@ import { Separator } from "@/components/ui/separator";
 import { uploadAiReferenceImage } from "@/lib/ai-reference-upload";
 import { saveRecipe, testRecipe } from "@/lib/ai-recipes-api";
 import {
+  canFinishWithCutout,
+  hasCutoutFinish,
   MODEL_CATALOG,
+  promptTokens,
+  pruneCustomerOptions,
+  setCutoutFinish,
+  STYLE_PALETTE_CHOICES,
+  validateRecipeOptions,
   type AiRecipe,
+  type CustomerOption,
   type ModelId,
   type RecipeParamKey,
   type RecipeParams,
@@ -88,11 +105,108 @@ function toDraft(r: AiRecipe): RecipeDraft {
   };
 }
 
-/** `{style}` → "style". Reserved conceptual tokens are still shown; the merchant
- *  decides what to feed them when testing. */
-function promptTokens(prompt: string | undefined): string[] {
-  if (!prompt) return [];
-  return [...new Set([...prompt.matchAll(/\{(\w+)\}/g)].map((m) => m[1]))];
+/** Editor for one prompt token's customer-facing choices. The token is what the
+ *  prompt says; the choices are what the customer will see in the storefront. */
+function CustomerOptionEditor({
+  token,
+  option,
+  onChange,
+}: {
+  token: string;
+  option: CustomerOption | undefined;
+  onChange: (next: CustomerOption) => void;
+}) {
+  const current: CustomerOption = option ?? {
+    id: token,
+    label: `Choose a ${token}`,
+    injectAs: token,
+    choices: [],
+  };
+
+  const setChoice = (i: number, patch: Partial<CustomerOption["choices"][number]>) =>
+    onChange({
+      ...current,
+      choices: current.choices.map((c, j) => (j === i ? { ...c, ...patch } : c)),
+    });
+
+  return (
+    <div className="rounded-md border p-3 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <code className="text-[11px] px-1.5 py-0.5 rounded bg-muted">{`{${token}}`}</code>
+        {token === "style" && current.choices.length === 0 && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => onChange({ ...current, choices: [...STYLE_PALETTE_CHOICES] })}
+          >
+            Fill from my styles
+          </Button>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground">What the customer is asked</Label>
+        <Input
+          value={current.label}
+          onChange={(e) => onChange({ ...current, label: e.target.value })}
+          placeholder="Choose a style"
+        />
+      </div>
+
+      {current.choices.length > 0 && (
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground">
+            Choices — the label is shown, the text is sent to the model
+          </Label>
+          {current.choices.map((c, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <Input
+                className="w-32 shrink-0"
+                value={c.label}
+                onChange={(e) => setChoice(i, { label: e.target.value })}
+                placeholder="Watercolour"
+              />
+              <Input
+                value={c.value}
+                onChange={(e) => setChoice(i, { value: e.target.value })}
+                placeholder="make this in watercolor styling"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="shrink-0"
+                aria-label={`Remove ${c.label || "choice"}`}
+                onClick={() =>
+                  onChange({ ...current, choices: current.choices.filter((_, j) => j !== i) })
+                }
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        onClick={() =>
+          onChange({
+            ...current,
+            choices: [
+              ...current.choices,
+              { id: `choice-${current.choices.length + 1}`, label: "", value: "" },
+            ],
+          })
+        }
+      >
+        <Plus className="h-4 w-4" /> Add choice
+      </Button>
+    </div>
+  );
 }
 
 /** A small upload slot showing a thumbnail once filled. */
@@ -180,7 +294,12 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
   }, [open, initial]);
 
   const spec = MODEL_CATALOG[draft.model];
-  const tokens = useMemo(() => promptTokens(draft.prompt), [draft.prompt]);
+  // A prompt-less model ignores the prompt, so its tokens are not real slots.
+  // The draft keeps them, so switching back restores the merchant's work.
+  const tokens = useMemo(
+    () => (spec.usesPrompt ? promptTokens(draft.prompt) : []),
+    [spec.usesPrompt, draft.prompt],
+  );
 
   function setModel(model: ModelId) {
     // Drop params the new model doesn't have, so we never send it a stray knob.
@@ -188,8 +307,23 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
     const params = Object.fromEntries(
       Object.entries(draft.params).filter(([k]) => allowed.has(k as RecipeParamKey)),
     ) as RecipeParams;
-    setDraft({ ...draft, model, params });
+    // Re-apply the finish against the NEW model: switching to `cutout` must not
+    // leave a cutout step behind, or the recipe would cut out twice.
+    const keepFinish = hasCutoutFinish(draft) && canFinishWithCutout(model);
+    setDraft(setCutoutFinish({ ...draft, model, params }, keepFinish));
     setTestResult(null);
+  }
+
+  function setFinish(enabled: boolean) {
+    setDraft((d) => setCutoutFinish(d, enabled));
+    setTestResult(null);
+  }
+
+  function setOption(next: CustomerOption) {
+    setDraft((d) => {
+      const rest = (d.customerOptions ?? []).filter((o) => o.injectAs !== next.injectAs);
+      return { ...d, customerOptions: [...rest, next] };
+    });
   }
 
   function setParam<K extends keyof RecipeParams>(key: K, value: RecipeParams[K]) {
@@ -236,9 +370,18 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
       toast.error("Give the recipe a name");
       return;
     }
+    if (optionError) {
+      toast.error(optionError);
+      return;
+    }
     setSaving(true);
     try {
-      await saveRecipe({ ...draft, name: draft.name.trim() } as Partial<AiRecipe>);
+      // Don't persist a prompt the chosen model would never read.
+      const base = spec.usesPrompt
+        ? draft
+        : { ...draft, prompt: undefined, customerOptions: undefined };
+      const clean = pruneCustomerOptions({ ...base, name: draft.name.trim() });
+      await saveRecipe(clean as Partial<AiRecipe>);
       toast.success("Recipe saved");
       onSaved();
       onOpenChange(false);
@@ -254,6 +397,14 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
   const refCount = Object.values(referenceUrls).filter(Boolean).length;
   const missingReference = refCount < spec.referenceImages.min;
   const canTest = !testing && !missingCustomer && !missingReference;
+
+  const finishOn = hasCutoutFinish(draft);
+  const optionError = useMemo(
+    () => (spec.usesPrompt ? validateRecipeOptions(draft) : null),
+    [spec.usesPrompt, draft],
+  );
+  const optionFor = (token: string) =>
+    (draft.customerOptions ?? []).find((o) => o.injectAs === token);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -312,6 +463,48 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
           ) : (
             <p className="text-sm text-muted-foreground rounded-md border bg-muted/40 px-3 py-2">
               {spec.label} doesn&rsquo;t take a prompt — it always does the same thing.
+            </p>
+          )}
+
+          {spec.usesPrompt && tokens.length > 0 && (
+            <div className="space-y-2">
+              <div>
+                <Label>Customer choices</Label>
+                <p className="text-xs text-muted-foreground">
+                  Each slot in your prompt becomes a picker in the storefront.
+                </p>
+              </div>
+              {tokens.map((t) => (
+                <CustomerOptionEditor
+                  key={t}
+                  token={t}
+                  option={optionFor(t)}
+                  onChange={setOption}
+                />
+              ))}
+            </div>
+          )}
+
+          {canFinishWithCutout(draft.model) ? (
+            <label className="flex items-start gap-3 rounded-md border px-3 py-3 cursor-pointer">
+              <Checkbox
+                checked={finishOn}
+                onCheckedChange={(v) => setFinish(v === true)}
+                className="mt-0.5"
+              />
+              <span className="space-y-1">
+                <span className="block text-sm font-medium">Remove the background afterwards</span>
+                <span className="block text-xs text-muted-foreground">
+                  Runs <strong>{spec.label}</strong> first, then cuts the subject out to a
+                  transparent PNG so your template&rsquo;s background shows through.
+                </span>
+              </span>
+            </label>
+          ) : (
+            <p className="text-xs text-muted-foreground rounded-md border bg-muted/40 px-3 py-2">
+              Want to style the subject too? Pick <strong>Art style</strong> and tick
+              &ldquo;Remove the background afterwards&rdquo;. Styling after a cutout would paint
+              the background back in.
             </p>
           )}
 
@@ -387,11 +580,10 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
                 />
               </div>
 
-              {(draft.steps?.length ?? 0) > 0 && (
+              {(draft.steps?.filter((s) => s.model !== "cutout").length ?? 0) > 0 && (
                 <p className="text-xs text-muted-foreground">
-                  This recipe chains {draft.steps!.length} extra step
-                  {draft.steps!.length === 1 ? "" : "s"} after the main model. Editing chained
-                  steps isn&rsquo;t available yet — they are preserved when you save.
+                  This recipe chains extra steps beyond the background-removal finish. They
+                  aren&rsquo;t editable here — they are preserved when you save.
                 </p>
               )}
             </CollapsibleContent>
@@ -442,20 +634,45 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
 
             {tokens.length > 0 && (
               <div className="space-y-2">
-                {tokens.map((t) => (
-                  <div key={t} className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">
-                      Test value for <code className="text-[11px]">{`{${t}}`}</code>
-                    </Label>
-                    <Input
-                      value={optionValues[t] ?? ""}
-                      onChange={(e) =>
-                        setOptionValues((o) => ({ ...o, [t]: e.target.value }))
-                      }
-                      placeholder="e.g. soft watercolour painting"
-                    />
-                  </div>
-                ))}
+                {tokens.map((t) => {
+                  const choices = optionFor(t)?.choices ?? [];
+                  return (
+                    <div key={t} className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">
+                        Test value for <code className="text-[11px]">{`{${t}}`}</code>
+                      </Label>
+                      {/* Once the token has choices, test what the customer can
+                          actually pick — free text would test a path nobody runs. */}
+                      {choices.length > 0 ? (
+                        <Select
+                          value={optionValues[t] || undefined}
+                          onValueChange={(v) => setOptionValues((o) => ({ ...o, [t]: v }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Pick a choice to test" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {choices
+                              .filter((c) => c.value.trim().length > 0)
+                              .map((c, i) => (
+                                <SelectItem key={i} value={c.value}>
+                                  {c.label || c.value}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          value={optionValues[t] ?? ""}
+                          onChange={(e) =>
+                            setOptionValues((o) => ({ ...o, [t]: e.target.value }))
+                          }
+                          placeholder="e.g. soft watercolour painting"
+                        />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -503,11 +720,14 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="items-center">
+          {optionError && (
+            <span className="mr-auto text-xs text-destructive">{optionError}</span>
+          )}
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving || !draft.name.trim()}>
+          <Button onClick={handleSave} disabled={saving || !draft.name.trim() || !!optionError}>
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
             Save recipe
           </Button>

@@ -21,8 +21,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import RecipeEditorDialog from "@/components/admin/RecipeEditorDialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { deleteRecipe, listRecipes, type SavedRecipe } from "@/lib/ai-recipes-api";
-import { BUILTIN_RECIPES, MODEL_CATALOG, type AiRecipe, type ModelId } from "@/lib/ai-recipe";
+import { BUILTIN_RECIPES, MODEL_CATALOG, recipeChain, type AiRecipe, type ModelId } from "@/lib/ai-recipe";
 
 const MODEL_LABEL: Record<ModelId, string> = {
   "face-swap": "Face swap",
@@ -31,10 +36,12 @@ const MODEL_LABEL: Record<ModelId, string> = {
   cutout: "Cutout",
 };
 
-function ModelBadge({ model }: { model: ModelId }) {
+/** The whole chain, not just the head — otherwise a style+cutout recipe reads as
+ *  a plain "Art style" and the badge quietly lies. */
+function ChainBadge({ recipe }: { recipe: AiRecipe }) {
   return (
     <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide px-2 py-1 rounded-full bg-accent text-accent-foreground whitespace-nowrap">
-      {MODEL_LABEL[model]}
+      {recipeChain(recipe).map((m) => MODEL_LABEL[m]).join(" → ")}
     </span>
   );
 }
@@ -96,7 +103,7 @@ export default function AiLibraryPage() {
           to="/admin/configs"
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4"
         >
-          <ArrowLeft className="h-4 w-4" /> Templates
+          <ArrowLeft className="h-4 w-4" /> Template
         </Link>
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -143,14 +150,16 @@ export default function AiLibraryPage() {
                   {r.description && (
                     <p className="text-sm text-muted-foreground mt-1">{r.description}</p>
                   )}
-                  {r.prompt && (
+                  {/* A prompt that is nothing but slots (e.g. "{style}") says less
+                      than the description already did. */}
+                  {r.prompt && r.prompt.replace(/\{\w+\}/g, "").trim().length > 0 && (
                     <p className="text-xs text-muted-foreground/80 mt-1.5 line-clamp-2">
                       {r.prompt}
                     </p>
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <ModelBadge model={r.model} />
+                  <ChainBadge recipe={r} />
                   <Button variant="ghost" size="icon" onClick={() => openEdit(r)} aria-label="Edit">
                     <Pencil className="h-4 w-4" />
                   </Button>
@@ -183,7 +192,7 @@ export default function AiLibraryPage() {
                     <p className="text-sm text-muted-foreground mt-1">{r.description}</p>
                   )}
                 </div>
-                <ModelBadge model={r.model} />
+                <ChainBadge recipe={r} />
               </div>
               <Button variant="secondary" size="sm" className="self-start" onClick={() => openEdit(r)}>
                 Use this
@@ -193,25 +202,29 @@ export default function AiLibraryPage() {
         </div>
       </section>
 
-      <section className="space-y-3">
-        <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Models
-        </h2>
-        <div className="space-y-2">
-          {Object.values(MODEL_CATALOG).map((m) => (
-            <Card key={m.id} className="p-4 flex items-start justify-between gap-4">
-              <div>
-                <h3 className="font-medium leading-tight">{m.label}</h3>
-                <p className="text-sm text-muted-foreground mt-1">{m.blurb}</p>
+      {/* Reference, not a third thing to act on. The editor already shows a
+          model's blurb when you select it, so this stays collapsed. */}
+      <Collapsible>
+        <CollapsibleTrigger className="text-xs font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground">
+          Which models can a recipe use?
+        </CollapsibleTrigger>
+        <CollapsibleContent className="pt-3">
+          <Card className="divide-y">
+            {Object.values(MODEL_CATALOG).map((m) => (
+              <div key={m.id} className="p-3 flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-medium leading-tight">{m.label}</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">{m.blurb}</p>
+                </div>
+                <div className="shrink-0 text-[11px] text-muted-foreground text-right whitespace-nowrap">
+                  <div>{m.usesPrompt ? "Prompt-driven" : "No prompt"}</div>
+                  <div className="opacity-70">{m.costTier} cost</div>
+                </div>
               </div>
-              <div className="shrink-0 text-[11px] text-muted-foreground text-right whitespace-nowrap">
-                <div>{m.usesPrompt ? "Prompt-driven" : "No prompt"}</div>
-                <div className="opacity-70">{m.costTier} cost</div>
-              </div>
-            </Card>
-          ))}
-        </div>
-      </section>
+            ))}
+          </Card>
+        </CollapsibleContent>
+      </Collapsible>
 
       <RecipeEditorDialog
         open={editorOpen}

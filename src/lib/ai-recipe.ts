@@ -229,6 +229,10 @@ function styleOption(pick: "prompt" | "styleInstruction"): CustomerOption {
   return { id: "style", label: "Choose a style", injectAs: "style", choices: styleChoices(pick) };
 }
 
+/** Backs the editor's "fill from my styles" shortcut. Short instructions: the
+ *  only chain we ship ends in a cutout, where terse styling survives best. */
+export const STYLE_PALETTE_CHOICES = styleChoices("styleInstruction");
+
 export const BUILTIN_RECIPES: AiRecipe[] = [
   {
     id: "builtin-face-swap",
@@ -284,3 +288,76 @@ export const BUILTIN_RECIPES: AiRecipe[] = [
     builtIn: true,
   },
 ];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Recipe shaping — shared by the editor and its tests.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Shape of a recipe mid-edit: the editor's draft has no `id` yet. */
+type RecipeShape = { model: ModelId; params?: RecipeParams; steps?: RecipeStep[] };
+
+/** Models a background-removal finish can follow. `cutout` is absent because it
+ *  already IS one, and `art-style` after a cutout would repaint the background. */
+export const CUTOUT_FINISH_MODELS: ModelId[] = ["face-swap", "ai-edit", "art-style"];
+
+export function canFinishWithCutout(model: ModelId): boolean {
+  return CUTOUT_FINISH_MODELS.includes(model);
+}
+
+export function hasCutoutFinish(recipe: RecipeShape): boolean {
+  return (recipe.steps ?? []).some((s) => s.model === "cutout");
+}
+
+/** Toggle the background-removal finish. Enabling forces the main model to emit
+ *  PNG — the cutout needs an alpha channel to write into. Disabling (or a model
+ *  that can't take the finish) strips the step. */
+export function setCutoutFinish<T extends RecipeShape>(recipe: T, enabled: boolean): T {
+  const steps = (recipe.steps ?? []).filter((s) => s.model !== "cutout");
+  if (!enabled || !canFinishWithCutout(recipe.model)) {
+    return { ...recipe, steps: steps.length > 0 ? steps : undefined };
+  }
+  return {
+    ...recipe,
+    params: { ...(recipe.params ?? {}), outputFormat: "png" },
+    steps: [...steps, { model: "cutout", input: "previous", params: { outputFormat: "png" } }],
+  };
+}
+
+/** `"a {style} of {subject}"` → `["style", "subject"]`. */
+export function promptTokens(prompt: string | undefined): string[] {
+  if (!prompt) return [];
+  return [...new Set([...prompt.matchAll(/\{(\w+)\}/g)].map((m) => m[1]))];
+}
+
+/** Save-time guard. `runRecipe` leaves an unmatched `{token}` untouched, so a
+ *  prompt whose token has no customerOption ships the literal text `{style}` to
+ *  the model — and the Test panel hides it, because there you type the value by
+ *  hand. Returns an error message, or null when the recipe is coherent. */
+export function validateRecipeOptions(recipe: {
+  prompt?: string;
+  customerOptions?: CustomerOption[];
+}): string | null {
+  const options = recipe.customerOptions ?? [];
+  for (const token of promptTokens(recipe.prompt)) {
+    const option = options.find((o) => o.injectAs === token);
+    if (!option) return `Add customer choices for {${token}}, or remove it from the prompt.`;
+    if (option.choices.length === 0) return `"${option.label}" needs at least one choice.`;
+  }
+  return null;
+}
+
+/** Drop options the prompt no longer refers to, so an edited prompt doesn't
+ *  leave orphans behind. */
+export function pruneCustomerOptions<T extends { prompt?: string; customerOptions?: CustomerOption[] }>(
+  recipe: T,
+): T {
+  if (!recipe.customerOptions?.length) return recipe;
+  const live = new Set(promptTokens(recipe.prompt));
+  const kept = recipe.customerOptions.filter((o) => live.has(o.injectAs));
+  return { ...recipe, customerOptions: kept.length > 0 ? kept : undefined };
+}
+
+/** The models a recipe runs, in order — `["art-style", "cutout"]`. */
+export function recipeChain(recipe: RecipeShape): ModelId[] {
+  return [recipe.model, ...(recipe.steps ?? []).map((s) => s.model)];
+}

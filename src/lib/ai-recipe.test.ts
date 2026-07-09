@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { aiRecipeSchema, BUILTIN_RECIPES, MODEL_CATALOG, type ModelId } from "./ai-recipe";
+import {
+  aiRecipeSchema,
+  BUILTIN_RECIPES,
+  hasCutoutFinish,
+  MODEL_CATALOG,
+  promptTokens,
+  pruneCustomerOptions,
+  recipeChain,
+  setCutoutFinish,
+  validateRecipeOptions,
+  type ModelId,
+} from "./ai-recipe";
 
 describe("BUILTIN_RECIPES", () => {
   it("every starter recipe validates against the schema", () => {
@@ -38,5 +49,90 @@ describe("BUILTIN_RECIPES", () => {
     expect(r.model).toBe("art-style");
     expect(r.steps?.map((s) => s.model)).toEqual(["cutout"]);
     expect(r.params.outputFormat).toBe("png");
+  });
+});
+
+describe("setCutoutFinish", () => {
+  it("appends a cutout step and forces PNG out of the main model", () => {
+    const r = setCutoutFinish({ model: "art-style" as ModelId, params: { outputFormat: "jpg" } }, true);
+    expect(recipeChain(r)).toEqual(["art-style", "cutout"]);
+    expect(r.params.outputFormat).toBe("png");
+  });
+
+  it("is idempotent — ticking twice does not cut out twice", () => {
+    const once = setCutoutFinish({ model: "art-style" as ModelId, params: {} }, true);
+    expect(recipeChain(setCutoutFinish(once, true))).toEqual(["art-style", "cutout"]);
+  });
+
+  it("removes the step when unticked", () => {
+    const on = setCutoutFinish({ model: "ai-edit" as ModelId, params: {} }, true);
+    expect(hasCutoutFinish(setCutoutFinish(on, false))).toBe(false);
+  });
+
+  it("refuses to finish a cutout with another cutout", () => {
+    // Guards the setModel path: clone style+cutout, switch the model to cutout.
+    const r = setCutoutFinish({ model: "cutout" as ModelId, params: {} }, true);
+    expect(recipeChain(r)).toEqual(["cutout"]);
+  });
+
+  it("preserves unrelated steps", () => {
+    const r = setCutoutFinish(
+      {
+        model: "art-style" as ModelId,
+        params: {},
+        steps: [{ model: "ai-edit" as ModelId, input: "previous" as const }],
+      },
+      true,
+    );
+    expect(recipeChain(r)).toEqual(["art-style", "ai-edit", "cutout"]);
+  });
+});
+
+describe("customer options", () => {
+  it("finds each distinct prompt token once", () => {
+    expect(promptTokens("a {style} of {subject}, very {style}")).toEqual(["style", "subject"]);
+  });
+
+  it("rejects a prompt token with no option — runRecipe would ship it literally", () => {
+    expect(validateRecipeOptions({ prompt: "{style}" })).toMatch(/\{style\}/);
+  });
+
+  it("rejects an option with no choices", () => {
+    const err = validateRecipeOptions({
+      prompt: "{style}",
+      customerOptions: [{ id: "style", label: "Choose a style", injectAs: "style", choices: [] }],
+    });
+    expect(err).toMatch(/at least one choice/);
+  });
+
+  it("accepts a fully wired prompt", () => {
+    expect(
+      validateRecipeOptions({
+        prompt: "{style}",
+        customerOptions: [
+          {
+            id: "style",
+            label: "Choose a style",
+            injectAs: "style",
+            choices: [{ id: "w", label: "Watercolour", value: "watercolour" }],
+          },
+        ],
+      }),
+    ).toBeNull();
+  });
+
+  it("prunes options the prompt no longer refers to", () => {
+    const pruned = pruneCustomerOptions({
+      prompt: "a plain portrait",
+      customerOptions: [
+        {
+          id: "style",
+          label: "Choose a style",
+          injectAs: "style",
+          choices: [{ id: "w", label: "W", value: "w" }],
+        },
+      ],
+    });
+    expect(pruned.customerOptions).toBeUndefined();
   });
 });
