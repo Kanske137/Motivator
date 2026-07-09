@@ -40,6 +40,10 @@ verify_jwt = false
 [functions.admin-settings]
 verify_jwt = false
 
+# AI-receptbiblioteket (CRUD + Test): session-token verifieras i funktionen.
+[functions.admin-ai-recipes]
+verify_jwt = false
+
 # Mapbox-token returneras till klienten (admin- + kund-editor) — publik pk-token.
 [functions.get-mapbox-token]
 verify_jwt = false

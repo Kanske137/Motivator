@@ -1,13 +1,28 @@
-// Wallery admin — AI recipes library (Step 3a).
+// Wallery admin — AI recipes library (Step 3a + 3b).
 //
-// The merchant-facing home for AI recipes: starter recipes to clone + the model
-// catalog. The full editor (edit prompt, pick model, Test) + the shop's own saved
-// recipes land in 3b/3c. For now this lists the built-in starters + models so the
-// tab is real and navigable.
+// The merchant-facing home for AI recipes: the shop's own saved recipes, the
+// starter recipes to clone, and the model catalog. Editing/testing happens in
+// RecipeEditorDialog; persistence goes through the tenant-scoped
+// `admin-ai-recipes` edge function (the browser can't touch the table).
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft, Loader2, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { BUILTIN_RECIPES, MODEL_CATALOG, type ModelId } from "@/lib/ai-recipe";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import RecipeEditorDialog from "@/components/admin/RecipeEditorDialog";
+import { deleteRecipe, listRecipes, type SavedRecipe } from "@/lib/ai-recipes-api";
+import { BUILTIN_RECIPES, MODEL_CATALOG, type AiRecipe, type ModelId } from "@/lib/ai-recipe";
 
 const MODEL_LABEL: Record<ModelId, string> = {
   "face-swap": "Face swap",
@@ -16,7 +31,64 @@ const MODEL_LABEL: Record<ModelId, string> = {
   cutout: "Cutout",
 };
 
+function ModelBadge({ model }: { model: ModelId }) {
+  return (
+    <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide px-2 py-1 rounded-full bg-accent text-accent-foreground whitespace-nowrap">
+      {MODEL_LABEL[model]}
+    </span>
+  );
+}
+
 export default function AiLibraryPage() {
+  const [recipes, setRecipes] = useState<SavedRecipe[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editing, setEditing] = useState<AiRecipe | undefined>();
+  const [pendingDelete, setPendingDelete] = useState<SavedRecipe | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      setRecipes(await listRecipes());
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Could not load your recipes");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  function openNew() {
+    setEditing(undefined);
+    setEditorOpen(true);
+  }
+
+  function openEdit(r: AiRecipe) {
+    setEditing(r);
+    setEditorOpen(true);
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    try {
+      await deleteRecipe(pendingDelete.id);
+      toast.success("Recipe deleted");
+      setPendingDelete(null);
+      await refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not delete the recipe");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
       <div>
@@ -26,15 +98,76 @@ export default function AiLibraryPage() {
         >
           <ArrowLeft className="h-4 w-4" /> Templates
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-          <Sparkles className="h-6 w-6 text-primary" /> AI recipes
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1 max-w-xl">
-          A recipe defines what the AI does to a customer&rsquo;s photo — a face swap, a
-          pet portrait, a style. Write it once and reuse it across templates. Start from a
-          template below, or build your own.
-        </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
+              <Sparkles className="h-6 w-6 text-primary" /> AI recipes
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1 max-w-xl">
+              A recipe defines what the AI does to a customer&rsquo;s photo — a face swap, a
+              pet portrait, a style. Write it once and reuse it across templates. Start from a
+              template below, or build your own.
+            </p>
+          </div>
+          <Button onClick={openNew} className="shrink-0">
+            <Plus className="h-4 w-4" /> New recipe
+          </Button>
+        </div>
       </div>
+
+      <section className="space-y-3">
+        <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Your recipes
+        </h2>
+
+        {loading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground py-6">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+          </div>
+        ) : loadError ? (
+          <Card className="p-4 text-sm text-destructive border-destructive/30 bg-destructive/5">
+            {loadError}
+          </Card>
+        ) : recipes.length === 0 ? (
+          <Card className="p-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              No recipes yet. Clone a starter below, or build one from scratch.
+            </p>
+          </Card>
+        ) : (
+          <div className="space-y-2">
+            {recipes.map((r) => (
+              <Card key={r.id} className="p-4 flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h3 className="font-medium leading-tight">{r.name}</h3>
+                  {r.description && (
+                    <p className="text-sm text-muted-foreground mt-1">{r.description}</p>
+                  )}
+                  {r.prompt && (
+                    <p className="text-xs text-muted-foreground/80 mt-1.5 line-clamp-2">
+                      {r.prompt}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <ModelBadge model={r.model} />
+                  <Button variant="ghost" size="icon" onClick={() => openEdit(r)} aria-label="Edit">
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setPendingDelete(r)}
+                    aria-label="Delete"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section className="space-y-3">
         <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -42,7 +175,7 @@ export default function AiLibraryPage() {
         </h2>
         <div className="grid gap-3 sm:grid-cols-2">
           {BUILTIN_RECIPES.map((r) => (
-            <Card key={r.id} className="p-4">
+            <Card key={r.id} className="p-4 flex flex-col gap-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="font-medium leading-tight">{r.name}</h3>
@@ -50,10 +183,11 @@ export default function AiLibraryPage() {
                     <p className="text-sm text-muted-foreground mt-1">{r.description}</p>
                   )}
                 </div>
-                <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide px-2 py-1 rounded-full bg-accent text-accent-foreground whitespace-nowrap">
-                  {MODEL_LABEL[r.model]}
-                </span>
+                <ModelBadge model={r.model} />
               </div>
+              <Button variant="secondary" size="sm" className="self-start" onClick={() => openEdit(r)}>
+                Use this
+              </Button>
             </Card>
           ))}
         </div>
@@ -79,10 +213,31 @@ export default function AiLibraryPage() {
         </div>
       </section>
 
-      <p className="text-xs text-muted-foreground">
-        Next: the recipe editor (edit the prompt, pick a model, and a Test button) and your
-        own saved recipes.
-      </p>
+      <RecipeEditorDialog
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        initial={editing}
+        onSaved={refresh}
+      />
+
+      <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete &ldquo;{pendingDelete?.name}&rdquo;?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Templates that still point at this recipe will stop generating until you pick
+              another one. This can&rsquo;t be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} disabled={deleting}>
+              {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
