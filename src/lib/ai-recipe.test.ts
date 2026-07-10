@@ -11,6 +11,7 @@ import {
   validateRecipeOptions,
   type ModelId,
 } from "./ai-recipe";
+import { DEFAULT_AI_STYLES } from "./ai-style-defaults";
 
 describe("BUILTIN_RECIPES", () => {
   it("every starter recipe validates against the schema", () => {
@@ -49,6 +50,44 @@ describe("BUILTIN_RECIPES", () => {
     expect(r.model).toBe("art-style");
     expect(r.steps?.map((s) => s.model)).toEqual(["cutout"]);
     expect(r.params.outputFormat).toBe("png");
+  });
+});
+
+describe("style palette bridges", () => {
+  const choices = (id: string) =>
+    BUILTIN_RECIPES.find((r) => r.id === id)!.customerOptions![0].choices;
+
+  it("every starter style declares a bridge", () => {
+    for (const s of DEFAULT_AI_STYLES) {
+      expect(s.bridge, `${s.id} has no bridge`).toBeTruthy();
+      // The whole point: tell Kontext this is not a photograph.
+      expect(s.bridge, `${s.id}`).toMatch(/not a photo$/);
+    }
+  });
+
+  it("the chained recipe prefixes each terse instruction with its bridge", () => {
+    for (const c of choices("builtin-style-cutout")) {
+      const style = DEFAULT_AI_STYLES.find((s) => s.id === c.id)!;
+      expect(c.value).toBe(`${style.bridge}. ${style.styleInstruction}`);
+    }
+  });
+
+  it("the un-chained recipe uses the long prompt and adds no bridge", () => {
+    // Its prompt already names the medium; a bridge would just repeat it.
+    for (const c of choices("builtin-art-style")) {
+      const style = DEFAULT_AI_STYLES.find((s) => s.id === c.id)!;
+      expect(c.value).toBe(style.prompt);
+      expect(c.value).not.toContain("not a photo");
+    }
+  });
+
+  it("carries the medium as data, so nothing has to guess it from the label", () => {
+    // Legacy regex-matched "akvarell|watercolor" etc. against the label. The
+    // labels here are Swedish; the bridges are English. A regex on the value
+    // would have to know both. It no longer has to know either.
+    const watercolor = DEFAULT_AI_STYLES.find((s) => s.id === "watercolor")!;
+    expect(watercolor.label).toBe("Akvarell");
+    expect(watercolor.bridge).toContain("watercolor");
   });
 });
 

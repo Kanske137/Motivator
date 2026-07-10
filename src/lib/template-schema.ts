@@ -440,6 +440,12 @@ export const aiStylePresetSchema = z.object({
    *  `prompt`; if that's also missing it falls back to the legacy Nano-Banana
    *  pipeline. Ignored when simpleStyleMode is off. */
   styleInstruction: z.string().optional(),
+  /** What MEDIUM this style is, ending in "not a photo". Kontext will not leave
+   *  photorealism on a terse instruction alone, so this rides in front of it.
+   *  Replaces the legacy `bridge` regex, which guessed the medium from the
+   *  label text in two languages. Absent = the merchant wrote a custom style
+   *  and owns the whole phrasing. */
+  bridge: z.string().optional(),
 });
 export type AiStylePreset = z.infer<typeof aiStylePresetSchema>;
 

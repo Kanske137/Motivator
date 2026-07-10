@@ -37,6 +37,15 @@ const STYLE_TAIL_HEADER =
   "keeping its structure and identity recognizable. The style is a SURFACE TREATMENT " +
   "only — it must not change the subject's orientation, facing direction, position or scale:";
 
+// KNOWN LIMITATION — do not "fix" this with more prompt text without measuring.
+// A style whose medium implies a painted SURFACE (oil: impasto, canvas texture)
+// makes Kontext paint the #7f7f7f backdrop too, so it is no longer flat and the
+// bg-remover leaves it in. The legacy pipeline had the identical failure — see
+// `diag6/stress/house1_oil_cutout.png`, named `_cutout` with its background
+// still present. Porting the Nano route's "do NOT extend the style into the
+// background" clause here was tried on 2026-07-10 and did NOT help: Kontext
+// paints the canvas regardless. Watercolor chains cleanly; oil does not.
+
 /** Compose what flux-kontext-pro actually receives.
  *
  *  Without a cutout following, the merchant's prompt is sent RAW. That is exact

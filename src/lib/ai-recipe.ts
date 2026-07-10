@@ -213,16 +213,27 @@ export type AiStyle = z.infer<typeof aiStyleSchema>;
 /** The starter style palette as customerOption choices.
  *
  *  `pick` chooses which text reaches the model. Alone, art-style takes the long
- *  descriptive `prompt`. In the style→cutout chain it takes the short
- *  `styleInstruction` — that is what the legacy `simpleStyleMode` path feeds
- *  Kontext, and terse instructions survive the later cutout far better. */
+ *  descriptive `prompt`, which already names its medium at length. In the
+ *  style→cutout chain it takes the short `styleInstruction` — what the legacy
+ *  `simpleStyleMode` path feeds Kontext — prefixed by the style's `bridge`,
+ *  because Kontext hands back a photograph when the instruction is that terse.
+ *  Legacy inferred that bridge with a regex over the label; here it is data, so
+ *  a merchant's own style simply carries its own wording. */
 function styleChoices(pick: "prompt" | "styleInstruction") {
-  return DEFAULT_AI_STYLES.map((s) => ({
-    id: s.id,
-    label: s.label,
-    value: (pick === "styleInstruction" ? s.styleInstruction : s.prompt) || s.prompt,
-    thumbnailUrl: s.thumbnailUrl,
-  }));
+  return DEFAULT_AI_STYLES.map((s) => {
+    const terse = s.styleInstruction || s.prompt;
+    return {
+      id: s.id,
+      label: s.label,
+      value:
+        pick === "prompt"
+          ? s.prompt
+          : s.bridge
+            ? `${s.bridge}. ${terse}`
+            : terse,
+      thumbnailUrl: s.thumbnailUrl,
+    };
+  });
 }
 
 function styleOption(pick: "prompt" | "styleInstruction"): CustomerOption {
