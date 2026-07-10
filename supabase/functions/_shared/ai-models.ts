@@ -8,6 +8,7 @@
 // This is ADDITIVE: the legacy `subjectKind` routes are untouched. The executor
 // only runs when a request carries a `recipe`.
 import { replicatePredict } from "./replicate.ts";
+import { buildArtStylePrompt } from "./prompt-guards.ts";
 
 export type ModelId = "face-swap" | "ai-edit" | "art-style" | "cutout";
 
@@ -34,6 +35,9 @@ export interface AdapterInput {
   customerImageUrls: string[];
   referenceImageUrls: string[];
   params?: RecipeParams;
+  /** True when a `cutout` runs on this call's output. Lets a styling model
+   *  isolate the subject on the backdrop the bg-remover expects. */
+  isolateForCutout?: boolean;
 }
 
 export type AdapterResult =
@@ -108,8 +112,13 @@ async function artStyleAdapter(input: AdapterInput, apiKey: string): Promise<Ada
       body: {
         input: {
           input_image: img,
-          prompt: input.prompt ?? "",
-          output_format: input.params?.outputFormat ?? "jpg",
+          prompt: buildArtStylePrompt(input.prompt, {
+            isolateForCutout: input.isolateForCutout === true,
+          }),
+          // A cutout downstream needs an alpha channel to write into.
+          output_format: input.isolateForCutout
+            ? "png"
+            : input.params?.outputFormat ?? "jpg",
           aspect_ratio: mapAspect(input.params?.aspectRatio) ?? "match_input_image",
           safety_tolerance: 2,
         },
@@ -177,18 +186,29 @@ export async function runRecipe(
   const adapter = ADAPTERS[recipe.model];
   if (!adapter) return { ok: false, status: 400, error: `unknown model: ${recipe.model}` };
 
+  const steps = recipe.steps ?? [];
+  /** Does a cutout consume THIS call's output? Only if the very next step is a
+   *  cutout that feeds on `previous` — a cutout further down the chain, or one
+   *  reading the customer's original photo, does not. */
+  const cutoutFollows = (i: number): boolean => {
+    const next = steps[i];
+    return next?.model === "cutout" && next.input === "previous";
+  };
+
   let result = await adapter(
     {
       prompt: fillPrompt(recipe.prompt, inputs.optionValues),
       customerImageUrls: inputs.customerImageUrls,
       referenceImageUrls: inputs.referenceImageUrls,
       params: recipe.params,
+      isolateForCutout: cutoutFollows(0),
     },
     apiKey,
   );
   if (!result.ok) return result;
 
-  for (const step of recipe.steps ?? []) {
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
     const stepAdapter = ADAPTERS[step.model];
     if (!stepAdapter) return { ok: false, status: 400, error: `unknown step model: ${step.model}` };
     const stepInput: AdapterInput = {
@@ -199,6 +219,7 @@ export async function runRecipe(
         : step.input === "customer" ? inputs.customerImageUrls
         : [],
       referenceImageUrls: step.input === "reference" ? inputs.referenceImageUrls : [],
+      isolateForCutout: cutoutFollows(i + 1),
     };
     result = await stepAdapter(stepInput, apiKey);
     if (!result.ok) return result;
