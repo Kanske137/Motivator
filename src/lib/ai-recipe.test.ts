@@ -91,6 +91,36 @@ describe("style palette bridges", () => {
   });
 });
 
+describe("nano starter recipes (the old isWatercolorStyle branch, as a choice)", () => {
+  const wc = BUILTIN_RECIPES.find((r) => r.id === "builtin-nano-watercolor")!;
+  const solid = BUILTIN_RECIPES.find((r) => r.id === "builtin-nano-backdrop")!;
+
+  it("both paint their own backdrop in one call — no cutout step", () => {
+    // That is exactly why they work for oil, which the art-style chain cannot.
+    for (const r of [wc, solid]) {
+      expect(r.model).toBe("ai-edit");
+      expect(r.steps).toBeUndefined();
+    }
+  });
+
+  it("only the watercolor one asks for splatter; the other forbids it", () => {
+    expect(wc.prompt).toContain("Add loose, organic watercolor splatter");
+    expect(solid.prompt).toContain("Do NOT add any watercolor dots");
+    expect(solid.prompt).not.toContain("Add loose, organic watercolor splatter");
+  });
+
+  it("keeps the merchant's style slot", () => {
+    for (const r of [wc, solid]) {
+      expect(promptTokens(r.prompt)).toEqual(["style"]);
+      expect(validateRecipeOptions(r)).toBeNull();
+    }
+  });
+
+  it("leaves no unresolved template literal from the extraction", () => {
+    for (const r of [wc, solid]) expect(r.prompt).not.toContain("${");
+  });
+});
+
 describe("setCutoutFinish", () => {
   it("appends a cutout step and forces PNG out of the main model", () => {
     const r = setCutoutFinish({ model: "art-style" as ModelId, params: { outputFormat: "jpg" } }, true);

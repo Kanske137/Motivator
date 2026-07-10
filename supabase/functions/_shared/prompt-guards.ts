@@ -45,6 +45,10 @@ const STYLE_TAIL_HEADER =
 // still present. Porting the Nano route's "do NOT extend the style into the
 // background" clause here was tried on 2026-07-10 and did NOT help: Kontext
 // paints the canvas regardless. Watercolor chains cleanly; oil does not.
+//
+// The fix is not a better prompt — it is a different recipe. `ai-edit` paints its
+// own backdrop in ONE call with no cutout to defeat, so painterly styles belong
+// on `builtin-nano-backdrop`. Verified on the same fixture.
 
 /** Compose what flux-kontext-pro actually receives.
  *

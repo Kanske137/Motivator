@@ -10,6 +10,10 @@
 //   - MediaLayerAi (the what) → a layer points at a recipe + supplies references.
 import { z } from "zod";
 import { DEFAULT_AI_STYLES } from "./ai-style-defaults";
+import {
+  NANO_SOLID_BACKDROP_PROMPT,
+  NANO_WATERCOLOR_CUTOUT_PROMPT,
+} from "./ai-recipe-prompts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Model catalog — curated. We own the Replicate identifiers + params. Merchants
@@ -296,6 +300,33 @@ export const BUILTIN_RECIPES: AiRecipe[] = [
     params: { aspectRatio: "match_customer", outputFormat: "png" },
     customerOptions: [styleOption("styleInstruction")],
     steps: [{ model: "cutout", input: "previous", params: { outputFormat: "png" } }],
+    builtIn: true,
+  },
+  {
+    // Arthena's signature look. Was imposed on any style whose LABEL matched
+    // /water\s*colou?r|akvarell|aquarelle/; now you choose it.
+    id: "builtin-nano-watercolor",
+    name: "Watercolor cutout with splatter",
+    description:
+      "Removes the background onto white, restyles the subject, and scatters loose paint droplets around it.",
+    model: "ai-edit",
+    prompt: NANO_WATERCOLOR_CUTOUT_PROMPT,
+    params: { aspectRatio: "match_customer", outputFormat: "png" },
+    customerOptions: [styleOption("prompt")],
+    builtIn: true,
+  },
+  {
+    // The other half of the old `isWatercolorStyle` branch. Nano paints its own
+    // backdrop in one call, so this is what oil and other surface-implying
+    // styles need — they cannot survive the art-style→cutout chain.
+    id: "builtin-nano-backdrop",
+    name: "Cutout on a solid backdrop",
+    description:
+      "Removes the background onto a clean white backdrop and restyles the subject. No droplets. Works with painterly styles.",
+    model: "ai-edit",
+    prompt: NANO_SOLID_BACKDROP_PROMPT,
+    params: { aspectRatio: "match_customer", outputFormat: "png" },
+    customerOptions: [styleOption("prompt")],
     builtIn: true,
   },
 ];
