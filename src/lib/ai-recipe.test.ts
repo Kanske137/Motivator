@@ -9,6 +9,9 @@ import {
   recipeChain,
   setCutoutFinish,
   validateRecipeOptions,
+  customerTokens,
+  isReservedToken,
+  mediaLayerAiSchema,
   type ModelId,
 } from "./ai-recipe";
 import { DEFAULT_AI_STYLES } from "./ai-style-defaults";
@@ -35,10 +38,11 @@ describe("BUILTIN_RECIPES", () => {
     }
   });
 
-  it("prompt placeholders resolve to a declared customerOption", () => {
+  it("every customer-facing placeholder resolves to a declared customerOption", () => {
+    // Reserved tokens like {motif} come from the binding, not an option.
     for (const r of BUILTIN_RECIPES) {
       const injectable = new Set((r.customerOptions ?? []).map((o) => o.injectAs));
-      for (const [, token] of (r.prompt ?? "").matchAll(/\{(\w+)\}/g)) {
+      for (const token of customerTokens(r.prompt)) {
         expect(injectable, `${r.id}: {${token}} has no customerOption`).toContain(token);
       }
     }
@@ -111,7 +115,8 @@ describe("nano starter recipes (the old isWatercolorStyle branch, as a choice)",
 
   it("keeps the merchant's style slot", () => {
     for (const r of [wc, solid]) {
-      expect(promptTokens(r.prompt)).toEqual(["style"]);
+      expect(customerTokens(r.prompt)).toEqual(["style"]);
+      expect(promptTokens(r.prompt)).toContain("motif");
       expect(validateRecipeOptions(r)).toBeNull();
     }
   });
@@ -154,6 +159,32 @@ describe("setCutoutFinish", () => {
       true,
     );
     expect(recipeChain(r)).toEqual(["art-style", "ai-edit", "cutout"]);
+  });
+});
+
+describe("reserved {motif} token", () => {
+  it("motif is reserved; style is not", () => {
+    expect(isReservedToken("motif")).toBe(true);
+    expect(isReservedToken("style")).toBe(false);
+  });
+
+  it("customerTokens hides motif but keeps real choices", () => {
+    expect(customerTokens("a {style} {motif} on white")).toEqual(["style"]);
+  });
+
+  it("a prompt whose ONLY token is {motif} needs no customer options", () => {
+    // Otherwise the motif-only nano recipes could never be saved.
+    expect(validateRecipeOptions({ prompt: "Isolate {motif} on white." })).toBeNull();
+  });
+
+  it("still demands options for a real token sitting next to {motif}", () => {
+    expect(validateRecipeOptions({ prompt: "{style} of {motif}" })).toMatch(/\{style\}/);
+  });
+
+  it("the binding accepts an optional motif", () => {
+    const bound = mediaLayerAiSchema.parse({ recipeId: "r1", motif: "a pet" });
+    expect(bound.motif).toBe("a pet");
+    expect(mediaLayerAiSchema.parse({ recipeId: "r1" }).motif).toBeUndefined();
   });
 });
 

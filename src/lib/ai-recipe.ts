@@ -177,11 +177,18 @@ export const recipeReferenceSchema = z.object({
 });
 export type RecipeReference = z.infer<typeof recipeReferenceSchema>;
 
-/** Attached to an aiPhoto (advanced) layer: which recipe + its references. */
+/** The recipe binding on a media layer: which recipe, its references, and what
+ *  the customer's photo depicts. Per-template — the same recipe reused across
+ *  products has a different motif on each. */
 export const mediaLayerAiSchema = z.object({
   recipeId: z.string().min(1),
   references: z.array(recipeReferenceSchema).default([]),
   customerHint: z.string().optional(),
+  /** What the customer uploads, e.g. "a pet" / "a residential house". Injected
+   *  into the prompt at `{motif}`. NOT a customer choice — it describes this
+   *  template's subject. Load-bearing: without it a background-removal recipe
+   *  keeps the whole scene (measured on diag6/stress/house1.jpg). */
+  motif: z.string().optional(),
   /** Preselected customerOption choices, keyed by CustomerOption.id. */
   optionDefaults: z.record(z.string()).optional(),
 });
@@ -371,6 +378,20 @@ export function promptTokens(prompt: string | undefined): string[] {
   return [...new Set([...prompt.matchAll(/\{(\w+)\}/g)].map((m) => m[1]))];
 }
 
+/** Tokens the executor fills from the layer binding, not from a customer choice.
+ *  They must NOT get a customerOption or a save-blocking validation error. */
+export const RESERVED_TOKENS = new Set(["motif"]);
+
+export function isReservedToken(token: string): boolean {
+  return RESERVED_TOKENS.has(token);
+}
+
+/** Prompt tokens the merchant must wire as customer choices — the reserved ones
+ *  removed. This is what the editor renders choice editors for. */
+export function customerTokens(prompt: string | undefined): string[] {
+  return promptTokens(prompt).filter((t) => !isReservedToken(t));
+}
+
 /** Save-time guard. `runRecipe` leaves an unmatched `{token}` untouched, so a
  *  prompt whose token has no customerOption ships the literal text `{style}` to
  *  the model — and the Test panel hides it, because there you type the value by
@@ -380,7 +401,7 @@ export function validateRecipeOptions(recipe: {
   customerOptions?: CustomerOption[];
 }): string | null {
   const options = recipe.customerOptions ?? [];
-  for (const token of promptTokens(recipe.prompt)) {
+  for (const token of customerTokens(recipe.prompt)) {
     const option = options.find((o) => o.injectAs === token);
     if (!option) return `Add customer choices for {${token}}, or remove it from the prompt.`;
     if (option.choices.length === 0) return `"${option.label}" needs at least one choice.`;

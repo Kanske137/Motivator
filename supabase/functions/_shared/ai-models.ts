@@ -169,6 +169,9 @@ export interface RecipeInputs {
   referenceImageUrls: string[];
   /** customerOption values keyed by their `injectAs` placeholder. */
   optionValues?: Record<string, string>;
+  /** Fills `{motif}` — what the customer's photo depicts, from the layer
+   *  binding. Reserved: it is not a customer choice. */
+  motif?: string;
 }
 
 /** Replace `{token}` placeholders from customerOption values. Unknown tokens are
@@ -186,6 +189,14 @@ export async function runRecipe(
   const adapter = ADAPTERS[recipe.model];
   if (!adapter) return { ok: false, status: 400, error: `unknown model: ${recipe.model}` };
 
+  // Customer choices + the reserved `motif` from the binding, in one map.
+  // `motif` is ALWAYS present (default "") so an unfilled `{motif}` collapses to
+  // empty rather than shipping the literal token to the model.
+  const injectMap: Record<string, string> = {
+    ...inputs.optionValues,
+    motif: inputs.motif?.trim() ?? "",
+  };
+
   const steps = recipe.steps ?? [];
   /** Does a cutout consume THIS call's output? Only if the very next step is a
    *  cutout that feeds on `previous` — a cutout further down the chain, or one
@@ -197,7 +208,7 @@ export async function runRecipe(
 
   let result = await adapter(
     {
-      prompt: fillPrompt(recipe.prompt, inputs.optionValues),
+      prompt: fillPrompt(recipe.prompt, injectMap),
       customerImageUrls: inputs.customerImageUrls,
       referenceImageUrls: inputs.referenceImageUrls,
       params: recipe.params,
@@ -212,7 +223,7 @@ export async function runRecipe(
     const stepAdapter = ADAPTERS[step.model];
     if (!stepAdapter) return { ok: false, status: 400, error: `unknown step model: ${step.model}` };
     const stepInput: AdapterInput = {
-      prompt: fillPrompt(step.prompt, inputs.optionValues),
+      prompt: fillPrompt(step.prompt, injectMap),
       params: step.params,
       customerImageUrls:
         step.input === "previous" ? [result.outputUrl]
