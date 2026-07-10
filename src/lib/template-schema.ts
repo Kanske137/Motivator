@@ -5,6 +5,7 @@
 // design canvas. Marginal/line thickness is in millimetres so the print-file
 // pipeline can convert them via PX_PER_CM.
 import { z } from "zod";
+import { mediaLayerAiSchema } from "./ai-recipe";
 
 // ---------- shared ----------
 export const orientationSchema = z.enum(["portrait", "landscape"]);
@@ -90,6 +91,12 @@ export const photoDefaultsSchema = z.object({
   fit: imageFitSchema,
   /** Optional placeholder image URL the admin can supply for preview only. */
   placeholderUrl: z.string().url().optional(),
+  /** Optional recipe binding. Absent = plain photo (today's behaviour). Present
+   *  = the customer's upload is run through this recipe before placement. This
+   *  is the photo/aiPhoto merge, done additively: a photo layer that carries a
+   *  recipe IS the unified media layer. The separate `aiPhoto` type is retired
+   *  in a later step once the customer editor reads this field. */
+  ai: mediaLayerAiSchema.optional(),
 });
 export type PhotoDefaults = z.infer<typeof photoDefaultsSchema>;
 

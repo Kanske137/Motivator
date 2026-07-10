@@ -59,17 +59,21 @@ value.
 
 ## The four steps — each verifiable before the next
 
-### 1. Schema + executor + layer unification (additive, nothing breaks)
-- Add `motif` to `mediaLayerAiSchema`.
-- Executor injects `{motif}` from the binding; `validateRecipeOptions` treats it
-  as reserved.
-- Introduce the unified media layer type. Map `photo` and `aiPhoto` → it in
-  `migrateLayer` (the existing per-layer runtime migrator that already collapses
-  legacy `subjectKind`). No DB rows touched — translation happens on read.
-- **Verify:** unit tests + one real `runRecipe` on house1 with a motif, via the
-  throwaway `recipe-diag` fn (see memory `motiv-print-file-resolution` /
-  `motiv-ai-recipe-design` for the pattern). Nothing in the customer flow changes
-  yet.
+### 1. Schema + executor groundwork (additive, nothing breaks) — DONE
+- **1a (done, commit ad6bbaf):** `motif` on `mediaLayerAiSchema`; executor injects
+  `{motif}` (reserved token — `validateRecipeOptions`/`customerTokens` skip it).
+  Verified live on house1: motif set → subject isolated; empty → collapses clean.
+- **1b (done):** `photoLayerSchema.defaults.ai` = optional `mediaLayerAiSchema`.
+  **This IS the merge, done additively:** a photo layer carrying a recipe binding
+  is the unified media layer; absent binding = plain photo. No new discriminant.
+
+  **SEQUENCING CORRECTION.** The original plan renamed the `photo`/`aiPhoto`
+  discriminant here and mapped it in `migrateLayer`. That is NOT additive — the
+  discriminant is read in ~8 files, so renaming it before those consumers are
+  rewritten just makes a big broken diff. So the actual merge is: photo layers
+  gain an optional `.ai` binding now; the redundant `aiPhoto` type + its legacy
+  `migrateLayer` mapping are removed in step 3/4, alongside the consumer rewrite
+  that has to touch those files anyway.
 
 ### 2. Admin: recipe picker + motif field on the media layer
 - One inspector for the unified layer. Recipe picker on top; **"No recipe
