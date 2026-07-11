@@ -39,7 +39,16 @@ import { MAP_STYLE_CATALOG } from "@/lib/map-style-catalog";
 import { defaultPromptFor } from "@/lib/ai-photo-prompts";
 import { uploadAiReferenceImage } from "@/lib/ai-reference-upload";
 import { FONT_CATALOG, FONT_CATEGORY_LABELS, type FontCategory } from "@/lib/font-catalog";
+import { BUILTIN_RECIPES, type MediaLayerAi } from "@/lib/ai-recipe";
+import { listRecipes, type SavedRecipe } from "@/lib/ai-recipes-api";
 import MultiFaceInspector from "./MultiFaceInspector";
+
+/** A sensible motif to prefill when a starter's subject is obvious. Blank = the
+ *  merchant must say what the customer uploads. */
+const STARTER_MOTIF: Record<string, string> = {
+  "builtin-pet": "a pet",
+  "builtin-face-swap": "a person",
+};
 
 interface Props {
   config: ProductConfig;
@@ -251,35 +260,35 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
       {layer.type === "photo" && (
         <div className="space-y-3 border-t pt-4">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Foto — defaults
+            Photo — defaults
           </p>
-          <Field label="Form">
+          <Field label="Shape">
             <Select
               value={layer.defaults.shape}
               onValueChange={(v) => updateDefaults({ shape: v as typeof layer.defaults.shape })}
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="rect">Rektangel</SelectItem>
-                <SelectItem value="circle">Cirkel</SelectItem>
-                <SelectItem value="heart">Hjärta</SelectItem>
-                <SelectItem value="star">Stjärna</SelectItem>
+                <SelectItem value="rect">Rectangle</SelectItem>
+                <SelectItem value="circle">Circle</SelectItem>
+                <SelectItem value="heart">Heart</SelectItem>
+                <SelectItem value="star">Star</SelectItem>
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Anpassning">
+          <Field label="Fit">
             <Select
               value={layer.defaults.fit}
               onValueChange={(v) => updateDefaults({ fit: v as typeof layer.defaults.fit })}
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="cover">Fyll (cover)</SelectItem>
-                <SelectItem value="contain">Inrymd (contain)</SelectItem>
+                <SelectItem value="cover">Fill (cover)</SelectItem>
+                <SelectItem value="contain">Fit inside (contain)</SelectItem>
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Placeholder-bild (URL, valfri)">
+          <Field label="Placeholder image (URL, optional)">
             <Input
               value={layer.defaults.placeholderUrl ?? ""}
               placeholder="https://…"
@@ -291,8 +300,13 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
             />
           </Field>
           <p className="text-[11px] text-muted-foreground -mt-1">
-            Visas i admin-canvas + kund-editor när inget kund-foto finns ännu.
+            Shown in the admin canvas and customer editor before a photo is uploaded.
           </p>
+
+          <PhotoRecipeBinding
+            binding={layer.defaults.ai}
+            onChange={(ai) => updateDefaults({ ai })}
+          />
         </div>
       )}
 
@@ -498,6 +512,98 @@ const Field = React.forwardRef<HTMLDivElement, { label: string; children: React.
   ),
 );
 Field.displayName = "Field";
+
+// ---------- photo layer → optional recipe binding ----------
+// The photo/aiPhoto merge at the UI: a photo layer optionally points at a
+// recipe. "No recipe" = plain photo. Choosing a recipe reveals the motif field —
+// what the customer's photo depicts — which the executor injects as {motif}.
+const NO_RECIPE = "__none__";
+
+function PhotoRecipeBinding({
+  binding,
+  onChange,
+}: {
+  binding: MediaLayerAi | undefined;
+  onChange: (ai: MediaLayerAi | undefined) => void;
+}) {
+  const [saved, setSaved] = useState<SavedRecipe[]>([]);
+  useEffect(() => {
+    // Best-effort: starters always work even if the shop has no saved recipes.
+    listRecipes().then(setSaved).catch(() => setSaved([]));
+  }, []);
+
+  const recipeId = binding?.recipeId ?? NO_RECIPE;
+  const chosen =
+    BUILTIN_RECIPES.find((r) => r.id === recipeId) ?? saved.find((r) => r.id === recipeId);
+
+  function pickRecipe(id: string) {
+    if (id === NO_RECIPE) {
+      onChange(undefined);
+      return;
+    }
+    onChange({
+      recipeId: id,
+      references: binding?.references ?? [],
+      // Prefill an obvious subject; keep an existing motif when re-picking.
+      motif: binding?.motif ?? STARTER_MOTIF[id],
+    });
+  }
+
+  return (
+    <div className="space-y-3 border-t pt-4">
+      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        AI recipe
+      </p>
+      <Field label="Recipe">
+        <Select value={recipeId} onValueChange={pickRecipe}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NO_RECIPE}>No recipe (plain photo)</SelectItem>
+            <SelectGroup>
+              <SelectLabel>Starters</SelectLabel>
+              {BUILTIN_RECIPES.map((r) => (
+                <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+              ))}
+            </SelectGroup>
+            {saved.length > 0 && (
+              <SelectGroup>
+                <SelectLabel>Your recipes</SelectLabel>
+                {saved.map((r) => (
+                  <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                ))}
+              </SelectGroup>
+            )}
+          </SelectContent>
+        </Select>
+      </Field>
+
+      {chosen && (
+        <>
+          {chosen.description && (
+            <p className="text-[11px] text-muted-foreground -mt-1">{chosen.description}</p>
+          )}
+          <Field label="What is the customer's photo of?">
+            <Input
+              value={binding?.motif ?? ""}
+              placeholder="e.g. a pet, a person, a residential house"
+              onChange={(e) =>
+                onChange({
+                  recipeId,
+                  references: binding?.references ?? [],
+                  motif: e.target.value.trim() ? e.target.value : undefined,
+                })
+              }
+            />
+          </Field>
+          <p className="text-[11px] text-muted-foreground -mt-1">
+            Tells the AI what to keep when it removes the background. Without it a
+            whole-scene photo keeps its surroundings.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
 
 // ---------- inline geocoding search for default place ----------
 function DefaultPlaceSearch({
