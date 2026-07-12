@@ -776,12 +776,21 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
         console.warn("[template-snapshot] image layer failed", e);
       }
     } else if (layer.type === "photo") {
-      // A recipe-bound photo layer prints its AI result; undefined for a plain
-      // photo, so it falls through to the customer's uploaded overlay.
+      // A recipe-bound photo layer prints its AI result; before one exists it
+      // falls through to the customer's uploaded overlay, then the selected
+      // reference (face-swap / pet), then the placeholder. Undefined slots are
+      // skipped for a plain photo.
+      const bindingRefs = layer.defaults.ai?.references ?? [];
+      const selectedRef = input.aiPhotoSelectedRefUrl?.[layer.id];
+      const activeRefUrl =
+        (selectedRef && bindingRefs.some((r) => r.url === selectedRef) ? selectedRef : null) ??
+        bindingRefs[0]?.url ??
+        undefined;
       const url =
         input.aiPhotoResults?.[layer.id] ??
         input.photoOverlays?.[layer.id] ??
         input.photoOverlayUrl ??
+        activeRefUrl ??
         layer.defaults.placeholderUrl;
       if (url) {
         const lv = input.layerValues?.[layer.id];

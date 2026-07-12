@@ -629,9 +629,28 @@ export function MapPreview({
             const zoom = pv?.zoom ?? 1;
             const staticClip = shapeClipPath(effectiveShape);
             // A recipe-bound photo layer renders its AI result (written to
-            // aiPhotoResults by AiPhotoSection). Empty for a plain photo, so this
-            // falls through to the simple-style result / upload / placeholder.
-            const src = aiPhotoResults[l.id] ?? photoAiResults[l.id] ?? photoSources[l.id]?.previewUrl ?? l.defaults.placeholderUrl ?? null;
+            // aiPhotoResults by AiPhotoSection). Before a result exists, show the
+            // customer-selected reference image (face-swap / pet) so the base
+            // motif is visible. Empty for a plain photo → falls through to the
+            // simple-style result / upload / placeholder.
+            const bindingRefs = l.defaults.ai?.references ?? [];
+            const orientedRefs = bindingRefs.filter(
+              (r) => (r.orientation ?? "any") === "any" || r.orientation === orientation,
+            );
+            const selectedRefUrl = aiPhotoSelectedRefUrl[l.id] ?? null;
+            const activeRefUrl =
+              (selectedRefUrl && orientedRefs.some((r) => r.url === selectedRefUrl)
+                ? selectedRefUrl
+                : null) ??
+              orientedRefs[0]?.url ??
+              null;
+            const src =
+              aiPhotoResults[l.id] ??
+              photoAiResults[l.id] ??
+              photoSources[l.id]?.previewUrl ??
+              activeRefUrl ??
+              l.defaults.placeholderUrl ??
+              null;
             return (
               <MapLayerSlot
                 key={l.id}

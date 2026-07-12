@@ -5,7 +5,7 @@
 //   - Map: search a default place (geocoding) → updates center/zoom +
 //     placeName/city/country, AND auto-builds text for any linked text layers.
 import React, { useEffect, useRef, useState } from "react";
-import { Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { Loader2, Plus, Search, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import type { ProductConfig } from "@/lib/product-config";
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,7 @@ import { applyAdminPlaceToLinkedTexts } from "@/lib/template-migrate";
 import { MAP_STYLE_CATALOG } from "@/lib/map-style-catalog";
 import { uploadAiReferenceImage } from "@/lib/ai-reference-upload";
 import { FONT_CATALOG, FONT_CATEGORY_LABELS, type FontCategory } from "@/lib/font-catalog";
-import { BUILTIN_RECIPES, type MediaLayerAi } from "@/lib/ai-recipe";
+import { BUILTIN_RECIPES, MODEL_CATALOG, type AiRecipe, type MediaLayerAi, type RecipeReference } from "@/lib/ai-recipe";
 import { listRecipes, type SavedRecipe } from "@/lib/ai-recipes-api";
 
 /** A sensible motif to prefill when a starter's subject is obvious. Blank = the
@@ -575,26 +575,146 @@ function PhotoRecipeBinding({
           {chosen.description && (
             <p className="text-[11px] text-muted-foreground -mt-1">{chosen.description}</p>
           )}
-          <Field label="What is the customer's photo of?">
-            <Input
-              value={binding?.motif ?? ""}
-              placeholder="e.g. a pet, a person, a residential house"
-              onChange={(e) =>
-                onChange({
-                  recipeId,
-                  references: binding?.references ?? [],
-                  motif: e.target.value.trim() ? e.target.value : undefined,
-                })
-              }
+
+          {MODEL_CATALOG[chosen.model].referenceImages.max > 0 && (
+            <ReferenceImagesEditor
+              recipe={chosen}
+              references={binding?.references ?? []}
+              onChange={(references) => onChange({ recipeId, references, motif: binding?.motif })}
             />
-          </Field>
-          <p className="text-[11px] text-muted-foreground -mt-1">
-            Tells the AI what to keep when it removes the background. Without it a
-            whole-scene photo keeps its surroundings.
-          </p>
+          )}
+
+          {(chosen.prompt ?? "").includes("{motif}") && (
+            <>
+              <Field label="What is the customer's photo of?">
+                <Input
+                  value={binding?.motif ?? ""}
+                  placeholder="e.g. a pet, a person, a residential house"
+                  onChange={(e) =>
+                    onChange({
+                      recipeId,
+                      references: binding?.references ?? [],
+                      motif: e.target.value.trim() ? e.target.value : undefined,
+                    })
+                  }
+                />
+              </Field>
+              <p className="text-[11px] text-muted-foreground -mt-1">
+                Tells the AI what to keep when it removes the background. Without it a
+                whole-scene photo keeps its surroundings.
+              </p>
+            </>
+          )}
         </>
       )}
     </div>
+  );
+}
+
+/** Admin editor for a recipe binding's reference images (the costume/scene the
+ *  customer's photo is placed onto). Shown for recipes whose model consumes
+ *  references (face-swap / ai-edit). Upload one, or several so the customer can
+ *  switch between them. Orientation tags let a reference target portrait or
+ *  landscape canvases. */
+function ReferenceImagesEditor({
+  recipe,
+  references,
+  onChange,
+}: {
+  recipe: AiRecipe;
+  references: RecipeReference[];
+  onChange: (refs: RecipeReference[]) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const max = MODEL_CATALOG[recipe.model].referenceImages.max;
+  const required = MODEL_CATALOG[recipe.model].referenceImages.min > 0;
+
+  async function onFiles(files: FileList | null) {
+    const f = files?.[0];
+    if (!f) return;
+    setUploading(true);
+    try {
+      const url = await uploadAiReferenceImage(f);
+      const id = (crypto as { randomUUID?: () => string }).randomUUID?.() ?? `ref-${Date.now()}`;
+      onChange([...references, { id, url, orientation: "any" }]);
+    } catch (e) {
+      console.error("[LayerInspector] reference upload failed", e);
+      toast.error("Kunde inte ladda upp referensbilden");
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  return (
+    <Field label={`Reference image${max > 1 ? "s" : ""}${required ? "" : " (optional)"}`}>
+      <div className="space-y-2">
+        {references.length > 0 && (
+          <div className="grid grid-cols-3 gap-2">
+            {references.map((r) => (
+              <div key={r.id} className="space-y-1">
+                <div className="relative aspect-square rounded-lg overflow-hidden ring-1 ring-border bg-muted">
+                  <img src={r.url} alt={r.label ?? ""} className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => onChange(references.filter((x) => x.id !== r.id))}
+                    className="absolute top-1 right-1 bg-background/85 rounded-md p-1 text-destructive hover:bg-background"
+                    title="Ta bort"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+                <Select
+                  value={r.orientation ?? "any"}
+                  onValueChange={(v) =>
+                    onChange(
+                      references.map((x) =>
+                        x.id === r.id ? { ...x, orientation: v as RecipeReference["orientation"] } : x,
+                      ),
+                    )
+                  }
+                >
+                  <SelectTrigger className="h-7 text-[11px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">Both</SelectItem>
+                    <SelectItem value="portrait">Portrait</SelectItem>
+                    <SelectItem value="landscape">Landscape</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+          </div>
+        )}
+        {references.length < max && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={uploading}
+            onClick={() => inputRef.current?.click()}
+          >
+            {uploading ? (
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+            ) : (
+              <Upload className="h-3.5 w-3.5 mr-1.5" />
+            )}
+            Add reference
+          </Button>
+        )}
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={(e) => onFiles(e.target.files)}
+        />
+        <p className="text-[11px] text-muted-foreground">
+          The costume / scene the customer's photo is placed onto.
+          {max > 1 ? " Add several to let the customer choose which one." : ""}
+        </p>
+      </div>
+    </Field>
   );
 }
 
