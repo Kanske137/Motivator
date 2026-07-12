@@ -5,7 +5,7 @@
 // design canvas. Marginal/line thickness is in millimetres so the print-file
 // pipeline can convert them via PX_PER_CM.
 import { z } from "zod";
-import { mediaLayerAiSchema } from "./ai-recipe";
+import { mediaLayerAiSchema, aiRecipeSchema } from "./ai-recipe";
 
 // ---------- shared ----------
 export const orientationSchema = z.enum(["portrait", "landscape"]);
@@ -406,6 +406,12 @@ export const templateSchema = z
     defaultLayoutName: z.string().min(1).optional(),
     /** Optional thumbnail URL for the Standard layout shown in the "Stil"-row. */
     defaultLayoutThumbnailUrl: z.string().url().optional(),
+    /** Save-time snapshot of the SAVED (non-builtin) recipes this template's
+     *  layers bind to, keyed by recipe id. Embedded by admin-templates on save so
+     *  the storefront resolves custom recipes without reading `ai_recipes` (RLS)
+     *  and a published product keeps the recipe as-of-last-save. The shop library
+     *  stays the edit source of truth; this is a read snapshot. */
+    resolvedRecipes: z.record(z.string(), aiRecipeSchema).optional(),
     sizeOverrides: z.record(z.string(), sizeOverrideSchema).default({}),
     /** Per-template price overrides: material -> size -> variant -> price (in the
      *  shop's currency). Falls back to the tenant's global default (pricing_rules)

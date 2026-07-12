@@ -1197,7 +1197,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   loadTemplateRecipes: async () => {
     const tpl = get().template;
     if (!tpl) return;
-    const have = get().resolvedRecipes;
+    // Prefer the template's embedded snapshot (published/saved via
+    // admin-templates) — it wins for immutability and skips the fetch. Then
+    // resolve any still-missing custom recipes via the storefront endpoint.
+    const embedded = tpl.resolvedRecipes;
+    let have = get().resolvedRecipes;
+    if (embedded && Object.keys(embedded).length > 0) {
+      have = { ...have, ...embedded };
+      set({ resolvedRecipes: have });
+    }
     const missing = collectRecipeIds(tpl)
       .filter((id) => !id.startsWith("builtin-"))
       .filter((id) => !have[id]);

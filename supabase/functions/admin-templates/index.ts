@@ -61,6 +61,64 @@ interface SavePayload {
   isCanvas?: boolean;
 }
 
+// ── Recipe snapshot ──────────────────────────────────────────────────────────
+// Embed the SAVED recipes the template's layers bind to, so the storefront can
+// resolve custom recipes without reading `ai_recipes` (RLS) and a published
+// product keeps the recipe as-of-last-save. Built-ins live in client code.
+
+function collectBoundRecipeIds(node: unknown, out: Set<string>): void {
+  if (Array.isArray(node)) {
+    for (const n of node) collectBoundRecipeIds(n, out);
+    return;
+  }
+  if (node && typeof node === "object") {
+    const o = node as Record<string, unknown>;
+    const ai = (o.defaults as { ai?: { recipeId?: string } } | undefined)?.ai;
+    if (o.type === "photo" && ai?.recipeId) out.add(ai.recipeId);
+    for (const v of Object.values(o)) collectBoundRecipeIds(v, out);
+  }
+}
+
+function recipeRowToCamel(row: Record<string, unknown>) {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description ?? undefined,
+    model: row.model,
+    prompt: row.prompt ?? undefined,
+    params: row.params ?? {},
+    customerOptions: row.customer_options ?? undefined,
+    steps: row.steps ?? undefined,
+  };
+}
+
+/** Returns the template with `resolvedRecipes` set to the shop's matching saved
+ *  recipes (or the key removed when none are bound). */
+async function embedResolvedRecipes(
+  supabase: { from: (t: string) => any },
+  installationId: string,
+  rawTemplate: unknown,
+): Promise<Record<string, unknown>> {
+  const template = { ...((rawTemplate ?? {}) as Record<string, unknown>) };
+  const ids = new Set<string>();
+  collectBoundRecipeIds(template, ids);
+  const savedIds = [...ids].filter((id) => id && !id.startsWith("builtin-"));
+  if (savedIds.length === 0) {
+    delete template.resolvedRecipes;
+    return template;
+  }
+  const { data, error } = await supabase
+    .from("ai_recipes")
+    .select("id, name, description, model, prompt, params, customer_options, steps")
+    .eq("installation_id", installationId)
+    .in("id", savedIds);
+  if (error) throw error;
+  const map: Record<string, unknown> = {};
+  for (const row of (data ?? []) as Record<string, unknown>[]) map[String(row.id)] = recipeRowToCamel(row);
+  template.resolvedRecipes = map;
+  return template;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -144,11 +202,14 @@ Deno.serve(async (req) => {
         const p = body as unknown as SavePayload;
         if (!p.handle?.trim()) return json({ ok: false, error: "handle krävs" }, 400);
 
+        // Snapshot the shop's bound custom recipes into the template.
+        const template = await embedResolvedRecipes(supabase, installationId, p.template);
+
         const meta = p.meta ?? {};
         const { error } = await supabase
           .from("product_configs")
           .update({
-            template: p.template ?? {},
+            template,
             tags: meta.tags ?? [],
             category_gid: meta.category_gid ?? null,
             status: meta.status ?? "DRAFT",
@@ -176,7 +237,7 @@ Deno.serve(async (req) => {
             .neq("shopify_handle", p.handle.trim());
           if (sibErr) throw sibErr;
 
-          const tpl = (p.template ?? {}) as Record<string, unknown>;
+          const tpl = template;
           for (const s of siblings ?? []) {
             const sib = (s.template ?? {}) as Record<string, unknown>;
             const sibOpts = (sib.productOptions ?? {}) as Record<string, unknown>;
