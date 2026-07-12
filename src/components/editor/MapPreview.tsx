@@ -630,7 +630,10 @@ export function MapPreview({
             const offsetY = pv?.offsetY ?? 0;
             const zoom = pv?.zoom ?? 1;
             const staticClip = shapeClipPath(effectiveShape);
-            const src = photoAiResults[l.id] ?? photoSources[l.id]?.previewUrl ?? l.defaults.placeholderUrl ?? null;
+            // A recipe-bound photo layer renders its AI result (written to
+            // aiPhotoResults by AiPhotoSection). Empty for a plain photo, so this
+            // falls through to the simple-style result / upload / placeholder.
+            const src = aiPhotoResults[l.id] ?? photoAiResults[l.id] ?? photoSources[l.id]?.previewUrl ?? l.defaults.placeholderUrl ?? null;
             return (
               <MapLayerSlot
                 key={l.id}

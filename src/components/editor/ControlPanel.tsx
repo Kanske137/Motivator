@@ -32,6 +32,16 @@ import TemplateThumbnail from "@/components/admin/TemplateThumbnail";
 import { MAP_ICONS, MAP_ICON_INITIAL_COUNT, getMapIcon } from "@/lib/map-icon-catalog";
 import { OnboardingHint } from "./OnboardingHint";
 
+/** A photo layer that points at a recipe behaves as an AI layer, not a plain
+ *  upload — `recipeId` set-or-empty is the switch (the unified media layer). */
+function isAiBoundPhoto(l: TemplateLayer): l is Extract<TemplateLayer, { type: "photo" }> {
+  return l.type === "photo" && !!l.defaults.ai?.recipeId;
+}
+/** Layers the customer AI section renders for: legacy aiPhoto + bound photo. */
+function isAiLayer(l: TemplateLayer): l is Extract<TemplateLayer, { type: "photo" | "aiPhoto" }> {
+  return l.type === "aiPhoto" || isAiBoundPhoto(l);
+}
+
 /** Per-layer slider that scales a layer up/down while preserving aspect ratio.
  *  Shown in the customer editor for any layer where `locks.size === false`.
  *  Scale percentage is RELATIVE to the layer's template default size. */
@@ -144,8 +154,10 @@ export function useAvailableSections(): SectionMeta[] {
 
   return useMemo(() => {
     const layers = templateLayers();
-    const photoLayers = layers.filter((l) => l.type === "photo");
-    const aiPhotoLayers = layers.filter((l) => l.type === "aiPhoto");
+    // A recipe-bound photo layer is an AI layer, so it leaves the "bild" tab and
+    // joins the "förvandling" tab.
+    const plainPhotoLayers = layers.filter((l) => l.type === "photo" && !isAiBoundPhoto(l));
+    const aiLayers = layers.filter(isAiLayer);
     const mapLayers = layers.filter((l) => l.type === "map");
     const textLayers = layers.filter((l) => l.type === "text");
 
@@ -160,8 +172,8 @@ export function useAvailableSections(): SectionMeta[] {
 
     const flags: Record<SectionId, boolean> = {
       lager: isFreeform,
-      bild: photoLayers.length > 0,
-      forvandling: aiPhotoLayers.length > 0,
+      bild: plainPhotoLayers.length > 0,
+      forvandling: aiLayers.length > 0,
       karta: editableMaps.length > 0,
       stil: allLayouts.length > 1,
       text: editableTexts.length > 0,
@@ -195,10 +207,10 @@ export function ControlPanel({ configs, activeHandle, activeProductType, onProdu
   const layers = templateLayers();
   const mapLayers = layers.filter((l): l is Extract<TemplateLayer, { type: "map" }> => l.type === "map");
   const textLayers = layers.filter((l): l is Extract<TemplateLayer, { type: "text" }> => l.type === "text");
-  const photoLayers = layers.filter((l): l is Extract<TemplateLayer, { type: "photo" }> => l.type === "photo");
-  const aiPhotoLayers = layers.filter(
-    (l): l is Extract<TemplateLayer, { type: "aiPhoto" }> => l.type === "aiPhoto",
+  const plainPhotoLayers = layers.filter(
+    (l): l is Extract<TemplateLayer, { type: "photo" }> => l.type === "photo" && !isAiBoundPhoto(l),
   );
+  const aiLayers = layers.filter(isAiLayer);
   const editableMaps = mapLayers.filter(
     (l) => !l.locks.position || !l.locks.style || !l.locks.shape || !l.locks.visibility || !l.locks.size || !l.locks.move,
   );
@@ -216,7 +228,7 @@ export function ControlPanel({ configs, activeHandle, activeProductType, onProdu
     case "bild":
       return (
         <PhotoLayersControls
-          photoLayers={photoLayers}
+          photoLayers={plainPhotoLayers}
           layerValues={layerValues}
           photoSources={photoSources}
           aiStyles={aiStyles}
@@ -225,9 +237,9 @@ export function ControlPanel({ configs, activeHandle, activeProductType, onProdu
     case "forvandling":
       return (
         <div className="space-y-5">
-          {aiPhotoLayers.map((l, idx, arr) => (
+          {aiLayers.map((l, idx, arr) => (
             <div key={l.id} className="space-y-3">
-              {l.defaults.multiFaceSwap?.enabled ? (
+              {l.type === "aiPhoto" && l.defaults.multiFaceSwap?.enabled ? (
                 <MultiFaceUploadSection
                   layer={l}
                   heading={arr.length > 1 ? l.name || t("layer.transformationTab", { n: idx + 1 }) : null}

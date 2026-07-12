@@ -776,7 +776,10 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
         console.warn("[template-snapshot] image layer failed", e);
       }
     } else if (layer.type === "photo") {
+      // A recipe-bound photo layer prints its AI result; undefined for a plain
+      // photo, so it falls through to the customer's uploaded overlay.
       const url =
+        input.aiPhotoResults?.[layer.id] ??
         input.photoOverlays?.[layer.id] ??
         input.photoOverlayUrl ??
         layer.defaults.placeholderUrl;
