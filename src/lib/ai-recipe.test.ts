@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   aiRecipeSchema,
   BUILTIN_RECIPES,
+  findBuiltinRecipe,
   hasCutoutFinish,
   MODEL_CATALOG,
   promptTokens,
   pruneCustomerOptions,
   recipeChain,
+  resolveBindingRecipe,
   setCutoutFinish,
   validateRecipeOptions,
   customerTokens,
@@ -234,5 +236,52 @@ describe("customer options", () => {
       ],
     });
     expect(pruned.customerOptions).toBeUndefined();
+  });
+});
+
+describe("resolveBindingRecipe", () => {
+  it("returns null when there is no binding or no recipeId", () => {
+    expect(resolveBindingRecipe(undefined)).toBeNull();
+    expect(resolveBindingRecipe(null)).toBeNull();
+    expect(resolveBindingRecipe({ recipeId: "", references: [] } as never)).toBeNull();
+  });
+
+  it("resolves a built-in recipe and exposes its style option, motif and references", () => {
+    const refs = [{ id: "r1", url: "https://x/r.png", orientation: "any" as const }];
+    const res = resolveBindingRecipe({
+      recipeId: "builtin-nano-backdrop",
+      references: refs,
+      motif: "a residential house",
+    });
+    expect(res).not.toBeNull();
+    expect(res!.recipe.id).toBe("builtin-nano-backdrop");
+    expect(res!.styleOption?.injectAs).toBe("style");
+    expect(res!.styleOption!.choices.length).toBeGreaterThan(0);
+    expect(res!.motif).toBe("a residential house");
+    expect(res!.references).toEqual(refs);
+  });
+
+  it("has no style option for the reference-based recipes", () => {
+    const face = resolveBindingRecipe({ recipeId: "builtin-face-swap", references: [] });
+    expect(face!.recipe.id).toBe("builtin-face-swap");
+    expect(face!.styleOption).toBeNull();
+
+    const cut = resolveBindingRecipe({ recipeId: "builtin-cutout", references: [] });
+    expect(cut!.styleOption).toBeNull();
+  });
+
+  it("returns null for a saved (non-builtin) recipe id — not resolvable storefront-side", () => {
+    expect(resolveBindingRecipe({ recipeId: "8f3c-uuid-saved", references: [] })).toBeNull();
+  });
+
+  it("resolves a supplied recipe when the caller has it (admin preview / snapshot)", () => {
+    const saved = { ...BUILTIN_RECIPES[0], id: "8f3c-uuid-saved", name: "My saved" };
+    const res = resolveBindingRecipe({ recipeId: "8f3c-uuid-saved", references: [] }, [...BUILTIN_RECIPES, saved]);
+    expect(res!.recipe.name).toBe("My saved");
+  });
+
+  it("findBuiltinRecipe looks up by id", () => {
+    expect(findBuiltinRecipe("builtin-pet")?.model).toBe("ai-edit");
+    expect(findBuiltinRecipe("nope")).toBeNull();
   });
 });

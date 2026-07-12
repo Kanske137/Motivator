@@ -433,3 +433,42 @@ export function pruneCustomerOptions<T extends { prompt?: string; customerOption
 export function recipeChain(recipe: RecipeShape): ModelId[] {
   return [recipe.model, ...(recipe.steps ?? []).map((s) => s.model)];
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Binding resolution — turn a media layer's recipe binding into a runnable
+// recipe for the customer editor / preview. The counterpart to the legacy
+// `resolveLegacyRecipe`: a bound layer names a recipe explicitly, so there is no
+// subjectKind guessing — just look the recipe up and expose its style option.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Look up a built-in recipe by id. */
+export function findBuiltinRecipe(recipeId: string): AiRecipe | null {
+  return BUILTIN_RECIPES.find((r) => r.id === recipeId) ?? null;
+}
+
+export interface ResolvedBinding {
+  recipe: AiRecipe;
+  /** The customer's style choice, if this recipe has one (injectAs "style").
+   *  Null for the reference-based recipes (face-swap / pet) and plain cutout. */
+  styleOption: CustomerOption | null;
+  /** What the customer's photo depicts — fills the reserved `{motif}`. */
+  motif?: string;
+  references: RecipeReference[];
+}
+
+/** Resolve a media-layer recipe binding for RUNTIME. Returns null when there is
+ *  no binding, or when the bound recipe isn't in `available` — the storefront
+ *  can't read `ai_recipes` (RLS), so a saved (non-builtin) recipe resolves to
+ *  null here and is instead embedded into the template at publish time. Callers
+ *  that DO have the recipes (admin preview, a published snapshot) pass them in
+ *  via `available`; the default pool is the built-ins, which always resolve. */
+export function resolveBindingRecipe(
+  binding: MediaLayerAi | undefined | null,
+  available: AiRecipe[] = BUILTIN_RECIPES,
+): ResolvedBinding | null {
+  if (!binding?.recipeId) return null;
+  const recipe = available.find((r) => r.id === binding.recipeId);
+  if (!recipe) return null;
+  const styleOption = recipe.customerOptions?.find((o) => o.injectAs === "style") ?? null;
+  return { recipe, styleOption, motif: binding.motif, references: binding.references ?? [] };
+}
