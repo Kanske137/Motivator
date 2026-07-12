@@ -1197,24 +1197,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   loadTemplateRecipes: async () => {
     const tpl = get().template;
     if (!tpl) return;
-    // Prefer the template's embedded snapshot (published/saved via
-    // admin-templates) — it wins for immutability and skips the fetch. Then
-    // resolve any still-missing custom recipes via the storefront endpoint.
-    const embedded = tpl.resolvedRecipes;
-    let have = get().resolvedRecipes;
-    if (embedded && Object.keys(embedded).length > 0) {
-      have = { ...have, ...embedded };
-      set({ resolvedRecipes: have });
+    const ids = collectRecipeIds(tpl).filter((id) => !id.startsWith("builtin-"));
+    if (ids.length === 0) return;
+    // Seed from the template's embedded snapshot first, so a bound layer renders
+    // instantly (and as a fallback if the fetch below fails / there's no shop /
+    // the recipe was deleted).
+    const embedded = tpl.resolvedRecipes ?? {};
+    const seed: Record<string, AiRecipe> = {};
+    for (const id of ids) if (embedded[id]) seed[id] = embedded[id];
+    if (Object.keys(seed).length > 0) {
+      set({ resolvedRecipes: { ...get().resolvedRecipes, ...seed } });
     }
-    const missing = collectRecipeIds(tpl)
-      .filter((id) => !id.startsWith("builtin-"))
-      .filter((id) => !have[id]);
-    if (missing.length === 0) return;
+    // Then fetch the CURRENT recipes so a layer respects library edits — these
+    // WIN over the embed. The embed stays only as the fallback above.
     const shop = useShopContextStore.getState().shop;
-    const recipes = await resolveStorefrontRecipes(shop, missing);
-    if (recipes.length === 0) return;
+    const fetched = await resolveStorefrontRecipes(shop, ids);
+    if (fetched.length === 0) return;
     const next = { ...get().resolvedRecipes };
-    for (const r of recipes) next[r.id] = r;
+    for (const r of fetched) next[r.id] = r;
     set({ resolvedRecipes: next });
   },
   setAiPhotoSelectedRef: (layerId, url) => {

@@ -268,8 +268,15 @@ export const BUILTIN_RECIPES: AiRecipe[] = [
     name: "Pet portrait",
     description: "Place the customer's pet into your reference scene.",
     model: "ai-edit",
+    // A general image editor regenerates the whole frame, so the background only
+    // holds if the prompt frames this as an EDIT of image #1 and enumerates what
+    // to preserve. Ported from the original app's pet route, which held the scene
+    // near-identical on prompt alone.
     prompt:
-      "Replace the pet in image #1 with the specific pet from image #2 — keep its markings, fur, breed and eye colour. Keep everything else in image #1 unchanged.",
+      "You are editing image #1 (the reference scene). Image #2 is a photograph of the customer's own pet (a cat or a dog). " +
+      "Replace the pet that appears in image #1 with the specific pet from image #2 — keep the unique markings, fur colour/pattern, breed traits, eye colour, ear shape and overall identity from image #2. " +
+      "Keep EVERYTHING ELSE from image #1 unchanged: the costume/clothing, props, background, lighting, camera angle, art style, composition, framing and aspect ratio. Do not change the pose unless required to make the new pet fit naturally. " +
+      "Return ONE single edited image (not a collage, side-by-side or comparison), with the same aspect ratio as image #1.",
     params: { aspectRatio: "match_reference" },
     builtIn: true,
   },
