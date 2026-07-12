@@ -37,10 +37,15 @@ export async function resolveStorefrontRecipes(
   recipeIds: string[],
 ): Promise<AiRecipe[]> {
   const ids = recipeIds.filter((id) => id && !id.startsWith("builtin-"));
-  if (!shop || ids.length === 0) return [];
+  if (ids.length === 0) return [];
   try {
+    // `shop` is optional: when present the endpoint scopes to that installation,
+    // otherwise it resolves the (unguessable-uuid, non-sensitive) recipe ids
+    // directly. Without this the editor falls back to the stale embedded snapshot
+    // whenever there's no ?shop= in the URL, so recipe edits wouldn't show until
+    // the template was re-saved.
     const { data, error } = await supabase.functions.invoke("storefront-recipes", {
-      body: { shop, recipeIds: ids },
+      body: { shop: shop ?? null, recipeIds: ids },
     });
     if (error) {
       console.warn("[storefront-recipes] resolve failed:", error.message);

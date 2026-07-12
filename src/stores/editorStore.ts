@@ -1203,8 +1203,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // instantly (and as a fallback if the fetch below fails / there's no shop /
     // the recipe was deleted).
     const embedded = tpl.resolvedRecipes ?? {};
+    const have0 = get().resolvedRecipes;
     const seed: Record<string, AiRecipe> = {};
-    for (const id of ids) if (embedded[id]) seed[id] = embedded[id];
+    // Seed the embed ONLY for ids we don't already hold, so a repeat run never
+    // clobbers a freshly-fetched (current) recipe with the stale snapshot.
+    for (const id of ids) if (embedded[id] && !have0[id]) seed[id] = embedded[id];
     if (Object.keys(seed).length > 0) {
       set({ resolvedRecipes: { ...get().resolvedRecipes, ...seed } });
     }

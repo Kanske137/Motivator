@@ -57,7 +57,6 @@ Deno.serve(async (req) => {
 
   try {
     const { shop, recipeIds } = await req.json();
-    if (!shop || typeof shop !== "string") return json({ error: "shop required" }, 400);
 
     // Never resolve built-in ids server-side — the client already has them.
     const ids: string[] = Array.isArray(recipeIds)
@@ -70,19 +69,25 @@ Deno.serve(async (req) => {
     if (!url || !srk) throw new Error("Supabase service role saknas");
     const supabase = createClient(url, srk);
 
-    const { data: inst, error: instErr } = await supabase
-      .from("shopify_app_installations")
-      .select("id")
-      .eq("shop_domain", shop)
-      .maybeSingle();
-    if (instErr) throw new Error(`installation lookup: ${instErr.message}`);
-    if (!inst) return json({ recipes: [] }); // unknown shop → nothing to resolve
+    // `shop` is OPTIONAL. When given we scope to that installation (defensive).
+    // When absent we resolve the requested ids directly — they are unguessable
+    // uuids taken from a template the client already loaded, and recipes are
+    // prompts/model config (not sensitive) — so the editor works even without a
+    // ?shop= context (admin preview / direct load), which is what lets recipe
+    // edits show without re-saving the template.
+    let query = supabase.from("ai_recipes").select(SELECT_COLS).in("id", ids);
+    if (shop && typeof shop === "string") {
+      const { data: inst, error: instErr } = await supabase
+        .from("shopify_app_installations")
+        .select("id")
+        .eq("shop_domain", shop)
+        .maybeSingle();
+      if (instErr) throw new Error(`installation lookup: ${instErr.message}`);
+      if (!inst) return json({ recipes: [] }); // unknown shop → nothing to resolve
+      query = query.eq("installation_id", inst.id);
+    }
 
-    const { data, error } = await supabase
-      .from("ai_recipes")
-      .select(SELECT_COLS)
-      .eq("installation_id", inst.id)
-      .in("id", ids);
+    const { data, error } = await query;
     if (error) throw new Error(`recipes lookup: ${error.message}`);
 
     return json({ recipes: (data ?? []).map((r) => toRecipe(r as RecipeRow)) });
