@@ -18,7 +18,6 @@ import { type ProductConfig, type ProductType } from "@/lib/product-config";
 import { getEnabledMapStyleIds, mapStyleLabel, mapStyleLabelKey, mapStylePreviewBg, mapStyleThumbnailUrl } from "@/lib/map-style-catalog";
 import { FormatSection } from "./FormatSection";
 import { PhotoUploadSection } from "./PhotoUploadSection";
-import { AiStyleSection } from "./AiStyleSection";
 import { AiPhotoSection } from "./AiPhotoSection";
 import { LayersSection } from "./LayersSection";
 import { Loader2, Search } from "lucide-react";
@@ -414,8 +413,6 @@ function PhotoLayersControls({
 
   const renderForLayer = (l: Extract<TemplateLayer, { type: "photo" }>) => {
     const showShape = !l.locks.shape || !l.locks.size || !l.locks.move;
-    const hasUpload = !!photoSources[l.id];
-    const showAi = hasUpload && aiStyles.length > 0;
     return (
       <div className="space-y-4">
         <PhotoUploadSection layerId={l.id} />
@@ -426,14 +423,6 @@ function PhotoLayersControls({
               value={(layerValues[l.id] as PhotoLayerValue | undefined) ?? null}
               heading={null}
             />
-          </div>
-        )}
-        {showAi && (
-          <div className="pt-4 border-t space-y-2">
-            <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              {t("section.aiStyle")}
-            </Label>
-            <AiStyleSection presets={aiStyles as any} layerId={l.id} />
           </div>
         )}
       </div>
