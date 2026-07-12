@@ -31,6 +31,13 @@ function syncContextToUrl(ctx: { locale: string; currency: string; rate: number;
   window.history.replaceState(window.history.state, "", url.toString());
 }
 
+/** The admin/back-office owns its own language (see admin-locale + LanguageToggle);
+ *  the Shopify theme's locale must never drive it. Only the storefront/customer
+ *  editor follows the shop context. */
+function onAdminRoute(): boolean {
+  return typeof window !== "undefined" && window.location.pathname.startsWith("/admin");
+}
+
 export function useShopContextBootstrap() {
   const setContext = useShopContextStore((s) => s.setContext);
   const { i18n } = useTranslation();
@@ -58,7 +65,8 @@ export function useShopContextBootstrap() {
       country: initialCountry,
       shop: params.get("shop") || null,
     });
-    void i18n.changeLanguage(initialLocale);
+    // Admin governs its own language; don't let the theme/browser locale clobber it.
+    if (!onAdminRoute()) void i18n.changeLanguage(initialLocale);
     syncContextToUrl({
       locale: initialLocale,
       currency: initialCurrency,
@@ -80,7 +88,7 @@ export function useShopContextBootstrap() {
           : countryFromCurrency(currency),
       };
       setContext(next);
-      void i18n.changeLanguage(next.locale);
+      if (!onAdminRoute()) void i18n.changeLanguage(next.locale);
       syncContextToUrl(next);
     };
     window.addEventListener("message", onMessage);
