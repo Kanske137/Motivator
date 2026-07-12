@@ -1,19 +1,17 @@
-// Customer-side face-swap section. One instance per `aiPhoto` layer.
+// Customer-side AI section. One instance per `aiPhoto` layer.
 //
-// Three modes (driven by layer.defaults.subjectKind):
-//   "human"            → admin reference + customer face → cdingram/face-swap
-//   "pet"              → admin reference + customer pet  → Nano Banana 2
-//   "removeBackground" → no reference; customer photo gets background removed
-//                        and a colorful watercolor/dot ring around the
-//                        subject. Customer can additionally pick one of the
-//                        template's enabled AI style presets and that style
-//                        is applied to the SUBJECT only — the background
-//                        stays white-with-dots regardless of style.
+// The layer's legacy `subjectKind` (+ simpleStyleMode + the customer's chosen
+// style) is resolved to a built-in recipe by `resolveLegacyRecipe`, and this
+// component sends that recipe — model + prompt + params + steps + the injected
+// {style} option + the {motif} — to `replicate-face-swap`. It no longer sends
+// the old bag of behaviour flags; the edge routes purely on `recipe`. The five
+// legacy modes map to: face-swap (human), pet, and the three removeBackground
+// recipes (style→cutout chain, Nano watercolor, Nano backdrop).
 //
-// Results are cached in localStorage keyed by (layerId, faceHash, refSlot)
-// where refSlot is the admin reference URL for human/pet, and a synthetic
-// "no-ref::style:<id>" string for removeBackground so each style picks
-// caches separately.
+// Results are cached in localStorage keyed by (layerId, faceHash, slot) where
+// `slot` is `aiRecipeCacheSlot` (recipe id + injected option values + motif +
+// reference URL) — two runs share a slot only if they'd send the model
+// identical inputs, so a cached image is never reused for a different recipe.
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2, Sparkles, Trash2, Upload } from "lucide-react";
@@ -24,6 +22,7 @@ import { useAiBusyStore } from "@/stores/aiBusyStore";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadCartPreview } from "@/lib/upload-preview";
 import { hashFile } from "@/lib/ai-cache-storage";
+import { resolveLegacyRecipe, aiRecipeCacheSlot } from "@/lib/legacy-ai-recipe";
 import type { TemplateLayer, AiStylePreset } from "@/lib/template-schema";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -44,24 +43,6 @@ const ACCEPT = "image/jpeg,image/png,image/webp,image/heic";
 const MAX_BYTES = 25 * 1024 * 1024;
 
 // Subject hints moved to i18n (aiPhoto.subjectHint*).
-
-/** Cache slot used in place of the admin reference URL for removeBackground.
- *  Including the style id keeps each style pick cached separately. When
- *  simpleStyleMode is on we append a tag so simple-mode results don't collide
- *  with legacy results for the same style id. */
-function refSlotFor(
-  subjectKind: string,
-  refUrl: string | null,
-  styleId: string | null,
-  simpleMode?: boolean,
-): string {
-  if (subjectKind === "removeBackground") {
-    let base = `no-ref::style:${styleId ?? "none"}`;
-    if (simpleMode) base += `::simple:1`;
-    return base;
-  }
-  return refUrl ?? "";
-}
 
 async function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -93,8 +74,33 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
   const source = sources[layer.id];
   const result = results[layer.id] ?? null;
   const subjectKind = layer.defaults.subjectKind ?? "human";
-  const swapPrompt = layer.defaults.swapPrompt;
   const isRemoveBg = subjectKind === "removeBackground";
+  const simpleStyleMode = isRemoveBg && layer.defaults.simpleStyleMode === true;
+  // Legacy aiPhoto layers carry the motif on the (misnamed) fluxStylePrompt
+  // field. It fills the recipe's reserved {motif} token — load-bearing for the
+  // Nano paths, ignored by the reference-based (face-swap / pet) recipes.
+  const motif = layer.defaults.fluxStylePrompt ?? undefined;
+
+  /** Single source of truth for the built-in recipe, its injected option values
+   *  and the cache slot, given a style pick + reference. Running a swap and
+   *  looking up cached thumbnails both go through this, so a written cache entry
+   *  and a later lookup can never compute different keys. */
+  const resolveFor = (style: AiStylePreset | null, refForSlot: string | null) => {
+    const { recipe, optionValues } = resolveLegacyRecipe({
+      subjectKind,
+      simpleStyleMode,
+      style: style
+        ? { prompt: style.prompt, styleInstruction: style.styleInstruction, bridge: style.bridge, label: style.label }
+        : null,
+    });
+    const slot = aiRecipeCacheSlot({
+      recipeId: recipe.id,
+      optionValues,
+      motif,
+      referenceImageUrl: isRemoveBg ? null : refForSlot,
+    });
+    return { recipe, optionValues, slot };
+  };
 
   // Resolve admin-configured reference subjects. Falls back to the legacy
   // single `referenceImageUrl` so old templates keep working unchanged.
@@ -144,7 +150,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
     if (!refUrl) return;
     const hash = source?.hash;
     if (!hash) return;
-    const slot = refSlotFor(subjectKind, refUrl, null);
+    const { slot } = resolveFor(null, refUrl);
     const cached = getCachedFaceSwap(layer.id, hash, slot);
     if (cached) {
       if (results[layer.id] !== cached) setAiPhotoResult(layer.id, cached);
@@ -243,13 +249,10 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
     startAiJob(jobId, { label: t("ai.creatingImage"), expectedSeconds, stage: t("ai.stagePrep") });
     try {
       const hash = await ensureHash();
-      const simpleStyleMode = isRemoveBg && layer.defaults.simpleStyleMode === true;
-      const cacheRefSlot = refSlotFor(
-        subjectKind,
-        refUrl,
-        selectedStyleId,
-        simpleStyleMode,
-      );
+      const selectedPreset = isRemoveBg && selectedStyleId
+        ? visibleStyles.find((p) => p.id === selectedStyleId) ?? null
+        : null;
+      const { recipe, optionValues, slot: cacheRefSlot } = resolveFor(selectedPreset, refUrl);
       // Only use cache when the user hasn't explicitly asked for a regenerate.
       if (!opts.force && hash) {
         const cached = getCachedFaceSwap(layer.id, hash, cacheRefSlot);
@@ -265,63 +268,28 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
       if (!faceImageUrl) return;
       const designId = `swap-${(crypto as { randomUUID?: () => string }).randomUUID?.() ?? Date.now()}`;
 
-      const selectedPreset = isRemoveBg && selectedStyleId
-        ? visibleStyles.find((p) => p.id === selectedStyleId) ?? null
-        : null;
-
-      console.info("[AiPhoto] invoking face-swap", {
+      console.info("[AiPhoto] invoking recipe", {
         layerId: layer.id,
-        referenceImageUrl: refUrl,
-        faceImageUrl,
+        recipeId: recipe.id,
         subjectKind,
-        removeBackgroundStyleId: selectedPreset?.id ?? null,
-        simpleStyleMode,
+        styleId: selectedPreset?.id ?? null,
+        motif: motif ? "set" : "none",
         force: !!opts.force,
       });
-      // Layer aspect ratio (visual width / height in CM) — passed to the
-      // edge function so Nano Banana can try to render the removeBackground
-      // output in the same shape as the layer it will land in. Best-effort
-      // only; the real safety net is contain-rendering on the client.
-      const { size: editorSize, orientation: editorOrientation } =
-        useEditorStore.getState();
-      let targetAspectRatio: number | null = null;
-      if (editorSize && layer.wPct > 0 && layer.hPct > 0) {
-        const m = editorSize.match(/(\d+)\s*x\s*(\d+)/i);
-        if (m) {
-          const a = parseInt(m[1], 10);
-          const b = parseInt(m[2], 10);
-          // size is "WxH" in cm. orientation flips which dimension is wider.
-          const [canvasW, canvasH] =
-            editorOrientation === "portrait"
-              ? [Math.min(a, b), Math.max(a, b)]
-              : [Math.max(a, b), Math.min(a, b)];
-          const layerWcm = (layer.wPct / 100) * canvasW;
-          const layerHcm = (layer.hPct / 100) * canvasH;
-          if (layerWcm > 0 && layerHcm > 0) {
-            targetAspectRatio = layerWcm / layerHcm;
-          }
-        }
-      }
 
       setStage(t("ai.stageCreate"));
       updateAiJobStage(jobId, t("ai.stageCreate"));
+      // Send the recipe + its inputs. Aspect ratio now rides on the recipe
+      // params (match_input_image); the client still contain-renders as the
+      // safety net, so the old layer-aspect hint is no longer needed here.
       const { data, error } = await supabase.functions.invoke("replicate-face-swap", {
         body: {
-          referenceImageUrl: refUrl,
-          faceImageUrl,
-          prompt: swapPrompt,
-          subjectKind,
+          recipe: { model: recipe.model, prompt: recipe.prompt, params: recipe.params, steps: recipe.steps },
+          customerImageUrls: [faceImageUrl],
+          referenceImageUrls: isRemoveBg ? [] : refUrl ? [refUrl] : [],
+          optionValues,
+          motif,
           designId,
-          removeBackgroundStyleId: selectedPreset?.id ?? null,
-          removeBackgroundStylePrompt: selectedPreset?.prompt ?? null,
-          removeBackgroundStyleLabel: selectedPreset?.label ?? null,
-          targetAspectRatio,
-          backdropColor: layer.defaults.backdropColor ?? null,
-          fillFrame: layer.defaults.fillFrame ?? null,
-          preserveSubjectColors: layer.defaults.preserveSubjectColors ?? null,
-          fluxStylePrompt: layer.defaults.fluxStylePrompt ?? null,
-          simpleStyleMode,
-          styleInstruction: selectedPreset?.styleInstruction ?? null,
         },
       });
       if (error) throw error;
@@ -391,7 +359,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
             {referenceImages.map((r) => {
               const isActive = (selectedRef?.url ?? null) === r.url;
               const cachedUrl = source?.hash
-                ? getCachedFaceSwap(layer.id, source.hash, refSlotFor(subjectKind, r.url, null))
+                ? getCachedFaceSwap(layer.id, source.hash, resolveFor(null, r.url).slot)
                 : null;
               const thumbSrc = cachedUrl ?? r.url;
               return (
@@ -490,9 +458,8 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
           <div className="grid grid-cols-3 gap-2">
             {visibleStyles.map((p) => {
               const isActive = selectedStyleId === p.id;
-              const simpleStyleMode = layer.defaults.simpleStyleMode === true;
               const cachedUrl = source?.hash
-                ? getCachedFaceSwap(layer.id, source.hash, refSlotFor("removeBackground", null, p.id, simpleStyleMode))
+                ? getCachedFaceSwap(layer.id, source.hash, resolveFor(p, null).slot)
                 : null;
               const thumbSrc = cachedUrl ?? p.thumbnailUrl ?? null;
               return (

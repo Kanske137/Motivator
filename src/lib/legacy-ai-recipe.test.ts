@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_AI_STYLES } from "./ai-style-defaults";
 import { BUILTIN_RECIPES, resolveStyleValue } from "./ai-recipe";
 import {
+  aiRecipeCacheSlot,
   isWatercolorStyle,
   legacyBuiltinRecipeId,
   resolveLegacyRecipe,
@@ -118,11 +119,44 @@ describe("resolveLegacyRecipe", () => {
       expect(resolveStyleValue({ prompt: s.prompt, styleInstruction: s.styleInstruction, bridge: s.bridge }, "prompt"))
         .toBe(nanoChoice.value);
       // Cutout chain path — bridged terse instruction.
-      const backdrop = resolveLegacyRecipe({ subjectKind: "removeBackground", style: sel });
-      void backdrop;
       const chainChoice = chain.customerOptions![0].choices.find((c) => c.id === s.id)!;
       const chained = resolveLegacyRecipe({ subjectKind: "removeBackground", simpleStyleMode: true, style: sel });
       expect(chained.optionValues.style).toBe(chainChoice.value);
     }
+  });
+});
+
+describe("aiRecipeCacheSlot", () => {
+  const A = { url: "https://x/ref-a.png" };
+  const B = { url: "https://x/ref-b.png" };
+
+  it("is stable for identical inputs and order-independent in optionValues", () => {
+    const s1 = aiRecipeCacheSlot({ recipeId: "builtin-nano-backdrop", optionValues: { style: "oil", foo: "bar" }, motif: "a house" });
+    const s2 = aiRecipeCacheSlot({ recipeId: "builtin-nano-backdrop", optionValues: { foo: "bar", style: "oil" }, motif: "a house" });
+    expect(s1).toBe(s2);
+  });
+
+  it("distinguishes recipe, reference, motif and style — never colliding across them", () => {
+    const base = { recipeId: "builtin-nano-backdrop", optionValues: { style: "oil" }, motif: "a house", referenceImageUrl: null };
+    const variants = [
+      aiRecipeCacheSlot(base),
+      aiRecipeCacheSlot({ ...base, recipeId: "builtin-nano-watercolor" }),
+      aiRecipeCacheSlot({ ...base, optionValues: { style: "watercolor" } }),
+      aiRecipeCacheSlot({ ...base, motif: "a dog" }),
+      aiRecipeCacheSlot({ ...base, referenceImageUrl: A.url }),
+    ];
+    expect(new Set(variants).size).toBe(variants.length);
+  });
+
+  it("separates two references for the same reference-based recipe (the face-swap case)", () => {
+    const a = aiRecipeCacheSlot({ recipeId: "builtin-face-swap", referenceImageUrl: A.url });
+    const b = aiRecipeCacheSlot({ recipeId: "builtin-face-swap", referenceImageUrl: B.url });
+    expect(a).not.toBe(b);
+  });
+
+  it("treats blank/absent motif and empty options the same", () => {
+    expect(aiRecipeCacheSlot({ recipeId: "builtin-face-swap" })).toBe(
+      aiRecipeCacheSlot({ recipeId: "builtin-face-swap", motif: "  ", optionValues: {} }),
+    );
   });
 });

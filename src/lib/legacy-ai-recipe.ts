@@ -117,3 +117,24 @@ export function resolveLegacyRecipe(input: LegacyModeInput): ResolvedLegacyRecip
 
   return { recipe, optionValues };
 }
+
+/** A stable localStorage cache-slot string identifying a resolved recipe run:
+ *  the transformation (recipe id), the injected customer option values, the
+ *  binding's motif, and — for reference-based recipes — the admin reference URL.
+ *  Replaces the old subjectKind-derived `refSlotFor`. Two runs share a slot iff
+ *  they would send the model identical inputs, so a cached image can never be
+ *  reused for a different recipe / style / motif / reference (the wrong-print
+ *  bug the cutover has to avoid). The customer's face hash is a separate
+ *  component of the full cache key, so it is deliberately not repeated here. */
+export function aiRecipeCacheSlot(input: {
+  recipeId: string;
+  optionValues?: Record<string, string>;
+  motif?: string | null;
+  referenceImageUrl?: string | null;
+}): string {
+  const opts = Object.entries(input.optionValues ?? {})
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([k, v]) => `${k}=${v}`)
+    .join(",");
+  return [input.recipeId, input.referenceImageUrl ?? "", (input.motif ?? "").trim(), opts].join("|");
+}

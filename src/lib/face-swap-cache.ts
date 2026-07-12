@@ -11,18 +11,17 @@ export interface FaceSwapCacheEntry {
   timestamp: number;
 }
 
-// v5: bumped after merging cat/dog → "pet" and adding "removeBackground"
-// route. The "referenceImageUrl" slot in the key may be a synthetic value
-// like "no-ref::style:<id>" for removeBackground variants so different style
-// picks cache separately.
-const STORAGE_KEY = "lovable.face-swap-cache.v5";
+// v6: bumped for the recipe cutover. The slot is now `aiRecipeCacheSlot`
+// (recipe id + option values + motif + reference URL) instead of the old
+// subjectKind-derived `no-ref::style:<id>` / reference-URL scheme, so v5 entries
+// would never match the new keys — clear them rather than leave orphans.
+const STORAGE_KEY = "lovable.face-swap-cache.v6";
 
 // Best-effort cleanup of older keys so we don't leave orphan data behind.
 if (typeof window !== "undefined") {
-  try { window.localStorage.removeItem("lovable.face-swap-cache.v1"); } catch { /* noop */ }
-  try { window.localStorage.removeItem("lovable.face-swap-cache.v2"); } catch { /* noop */ }
-  try { window.localStorage.removeItem("lovable.face-swap-cache.v3"); } catch { /* noop */ }
-  try { window.localStorage.removeItem("lovable.face-swap-cache.v4"); } catch { /* noop */ }
+  for (const v of ["v1", "v2", "v3", "v4", "v5"]) {
+    try { window.localStorage.removeItem(`lovable.face-swap-cache.${v}`); } catch { /* noop */ }
+  }
 }
 const MAX_ENTRIES = 30;
 
