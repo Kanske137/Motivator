@@ -211,9 +211,9 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
     <div className="space-y-5">
       <Card className="p-5 space-y-5">
         <div>
-          <h2 className="text-base font-semibold">Produkt & varianter</h2>
+          <h2 className="text-base font-semibold">{t("admin.productOptions.title")}</h2>
           <p className="text-xs text-muted-foreground">
-            Välj vilka produkter, storlekar och varianter den här mallen säljs som.
+            {t("admin.productOptions.subtitle")}
           </p>
         </div>
 
@@ -221,9 +221,10 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
           <div className="flex items-start gap-2 rounded-md border border-dashed bg-muted/40 p-3 text-xs text-muted-foreground">
             <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
             <span>
-              {missingSkus.length} variantkombination{missingSkus.length === 1 ? "" : "er"} saknar Gelato-SKU och
-              kommer hoppas över vid synk till Shopify (t.ex.{" "}
-              <code className="font-mono">{missingSkus[0].size} · {missingSkus[0].variant}</code>).
+              {t("admin.productOptions.missingSku", {
+                count: missingSkus.length,
+                example: `${missingSkus[0].size} · ${missingSkus[0].variant}`,
+              })}
             </span>
           </div>
         )}
@@ -238,7 +239,7 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
         })() && (
           <div className="space-y-3 rounded-md border p-4">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">Poster</Label>
+              <Label className="text-sm font-medium">{t("productKind.poster")}</Label>
               <Switch
                 checked={value.poster?.enabled ?? false}
                 onCheckedChange={(c) => toggleEnabled("poster", c)}
@@ -247,14 +248,14 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
             {value.poster?.enabled && (
               <div className="grid gap-4 md:grid-cols-2">
                 <ChecklistGroup
-                  title="Tillåtna storlekar"
+                  title={t("admin.productOptions.allowedSizes")}
                   all={posterSizes}
                   selected={value.poster.allowedSizes}
                   onToggle={(item, c) => toggleListItem("poster", "allowedSizes", item, c)}
                   onSelectAll={(c) => setListField("poster", "allowedSizes", c ? posterSizes : [])}
                 />
                 <ChecklistGroup
-                  title="Tillåtna ramar"
+                  title={t("admin.productOptions.allowedFrames")}
                   all={posterFrames}
                   selected={value.poster.allowedFrames}
                   onToggle={(item, c) => toggleListItem("poster", "allowedFrames", item, c)}
@@ -272,7 +273,7 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
         })() && (
           <div className="space-y-3 rounded-md border p-4">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">Canvas</Label>
+              <Label className="text-sm font-medium">{t("productKind.canvas")}</Label>
               <Switch
                 checked={value.canvas?.enabled ?? false}
                 onCheckedChange={(c) => toggleEnabled("canvas", c)}
@@ -281,14 +282,14 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
             {value.canvas?.enabled && (
               <div className="grid gap-4 md:grid-cols-2">
                 <ChecklistGroup
-                  title="Tillåtna storlekar"
+                  title={t("admin.productOptions.allowedSizes")}
                   all={canvasSizes}
                   selected={value.canvas.allowedSizes}
                   onToggle={(item, c) => toggleListItem("canvas", "allowedSizes", item, c)}
                   onSelectAll={(c) => setListField("canvas", "allowedSizes", c ? canvasSizes : [])}
                 />
                 <ChecklistGroup
-                  title="Tillåtna djup"
+                  title={t("admin.productOptions.allowedDepths")}
                   all={canvasDepths}
                   selected={value.canvas.allowedDepths}
                   onToggle={(item, c) => toggleListItem("canvas", "allowedDepths", item, c)}
@@ -315,14 +316,14 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
             {value.aluminum?.enabled && (
               <div className="grid gap-4 md:grid-cols-2">
                 <ChecklistGroup
-                  title="Tillåtna storlekar"
+                  title={t("admin.productOptions.allowedSizes")}
                   all={aluminumSizes}
                   selected={value.aluminum.allowedSizes}
                   onToggle={(item, c) => toggleListItem("aluminum", "allowedSizes", item, c)}
                   onSelectAll={(c) => setListField("aluminum", "allowedSizes", c ? aluminumSizes : [])}
                 />
                 <ChecklistGroup
-                  title="Material"
+                  title={t("admin.productOptions.materials")}
                   all={aluminumMaterials}
                   selected={value.aluminum.allowedMaterials}
                   onToggle={(item, c) => toggleListItem("aluminum", "allowedMaterials", item, c)}
@@ -349,14 +350,14 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
             {value.acrylic?.enabled && (
               <div className="grid gap-4 md:grid-cols-2">
                 <ChecklistGroup
-                  title="Tillåtna storlekar"
+                  title={t("admin.productOptions.allowedSizes")}
                   all={acrylicSizes}
                   selected={value.acrylic.allowedSizes}
                   onToggle={(item, c) => toggleListItem("acrylic", "allowedSizes", item, c)}
                   onSelectAll={(c) => setListField("acrylic", "allowedSizes", c ? acrylicSizes : [])}
                 />
                 <ChecklistGroup
-                  title="Finish"
+                  title={t("admin.productOptions.finish")}
                   all={acrylicFinishes}
                   selected={value.acrylic.allowedFinishes}
                   onToggle={(item, c) => toggleListItem("acrylic", "allowedFinishes", item, c)}
@@ -421,9 +422,9 @@ function MapStylesEditor({
         <AccordionItem value="map-styles" className="border-0">
           <AccordionTrigger className="px-5 py-4 hover:no-underline">
             <div className="text-left">
-              <h2 className="text-base font-semibold">Kartstilar</h2>
+              <h2 className="text-base font-semibold">{t("admin.mapStyles.title")}</h2>
               <p className="text-xs text-muted-foreground font-normal">
-                {enabledCount} av {presets.length} aktiverade. Stilar kunden kan välja för kartlagret.
+                {t("admin.mapStyles.subtitle", { count: enabledCount, total: presets.length })}
               </p>
             </div>
           </AccordionTrigger>
@@ -461,7 +462,7 @@ function MapStylesEditor({
                     <Switch
                       checked={enabled}
                       onCheckedChange={(c) => toggle(s.id, c)}
-                      aria-label={`Aktivera ${label}`}
+                      aria-label={t("admin.mapStyles.enableAria", { label })}
                     />
                   </div>
                 );
@@ -489,14 +490,15 @@ function ChecklistGroup({
   onToggle: (item: string, checked: boolean) => void;
   onSelectAll: (checked: boolean) => void;
 }) {
+  const { t } = useTranslation();
   const selectedCount = all.filter((i) => selected.includes(i)).length;
   const allSelected = all.length > 0 && selectedCount === all.length;
   const empty = all.length === 0;
   const summary = empty
-    ? "Inga alternativ"
+    ? t("admin.multiSelect.noOptions")
     : selectedCount === 0
-      ? "Inga valda"
-      : `${selectedCount} av ${all.length} valda`;
+      ? t("admin.multiSelect.noneSelected")
+      : t("admin.multiSelect.countSelected", { count: selectedCount, total: all.length });
 
   return (
     <div>
@@ -524,7 +526,7 @@ function ChecklistGroup({
               className="text-xs text-primary hover:underline"
               onClick={() => onSelectAll(!allSelected)}
             >
-              {allSelected ? "Rensa alla" : "Välj alla"}
+              {allSelected ? t("admin.multiSelect.clearAll") : t("admin.multiSelect.selectAll")}
             </button>
           </div>
           <div className="max-h-64 space-y-0.5 overflow-auto p-2">
@@ -557,6 +559,7 @@ function AllowedFontsEditor({
   value: string[] | undefined;
   onChange: (next: string[]) => void;
 }) {
+  const { t } = useTranslation();
   // Undefined / empty array → all fonts allowed (legacy behaviour).
   const allAllowed = !value || value.length === 0;
   const isAllowed = (family: string) => allAllowed || value!.includes(family);
@@ -579,20 +582,19 @@ function AllowedFontsEditor({
         <AccordionItem value="allowed-fonts" className="border-0">
           <AccordionTrigger className="px-5 py-4 hover:no-underline">
             <div className="text-left">
-              <h2 className="text-base font-semibold">Tillåtna typsnitt</h2>
+              <h2 className="text-base font-semibold">{t("admin.fonts.title")}</h2>
               <p className="text-xs text-muted-foreground font-normal">
-                {enabledCount} av {FONT_FAMILIES.length} aktiverade. Typsnitt kunden
-                kan välja för text-lager.
+                {t("admin.fonts.subtitle", { count: enabledCount, total: FONT_FAMILIES.length })}
               </p>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-5 pb-5 space-y-3">
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" size="sm" onClick={enableAll}>
-                Aktivera alla
+                {t("admin.fonts.enableAll")}
               </Button>
               <Button type="button" variant="outline" size="sm" onClick={disableAll}>
-                Avaktivera alla
+                {t("admin.fonts.disableAll")}
               </Button>
             </div>
             {(["sans", "serif", "display", "script", "mono"] as FontCategory[]).map((cat) => {

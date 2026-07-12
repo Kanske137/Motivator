@@ -323,5 +323,36 @@
     "lager": "Add images, text or shapes.",
     "startHere": "Start here",
     "continueHere": "Continue here"
+  },
+  "admin": {
+    "productOptions": {
+      "title": "Product & variants",
+      "subtitle": "Choose which products, sizes and variants this template is sold as.",
+      "missingSku_one": "{{count}} variant combination lacks a Gelato SKU and will be skipped when syncing to Shopify (e.g. {{example}}).",
+      "missingSku_other": "{{count}} variant combinations lack a Gelato SKU and will be skipped when syncing to Shopify (e.g. {{example}}).",
+      "allowedSizes": "Allowed sizes",
+      "allowedFrames": "Allowed frames",
+      "allowedDepths": "Allowed depths",
+      "materials": "Materials",
+      "finish": "Finish"
+    },
+    "multiSelect": {
+      "noOptions": "No options",
+      "noneSelected": "None selected",
+      "countSelected": "{{count}} of {{total}} selected",
+      "selectAll": "Select all",
+      "clearAll": "Clear all"
+    },
+    "mapStyles": {
+      "title": "Map styles",
+      "subtitle": "{{count}} of {{total}} enabled. Styles the customer can pick for the map layer.",
+      "enableAria": "Enable {{label}}"
+    },
+    "fonts": {
+      "title": "Allowed fonts",
+      "subtitle": "{{count}} of {{total}} enabled. Fonts the customer can pick for text layers.",
+      "enableAll": "Enable all",
+      "disableAll": "Disable all"
+    }
   }
 }

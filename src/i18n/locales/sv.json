@@ -323,5 +323,36 @@
     "lager": "Lägg till bilder, text eller former.",
     "startHere": "Börja här",
     "continueHere": "Fortsätt här"
+  },
+  "admin": {
+    "productOptions": {
+      "title": "Produkt & varianter",
+      "subtitle": "Välj vilka produkter, storlekar och varianter den här mallen säljs som.",
+      "missingSku_one": "{{count}} variantkombination saknar Gelato-SKU och kommer hoppas över vid synk till Shopify (t.ex. {{example}}).",
+      "missingSku_other": "{{count}} variantkombinationer saknar Gelato-SKU och kommer hoppas över vid synk till Shopify (t.ex. {{example}}).",
+      "allowedSizes": "Tillåtna storlekar",
+      "allowedFrames": "Tillåtna ramar",
+      "allowedDepths": "Tillåtna djup",
+      "materials": "Material",
+      "finish": "Finish"
+    },
+    "multiSelect": {
+      "noOptions": "Inga alternativ",
+      "noneSelected": "Inga valda",
+      "countSelected": "{{count}} av {{total}} valda",
+      "selectAll": "Välj alla",
+      "clearAll": "Rensa alla"
+    },
+    "mapStyles": {
+      "title": "Kartstilar",
+      "subtitle": "{{count}} av {{total}} aktiverade. Stilar kunden kan välja för kartlagret.",
+      "enableAria": "Aktivera {{label}}"
+    },
+    "fonts": {
+      "title": "Tillåtna typsnitt",
+      "subtitle": "{{count}} av {{total}} aktiverade. Typsnitt kunden kan välja för text-lager.",
+      "enableAll": "Aktivera alla",
+      "disableAll": "Avaktivera alla"
+    }
   }
 }

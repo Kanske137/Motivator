@@ -47,8 +47,15 @@ import LayerList, { toggleAllLocks } from "@/components/admin/LayerList";
 import LayerInspector from "@/components/admin/LayerInspector";
 import DeleteTemplateDialog from "@/components/admin/DeleteTemplateDialog";
 import TemplateThumbnail from "@/components/admin/TemplateThumbnail";
+import LanguageToggle from "@/components/admin/LanguageToggle";
+import { applyStoredAdminLocale } from "@/lib/admin-locale";
 
 export default function DesignerPage() {
+  // Apply the merchant's saved admin language (default English) on mount.
+  useEffect(() => {
+    applyStoredAdminLocale();
+  }, []);
+
   const { handle } = useParams<{ handle: string }>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -525,6 +532,7 @@ export default function DesignerPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
+            <LanguageToggle />
             <Button asChild variant="ghost" size="sm">
               <a
                 href={`/editor?handle=${handle}&preview=draft`}

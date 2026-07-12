@@ -34,7 +34,9 @@ void i18n
       pl: { translation: pl },
     },
     lng: "sv",
-    fallbackLng: "sv",
+    // English first so partially-translated admin strings fall back to EN (the
+    // admin default) rather than Swedish; then sv as a final backstop.
+    fallbackLng: ["en", "sv"],
     interpolation: { escapeValue: false },
     returnNull: false,
   });
