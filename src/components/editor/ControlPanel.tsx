@@ -20,7 +20,6 @@ import { FormatSection } from "./FormatSection";
 import { PhotoUploadSection } from "./PhotoUploadSection";
 import { AiStyleSection } from "./AiStyleSection";
 import { AiPhotoSection } from "./AiPhotoSection";
-import { MultiFaceUploadSection } from "./MultiFaceUploadSection";
 import { LayersSection } from "./LayersSection";
 import { Loader2, Search } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -229,18 +228,11 @@ export function ControlPanel({ configs, activeHandle, activeProductType, onProdu
         <div className="space-y-5">
           {aiLayers.map((l, idx, arr) => (
             <div key={l.id} className="space-y-3">
-              {l.type === "aiPhoto" && l.defaults.multiFaceSwap?.enabled ? (
-                <MultiFaceUploadSection
-                  layer={l}
-                  heading={arr.length > 1 ? l.name || t("layer.transformationTab", { n: idx + 1 }) : null}
-                />
-              ) : (
-                <AiPhotoSection
-                  layer={l}
-                  heading={arr.length > 1 ? l.name || t("layer.transformationTab", { n: idx + 1 }) : null}
-                  aiStylePresets={aiStyles}
-                />
-              )}
+              <AiPhotoSection
+                layer={l}
+                heading={arr.length > 1 ? l.name || t("layer.transformationTab", { n: idx + 1 }) : null}
+                aiStylePresets={aiStyles}
+              />
               <LayerTransformControls layer={l} />
             </div>
           ))}

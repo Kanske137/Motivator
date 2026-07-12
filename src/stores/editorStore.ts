@@ -113,16 +113,6 @@ export interface AiPhotoSource {
   uploadedUrl: string | null;
 }
 
-/** Per-slot customer portrait for the OPTIONAL multi-face mode. Mirrors the
- *  shape of `AiPhotoSource` — uploaded lazily to cart-previews and hashed
- *  for caching. */
-export interface MultiFacePortrait {
-  file: File;
-  previewUrl: string;
-  hash: string | null;
-  uploadedUrl: string | null;
-}
-
 /** Per-photo-layer customer state. Each `photo` layer in the template has
  *  its own uploaded file + AI state, so multi-photo templates show
  *  independent images per behållare. */
@@ -199,11 +189,6 @@ interface EditorState {
   /** Persistent face-swap cache keyed by `${faceHash}|${refUrl}|${layerId}`. */
   faceSwapCache: Record<string, FaceSwapCacheEntry>;
 
-  /** Customer-uploaded portraits per aiPhoto layer per slot id, for the
-   *  OPTIONAL multi-face mode. Strictly additive — does not affect any
-   *  existing single-face behavior. */
-  multiFacePortraits: Record<string, Record<string, MultiFacePortrait>>;
-
   // ---------- setters ----------
   setConfig: (c: ProductConfig) => void;
   setPosterBgColor: (c: string) => void;
@@ -262,16 +247,6 @@ interface EditorState {
     referenceImageUrl: string,
   ) => string | null;
 
-  // ---------- multi-face (OPTIONAL) ----------
-  setMultiFacePortrait: (
-    layerId: string,
-    slotId: string,
-    file: File | null,
-    previewUrl: string | null,
-  ) => void;
-  setMultiFacePortraitHash: (layerId: string, slotId: string, hash: string) => void;
-  setMultiFacePortraitUploadedUrl: (layerId: string, slotId: string, url: string) => void;
-  clearMultiFacePortraits: (layerId: string) => void;
 
   // Per-layer setters
   setLayerMapCenter: (id: string, c: [number, number]) => void;
@@ -564,7 +539,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   aiPhotoResults: {},
   aiPhotoSelectedRefUrl: {},
   faceSwapCache: loadFaceSwapCache(),
-  multiFacePortraits: {},
   hiddenLayerIds: {},
   handlesVisible: true,
 
@@ -1282,70 +1256,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!faceHash || !referenceImageUrl) return null;
     const entry = get().faceSwapCache[makeFaceSwapKey(faceHash, referenceImageUrl, layerId)];
     return entry?.url ?? null;
-  },
-
-  // ---------- multi-face (OPTIONAL) ----------
-  setMultiFacePortrait: (layerId, slotId, file, previewUrl) => {
-    const cur = get().multiFacePortraits;
-    const layerMap = { ...(cur[layerId] ?? {}) };
-    const prev = layerMap[slotId];
-    if (prev?.previewUrl?.startsWith("blob:") && prev.previewUrl !== previewUrl) {
-      try { URL.revokeObjectURL(prev.previewUrl); } catch { /* noop */ }
-    }
-    if (!file || !previewUrl) {
-      delete layerMap[slotId];
-    } else {
-      layerMap[slotId] = { file, previewUrl, hash: null, uploadedUrl: null };
-    }
-    const nextLayers = { ...cur };
-    if (Object.keys(layerMap).length === 0) {
-      delete nextLayers[layerId];
-    } else {
-      nextLayers[layerId] = layerMap;
-    }
-    // New portrait on any slot → drop the cached aggregated result for the
-    // layer so the customer's next "Skapa" re-runs with the fresh inputs.
-    const results = { ...get().aiPhotoResults };
-    delete results[layerId];
-    set({ multiFacePortraits: nextLayers, aiPhotoResults: results });
-  },
-  setMultiFacePortraitHash: (layerId, slotId, hash) => {
-    const cur = get().multiFacePortraits;
-    const layerMap = cur[layerId];
-    const entry = layerMap?.[slotId];
-    if (!entry || entry.hash === hash) return;
-    set({
-      multiFacePortraits: {
-        ...cur,
-        [layerId]: { ...layerMap, [slotId]: { ...entry, hash } },
-      },
-    });
-  },
-  setMultiFacePortraitUploadedUrl: (layerId, slotId, url) => {
-    const cur = get().multiFacePortraits;
-    const layerMap = cur[layerId];
-    const entry = layerMap?.[slotId];
-    if (!entry) return;
-    set({
-      multiFacePortraits: {
-        ...cur,
-        [layerId]: { ...layerMap, [slotId]: { ...entry, uploadedUrl: url } },
-      },
-    });
-  },
-  clearMultiFacePortraits: (layerId) => {
-    const cur = get().multiFacePortraits;
-    if (!cur[layerId]) return;
-    for (const entry of Object.values(cur[layerId])) {
-      if (entry.previewUrl?.startsWith("blob:")) {
-        try { URL.revokeObjectURL(entry.previewUrl); } catch { /* noop */ }
-      }
-    }
-    const next = { ...cur };
-    delete next[layerId];
-    const results = { ...get().aiPhotoResults };
-    delete results[layerId];
-    set({ multiFacePortraits: next, aiPhotoResults: results });
   },
 
   setLayerMapCenter: (id, c) => updateMap(set, get, id, { center: c }),

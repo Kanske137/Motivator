@@ -41,7 +41,6 @@ import { uploadAiReferenceImage } from "@/lib/ai-reference-upload";
 import { FONT_CATALOG, FONT_CATEGORY_LABELS, type FontCategory } from "@/lib/font-catalog";
 import { BUILTIN_RECIPES, type MediaLayerAi } from "@/lib/ai-recipe";
 import { listRecipes, type SavedRecipe } from "@/lib/ai-recipes-api";
-import MultiFaceInspector from "./MultiFaceInspector";
 
 /** A sensible motif to prefill when a starter's subject is obvious. Blank = the
  *  merchant must say what the customer uploads. */
@@ -1003,8 +1002,6 @@ function AiPhotoDefaultsSection({
           bevaras (kläder, frisyr, miljö).
         </p>
       )}
-
-      <MultiFaceInspector layer={layer} onChange={onChange} />
     </div>
   );
 }

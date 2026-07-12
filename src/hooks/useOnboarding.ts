@@ -23,7 +23,6 @@ export function useOnboarding() {
   const photoSources = useEditorStore((s) => s.photoSources);
   const aiPhotoSources = useEditorStore((s) => s.aiPhotoSources);
   const aiPhotoResults = useEditorStore((s) => s.aiPhotoResults);
-  const multiFacePortraits = useEditorStore((s) => s.multiFacePortraits);
   const layerValues = useEditorStore((s) => s.layerValues);
 
   const layers = templateLayers();
@@ -34,21 +33,13 @@ export function useOnboarding() {
     if (Object.keys(photoSources).length > 0) markCompleted("bild");
   }, [photoSources, completed.bild, markCompleted]);
 
-  // Auto-mark FORVANDLING när minst ett aiPhoto-lager har källbild
-  // (single-face) eller minst en portrait-slot är ifylld (multi-face).
+  // Auto-mark FORVANDLING när minst ett AI-lager har källbild eller resultat.
   useEffect(() => {
     if (completed.forvandling) return;
     if (Object.keys(aiPhotoSources).length > 0 || Object.keys(aiPhotoResults).length > 0) {
       markCompleted("forvandling");
-      return;
     }
-    for (const slots of Object.values(multiFacePortraits)) {
-      if (slots && Object.keys(slots).length > 0) {
-        markCompleted("forvandling");
-        return;
-      }
-    }
-  }, [aiPhotoSources, aiPhotoResults, multiFacePortraits, completed.forvandling, markCompleted]);
+  }, [aiPhotoSources, aiPhotoResults, completed.forvandling, markCompleted]);
 
   // Auto-mark KARTA när någon map har ändrat plats från template default.
   useEffect(() => {
@@ -83,12 +74,7 @@ export function useOnboarding() {
   );
 
   const hintTextKey = (section: SectionId): string => {
-    if (section === "forvandling") {
-      const aiPhoto = layers.find((l) => l.type === "aiPhoto") as any;
-      if (aiPhoto?.defaults?.multiFaceSwap?.enabled) return "onboarding.forvandling.multiFace";
-      if (aiPhoto?.defaults?.faceSwap?.enabled) return "onboarding.forvandling.faceSingle";
-      return "onboarding.forvandling.aiPhoto";
-    }
+    if (section === "forvandling") return "onboarding.forvandling.aiPhoto";
     if (section === "bild") return "onboarding.bild";
     if (section === "karta") return "onboarding.karta";
     if (section === "stil") return "onboarding.stil";
