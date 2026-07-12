@@ -11,7 +11,6 @@ import {
   type Template,
   type TemplateLayer,
 } from "./template-schema";
-import { DEFAULT_AI_STYLES } from "./ai-style-defaults";
 import { legacyBuiltinRecipeId } from "./legacy-ai-recipe";
 import type { MediaLayerAi } from "./ai-recipe";
 
@@ -312,13 +311,6 @@ function migrateTemplate(template: Template): Template {
   // as front-zone and adds wrap automatically.
   if (next.canvasLayout && next.canvasLayout.coordSpace !== "front") {
     next = { ...next, canvasLayout: convertCanvasLayoutToFront(next) };
-  }
-  // Seed default AI styles when none are configured (admin can edit/remove later).
-  if (!next.productOptions.aiStyles || next.productOptions.aiStyles.length === 0) {
-    next = {
-      ...next,
-      productOptions: { ...next.productOptions, aiStyles: [...DEFAULT_AI_STYLES] },
-    };
   }
   return autoLinkSingleLayerTemplate(next);
 }

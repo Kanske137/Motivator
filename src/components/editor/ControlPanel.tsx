@@ -205,7 +205,6 @@ export function ControlPanel({ configs, activeHandle, activeProductType, onProdu
   const editableTexts = textLayers.filter(
     (l) => !l.locks.content || !l.locks.font || !l.locks.visibility || !l.locks.size || !l.locks.move,
   );
-  const aiStyles = productOptions?.aiStyles ?? [];
   const allLayouts = template ? getAllLayouts(template) : [];
   const productType = config.product_type ?? null;
 
@@ -219,7 +218,6 @@ export function ControlPanel({ configs, activeHandle, activeProductType, onProdu
           photoLayers={plainPhotoLayers}
           layerValues={layerValues}
           photoSources={photoSources}
-          aiStyles={aiStyles}
         />
       );
     case "forvandling":
@@ -393,12 +391,10 @@ function PhotoLayersControls({
   photoLayers,
   layerValues,
   photoSources,
-  aiStyles,
 }: {
   photoLayers: Array<Extract<TemplateLayer, { type: "photo" }>>;
   layerValues: Record<string, unknown>;
   photoSources: Record<string, { file: File; previewUrl: string } | undefined>;
-  aiStyles: Array<{ id: string; label: string; thumbnailUrl?: string; prompt: string; enabled?: boolean }>;
 }) {
   const { t } = useTranslation();
   const [activeId, setActiveId] = useState<string>(photoLayers[0]?.id ?? "");

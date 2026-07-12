@@ -29,10 +29,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { ProductConfig } from "@/lib/product-config";
-import type { AiStylePreset, MapStylePreset, ProductOptions } from "@/lib/template-schema";
+import type { MapStylePreset, ProductOptions } from "@/lib/template-schema";
 import { DEFAULT_PRODUCT_VARIANTS, mergeUnique } from "@/lib/product-defaults";
 import { hasGelatoSku } from "@/lib/gelato-catalog";
-import { DEFAULT_AI_STYLES } from "@/lib/ai-style-defaults";
 import { MAP_STYLE_CATALOG, mapStyleThumbnailUrl, mapStyleLabelKey } from "@/lib/map-style-catalog";
 import { uploadCartPreview } from "@/lib/upload-preview";
 import { FONT_CATALOG, FONT_CATEGORY_LABELS, FONT_FAMILIES, type FontCategory } from "@/lib/font-catalog";
@@ -354,12 +353,6 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
         onChange={(mapStyles) => onChange({ ...value, mapStyles })}
       />
 
-      {/* AI Styles — separate collapsible card */}
-      <AiStylesEditor
-        value={value.aiStyles ?? []}
-        onChange={(aiStyles) => onChange({ ...value, aiStyles })}
-      />
-
       {/* Allowed fonts — per-template customer font picker */}
       <AllowedFontsEditor
         value={value.allowedFonts}
@@ -456,199 +449,6 @@ function MapStylesEditor({
         </AccordionItem>
       </Accordion>
     </Card>
-  );
-}
-
-function AiStylesEditor({
-  value,
-  onChange,
-}: {
-  value: AiStylePreset[];
-  onChange: (next: AiStylePreset[]) => void;
-}) {
-  const presets = value.length === 0 ? DEFAULT_AI_STYLES : value;
-  const enabledCount = presets.filter((p) => p.enabled !== false).length;
-
-  const updateAt = (idx: number, patch: Partial<AiStylePreset>) => {
-    const next = presets.map((p, i) => (i === idx ? { ...p, ...patch } : p));
-    onChange(next);
-  };
-  const removeAt = (idx: number) => onChange(presets.filter((_, i) => i !== idx));
-  const addPreset = () => {
-    const id = `style-${Date.now().toString(36)}`;
-    onChange([...presets, { id, label: "Ny stil", enabled: true, prompt: "Describe the artistic style here." }]);
-  };
-  const seedDefaults = () => onChange([...DEFAULT_AI_STYLES]);
-
-  return (
-    <Card className="p-0 overflow-hidden">
-      <Accordion type="single" collapsible defaultValue="">
-        <AccordionItem value="ai-styles" className="border-0">
-          <AccordionTrigger className="px-5 py-4 hover:no-underline">
-            <div className="text-left">
-              <h2 className="text-base font-semibold">AI-stilar</h2>
-              <p className="text-xs text-muted-foreground font-normal">
-                {enabledCount} av {presets.length} aktiverade. Stilar som kunden kan tillämpa på sin uppladdade bild.
-              </p>
-            </div>
-          </AccordionTrigger>
-          <AccordionContent className="px-5 pb-5 space-y-3">
-            <div className="flex justify-end gap-2">
-              {value.length === 0 && (
-                <Button type="button" variant="outline" size="sm" onClick={seedDefaults}>
-                  Använd standard
-                </Button>
-              )}
-              <Button type="button" variant="outline" size="sm" onClick={addPreset}>
-                <Plus className="h-3.5 w-3.5 mr-1" />
-                Lägg till
-              </Button>
-            </div>
-
-            <Accordion type="single" collapsible className="space-y-2">
-              {presets.map((p, i) => (
-                <AiStyleRow
-                  key={p.id + i}
-                  preset={p}
-                  onChange={(patch) => updateAt(i, patch)}
-                  onRemove={() => removeAt(i)}
-                />
-              ))}
-            </Accordion>
-            {presets.length === 0 && (
-              <p className="text-xs text-muted-foreground">Inga AI-stilar konfigurerade.</p>
-            )}
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
-    </Card>
-  );
-}
-
-function AiStyleRow({
-  preset,
-  onChange,
-  onRemove,
-}: {
-  preset: AiStylePreset;
-  onChange: (patch: Partial<AiStylePreset>) => void;
-  onRemove: () => void;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-  const enabled = preset.enabled !== false;
-
-  const handleUpload = async (file: File | undefined) => {
-    if (!file) return;
-    setUploading(true);
-    try {
-      const reader = new FileReader();
-      const dataUrl: string = await new Promise((res, rej) => {
-        reader.onload = () => res(reader.result as string);
-        reader.onerror = () => rej(new Error("read failed"));
-        reader.readAsDataURL(file);
-      });
-      const url = await uploadCartPreview(dataUrl, `aistyle-${preset.id}-${Date.now()}`);
-      onChange({ thumbnailUrl: url });
-    } catch (e) {
-      toast.error("Kunde inte ladda upp thumbnail", {
-        description: e instanceof Error ? e.message : undefined,
-      });
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  return (
-    <AccordionItem value={preset.id} className="rounded-md border bg-background px-3">
-      <div className="flex items-center gap-2 py-1">
-        <Switch
-          checked={enabled}
-          onCheckedChange={(c) => onChange({ enabled: c })}
-          onClick={(e) => e.stopPropagation()}
-          aria-label={`Aktivera ${preset.label}`}
-        />
-        <AccordionTrigger className="flex-1 py-2 hover:no-underline">
-          <span className={`text-sm font-medium ${enabled ? "" : "text-muted-foreground line-through"}`}>
-            {preset.label}
-          </span>
-        </AccordionTrigger>
-      </div>
-      <AccordionContent className="pb-3">
-        <div className="flex gap-3">
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={() => inputRef.current?.click()}
-                  className="relative h-16 w-16 shrink-0 rounded-md overflow-hidden border bg-muted flex items-center justify-center"
-                  aria-label="Ladda upp thumbnail"
-                >
-                  {preset.thumbnailUrl ? (
-                    <img src={preset.thumbnailUrl} alt={preset.label} className="h-full w-full object-cover" />
-                  ) : (
-                    <Upload className="h-4 w-4 text-muted-foreground" />
-                  )}
-                  {uploading && (
-                    <div className="absolute inset-0 bg-background/70 flex items-center justify-center">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    </div>
-                  )}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Thumbnail som visas för kunden i stilväljaren.</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="hidden"
-            onChange={(e) => handleUpload(e.target.files?.[0])}
-          />
-          <div className="flex-1 space-y-2 min-w-0">
-            <div className="flex items-center gap-2">
-              <Input
-                value={preset.label}
-                onChange={(e) => onChange({ label: e.target.value })}
-                placeholder="Etikett"
-                className="h-8 text-sm"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-destructive shrink-0"
-                onClick={onRemove}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-            <Textarea
-              value={preset.prompt}
-              onChange={(e) => onChange({ prompt: e.target.value })}
-              rows={2}
-              placeholder="Prompt till AI-modellen…"
-              className="text-xs"
-            />
-            {/* Short Kontext-Pro instruction. Only used when the layer has
-                `simpleStyleMode === true`. Kept very short on purpose — long
-                prompts make Kontext drift on geometry. */}
-            <Input
-              value={preset.styleInstruction ?? ""}
-              onChange={(e) =>
-                onChange({
-                  styleInstruction: e.target.value.trim() ? e.target.value : undefined,
-                })
-              }
-              placeholder="Kontext-instruktion (t.ex. make this in oil styling)"
-              className="h-7 text-xs"
-            />
-          </div>
-        </div>
-      </AccordionContent>
-    </AccordionItem>
   );
 }
 
