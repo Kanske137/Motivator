@@ -102,9 +102,9 @@ export function legacyAiPhotoBinding(defaults: Record<string, unknown>): MediaLa
   return { recipeId, references, ...(motif ? { motif } : {}) };
 }
 
-/** Coerce legacy shape values silently to a supported one, and migrate legacy
- *  aiPhoto layers to the unified photo-with-recipe-binding shape. Runs at
- *  template-read time so existing saved templates upgrade transparently. */
+/** Coerce legacy shape values silently to a supported one. aiPhoto→photo+recipe
+ *  conversion happens pre-parse in `coerceLegacyRaw`, so nothing aiPhoto reaches
+ *  here. */
 function migrateLayer(layer: TemplateLayer): TemplateLayer {
   if (layer.type === "map") {
     const s = layer.defaults.shape as string;
@@ -112,40 +112,6 @@ function migrateLayer(layer: TemplateLayer): TemplateLayer {
       return {
         ...layer,
         defaults: { ...layer.defaults, shape: "circle" },
-      };
-    }
-  }
-  // Retire the aiPhoto type: a non-multiFace aiPhoto layer becomes a photo layer
-  // carrying an `.ai` recipe binding (the unified media layer). multiFaceSwap
-  // layers are out of scope and stay aiPhoto for now.
-  if (layer.type === "aiPhoto" && !layer.defaults.multiFaceSwap?.enabled) {
-    const d = layer.defaults as unknown as Record<string, unknown>;
-    return {
-      id: layer.id,
-      name: layer.name,
-      xPct: layer.xPct,
-      yPct: layer.yPct,
-      wPct: layer.wPct,
-      hPct: layer.hPct,
-      rotation: layer.rotation,
-      zIndex: layer.zIndex,
-      locks: layer.locks,
-      type: "photo",
-      defaults: {
-        shape: (d.shape as "rect" | "circle" | "heart" | "star") ?? "rect",
-        fit: (d.fit as "cover" | "contain") ?? "cover",
-        ...(typeof d.placeholderUrl === "string" ? { placeholderUrl: d.placeholderUrl } : {}),
-        ai: legacyAiPhotoBinding(d),
-      },
-    } as TemplateLayer;
-  }
-  // Remaining aiPhoto (multiFace): collapse legacy "cat"/"dog"/"other" → "pet".
-  if (layer.type === "aiPhoto") {
-    const sk = layer.defaults.subjectKind as string;
-    if (sk === "cat" || sk === "dog" || sk === "other") {
-      return {
-        ...layer,
-        defaults: { ...layer.defaults, subjectKind: "pet" },
       };
     }
   }
@@ -183,24 +149,20 @@ function coerceLegacyRaw(raw: unknown): unknown {
             l.defaults = d;
           }
         }
-        // Legacy aiPhoto subjectKind: cat / dog / other → pet.
+        // Retire the aiPhoto type at read time: convert to a photo layer with an
+        // `.ai` recipe binding BEFORE parse, so the schema no longer needs an
+        // aiPhoto member. multiFace is gone, so this is unconditional.
+        // legacyAiPhotoBinding handles subjectKind (incl. cat/dog/other → pet),
+        // references (incl. the legacy referenceImageUrl fallback) and motif.
         if (l?.type === "aiPhoto") {
           const d = (l.defaults ?? {}) as Record<string, unknown>;
-          const sk = d.subjectKind;
-          if (sk === "cat" || sk === "dog" || sk === "other") {
-            d.subjectKind = "pet";
-            l.defaults = d;
-          }
-          // Backfill referenceImages from legacy single referenceImageUrl.
-          if (!Array.isArray(d.referenceImages)) d.referenceImages = [];
-          const list = d.referenceImages as Array<{ id?: string; url?: string }>;
-          if (list.length === 0 && typeof d.referenceImageUrl === "string" && d.referenceImageUrl) {
-            const id =
-              (typeof crypto !== "undefined" && (crypto as { randomUUID?: () => string }).randomUUID?.()) ||
-              `ref-${Date.now()}`;
-            d.referenceImages = [{ id, url: d.referenceImageUrl }];
-          }
-          l.defaults = d;
+          l.type = "photo";
+          l.defaults = {
+            shape: typeof d.shape === "string" ? d.shape : "rect",
+            fit: typeof d.fit === "string" ? d.fit : "cover",
+            ...(typeof d.placeholderUrl === "string" ? { placeholderUrl: d.placeholderUrl } : {}),
+            ai: legacyAiPhotoBinding(d),
+          };
         }
       }
     }

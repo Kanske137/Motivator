@@ -180,35 +180,6 @@ export default function LayerCanvas({
           </div>
         );
       }
-      case "aiPhoto": {
-        const clipPath = buildShapeClipPath(layer.defaults.shape as ClipShape, wPx, hPx);
-        // Resolve the source like the customer editor (multi-ref array first,
-        // legacy single field as fallback) so both show the same reference.
-        const aiRefs = layer.defaults.referenceImages ?? [];
-        const src = aiRefs[0]?.url ?? layer.defaults.referenceImageUrl;
-        const isRemoveBg = layer.defaults.subjectKind === "removeBackground";
-        const placeholderText = isRemoveBg
-          ? "✨ AI-bild (bakgrund tas bort)"
-          : "✨ AI-bildplats";
-        return (
-          <div className="absolute inset-0 overflow-hidden" style={{ clipPath }}>
-            {src ? (
-              <img
-                src={src}
-                alt=""
-                className={`w-full h-full ${
-                  layer.defaults.fit === "contain" ? "object-contain" : "object-cover"
-                }`}
-                draggable={false}
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground bg-accent/60 border border-dashed border-primary/40 text-center px-1">
-                {placeholderText}
-              </div>
-            )}
-          </div>
-        );
-      }
       default:
         return null;
     }
@@ -443,7 +414,6 @@ export default function LayerCanvas({
                     {layer.type === "text" && "T "}
                     {layer.type === "image" && "🖼 "}
                     {layer.type === "photo" && "📷 "}
-                    {layer.type === "aiPhoto" && "✨ "}
                     {layer.type === "line" && "▬ "}
                     {layer.type === "margin" && "▢ "}
                     {layer.type === "shape" && "◇ "}

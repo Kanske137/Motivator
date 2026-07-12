@@ -179,34 +179,6 @@ export default function TemplateThumbnail({
             </div>
           );
         }
-        if (layer.type === "aiPhoto") {
-          const clipPath =
-            layer.defaults.shape === "circle" ? "circle(50% at 50% 50%)" : undefined;
-          // Prefer an orientation-matching reference when available so the
-          // thumbnail mirrors what the customer will see in that orientation.
-          const refs = layer.defaults.referenceImages ?? [];
-          const orientMatch =
-            refs.find((r) => (r.orientation ?? "any") === orientation) ??
-            refs.find((r) => (r.orientation ?? "any") === "any") ??
-            refs[0];
-          const src = orientMatch?.url ?? layer.defaults.referenceImageUrl;
-          return (
-            <div key={layer.id} style={{ ...style, overflow: "hidden", clipPath }}>
-              {src ? (
-                <img
-                  src={src}
-                  alt=""
-                  className={`w-full h-full ${
-                    layer.defaults.fit === "contain" ? "object-contain" : "object-cover"
-                  }`}
-                  draggable={false}
-                />
-              ) : (
-                <div className="w-full h-full bg-accent/40 border border-dashed border-primary/30" />
-              )}
-            </div>
-          );
-        }
         return null;
       })}
       {isAcrylic && (

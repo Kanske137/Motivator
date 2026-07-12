@@ -22,21 +22,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { uploadCartPreview } from "@/lib/upload-preview";
 import { hashFile } from "@/lib/ai-cache-storage";
 import { buildAiLayerDriver } from "@/lib/ai-layer-driver";
-import type { TemplateLayer, AiStylePreset } from "@/lib/template-schema";
+import type { TemplateLayer } from "@/lib/template-schema";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { AiProgress } from "./AiProgress";
 
-/** A bound photo layer OR a legacy aiPhoto layer — both drive this section. */
-type MediaLayer = Extract<TemplateLayer, { type: "photo" | "aiPhoto" }>;
+/** A photo layer carrying an `.ai` recipe binding. */
+type MediaLayer = Extract<TemplateLayer, { type: "photo" }>;
 
 interface Props {
   layer: MediaLayer;
   /** Heading shown when there are multiple AI layers in one template. */
   heading?: string | null;
-  /** Template-level AI style presets — the legacy removeBackground style source.
-   *  Bound recipes carry their own style choices, so this is ignored for them. */
-  aiStylePresets?: AiStylePreset[];
 }
 
 const ACCEPT = "image/jpeg,image/png,image/webp,image/heic";
@@ -53,7 +50,7 @@ async function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
+export function AiPhotoSection({ layer, heading }: Props) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const sources = useEditorStore((s) => s.aiPhotoSources);
@@ -82,7 +79,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
   // Normalize both worlds — a bound photo layer and a legacy aiPhoto layer — to
   // one driver, so nothing below branches on layer type. Null only for a plain
   // photo (no recipe), which ControlPanel never routes here (guarded on render).
-  const driver = buildAiLayerDriver(layer, aiStylePresets, editorOrientation);
+  const driver = buildAiLayerDriver(layer, editorOrientation);
   const needsReference = driver?.needsReference ?? false;
   const references = driver?.references ?? [];
   const styleChoices = driver?.styleChoices ?? [];

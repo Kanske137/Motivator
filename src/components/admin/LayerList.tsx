@@ -25,7 +25,6 @@ const typeLabel: Record<TemplateLayer["type"], string> = {
   text: "Text",
   image: "Bild",
   photo: "Foto",
-  aiPhoto: "AI-bild",
   line: "Linje",
   margin: "Marginal",
   shape: "Figur",

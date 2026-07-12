@@ -17,9 +17,9 @@ export function isAiBoundPhoto(l: TemplateLayer): l is Extract<TemplateLayer, { 
   return l.type === "photo" && !!l.defaults.ai?.recipeId;
 }
 
-/** Layers the customer AI section drives: legacy aiPhoto + recipe-bound photo. */
-export function isAiLayer(l: TemplateLayer): l is Extract<TemplateLayer, { type: "photo" | "aiPhoto" }> {
-  return l.type === "aiPhoto" || isAiBoundPhoto(l);
+/** Layers the customer AI section drives: recipe-bound photo layers. */
+export function isAiLayer(l: TemplateLayer): l is Extract<TemplateLayer, { type: "photo" }> {
+  return isAiBoundPhoto(l);
 }
 
 const SNAP_PCT = 1.25;
@@ -449,27 +449,6 @@ export function createLayer(type: LayerType, existing: TemplateLayer[]): Templat
         type: "photo",
         name: `Foto ${countOfType(existing, "photo") + 1}`,
         defaults: { shape: "rect", fit: "cover" },
-        locks: defaultLocks({ content: false, shape: false }),
-      };
-    case "aiPhoto":
-      return {
-        ...base,
-        xPct: 20,
-        yPct: 20,
-        wPct: 60,
-        hPct: 60,
-        type: "aiPhoto",
-        name: `AI-bild ${countOfType(existing, "aiPhoto") + 1}`,
-        defaults: {
-          shape: "rect",
-          fit: "cover",
-          subjectKind: "human",
-          referenceImages: [],
-          swapPrompt:
-            "Replace only the face/head onto the reference subject. Preserve the reference outfit, hair contour, lighting, pose and background.",
-        },
-        // Customer can change the SHAPE and upload content; everything else
-        // (position/size/style) is admin-controlled like a regular photo layer.
         locks: defaultLocks({ content: false, shape: false }),
       };
     case "shape":

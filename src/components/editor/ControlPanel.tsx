@@ -231,7 +231,6 @@ export function ControlPanel({ configs, activeHandle, activeProductType, onProdu
               <AiPhotoSection
                 layer={l}
                 heading={arr.length > 1 ? l.name || t("layer.transformationTab", { n: idx + 1 }) : null}
-                aiStylePresets={aiStyles}
               />
               <LayerTransformControls layer={l} />
             </div>

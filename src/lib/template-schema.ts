@@ -367,15 +367,14 @@ export const photoLayerSchema = layerBase.extend({
   type: z.literal("photo"),
   defaults: photoDefaultsSchema,
 });
-export const aiPhotoLayerSchema = layerBase.extend({
-  type: z.literal("aiPhoto"),
-  defaults: aiPhotoDefaultsSchema,
-});
 export const shapeLayerSchema = layerBase.extend({
   type: z.literal("shape"),
   defaults: shapeDefaultsSchema,
 });
 
+// The aiPhoto layer type is retired — a photo layer with an `.ai` recipe binding
+// is the unified media layer. Legacy aiPhoto JSON is converted to photo+binding
+// pre-parse in template-migrate's coerceLegacyRaw, so it never reaches this union.
 export const layerSchema = z.discriminatedUnion("type", [
   mapLayerSchema,
   imageLayerSchema,
@@ -383,7 +382,6 @@ export const layerSchema = z.discriminatedUnion("type", [
   lineLayerSchema,
   marginLayerSchema,
   photoLayerSchema,
-  aiPhotoLayerSchema,
   shapeLayerSchema,
 ]);
 export type TemplateLayer = z.infer<typeof layerSchema>;

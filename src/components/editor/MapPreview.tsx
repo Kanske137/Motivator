@@ -381,7 +381,7 @@ export function MapPreview({
     const bleedEligible =
       wrapCm > 0 &&
       !layersIncludeWrap &&
-      (l.type === "map" || l.type === "image" || l.type === "photo" || l.type === "aiPhoto");
+      (l.type === "map" || l.type === "image" || l.type === "photo");
     if (bleedEligible) {
       const extX = frontInsetX * 100;
       const extY = frontInsetY * 100;
@@ -522,7 +522,6 @@ export function MapPreview({
           const isCustomDecor = isCustomLayerId(l.id) && (l.type === "shape" || l.type === "line");
           const isInteractiveLayer =
             l.type === "photo" ||
-            l.type === "aiPhoto" ||
             (l.type === "map" && !l.locks.position);
 
           const wrapStyle: React.CSSProperties = {
@@ -536,7 +535,7 @@ export function MapPreview({
           };
           const movable =
             !l.locks.move &&
-            (l.type === "map" || l.type === "photo" || l.type === "aiPhoto" || l.type === "text" || l.type === "image" || isCustomDecor);
+            (l.type === "map" || l.type === "photo" || l.type === "text" || l.type === "image" || isCustomDecor);
           // Skapa själv: tillåt fri storleksändring på ALLA flyttbara lager
           // (utom margin). På vanliga mallar behåller vi tidigare beteende
           // där bara kund-tillagda shape/line har resize-handtag.
@@ -545,7 +544,6 @@ export function MapPreview({
             (isCustomDecor ||
               (isFreeform &&
                 (l.type === "photo" ||
-                  l.type === "aiPhoto" ||
                   l.type === "map" ||
                   l.type === "text" ||
                   l.type === "image")));
@@ -655,110 +653,6 @@ export function MapPreview({
                     draggable={!!src}
                   />
                 )}
-              </MapLayerSlot>
-            );
-          }
-
-          if (l.type === "aiPhoto") {
-            const v = layerValues[l.id];
-            const av = v && v.kind === "aiPhoto" ? v : null;
-            const effectiveShape = (av?.shape ?? l.defaults.shape) as "rect" | "circle" | "heart" | "star";
-            const staticClip = shapeClipPath(effectiveShape);
-            // Source priority: face-swap result → customer-selected reference
-            // (when admin uploaded multiple) → admin reference image → empty.
-            const aiResultUrl = aiPhotoResults[l.id] ?? null;
-            const selectedRefUrl = aiPhotoSelectedRefUrl[l.id] ?? null;
-            // Resolve the active reference item, filtered by current
-            // orientation so a stale portrait selection doesn't render
-            // when the canvas is now in landscape (and vice versa).
-            const refList = l.defaults.referenceImages ?? [];
-            const orientationMatches = refList.filter((r) => {
-              const o = (r as { orientation?: string }).orientation ?? "any";
-              return o === "any" || o === orientation;
-            });
-            const activeRefUrl =
-              (selectedRefUrl && orientationMatches.some((r) => r.url === selectedRefUrl)
-                ? selectedRefUrl
-                : null)
-              ?? orientationMatches[0]?.url
-              ?? l.defaults.referenceImageUrl
-              ?? null;
-            const src = aiResultUrl ?? activeRefUrl;
-            const activeRef = activeRefUrl ? (refList.find((r) => r.url === activeRefUrl) ?? null) : null;
-            const refFocalX = activeRef?.focalX ?? 0;
-            const refFocalY = activeRef?.focalY ?? 0;
-            // If the visible image is the admin reference or its swap result,
-            // honor the admin-chosen focal. Otherwise (no AI result, no ref —
-            // e.g. removeBackground placeholder) fall back to layer offset.
-            const usingRefOrSwap = !!(aiResultUrl || activeRefUrl);
-            const offsetX = usingRefOrSwap ? refFocalX : (av?.offsetX ?? 0);
-            const offsetY = usingRefOrSwap ? refFocalY : (av?.offsetY ?? 0);
-            const zoom = av?.zoom ?? 1;
-            // Only force `contain` for removeBackground (Nano Banana 2 doesn't
-            // always honor target aspect ratio, and its pure-white padding
-            // blends seamlessly into the layer). For human face-swap (Replicate
-            // returns the same dimensions as the reference image) and pet swap
-            // (prompt enforces same aspect ratio as the reference), use the
-            // layer's default fit so the result fills the layer exactly like
-            // the reference image did — no empty edges.
-            const aiSubjectKind = l.defaults.subjectKind ?? "human";
-            const effectiveFit = aiResultUrl && aiSubjectKind === "removeBackground" ? "contain" : l.defaults.fit;
-            // removeBackground only: render the per-layer backdropColor as a
-            // solid fill BEHIND the (potentially transparent) AI result so the
-            // editor preview matches the print snapshot exactly. Shape-clipped
-            // by the surrounding MapLayerSlot.
-            const rbBackdropColor = aiResultUrl && aiSubjectKind === "removeBackground"
-              ? (l.defaults as { backdropColor?: string }).backdropColor ?? null
-              : null;
-            return (
-              <MapLayerSlot
-                key={l.id}
-                wrapStyle={wrapStyle}
-                shape={effectiveShape}
-                staticClip={staticClip}
-                overlay={<>{moveHandle}{resizeHandle}</>}
-              >
-                {(clip) =>
-                  src ? (
-                    <>
-                      {rbBackdropColor ? (
-                        <div
-                          aria-hidden="true"
-                          style={{
-                            position: "absolute",
-                            inset: 0,
-                            backgroundColor: rbBackdropColor,
-                            clipPath: clip,
-                            pointerEvents: "none",
-                          }}
-                        />
-                      ) : null}
-                      <PhotoLayerView
-                        layerId={l.id}
-                        src={src}
-                        fit={effectiveFit}
-                        shape={effectiveShape}
-                        staticClipPath={clip}
-                        offsetX={offsetX}
-                        offsetY={offsetY}
-                        zoom={zoom}
-                        draggable={!!src && !usingRefOrSwap}
-                      />
-                    </>
-                  ) : (
-                    <div
-                      className={`w-full h-full flex flex-col items-center justify-center gap-1 text-center px-2 bg-accent/30 rounded${
-                        effectiveShape === "rect" ? " border-2 border-dashed border-primary/40" : ""
-                      }`}
-                      style={{ clipPath: clip }}
-                    >
-                      <span className="text-base">✨</span>
-                      <span className="text-[10px] text-muted-foreground leading-tight">
-                        AI-bild visas här efter Skapa nu
-                      </span>
-                    </div>
-                  )
-                }
               </MapLayerSlot>
             );
           }

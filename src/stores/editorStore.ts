@@ -91,15 +91,7 @@ export interface PhotoLayerValue {
   zoom: number;
 }
 
-export interface AiPhotoLayerValue {
-  kind: "aiPhoto";
-  shape: PhotoShape;
-  offsetX: number;
-  offsetY: number;
-  zoom: number;
-}
-
-export type LayerValue = MapLayerValue | TextLayerValue | PhotoLayerValue | AiPhotoLayerValue;
+export type LayerValue = MapLayerValue | TextLayerValue | PhotoLayerValue;
 
 /** Per-aiPhoto-layer customer state. The customer's selfie/pet photo lives
  *  here keyed by layer id, so multiple aiPhoto layers in one template are
@@ -403,14 +395,6 @@ function hydrateLayerValues(
     } else if (l.type === "photo") {
       out[l.id] = {
         kind: "photo",
-        shape: l.defaults.shape as PhotoShape,
-        offsetX: 0,
-        offsetY: 0,
-        zoom: 1,
-      };
-    } else if (l.type === "aiPhoto") {
-      out[l.id] = {
-        kind: "aiPhoto",
         shape: l.defaults.shape as PhotoShape,
         offsetX: 0,
         offsetY: 0,
@@ -830,25 +814,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const aiPhotoSources = remap(state.aiPhotoSources);
     const aiPhotoResults = remap(state.aiPhotoResults);
     const aiPhotoSelectedRefUrl = remap(state.aiPhotoSelectedRefUrl);
-    // Orientation-aware healing: for every aiPhoto layer in the new
-    // orientation, ensure the selected reference URL matches an entry
-    // tagged for this orientation (or "any"). Otherwise switch to the
-    // first matching one. This keeps MapPreview in sync even before the
-    // AiPhotoSection control panel mounts.
-    for (const l of nextLayers) {
-      if (l.type !== "aiPhoto") continue;
-      const refs = l.defaults.referenceImages ?? [];
-      if (refs.length === 0) continue;
-      const matching = refs.filter((r) => {
-        const o = (r as { orientation?: string }).orientation ?? "any";
-        return o === "any" || o === orientation;
-      });
-      if (matching.length === 0) continue;
-      const cur = aiPhotoSelectedRefUrl[l.id];
-      if (!cur || !matching.some((r) => r.url === cur)) {
-        aiPhotoSelectedRefUrl[l.id] = matching[0].url;
-      }
-    }
     const layerTransforms = remap(state.layerTransforms);
 
     const nextBgColor = block[orientation]?.background?.color;
@@ -957,12 +922,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       } else if (oldVal.kind === "photo" && fresh.kind === "photo" && newLayer.type === "photo") {
         const locks = newLayer.locks;
         // Photo shape is layout-defining; only customer offset/zoom survives.
-        layerValues[newId] = {
-          ...fresh,
-          ...(!locks.move ? { offsetX: oldVal.offsetX, offsetY: oldVal.offsetY, zoom: oldVal.zoom } : {}),
-        };
-      } else if (oldVal.kind === "aiPhoto" && fresh.kind === "aiPhoto" && newLayer.type === "aiPhoto") {
-        const locks = newLayer.locks;
         layerValues[newId] = {
           ...fresh,
           ...(!locks.move ? { offsetX: oldVal.offsetX, offsetY: oldVal.offsetY, zoom: oldVal.zoom } : {}),
@@ -1414,14 +1373,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         offsetY: 0,
         zoom: 1,
       };
-    } else if (newLayer.type === "aiPhoto") {
-      layerValues[newLayer.id] = {
-        kind: "aiPhoto",
-        shape: newLayer.defaults.shape as PhotoShape,
-        offsetX: 0,
-        offsetY: 0,
-        zoom: 1,
-      };
     }
     set({ template: nextTemplate, layerValues });
     return newLayer.id;
@@ -1516,10 +1467,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           const src = state.photoSources[layer.id];
           if (src?.previewUrl || src?.originalUrl) return true;
         }
-      } else if (layer.type === "aiPhoto") {
-        if (state.aiPhotoResults[layer.id]) return true;
-        const src = state.aiPhotoSources[layer.id];
-        if (src?.previewUrl || src?.uploadedUrl) return true;
       } else if (layer.type === "map") {
         if (v && v.kind === "map" && v.placeName) return true;
       } else if (layer.type === "text") {
@@ -1624,11 +1571,11 @@ function updatePhoto(
   set: SetFn,
   get: GetFn,
   id: string,
-  patch: Partial<PhotoLayerValue> & Partial<AiPhotoLayerValue>,
+  patch: Partial<PhotoLayerValue>,
 ) {
   const state = get();
   const cur = state.layerValues[id];
-  if (!cur || (cur.kind !== "photo" && cur.kind !== "aiPhoto")) return;
+  if (!cur || cur.kind !== "photo") return;
   const next = { ...cur, ...patch } as LayerValue;
   const layerValues = { ...state.layerValues, [id]: next };
   set({ layerValues });

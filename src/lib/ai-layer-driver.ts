@@ -13,10 +13,10 @@ import {
   resolveBindingRecipe,
   type AiRecipe,
 } from "./ai-recipe";
-import { resolveLegacyRecipe, aiRecipeCacheSlot } from "./legacy-ai-recipe";
-import type { TemplateLayer, AiStylePreset } from "./template-schema";
+import { aiRecipeCacheSlot } from "./legacy-ai-recipe";
+import type { TemplateLayer } from "./template-schema";
 
-type MediaLayer = Extract<TemplateLayer, { type: "photo" | "aiPhoto" }>;
+type MediaLayer = Extract<TemplateLayer, { type: "photo" }>;
 
 export type Orientation = "portrait" | "landscape";
 
@@ -62,34 +62,13 @@ function forOrientation(refs: DriverReference[], orientation: Orientation): Driv
   return refs.filter((r) => (r.orientation ?? "any") === "any" || r.orientation === orientation);
 }
 
-/** Legacy aiPhoto references: the `referenceImages[]` list, falling back to the
- *  single legacy `referenceImageUrl` so old templates keep working. */
-function legacyReferences(layer: Extract<TemplateLayer, { type: "aiPhoto" }>): DriverReference[] {
-  const list = layer.defaults.referenceImages ?? [];
-  if (list.length > 0) {
-    return list.map((r) => ({
-      id: r.id,
-      url: r.url,
-      label: r.label,
-      orientation: (r as { orientation?: DriverReference["orientation"] }).orientation ?? "any",
-    }));
-  }
-  if (layer.defaults.referenceImageUrl) {
-    return [{ id: "legacy", url: layer.defaults.referenceImageUrl, orientation: "any" }];
-  }
-  return [];
-}
-
 /** Build the driver, or null when the layer is a plain photo (no recipe) — i.e.
  *  not an AI layer and nothing for the AI section to render. */
 export function buildAiLayerDriver(
   layer: MediaLayer,
-  aiStylePresets: AiStylePreset[] | undefined,
   orientation: Orientation,
 ): AiLayerDriver | null {
-  // ── Binding path: a photo layer that points at a recipe. ──────────────────
-  const binding = layer.type === "photo" ? layer.defaults.ai : undefined;
-  const bound = resolveBindingRecipe(binding);
+  const bound = resolveBindingRecipe(layer.defaults.ai);
   if (bound) {
     const { recipe, styleOption, motif } = bound;
     const references = forOrientation(
@@ -120,43 +99,6 @@ export function buildAiLayerDriver(
       return { recipe, optionValues, slot };
     };
     return { needsReference, references, styleChoices, motif, hintKey: undefined, resolve };
-  }
-
-  // ── Legacy path: an aiPhoto layer with subjectKind + flags. ───────────────
-  if (layer.type === "aiPhoto") {
-    const subjectKind = layer.defaults.subjectKind ?? "human";
-    const isRemoveBg = subjectKind === "removeBackground";
-    const simpleStyleMode = isRemoveBg && layer.defaults.simpleStyleMode === true;
-    const motif = layer.defaults.fluxStylePrompt ?? undefined;
-    const references = forOrientation(legacyReferences(layer), orientation);
-    const presets = (aiStylePresets ?? []).filter((p) => p.enabled !== false);
-    const styleChoices: DriverStyleChoice[] = isRemoveBg
-      ? presets.map((p) => ({ id: p.id, label: p.label, thumbnailUrl: p.thumbnailUrl }))
-      : [];
-    const resolve = (styleId: string | null, refUrl: string | null): AiRun => {
-      const preset = isRemoveBg && styleId ? presets.find((p) => p.id === styleId) ?? null : null;
-      const { recipe, optionValues } = resolveLegacyRecipe({
-        subjectKind,
-        simpleStyleMode,
-        style: preset
-          ? { prompt: preset.prompt, styleInstruction: preset.styleInstruction, bridge: preset.bridge, label: preset.label }
-          : null,
-      });
-      const slot = aiRecipeCacheSlot({
-        recipeId: recipe.id,
-        optionValues,
-        motif,
-        referenceImageUrl: isRemoveBg ? null : refUrl,
-      });
-      return { recipe, optionValues, slot };
-    };
-    const hintKey =
-      subjectKind === "pet"
-        ? "aiPhoto.subjectHintPet"
-        : isRemoveBg
-          ? "aiPhoto.subjectHintRemoveBg"
-          : "aiPhoto.subjectHintHuman";
-    return { needsReference: !isRemoveBg, references, styleChoices, motif, hintKey, resolve };
   }
 
   // Plain photo with no binding → not an AI layer.

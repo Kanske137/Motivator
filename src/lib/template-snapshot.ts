@@ -726,7 +726,7 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
     const BLEED_EPS = 0.5;
     const bleedEligible =
       layer.type === "map" || layer.type === "image" ||
-      layer.type === "photo" || layer.type === "aiPhoto";
+      layer.type === "photo";
     if (wrapPxExtra > 0 && bleedEligible) {
       if (eff.xPct <= BLEED_EPS) { rect.x -= wrapPxExtra; rect.w += wrapPxExtra; }
       if (eff.yPct <= BLEED_EPS) { rect.y -= wrapPxExtra; rect.h += wrapPxExtra; }
@@ -794,56 +794,6 @@ export async function renderTemplateSnapshot(input: TemplateSnapshotInput): Prom
           await drawPhotoLayer(ctx, rect, url, shape, layer.defaults.fit, offsetX, offsetY, zoom);
         } catch (e) {
           console.warn("[template-snapshot] photo layer failed", e);
-        }
-      }
-    } else if (layer.type === "aiPhoto") {
-      const aiResultUrl = input.aiPhotoResults?.[layer.id] ?? null;
-      const url = aiResultUrl ?? layer.defaults.referenceImageUrl;
-      if (url) {
-        const lv = input.layerValues?.[layer.id];
-        const av = lv && lv.kind === "aiPhoto" ? lv : null;
-        const shape = (av?.shape ?? layer.defaults.shape) as "rect" | "circle" | "heart" | "star";
-        // Resolve admin focal for the active reference (face-swap result has
-        // identical dimensions, so the focal applies cleanly). Falls back
-        // to per-layer offset for placeholders / removeBg.
-        const refList = layer.defaults.referenceImages ?? [];
-        const activeRefUrl =
-          input.aiPhotoSelectedRefUrl?.[layer.id] ?? layer.defaults.referenceImageUrl ?? null;
-        const activeRef = activeRefUrl
-          ? refList.find((r) => r.url === activeRefUrl) ?? null
-          : null;
-        const usingRefOrSwap = !!(aiResultUrl || activeRefUrl);
-        const offsetX = usingRefOrSwap ? activeRef?.focalX ?? 0 : av?.offsetX ?? 0;
-        const offsetY = usingRefOrSwap ? activeRef?.focalY ?? 0 : av?.offsetY ?? 0;
-        const zoom = av?.zoom ?? 1;
-        // Only force `contain` for removeBackground results (Nano Banana 2
-        // may not perfectly match target aspect; its white padding blends in).
-        // For human face-swap (Replicate preserves reference dimensions) and
-        // pet swap (prompt enforces same aspect as reference), use the
-        // layer's default fit so the print fills the layer exactly like the
-        // reference image — matches the editor preview, no empty edges.
-        const aiSubjectKind = layer.defaults.subjectKind ?? "human";
-        const fit =
-          aiResultUrl && aiSubjectKind === "removeBackground"
-            ? "contain"
-            : layer.defaults.fit;
-        // removeBackground only: composite the per-layer backdropColor BEHIND
-        // the (potentially transparent) AI result so alpha pixels reveal the
-        // exact configured hex — not the global poster bg. Respects the
-        // layer's shape clip so e.g. circle layers don't paint outside.
-        const backdropColor = (layer.defaults as { backdropColor?: string })
-          .backdropColor;
-        if (aiResultUrl && aiSubjectKind === "removeBackground" && backdropColor) {
-          ctx.save();
-          clipForShape(ctx, shape, rect.x, rect.y, rect.w, rect.h);
-          ctx.fillStyle = backdropColor;
-          ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-          ctx.restore();
-        }
-        try {
-          await drawPhotoLayer(ctx, rect, url, shape, fit, offsetX, offsetY, zoom);
-        } catch (e) {
-          console.warn("[template-snapshot] aiPhoto layer failed", e);
         }
       }
     } else if (layer.type === "line") {

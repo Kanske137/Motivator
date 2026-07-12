@@ -86,7 +86,6 @@ const LAYER_TYPE_ICON: Record<TemplateLayer["type"], LucideIcon> = {
   map: MapPin,
   text: Type,
   photo: ImageIcon,
-  aiPhoto: Sparkles,
   shape: Frame,
   line: Minus,
   margin: Square,
