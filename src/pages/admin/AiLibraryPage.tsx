@@ -22,6 +22,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import RecipeEditorDialog from "@/components/admin/RecipeEditorDialog";
+import LanguageToggle from "@/components/admin/LanguageToggle";
+import { applyStoredAdminLocale } from "@/lib/admin-locale";
 import {
   Collapsible,
   CollapsibleContent,
@@ -50,6 +52,9 @@ function ChainBadge({ recipe }: { recipe: AiRecipe }) {
 
 export default function AiLibraryPage() {
   const { t } = useTranslation();
+  useEffect(() => {
+    applyStoredAdminLocale();
+  }, []);
   const [recipes, setRecipes] = useState<SavedRecipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -117,9 +122,12 @@ export default function AiLibraryPage() {
               {t("admin.aiLibrary.intro")}
             </p>
           </div>
-          <Button onClick={openNew} className="shrink-0">
-            <Plus className="h-4 w-4" /> {t("admin.aiLibrary.newRecipe")}
-          </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            <LanguageToggle />
+            <Button onClick={openNew}>
+              <Plus className="h-4 w-4" /> {t("admin.aiLibrary.newRecipe")}
+            </Button>
+          </div>
         </div>
       </div>
 

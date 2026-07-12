@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { invokeAdmin } from "@/lib/admin-api";
+import LanguageToggle from "@/components/admin/LanguageToggle";
+import { applyStoredAdminLocale } from "@/lib/admin-locale";
 import {
   POSTER_SIZES,
   POSTER_FRAMES,
@@ -53,6 +55,9 @@ interface PriceRow {
 
 export default function SettingsPage() {
   const { t } = useTranslation();
+  useEffect(() => {
+    applyStoredAdminLocale();
+  }, []);
   const [prices, setPrices] = useState<PriceMap>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -162,10 +167,13 @@ export default function SettingsPage() {
               </p>
             </div>
           </div>
-          <Button onClick={save} disabled={saving || loading}>
-            {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-            {t("admin.settings.savePrices")}
-          </Button>
+          <div className="flex items-center gap-2">
+            <LanguageToggle />
+            <Button onClick={save} disabled={saving || loading}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+              {t("admin.settings.savePrices")}
+            </Button>
+          </div>
         </div>
       </header>
 

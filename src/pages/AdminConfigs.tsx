@@ -12,6 +12,8 @@ import { resolveTemplate } from "@/lib/template-migrate";
 import type { Template } from "@/lib/template-schema";
 import CreateTemplateDialog from "@/components/admin/CreateTemplateDialog";
 import TemplateThumbnail from "@/components/admin/TemplateThumbnail";
+import LanguageToggle from "@/components/admin/LanguageToggle";
+import { applyStoredAdminLocale } from "@/lib/admin-locale";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +38,9 @@ interface InstallStatus {
 
 export default function AdminConfigs() {
   const { t } = useTranslation();
+  useEffect(() => {
+    applyStoredAdminLocale();
+  }, []);
   const [configs, setConfigs] = useState<ConfigWithTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -139,6 +144,7 @@ export default function AdminConfigs() {
               <p className="text-sm text-muted-foreground">{t("admin.configs.pageSubtitle")}</p>
             </div>
             <div className="flex items-center gap-2">
+              <LanguageToggle />
               <Button variant="outline" onClick={() => setCreateOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 {t("admin.configs.createTemplate")}
