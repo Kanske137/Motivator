@@ -77,6 +77,7 @@ interface Props {
 }
 
 const ASPECT_CHOICES: Array<{ value: string; label: string }> = [
+  { value: "match_layer", label: "Match the layer's shape (recommended)" },
   { value: "match_customer", label: "Match the customer's photo" },
   { value: "match_reference", label: "Match your reference image" },
   { value: "1:1", label: "Square (1:1)" },
@@ -517,7 +518,7 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
                 <div className="space-y-2">
                   <Label>Output shape</Label>
                   <Select
-                    value={draft.params.aspectRatio ?? "match_customer"}
+                    value={draft.params.aspectRatio ?? "match_layer"}
                     onValueChange={(v) => setParam("aspectRatio", v)}
                   >
                     <SelectTrigger>

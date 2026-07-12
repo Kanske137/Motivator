@@ -22,6 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { uploadCartPreview } from "@/lib/upload-preview";
 import { hashFile } from "@/lib/ai-cache-storage";
 import { buildAiLayerDriver } from "@/lib/ai-layer-driver";
+import { nearestAspectBucket } from "@/lib/ai-recipe";
 import type { TemplateLayer } from "@/lib/template-schema";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -244,14 +245,33 @@ export function AiPhotoSection({ layer, heading }: Props) {
         force: !!opts.force,
       });
 
+      // Resolve `match_layer` → the layer's OWN aspect (nearest supported bucket)
+      // so the output FILLS the layer box, not the input's aspect. Computed here
+      // because the recipe doesn't know the layer/canvas geometry. Other aspect
+      // values — or a layer whose geometry can't be read — pass through untouched
+      // (the edge maps a leftover `match_layer` to `match_input_image`).
+      let recipeParams = recipe.params;
+      if (recipe.params?.aspectRatio === "match_layer") {
+        const { size: editorSize, orientation: layerOrientation } = useEditorStore.getState();
+        const m = editorSize?.match(/(\d+)\s*x\s*(\d+)/i);
+        if (m && layer.wPct > 0 && layer.hPct > 0) {
+          const a = parseInt(m[1], 10);
+          const b = parseInt(m[2], 10);
+          const [canvasW, canvasH] =
+            layerOrientation === "portrait" ? [Math.min(a, b), Math.max(a, b)] : [Math.max(a, b), Math.min(a, b)];
+          const wCm = (layer.wPct / 100) * canvasW;
+          const hCm = (layer.hPct / 100) * canvasH;
+          if (wCm > 0 && hCm > 0) {
+            recipeParams = { ...recipe.params, aspectRatio: nearestAspectBucket(wCm / hCm) };
+          }
+        }
+      }
+
       setStage(t("ai.stageCreate"));
       updateAiJobStage(jobId, t("ai.stageCreate"));
-      // Send the recipe + its inputs. Aspect ratio now rides on the recipe
-      // params (match_input_image); the client still contain-renders as the
-      // safety net, so the old layer-aspect hint is no longer needed here.
       const { data, error } = await supabase.functions.invoke("replicate-face-swap", {
         body: {
-          recipe: { model: recipe.model, prompt: recipe.prompt, params: recipe.params, steps: recipe.steps },
+          recipe: { model: recipe.model, prompt: recipe.prompt, params: recipeParams, steps: recipe.steps },
           customerImageUrls: [faceImageUrl],
           referenceImageUrls: needsReference && refUrl ? [refUrl] : [],
           optionValues,

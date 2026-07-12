@@ -276,8 +276,8 @@ export const BUILTIN_RECIPES: AiRecipe[] = [
       "You are editing image #1 (the reference scene). Image #2 is a photograph of the customer's own pet (a cat or a dog). " +
       "Replace the pet that appears in image #1 with the specific pet from image #2 — keep the unique markings, fur colour/pattern, breed traits, eye colour, ear shape and overall identity from image #2. " +
       "Keep EVERYTHING ELSE from image #1 unchanged: the costume/clothing, props, background, lighting, camera angle, art style, composition, framing and aspect ratio. Do not change the pose unless required to make the new pet fit naturally. " +
-      "Return ONE single edited image (not a collage, side-by-side or comparison), with the same aspect ratio as image #1.",
-    params: { aspectRatio: "match_reference" },
+      "Return ONE single edited image (not a collage, side-by-side or comparison).",
+    params: { aspectRatio: "match_layer" },
     builtIn: true,
   },
   {
@@ -295,7 +295,7 @@ export const BUILTIN_RECIPES: AiRecipe[] = [
     description: "Let the customer restyle their photo with one of your styles.",
     model: "art-style",
     prompt: "{style}",
-    params: { aspectRatio: "match_customer", outputFormat: "jpg" },
+    params: { aspectRatio: "match_layer", outputFormat: "jpg" },
     customerOptions: [styleOption("prompt")],
     builtIn: true,
   },
@@ -310,7 +310,7 @@ export const BUILTIN_RECIPES: AiRecipe[] = [
       "Restyle the customer's photo, then remove the background — the styled subject lands on your template's background.",
     model: "art-style",
     prompt: "{style}",
-    params: { aspectRatio: "match_customer", outputFormat: "png" },
+    params: { aspectRatio: "match_layer", outputFormat: "png" },
     customerOptions: [styleOption("styleInstruction")],
     steps: [{ model: "cutout", input: "previous", params: { outputFormat: "png" } }],
     builtIn: true,
@@ -324,7 +324,7 @@ export const BUILTIN_RECIPES: AiRecipe[] = [
       "Removes the background onto white, restyles the subject, and scatters loose paint droplets around it.",
     model: "ai-edit",
     prompt: NANO_WATERCOLOR_CUTOUT_PROMPT,
-    params: { aspectRatio: "match_customer", outputFormat: "png" },
+    params: { aspectRatio: "match_layer", outputFormat: "png" },
     customerOptions: [styleOption("prompt")],
     builtIn: true,
   },
@@ -338,7 +338,7 @@ export const BUILTIN_RECIPES: AiRecipe[] = [
       "Removes the background onto a clean white backdrop and restyles the subject. No droplets. Works with painterly styles.",
     model: "ai-edit",
     prompt: NANO_SOLID_BACKDROP_PROMPT,
-    params: { aspectRatio: "match_customer", outputFormat: "png" },
+    params: { aspectRatio: "match_layer", outputFormat: "png" },
     customerOptions: [styleOption("prompt")],
     builtIn: true,
   },
@@ -433,16 +433,43 @@ export function recipeChain(recipe: RecipeShape): ModelId[] {
 
 /** Does this recipe composite the customer's photo onto an admin reference (so a
  *  reference-image editor makes sense)? Face-swap always does; an ai-edit recipe
- *  that anchors its aspect ratio on the reference (the pet portrait) does too.
- *  Background-removal / art-style recipes work on the customer photo alone, so
- *  they take no references. The references are a PICKER pool — the customer
- *  chooses one and only that (+ their photo) is sent — so there is no upper
- *  bound on how many the merchant can offer. */
-export function recipeUsesReferences(recipe: { model: ModelId; params?: RecipeParams }): boolean {
+ *  that composites the customer's photo onto a reference (its prompt refers to
+ *  "image #2") does too. Background-removal / art-style recipes work on the
+ *  customer photo alone, so they take no references. The references are a PICKER
+ *  pool — the customer chooses one and only that (+ their photo) is sent — so
+ *  there is no upper bound on how many the merchant can offer. */
+export function recipeUsesReferences(recipe: { model: ModelId; prompt?: string }): boolean {
   return (
     MODEL_CATALOG[recipe.model].referenceImages.min > 0 ||
-    recipe.params?.aspectRatio === "match_reference"
+    /image\s*#?\s*2/i.test(recipe.prompt ?? "")
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Aspect ratio buckets — models (flux-kontext-pro, nano-banana-2) accept a fixed
+// set of `aspect_ratio` values, not arbitrary ratios. `match_layer` resolves to
+// the nearest of these to the layer's own width/height (computed client-side and
+// sent literally), so the output fills the layer box with minimal cropping.
+// ─────────────────────────────────────────────────────────────────────────────
+const ASPECT_BUCKETS: Array<[string, number]> = [
+  ["21:9", 21 / 9], ["16:9", 16 / 9], ["3:2", 3 / 2], ["4:3", 4 / 3], ["5:4", 5 / 4],
+  ["1:1", 1], ["4:5", 4 / 5], ["3:4", 3 / 4], ["2:3", 2 / 3], ["9:16", 9 / 16], ["9:21", 9 / 21],
+];
+
+/** The supported `aspect_ratio` bucket nearest to a width/height ratio, chosen in
+ *  log space so proportional error (not absolute) decides the match. */
+export function nearestAspectBucket(ratio: number): string {
+  if (!Number.isFinite(ratio) || ratio <= 0) return "1:1";
+  let best = ASPECT_BUCKETS[0];
+  let bestErr = Infinity;
+  for (const b of ASPECT_BUCKETS) {
+    const err = Math.abs(Math.log(ratio) - Math.log(b[1]));
+    if (err < bestErr) {
+      bestErr = err;
+      best = b;
+    }
+  }
+  return best[0];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
