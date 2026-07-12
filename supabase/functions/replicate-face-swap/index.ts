@@ -962,15 +962,22 @@ Deno.serve(async (req) => {
         : referenceImageUrl ? [referenceImageUrl] : [];
       const optionValues: Record<string, string> =
         body.optionValues && typeof body.optionValues === "object" ? body.optionValues : {};
+      // `motif` describes what the customer's photo depicts, from the layer
+      // binding. Reserved (not a customer choice); the executor injects it at
+      // `{motif}`. Load-bearing for the nano starters — without it a
+      // background-removal recipe keeps the whole scene.
+      const motif: string | undefined =
+        typeof body.motif === "string" ? body.motif : undefined;
 
       const recipe = body.recipe as ExecRecipe;
       console.log(
         `[face-swap] recipe run model=${recipe.model} steps=${recipe.steps?.length ?? 0} ` +
-          `customer=${customerImageUrls.length} ref=${referenceImageUrls.length} designId=${designId}`,
+          `customer=${customerImageUrls.length} ref=${referenceImageUrls.length} ` +
+          `motif=${motif ? "set" : "none"} designId=${designId}`,
       );
       const rec = await runRecipe(
         recipe,
-        { customerImageUrls, referenceImageUrls, optionValues },
+        { customerImageUrls, referenceImageUrls, optionValues, motif },
         RECIPE_TOKEN,
       );
       if (!rec.ok) {
