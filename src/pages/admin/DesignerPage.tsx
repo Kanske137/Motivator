@@ -10,7 +10,7 @@
 // product_configs. Publish stamps `publishedAt` and runs zod validation.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, ChevronDown, Eye, Image as ImageIcon, Loader2, MapPin, Minus, Save, Send, Shapes, Sparkle, Square, Type, Undo2, Zap } from "lucide-react";
+import { ArrowLeft, ChevronDown, Eye, Image as ImageIcon, Loader2, MapPin, Minus, Save, Send, Shapes, Square, Type, Undo2, Zap } from "lucide-react";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -373,21 +373,6 @@ export default function DesignerPage() {
     setLayers(normaliseZIndex([...layers, nextLayer]));
     setSelectedId(nextLayer.id);
   }
-  /** Add an AI layer in the unified model: a photo layer pre-bound to a starter
-   *  recipe. `recipeId` set = AI layer; the inspector's recipe picker lets the
-   *  merchant switch recipe. Replaces the retired aiPhoto layer type. */
-  function addAiLayer() {
-    const base = createLayer("photo", layers) as Extract<TemplateLayer, { type: "photo" }>;
-    const aiCount = layers.filter((l) => l.type === "photo" && !!l.defaults.ai?.recipeId).length;
-    const nextLayer: TemplateLayer = {
-      ...base,
-      name: `AI-bild ${aiCount + 1}`,
-      defaults: { ...base.defaults, ai: { recipeId: "builtin-face-swap", references: [] } },
-    };
-    setLayers(normaliseZIndex([...layers, nextLayer]));
-    setSelectedId(nextLayer.id);
-  }
-
   function addShape(kind: ShapeKind) {
     const nextLayer = createShapeLayer(kind, layers);
     setLayers(normaliseZIndex([...layers, nextLayer]));
@@ -712,10 +697,6 @@ export default function DesignerPage() {
               <Button size="sm" variant="outline" onClick={() => addLayer("photo")}>
                 <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
                 Lägg till bild
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => addAiLayer()}>
-                <Sparkle className="h-3.5 w-3.5 mr-1.5" />
-                Lägg till AI-bild
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
