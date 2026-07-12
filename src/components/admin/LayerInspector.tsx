@@ -37,7 +37,7 @@ import { applyAdminPlaceToLinkedTexts } from "@/lib/template-migrate";
 import { MAP_STYLE_CATALOG } from "@/lib/map-style-catalog";
 import { uploadAiReferenceImage } from "@/lib/ai-reference-upload";
 import { FONT_CATALOG, FONT_CATEGORY_LABELS, type FontCategory } from "@/lib/font-catalog";
-import { BUILTIN_RECIPES, MODEL_CATALOG, type AiRecipe, type MediaLayerAi, type RecipeReference } from "@/lib/ai-recipe";
+import { BUILTIN_RECIPES, MODEL_CATALOG, recipeUsesReferences, type AiRecipe, type MediaLayerAi, type RecipeReference } from "@/lib/ai-recipe";
 import { listRecipes, type SavedRecipe } from "@/lib/ai-recipes-api";
 
 /** A sensible motif to prefill when a starter's subject is obvious. Blank = the
@@ -576,7 +576,7 @@ function PhotoRecipeBinding({
             <p className="text-[11px] text-muted-foreground -mt-1">{chosen.description}</p>
           )}
 
-          {MODEL_CATALOG[chosen.model].referenceImages.max > 0 && (
+          {recipeUsesReferences(chosen) && (
             <ReferenceImagesEditor
               recipe={chosen}
               references={binding?.references ?? []}
@@ -627,7 +627,9 @@ function ReferenceImagesEditor({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const max = MODEL_CATALOG[recipe.model].referenceImages.max;
+  // References are a picker pool — the customer chooses one and only that is
+  // sent — so there is no upper bound. `required` = the recipe can't run without
+  // at least one (face-swap).
   const required = MODEL_CATALOG[recipe.model].referenceImages.min > 0;
 
   async function onFiles(files: FileList | null) {
@@ -648,7 +650,7 @@ function ReferenceImagesEditor({
   }
 
   return (
-    <Field label={`Reference image${max > 1 ? "s" : ""}${required ? "" : " (optional)"}`}>
+    <Field label={`Reference images${required ? "" : " (optional)"}`}>
       <div className="space-y-2">
         {references.length > 0 && (
           <div className="grid grid-cols-3 gap-2">
@@ -686,22 +688,20 @@ function ReferenceImagesEditor({
             ))}
           </div>
         )}
-        {references.length < max && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={uploading}
-            onClick={() => inputRef.current?.click()}
-          >
-            {uploading ? (
-              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-            ) : (
-              <Upload className="h-3.5 w-3.5 mr-1.5" />
-            )}
-            Add reference
-          </Button>
-        )}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={uploading}
+          onClick={() => inputRef.current?.click()}
+        >
+          {uploading ? (
+            <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+          ) : (
+            <Upload className="h-3.5 w-3.5 mr-1.5" />
+          )}
+          Add reference
+        </Button>
         <input
           ref={inputRef}
           type="file"
@@ -710,8 +710,8 @@ function ReferenceImagesEditor({
           onChange={(e) => onFiles(e.target.files)}
         />
         <p className="text-[11px] text-muted-foreground">
-          The costume / scene the customer's photo is placed onto.
-          {max > 1 ? " Add several to let the customer choose which one." : ""}
+          The costume / scene the customer's photo is placed onto. Add as many as
+          you like — the customer picks which one to use.
         </p>
       </div>
     </Field>

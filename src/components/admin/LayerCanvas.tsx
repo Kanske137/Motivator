@@ -160,7 +160,10 @@ export default function LayerCanvas({
         // Same per-shape clip as the customer editor (circle/heart/star), not
         // circle-only — otherwise heart/star show as a rectangle in admin.
         const clipPath = buildShapeClipPath(layer.defaults.shape as ClipShape, wPx, hPx);
-        const src = layer.defaults.placeholderUrl;
+        // A recipe-bound photo layer previews its first reference image (the
+        // costume/scene) so the admin sees the base motif; falls back to the
+        // placeholder.
+        const src = layer.defaults.ai?.references?.[0]?.url ?? layer.defaults.placeholderUrl;
         return (
           <div className="absolute inset-0 overflow-hidden" style={{ clipPath }}>
             {src ? (

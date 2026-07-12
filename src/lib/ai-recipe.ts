@@ -424,6 +424,20 @@ export function recipeChain(recipe: RecipeShape): ModelId[] {
   return [recipe.model, ...(recipe.steps ?? []).map((s) => s.model)];
 }
 
+/** Does this recipe composite the customer's photo onto an admin reference (so a
+ *  reference-image editor makes sense)? Face-swap always does; an ai-edit recipe
+ *  that anchors its aspect ratio on the reference (the pet portrait) does too.
+ *  Background-removal / art-style recipes work on the customer photo alone, so
+ *  they take no references. The references are a PICKER pool — the customer
+ *  chooses one and only that (+ their photo) is sent — so there is no upper
+ *  bound on how many the merchant can offer. */
+export function recipeUsesReferences(recipe: { model: ModelId; params?: RecipeParams }): boolean {
+  return (
+    MODEL_CATALOG[recipe.model].referenceImages.min > 0 ||
+    recipe.params?.aspectRatio === "match_reference"
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Binding resolution — turn a media layer's recipe binding into a runnable
 // recipe for the customer editor / preview. The counterpart to the legacy
