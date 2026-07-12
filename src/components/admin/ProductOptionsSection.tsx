@@ -8,7 +8,7 @@
 // still see canvas-shaped sizes/depths instead of poster frames.
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Info, Plus, Trash2, Upload, Loader2 } from "lucide-react";
+import { Info, Plus, Trash2, Upload, Loader2, ChevronDown } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Accordion,
   AccordionContent,
@@ -155,6 +156,19 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
     onChange({ ...value, [kind]: { ...block, [field]: nextList } });
   }
 
+  // Bulk select/clear a whole field at once. Done in the parent so it writes a
+  // single `value` update — a per-item loop over toggleListItem would read the
+  // same stale `value` each iteration and only the last write would survive.
+  function setListField(
+    kind: Kind,
+    field: "allowedSizes" | "allowedFrames" | "allowedDepths" | "allowedMaterials" | "allowedFinishes",
+    items: string[],
+  ) {
+    const block = (value as Record<string, unknown>)[kind] as Record<string, unknown> | undefined;
+    if (!block) return;
+    onChange({ ...value, [kind]: { ...block, [field]: items } });
+  }
+
   // Banner only fires when an *enabled* combination lacks a Gelato SKU.
   // Undantag: Hängare-varianter saknas medvetet hos Gelato för små storlekar
   // (t.ex. 13×18) — de visas som "ej tillgänglig" (greyed out) i kundvyn och
@@ -237,12 +251,14 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
                   all={posterSizes}
                   selected={value.poster.allowedSizes}
                   onToggle={(item, c) => toggleListItem("poster", "allowedSizes", item, c)}
+                  onSelectAll={(c) => setListField("poster", "allowedSizes", c ? posterSizes : [])}
                 />
                 <ChecklistGroup
                   title="Tillåtna ramar"
                   all={posterFrames}
                   selected={value.poster.allowedFrames}
                   onToggle={(item, c) => toggleListItem("poster", "allowedFrames", item, c)}
+                  onSelectAll={(c) => setListField("poster", "allowedFrames", c ? posterFrames : [])}
                 />
               </div>
             )}
@@ -269,12 +285,14 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
                   all={canvasSizes}
                   selected={value.canvas.allowedSizes}
                   onToggle={(item, c) => toggleListItem("canvas", "allowedSizes", item, c)}
+                  onSelectAll={(c) => setListField("canvas", "allowedSizes", c ? canvasSizes : [])}
                 />
                 <ChecklistGroup
                   title="Tillåtna djup"
                   all={canvasDepths}
                   selected={value.canvas.allowedDepths}
                   onToggle={(item, c) => toggleListItem("canvas", "allowedDepths", item, c)}
+                  onSelectAll={(c) => setListField("canvas", "allowedDepths", c ? canvasDepths : [])}
                 />
               </div>
             )}
@@ -301,12 +319,14 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
                   all={aluminumSizes}
                   selected={value.aluminum.allowedSizes}
                   onToggle={(item, c) => toggleListItem("aluminum", "allowedSizes", item, c)}
+                  onSelectAll={(c) => setListField("aluminum", "allowedSizes", c ? aluminumSizes : [])}
                 />
                 <ChecklistGroup
                   title="Material"
                   all={aluminumMaterials}
                   selected={value.aluminum.allowedMaterials}
                   onToggle={(item, c) => toggleListItem("aluminum", "allowedMaterials", item, c)}
+                  onSelectAll={(c) => setListField("aluminum", "allowedMaterials", c ? aluminumMaterials : [])}
                 />
               </div>
             )}
@@ -333,12 +353,14 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
                   all={acrylicSizes}
                   selected={value.acrylic.allowedSizes}
                   onToggle={(item, c) => toggleListItem("acrylic", "allowedSizes", item, c)}
+                  onSelectAll={(c) => setListField("acrylic", "allowedSizes", c ? acrylicSizes : [])}
                 />
                 <ChecklistGroup
                   title="Finish"
                   all={acrylicFinishes}
                   selected={value.acrylic.allowedFinishes}
                   onToggle={(item, c) => toggleListItem("acrylic", "allowedFinishes", item, c)}
+                  onSelectAll={(c) => setListField("acrylic", "allowedFinishes", c ? acrylicFinishes : [])}
                 />
               </div>
             )}
@@ -452,39 +474,78 @@ function MapStylesEditor({
   );
 }
 
+/** A labelled multi-select: a compact dropdown trigger ("N av M valda") that
+ *  opens a checkbox list, with a select-all / clear shortcut. */
 function ChecklistGroup({
   title,
   all,
   selected,
   onToggle,
+  onSelectAll,
 }: {
   title: string;
   all: string[];
   selected: string[];
   onToggle: (item: string, checked: boolean) => void;
+  onSelectAll: (checked: boolean) => void;
 }) {
+  const selectedCount = all.filter((i) => selected.includes(i)).length;
+  const allSelected = all.length > 0 && selectedCount === all.length;
+  const empty = all.length === 0;
+  const summary = empty
+    ? "Inga alternativ"
+    : selectedCount === 0
+      ? "Inga valda"
+      : `${selectedCount} av ${all.length} valda`;
+
   return (
     <div>
       <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
         {title}
       </p>
-      <div className="space-y-2">
-        {all.map((item) => {
-          const checked = selected.includes(item);
-          return (
-            <label key={item} className="flex items-center gap-2 text-sm cursor-pointer">
-              <Checkbox
-                checked={checked}
-                onCheckedChange={(c) => onToggle(item, Boolean(c))}
-              />
-              <span>{item}</span>
-            </label>
-          );
-        })}
-        {all.length === 0 && (
-          <p className="text-xs text-muted-foreground">Inga alternativ konfigurerade.</p>
-        )}
-      </div>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={empty}
+            className="w-full justify-between font-normal"
+          >
+            <span className={selectedCount === 0 ? "text-muted-foreground" : ""}>{summary}</span>
+            <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-64 p-0">
+          <div className="flex items-center justify-between border-b px-3 py-2">
+            <span className="text-xs font-medium text-muted-foreground">{title}</span>
+            <button
+              type="button"
+              className="text-xs text-primary hover:underline"
+              onClick={() => onSelectAll(!allSelected)}
+            >
+              {allSelected ? "Rensa alla" : "Välj alla"}
+            </button>
+          </div>
+          <div className="max-h-64 space-y-0.5 overflow-auto p-2">
+            {all.map((item) => {
+              const checked = selected.includes(item);
+              return (
+                <label
+                  key={item}
+                  className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-muted"
+                >
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={(c) => onToggle(item, Boolean(c))}
+                  />
+                  <span>{item}</span>
+                </label>
+              );
+            })}
+          </div>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
