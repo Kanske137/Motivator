@@ -373,6 +373,20 @@ export default function DesignerPage() {
     setLayers(normaliseZIndex([...layers, nextLayer]));
     setSelectedId(nextLayer.id);
   }
+  /** Add an AI layer in the unified model: a photo layer pre-bound to a starter
+   *  recipe. `recipeId` set = AI layer; the inspector's recipe picker lets the
+   *  merchant switch recipe. Replaces the retired aiPhoto layer type. */
+  function addAiLayer() {
+    const base = createLayer("photo", layers) as Extract<TemplateLayer, { type: "photo" }>;
+    const aiCount = layers.filter((l) => l.type === "photo" && !!l.defaults.ai?.recipeId).length;
+    const nextLayer: TemplateLayer = {
+      ...base,
+      name: `AI-bild ${aiCount + 1}`,
+      defaults: { ...base.defaults, ai: { recipeId: "builtin-face-swap", references: [] } },
+    };
+    setLayers(normaliseZIndex([...layers, nextLayer]));
+    setSelectedId(nextLayer.id);
+  }
 
   function addShape(kind: ShapeKind) {
     const nextLayer = createShapeLayer(kind, layers);
@@ -699,9 +713,9 @@ export default function DesignerPage() {
                 <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
                 Lägg till bild
               </Button>
-              <Button size="sm" variant="outline" onClick={() => addLayer("aiPhoto")}>
+              <Button size="sm" variant="outline" onClick={() => addAiLayer()}>
                 <Sparkle className="h-3.5 w-3.5 mr-1.5" />
-                Lägg till AI-referensbild
+                Lägg till AI-bild
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
