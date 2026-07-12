@@ -194,16 +194,6 @@ export const mediaLayerAiSchema = z.object({
 });
 export type MediaLayerAi = z.infer<typeof mediaLayerAiSchema>;
 
-/** The SIMPLE tier — attached to a regular photo layer. The customer can restyle
- *  their uploaded photo with one of the template's AI styles (art-style model).
- *  NOT the full recipe editor. */
-export const photoLayerStyleSchema = z.object({
-  enabled: z.boolean(),
-  /** Which of the template's AiStyles to offer (default: all). */
-  styleIds: z.array(z.string()).optional(),
-});
-export type PhotoLayerStyle = z.infer<typeof photoLayerStyleSchema>;
-
 /** Template-level shared style palette (the ~6). Already exists today as
  *  `aiStylePresets`; declared here so both the simple photo-layer tier and an
  *  advanced recipe's style option can draw from the same list. Each is a
