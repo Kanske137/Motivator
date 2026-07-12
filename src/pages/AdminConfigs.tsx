@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { type ProductConfig } from "@/lib/product-config";
@@ -34,6 +35,7 @@ interface InstallStatus {
 }
 
 export default function AdminConfigs() {
+  const { t } = useTranslation();
   const [configs, setConfigs] = useState<ConfigWithTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -64,7 +66,7 @@ export default function AdminConfigs() {
         });
         setConfigs(enriched);
       } catch (e) {
-        toast.error("Kunde inte ladda mallar", {
+        toast.error(t("admin.configs.loadError"), {
           description: e instanceof Error ? e.message : String(e),
         });
       } finally {
@@ -76,7 +78,7 @@ export default function AdminConfigs() {
 
   useEffect(() => {
     if (searchParams.get("installed") === "1") {
-      toast.success("Shopify-app installerad ✓");
+      toast.success(t("admin.configs.appInstalledToast"));
       refreshInstallStatus();
     }
   }, [searchParams]);
@@ -89,14 +91,14 @@ export default function AdminConfigs() {
         body: { shop },
       });
       if (error || !data?.installUrl) {
-        toast.error("Kunde inte starta installationen", {
-          description: error?.message ?? data?.error ?? "okänt fel",
+        toast.error(t("admin.configs.installStartError"), {
+          description: error?.message ?? data?.error ?? t("admin.configs.unknownError"),
         });
         return;
       }
       window.open(data.installUrl as string, "_blank", "noopener,noreferrer");
-      toast.info("Installationsfönster öppnat", {
-        description: "Godkänn appen i Shopify-fliken — sidan uppdateras automatiskt vid retur.",
+      toast.info(t("admin.configs.installWindowOpened"), {
+        description: t("admin.configs.installWindowDescription"),
       });
     } finally {
       setInstalling(false);
@@ -112,16 +114,16 @@ export default function AdminConfigs() {
         handle: cfg.shopify_handle,
       });
       if (error || !data?.ok) {
-        failures.push(`${cfg.shopify_handle}: ${error?.message ?? data?.error ?? "fel"}`);
+        failures.push(`${cfg.shopify_handle}: ${error?.message ?? data?.error ?? t("admin.configs.errorLabel")}`);
       } else {
         okCount += 1;
       }
     }
     setSyncing(false);
     if (failures.length === 0) {
-      toast.success("Synkad till Shopify", { description: `${okCount} mall(ar) uppdaterade` });
+      toast.success(t("admin.configs.syncSuccess"), { description: t("admin.configs.syncSuccessDescription", { count: okCount }) });
     } else {
-      toast.warning(`Synk klar med ${failures.length} fel`, {
+      toast.warning(t("admin.configs.syncPartialTitle", { count: failures.length }), {
         description: failures.slice(0, 3).join(" · "),
       });
     }
@@ -133,17 +135,17 @@ export default function AdminConfigs() {
         <div className="max-w-5xl mx-auto px-4 py-4 space-y-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
-              <h1 className="text-xl font-bold">Produktkonfigurationer</h1>
-              <p className="text-sm text-muted-foreground">Layouter, kartstilar, storlekar och Gelato-mappning</p>
+              <h1 className="text-xl font-bold">{t("admin.configs.pageTitle")}</h1>
+              <p className="text-sm text-muted-foreground">{t("admin.configs.pageSubtitle")}</p>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" onClick={() => setCreateOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
-                Skapa ny mall
+                {t("admin.configs.createTemplate")}
               </Button>
               <Button onClick={() => setConfirmSyncOpen(true)} disabled={syncing || !installStatus?.installed || configs.length === 0}>
                 {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
-                Synka till Shopify
+                {t("admin.configs.syncToShopify")}
               </Button>
             </div>
           </div>
@@ -155,21 +157,21 @@ export default function AdminConfigs() {
                 <>
                   <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
                   <span className="truncate">
-                    Shopify-app installerad på <span className="font-mono">{installStatus.shop}</span>
+                    {t("admin.configs.appInstalledOn")} <span className="font-mono">{installStatus.shop}</span>
                   </span>
                 </>
               ) : (
                 <>
                   <AlertCircle className="h-4 w-4 text-destructive shrink-0" />
                   <span className="truncate">
-                    Shopify-app ej installerad{installStatus?.shop ? <> på <span className="font-mono">{installStatus.shop}</span></> : null} — synkning är inaktiverad tills appen är installerad.
+                    {t("admin.configs.appNotInstalled")}{installStatus?.shop ? <> {t("admin.configs.onLabel")} <span className="font-mono">{installStatus.shop}</span></> : null} {t("admin.configs.syncDisabledUntilInstalled")}
                   </span>
                 </>
               )}
             </div>
             <Button size="sm" variant={installStatus?.installed ? "outline" : "default"} onClick={startInstall} disabled={installing}>
               {installing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
-              {installStatus?.installed ? "Installera om" : "Installera Shopify-app"}
+              {installStatus?.installed ? t("admin.configs.reinstall") : t("admin.configs.installApp")}
             </Button>
           </div>
         </div>
@@ -205,20 +207,20 @@ export default function AdminConfigs() {
                       </div>
                     </div>
                     <div className="text-xs text-muted-foreground space-y-0.5">
-                      <div>{c.__template.defaultLayout.portrait.layers.length} lager (stående)</div>
-                      <div>{c.__template.publishedAt ? "Publicerad" : "Draft"}</div>
+                      <div>{t("admin.configs.layersPortrait", { count: c.__template.defaultLayout.portrait.layers.length })}</div>
+                      <div>{c.__template.publishedAt ? t("admin.configs.published") : t("admin.configs.draft")}</div>
                     </div>
                     <div className="flex gap-2 pt-1">
                       <Button asChild variant="default" size="sm" className="flex-1">
                         <Link to={`/admin/designer/${c.shopify_handle}`}>
                           <Pencil className="h-3 w-3 mr-1" />
-                          Redigera
+                          {t("admin.configs.edit")}
                         </Link>
                       </Button>
                       <Button asChild variant="outline" size="sm" className="flex-1">
                         <Link to={`/editor?handle=${c.shopify_handle}`}>
                           <ExternalLink className="h-3 w-3 mr-1" />
-                          Editor
+                          {t("admin.configs.editor")}
                         </Link>
                       </Button>
                     </div>
@@ -232,7 +234,7 @@ export default function AdminConfigs() {
 
         {!loading && configs.length === 0 && (
           <div className="mt-8 p-8 rounded-lg border border-dashed text-center text-sm text-muted-foreground">
-            Inga mallar än. Klicka "Skapa ny mall" för att börja.
+            {t("admin.configs.emptyState")}
           </div>
         )}
       </main>
@@ -242,20 +244,20 @@ export default function AdminConfigs() {
       <AlertDialog open={confirmSyncOpen} onOpenChange={setConfirmSyncOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Synka alla mallar till Shopify?</AlertDialogTitle>
+            <AlertDialogTitle>{t("admin.configs.confirmSyncTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {configs.length} mall{configs.length === 1 ? "" : "ar"} kommer skickas till Shopify. Befintliga produkter med samma handle uppdateras (titel, varianter, metafält). Vill du fortsätta?
+              {t("admin.configs.confirmSyncDescription", { count: configs.length })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogCancel>{t("admin.configs.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 setConfirmSyncOpen(false);
                 syncToShopify();
               }}
             >
-              Ja, synka
+              {t("admin.configs.confirmSyncAction")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

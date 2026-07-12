@@ -16,6 +16,7 @@
 // The Test panel runs the recipe through `admin-ai-recipes` → the same
 // `runRecipe` executor the customer path uses, so the preview is truthful.
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, Play, Plus, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -62,6 +63,8 @@ import {
   type RecipeParams,
 } from "@/lib/ai-recipe";
 
+type TFn = (key: string, options?: Record<string, unknown>) => string;
+
 /** What the dialog edits. `id` absent (or `builtin-…`) means saving clones. */
 export type RecipeDraft = Omit<AiRecipe, "id" | "params" | "builtIn"> & {
   id?: string;
@@ -76,27 +79,27 @@ interface Props {
   onSaved: () => void;
 }
 
-const ASPECT_CHOICES: Array<{ value: string; label: string }> = [
-  { value: "match_layer", label: "Match the layer's shape (recommended)" },
-  { value: "match_customer", label: "Match the customer's photo" },
-  { value: "match_reference", label: "Match your reference image" },
-  { value: "1:1", label: "Square (1:1)" },
-  { value: "4:5", label: "Portrait (4:5)" },
-  { value: "3:4", label: "Portrait (3:4)" },
-  { value: "2:3", label: "Portrait (2:3)" },
-  { value: "3:2", label: "Landscape (3:2)" },
-  { value: "16:9", label: "Landscape (16:9)" },
+const ASPECT_CHOICES: Array<{ value: string; labelKey: string }> = [
+  { value: "match_layer", labelKey: "aspectMatchLayer" },
+  { value: "match_customer", labelKey: "aspectMatchCustomer" },
+  { value: "match_reference", labelKey: "aspectMatchReference" },
+  { value: "1:1", labelKey: "aspectSquare" },
+  { value: "4:5", labelKey: "aspectPortrait45" },
+  { value: "3:4", labelKey: "aspectPortrait34" },
+  { value: "2:3", labelKey: "aspectPortrait23" },
+  { value: "3:2", labelKey: "aspectLandscape32" },
+  { value: "16:9", labelKey: "aspectLandscape169" },
 ];
 
 function blankDraft(): RecipeDraft {
   return { name: "", model: "ai-edit", prompt: "", params: {} };
 }
 
-function toDraft(r: AiRecipe): RecipeDraft {
+function toDraft(r: AiRecipe, t: TFn): RecipeDraft {
   // A built-in keeps its id so the caller knows the origin; `save` clones it.
   return {
     id: r.id,
-    name: r.builtIn ? `${r.name} (copy)` : r.name,
+    name: r.builtIn ? t("admin.recipeEditor.copySuffix", { name: r.name }) : r.name,
     description: r.description,
     model: r.model,
     prompt: r.prompt ?? "",
@@ -117,9 +120,10 @@ function CustomerOptionEditor({
   option: CustomerOption | undefined;
   onChange: (next: CustomerOption) => void;
 }) {
+  const { t } = useTranslation();
   const current: CustomerOption = option ?? {
     id: token,
-    label: `Choose a ${token}`,
+    label: t("admin.recipeEditor.chooseToken", { token }),
     injectAs: token,
     choices: [],
   };
@@ -141,24 +145,24 @@ function CustomerOptionEditor({
             size="sm"
             onClick={() => onChange({ ...current, choices: [...STYLE_PALETTE_CHOICES] })}
           >
-            Fill from my styles
+            {t("admin.recipeEditor.fillFromStyles")}
           </Button>
         )}
       </div>
 
       <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground">What the customer is asked</Label>
+        <Label className="text-xs text-muted-foreground">{t("admin.recipeEditor.whatCustomerAsked")}</Label>
         <Input
           value={current.label}
           onChange={(e) => onChange({ ...current, label: e.target.value })}
-          placeholder="Choose a style"
+          placeholder={t("admin.recipeEditor.chooseStyle")}
         />
       </div>
 
       {current.choices.length > 0 && (
         <div className="space-y-2">
           <Label className="text-xs text-muted-foreground">
-            Choices — the label is shown, the text is sent to the model
+            {t("admin.recipeEditor.choicesHint")}
           </Label>
           {current.choices.map((c, i) => (
             <div key={i} className="flex items-start gap-2">
@@ -166,19 +170,21 @@ function CustomerOptionEditor({
                 className="w-32 shrink-0"
                 value={c.label}
                 onChange={(e) => setChoice(i, { label: e.target.value })}
-                placeholder="Watercolour"
+                placeholder={t("admin.recipeEditor.choiceLabelPlaceholder")}
               />
               <Input
                 value={c.value}
                 onChange={(e) => setChoice(i, { value: e.target.value })}
-                placeholder="make this in watercolor styling"
+                placeholder={t("admin.recipeEditor.choiceValuePlaceholder")}
               />
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
                 className="shrink-0"
-                aria-label={`Remove ${c.label || "choice"}`}
+                aria-label={t("admin.recipeEditor.removeChoice", {
+                  label: c.label || t("admin.recipeEditor.choiceFallback"),
+                })}
                 onClick={() =>
                   onChange({ ...current, choices: current.choices.filter((_, j) => j !== i) })
                 }
@@ -204,7 +210,7 @@ function CustomerOptionEditor({
           })
         }
       >
-        <Plus className="h-4 w-4" /> Add choice
+        <Plus className="h-4 w-4" /> {t("admin.recipeEditor.addChoice")}
       </Button>
     </div>
   );
@@ -224,6 +230,7 @@ function ImageSlot({
   onClear: () => void;
   busy?: boolean;
 }) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   return (
     <div className="space-y-1.5">
@@ -240,7 +247,7 @@ function ImageSlot({
               type="button"
               onClick={onClear}
               className="absolute -top-2 -right-2 rounded-full bg-background border p-1 shadow-sm hover:bg-accent"
-              aria-label={`Remove ${label}`}
+              aria-label={t("admin.recipeEditor.removeImage", { label })}
             >
               <X className="h-3 w-3" />
             </button>
@@ -272,6 +279,7 @@ function ImageSlot({
 }
 
 export default function RecipeEditorDialog({ open, onOpenChange, initial, onSaved }: Props) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState<RecipeDraft>(blankDraft);
   const [saving, setSaving] = useState(false);
 
@@ -286,13 +294,13 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
 
   useEffect(() => {
     if (!open) return;
-    setDraft(initial ? toDraft(initial) : blankDraft());
+    setDraft(initial ? toDraft(initial, t) : blankDraft());
     setCustomerUrl(undefined);
     setReferenceUrls({});
     setOptionValues({});
     setTestResult(null);
     setTestError(null);
-  }, [open, initial]);
+  }, [open, initial, t]);
 
   const spec = MODEL_CATALOG[draft.model];
   // A prompt-less model ignores the prompt, so its tokens are not real slots.
@@ -339,7 +347,7 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
       if (slot === "customer") setCustomerUrl(url);
       else setReferenceUrls((r) => ({ ...r, [slot]: url }));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Upload failed");
+      toast.error(e instanceof Error ? e.message : t("admin.recipeEditor.uploadFailed"));
     } finally {
       setUploading(null);
     }
@@ -360,7 +368,7 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
       });
       setTestResult({ url: res.outputUrl, ms: res.ms });
     } catch (e) {
-      setTestError(e instanceof Error ? e.message : "The test run failed");
+      setTestError(e instanceof Error ? e.message : t("admin.recipeEditor.testRunFailed"));
     } finally {
       setTesting(false);
     }
@@ -368,7 +376,7 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
 
   async function handleSave() {
     if (!draft.name.trim()) {
-      toast.error("Give the recipe a name");
+      toast.error(t("admin.recipeEditor.nameRequired"));
       return;
     }
     if (optionError) {
@@ -383,11 +391,11 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
         : { ...draft, prompt: undefined, customerOptions: undefined };
       const clean = pruneCustomerOptions({ ...base, name: draft.name.trim() });
       await saveRecipe(clean as Partial<AiRecipe>);
-      toast.success("Recipe saved");
+      toast.success(t("admin.recipeEditor.recipeSaved"));
       onSaved();
       onOpenChange(false);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save the recipe");
+      toast.error(e instanceof Error ? e.message : t("admin.recipeEditor.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -411,26 +419,25 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{draft.id && !draft.id.startsWith("builtin-") ? "Edit recipe" : "New recipe"}</DialogTitle>
+          <DialogTitle>{draft.id && !draft.id.startsWith("builtin-") ? t("admin.recipeEditor.editRecipe") : t("admin.recipeEditor.newRecipe")}</DialogTitle>
           <DialogDescription>
-            A recipe is what the AI does to a customer&rsquo;s photo. Test it here before you
-            use it in a template.
+            {t("admin.recipeEditor.dialogDescription")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5">
           <div className="space-y-2">
-            <Label htmlFor="recipe-name">Name</Label>
+            <Label htmlFor="recipe-name">{t("admin.recipeEditor.name")}</Label>
             <Input
               id="recipe-name"
               value={draft.name}
               onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-              placeholder="Pet portrait in a royal scene"
+              placeholder={t("admin.recipeEditor.namePlaceholder")}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="recipe-model">Model</Label>
+            <Label htmlFor="recipe-model">{t("admin.recipeEditor.model")}</Label>
             <Select value={draft.model} onValueChange={(v) => setModel(v as ModelId)}>
               <SelectTrigger id="recipe-model">
                 <SelectValue />
@@ -448,38 +455,38 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
 
           {spec.usesPrompt ? (
             <div className="space-y-2">
-              <Label htmlFor="recipe-prompt">Prompt</Label>
+              <Label htmlFor="recipe-prompt">{t("admin.recipeEditor.prompt")}</Label>
               <Textarea
                 id="recipe-prompt"
                 rows={5}
                 value={draft.prompt ?? ""}
                 onChange={(e) => setDraft({ ...draft, prompt: e.target.value })}
-                placeholder="Describe the edit. Refer to the reference as image #1 and the customer's photo as image #2."
+                placeholder={t("admin.recipeEditor.promptPlaceholder")}
               />
               <p className="text-xs text-muted-foreground">
-                Wrap a word in braces to make it a slot the customer fills, e.g.{" "}
+                {t("admin.recipeEditor.wrapInBraces")}{" "}
                 <code className="text-[11px]">{"{style}"}</code>.
               </p>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground rounded-md border bg-muted/40 px-3 py-2">
-              {spec.label} doesn&rsquo;t take a prompt — it always does the same thing.
+              {t("admin.recipeEditor.modelNoPrompt", { label: spec.label })}
             </p>
           )}
 
           {spec.usesPrompt && tokens.length > 0 && (
             <div className="space-y-2">
               <div>
-                <Label>Customer choices</Label>
+                <Label>{t("admin.recipeEditor.customerChoices")}</Label>
                 <p className="text-xs text-muted-foreground">
-                  Each slot in your prompt becomes a picker in the storefront.
+                  {t("admin.recipeEditor.customerChoicesHint")}
                 </p>
               </div>
-              {tokens.map((t) => (
+              {tokens.map((tok) => (
                 <CustomerOptionEditor
-                  key={t}
-                  token={t}
-                  option={optionFor(t)}
+                  key={tok}
+                  token={tok}
+                  option={optionFor(tok)}
                   onChange={setOption}
                 />
               ))}
@@ -494,29 +501,26 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
                 className="mt-0.5"
               />
               <span className="space-y-1">
-                <span className="block text-sm font-medium">Remove the background afterwards</span>
+                <span className="block text-sm font-medium">{t("admin.recipeEditor.removeBackground")}</span>
                 <span className="block text-xs text-muted-foreground">
-                  Runs <strong>{spec.label}</strong> first, then cuts the subject out to a
-                  transparent PNG so your template&rsquo;s background shows through.
+                  {t("admin.recipeEditor.runsLabel")}{" "}<strong>{spec.label}</strong>{" "}{t("admin.recipeEditor.thenCutsOut")}
                 </span>
               </span>
             </label>
           ) : (
             <p className="text-xs text-muted-foreground rounded-md border bg-muted/40 px-3 py-2">
-              Want to style the subject too? Pick <strong>Art style</strong> and tick
-              &ldquo;Remove the background afterwards&rdquo;. Styling after a cutout would paint
-              the background back in.
+              {t("admin.recipeEditor.styleSubjectPrefix")}{" "}<strong>{t("admin.recipeEditor.artStyle")}</strong>{" "}{t("admin.recipeEditor.styleSubjectSuffix")}
             </p>
           )}
 
           <Collapsible>
             <CollapsibleTrigger className="text-xs font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground">
-              Advanced
+              {t("admin.recipeEditor.advanced")}
             </CollapsibleTrigger>
             <CollapsibleContent className="pt-3 space-y-4">
               {spec.params.includes("aspectRatio") && (
                 <div className="space-y-2">
-                  <Label>Output shape</Label>
+                  <Label>{t("admin.recipeEditor.outputShape")}</Label>
                   <Select
                     value={draft.params.aspectRatio ?? "match_layer"}
                     onValueChange={(v) => setParam("aspectRatio", v)}
@@ -527,7 +531,7 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
                     <SelectContent>
                       {ASPECT_CHOICES.map((c) => (
                         <SelectItem key={c.value} value={c.value}>
-                          {c.label}
+                          {t(`admin.recipeEditor.${c.labelKey}`)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -537,7 +541,7 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
 
               {spec.params.includes("outputFormat") && (
                 <div className="space-y-2">
-                  <Label>File format</Label>
+                  <Label>{t("admin.recipeEditor.fileFormat")}</Label>
                   <Select
                     value={draft.params.outputFormat ?? "png"}
                     onValueChange={(v) => setParam("outputFormat", v as "png" | "jpg")}
@@ -546,8 +550,8 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="png">PNG — keeps transparency</SelectItem>
-                      <SelectItem value="jpg">JPG — smaller file</SelectItem>
+                      <SelectItem value="png">{t("admin.recipeEditor.formatPng")}</SelectItem>
+                      <SelectItem value="jpg">{t("admin.recipeEditor.formatJpg")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -555,7 +559,7 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
 
               {spec.params.includes("backdropColor") && (
                 <div className="space-y-2">
-                  <Label htmlFor="backdrop">Backdrop colour</Label>
+                  <Label htmlFor="backdrop">{t("admin.recipeEditor.backdropColour")}</Label>
                   <div className="flex items-center gap-2">
                     <Input
                       id="backdrop"
@@ -572,19 +576,18 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="recipe-desc">Description</Label>
+                <Label htmlFor="recipe-desc">{t("admin.recipeEditor.description")}</Label>
                 <Input
                   id="recipe-desc"
                   value={draft.description ?? ""}
                   onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-                  placeholder="Shown to you in the library — not to customers."
+                  placeholder={t("admin.recipeEditor.descriptionPlaceholder")}
                 />
               </div>
 
               {(draft.steps?.filter((s) => s.model !== "cutout").length ?? 0) > 0 && (
                 <p className="text-xs text-muted-foreground">
-                  This recipe chains extra steps beyond the background-removal finish. They
-                  aren&rsquo;t editable here — they are preserved when you save.
+                  {t("admin.recipeEditor.extraStepsNote")}
                 </p>
               )}
             </CollapsibleContent>
@@ -595,16 +598,16 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
           {/* ── Test panel ─────────────────────────────────────────────── */}
           <div className="space-y-3">
             <div>
-              <h3 className="text-sm font-medium">Test</h3>
+              <h3 className="text-sm font-medium">{t("admin.recipeEditor.test")}</h3>
               <p className="text-xs text-muted-foreground">
-                Runs the real model, exactly as a customer would.
+                {t("admin.recipeEditor.testHint")}
               </p>
             </div>
 
             <div className="flex flex-wrap gap-4">
               {needsCustomer && (
                 <ImageSlot
-                  label="Customer photo"
+                  label={t("admin.recipeEditor.customerPhoto")}
                   url={customerUrl}
                   busy={uploading === "customer"}
                   onPick={(f) => pickImage(f, "customer")}
@@ -616,8 +619,10 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
                   key={i}
                   label={
                     spec.referenceImages.max > 1
-                      ? `Reference ${i + 1}${i < spec.referenceImages.min ? "" : " (optional)"}`
-                      : "Reference image"
+                      ? i < spec.referenceImages.min
+                        ? t("admin.recipeEditor.referenceN", { n: i + 1 })
+                        : t("admin.recipeEditor.referenceNOptional", { n: i + 1 })
+                      : t("admin.recipeEditor.referenceImage")
                   }
                   url={referenceUrls[i]}
                   busy={uploading === `ref-${i}`}
@@ -635,22 +640,22 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
 
             {tokens.length > 0 && (
               <div className="space-y-2">
-                {tokens.map((t) => {
-                  const choices = optionFor(t)?.choices ?? [];
+                {tokens.map((tok) => {
+                  const choices = optionFor(tok)?.choices ?? [];
                   return (
-                    <div key={t} className="space-y-1.5">
+                    <div key={tok} className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">
-                        Test value for <code className="text-[11px]">{`{${t}}`}</code>
+                        {t("admin.recipeEditor.testValueFor")}{" "}<code className="text-[11px]">{`{${tok}}`}</code>
                       </Label>
                       {/* Once the token has choices, test what the customer can
                           actually pick — free text would test a path nobody runs. */}
                       {choices.length > 0 ? (
                         <Select
-                          value={optionValues[t] || undefined}
-                          onValueChange={(v) => setOptionValues((o) => ({ ...o, [t]: v }))}
+                          value={optionValues[tok] || undefined}
+                          onValueChange={(v) => setOptionValues((o) => ({ ...o, [tok]: v }))}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Pick a choice to test" />
+                            <SelectValue placeholder={t("admin.recipeEditor.pickChoiceToTest")} />
                           </SelectTrigger>
                           <SelectContent>
                             {choices
@@ -664,11 +669,11 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
                         </Select>
                       ) : (
                         <Input
-                          value={optionValues[t] ?? ""}
+                          value={optionValues[tok] ?? ""}
                           onChange={(e) =>
-                            setOptionValues((o) => ({ ...o, [t]: e.target.value }))
+                            setOptionValues((o) => ({ ...o, [tok]: e.target.value }))
                           }
-                          placeholder="e.g. soft watercolour painting"
+                          placeholder={t("admin.recipeEditor.testValuePlaceholder")}
                         />
                       )}
                     </div>
@@ -681,26 +686,24 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
               <Button type="button" variant="secondary" onClick={handleTest} disabled={!canTest}>
                 {testing ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> Running…
+                    <Loader2 className="h-4 w-4 animate-spin" /> {t("admin.recipeEditor.running")}
                   </>
                 ) : (
                   <>
-                    <Play className="h-4 w-4" /> Run test
+                    <Play className="h-4 w-4" /> {t("admin.recipeEditor.runTest")}
                   </>
                 )}
               </Button>
               {(missingCustomer || missingReference) && (
                 <span className="text-xs text-muted-foreground">
                   {missingCustomer
-                    ? "Upload a customer photo to test."
-                    : `This model needs ${spec.referenceImages.min} reference image${
-                        spec.referenceImages.min === 1 ? "" : "s"
-                      }.`}
+                    ? t("admin.recipeEditor.uploadCustomerPhoto")
+                    : t("admin.recipeEditor.modelNeedsReferences", { count: spec.referenceImages.min })}
                 </span>
               )}
               {testResult && (
                 <span className="text-xs text-muted-foreground">
-                  Took {(testResult.ms / 1000).toFixed(1)}s
+                  {t("admin.recipeEditor.took", { seconds: (testResult.ms / 1000).toFixed(1) })}
                 </span>
               )}
             </div>
@@ -714,7 +717,7 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
             {testResult && (
               <img
                 src={testResult.url}
-                alt="Test result"
+                alt={t("admin.recipeEditor.testResult")}
                 className="max-h-72 rounded-md border object-contain"
               />
             )}
@@ -726,11 +729,11 @@ export default function RecipeEditorDialog({ open, onOpenChange, initial, onSave
             <span className="mr-auto text-xs text-destructive">{optionError}</span>
           )}
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancel
+            {t("admin.recipeEditor.cancel")}
           </Button>
           <Button onClick={handleSave} disabled={saving || !draft.name.trim() || !!optionError}>
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-            Save recipe
+            {t("admin.recipeEditor.saveRecipe")}
           </Button>
         </DialogFooter>
       </DialogContent>

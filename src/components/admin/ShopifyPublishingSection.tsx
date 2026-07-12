@@ -3,6 +3,7 @@
 // to Shopify on the next sync, with diff-protection: fields edited manually
 // in Shopify Admin will not be overwritten.
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,6 +33,7 @@ interface Props {
 }
 
 export default function ShopifyPublishingSection({ config, onChange }: Props) {
+  const { t } = useTranslation();
   const [tagInput, setTagInput] = useState("");
   const tags = config.tags ?? [];
   const salesChannels = config.sales_channels ?? ["online_store"];
@@ -60,16 +62,16 @@ export default function ShopifyPublishingSection({ config, onChange }: Props) {
         <AccordionItem value="shopify" className="border-0">
           <AccordionTrigger className="py-0 hover:no-underline">
             <div className="text-left">
-              <h2 className="text-base font-semibold">Shopify-publicering</h2>
+              <h2 className="text-base font-semibold">{t("admin.publishing.title")}</h2>
               <p className="text-xs text-muted-foreground font-normal">
-                Status, taggar, kategori, beskrivning & SEO. Ändringar skickas vid nästa synk.
+                {t("admin.publishing.subtitle")}
               </p>
             </div>
           </AccordionTrigger>
           <AccordionContent className="pt-4 space-y-5">
             {/* Handle (read-only) */}
             <div className="space-y-1.5">
-              <Label className="text-xs">Handle (låst efter skapande)</Label>
+              <Label className="text-xs">{t("admin.publishing.handleLabel")}</Label>
               <Input
                 value={config.shopify_handle}
                 readOnly
@@ -79,7 +81,7 @@ export default function ShopifyPublishingSection({ config, onChange }: Props) {
 
             {/* Status */}
             <div className="space-y-1.5">
-              <Label className="text-xs">Status i Shopify</Label>
+              <Label className="text-xs">{t("admin.publishing.statusLabel")}</Label>
               <Select
                 value={config.status ?? "DRAFT"}
                 onValueChange={(v) => onChange({ status: v as ProductStatus })}
@@ -88,16 +90,16 @@ export default function ShopifyPublishingSection({ config, onChange }: Props) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="DRAFT">Draft (synlig endast i admin)</SelectItem>
-                  <SelectItem value="ACTIVE">Active (publicerad)</SelectItem>
-                  <SelectItem value="ARCHIVED">Archived (dold)</SelectItem>
+                  <SelectItem value="DRAFT">{t("admin.publishing.statusDraft")}</SelectItem>
+                  <SelectItem value="ACTIVE">{t("admin.publishing.statusActive")}</SelectItem>
+                  <SelectItem value="ARCHIVED">{t("admin.publishing.statusArchived")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {/* Sales channels */}
             <div className="space-y-2">
-              <Label className="text-xs">Försäljningskanaler</Label>
+              <Label className="text-xs">{t("admin.publishing.salesChannels")}</Label>
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="ch-online"
@@ -105,14 +107,14 @@ export default function ShopifyPublishingSection({ config, onChange }: Props) {
                   onCheckedChange={(v) => toggleChannel("online_store", v === true)}
                 />
                 <Label htmlFor="ch-online" className="text-sm font-normal cursor-pointer">
-                  Online Store
+                  {t("admin.publishing.onlineStore")}
                 </Label>
               </div>
             </div>
 
             {/* Tags */}
             <div className="space-y-2">
-              <Label className="text-xs">Taggar (utöver auto-taggar)</Label>
+              <Label className="text-xs">{t("admin.publishing.tagsLabel")}</Label>
               <div className="flex gap-2">
                 <Input
                   value={tagInput}
@@ -123,16 +125,16 @@ export default function ShopifyPublishingSection({ config, onChange }: Props) {
                       addTag();
                     }
                   }}
-                  placeholder="t.ex. presenttips"
+                  placeholder={t("admin.publishing.tagPlaceholder")}
                   className="h-9"
                 />
               </div>
               {tags.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
-                  {tags.map((t) => (
-                    <Badge key={t} variant="secondary" className="gap-1">
-                      {t}
-                      <button onClick={() => removeTag(t)} aria-label={`Ta bort ${t}`}>
+                  {tags.map((tag) => (
+                    <Badge key={tag} variant="secondary" className="gap-1">
+                      {tag}
+                      <button onClick={() => removeTag(tag)} aria-label={t("admin.publishing.removeTag", { tag })}>
                         <X className="h-3 w-3" />
                       </button>
                     </Badge>
@@ -140,13 +142,13 @@ export default function ShopifyPublishingSection({ config, onChange }: Props) {
                 </div>
               )}
               <p className="text-xs text-muted-foreground">
-                Auto-taggar (mall-slug, produkttyp, "personalized", "print-on-demand") läggs alltid till.
+                {t("admin.publishing.autoTagsHint")}
               </p>
             </div>
 
             {/* Category override */}
             <div className="space-y-1.5">
-              <Label className="text-xs">Kategori-GID (valfritt — annars auto)</Label>
+              <Label className="text-xs">{t("admin.publishing.categoryGidLabel")}</Label>
               <Input
                 value={config.category_gid ?? ""}
                 onChange={(e) =>
@@ -156,24 +158,24 @@ export default function ShopifyPublishingSection({ config, onChange }: Props) {
                 className="font-mono text-xs"
               />
               <p className="text-xs text-muted-foreground">
-                Default: Posters → ap-2-1-3, Canvas → ap-2-1-1.
+                {t("admin.publishing.categoryGidHint")}
               </p>
             </div>
 
             {/* Description */}
             <div className="space-y-1.5">
-              <Label className="text-xs">Beskrivning (HTML)</Label>
+              <Label className="text-xs">{t("admin.publishing.descriptionLabel")}</Label>
               <Textarea
                 value={config.description_html ?? ""}
                 onChange={(e) => onChange({ description_html: e.target.value })}
-                placeholder="<p>Personlig design — skapas i editorn.</p>"
+                placeholder={t("admin.publishing.descriptionPlaceholder")}
                 className="min-h-[100px] font-mono text-xs"
               />
             </div>
 
             {/* SEO */}
             <SeoField
-              label="SEO-titel"
+              label={t("admin.publishing.seoTitleLabel")}
               max={60}
               value={config.seo_title ?? ""}
               placeholder={config.title}
@@ -181,7 +183,7 @@ export default function ShopifyPublishingSection({ config, onChange }: Props) {
               multiline={false}
             />
             <SeoField
-              label="SEO-beskrivning"
+              label={t("admin.publishing.seoDescriptionLabel")}
               max={160}
               value={config.seo_description ?? ""}
               onChange={(v) => onChange({ seo_description: v })}

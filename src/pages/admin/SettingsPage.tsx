@@ -6,6 +6,7 @@
 // guarded `admin-settings` edge function into the per-tenant `pricing_rules`
 // table. The sync uses them (override ?? global) as the Shopify variant price.
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
@@ -51,6 +52,7 @@ interface PriceRow {
 }
 
 export default function SettingsPage() {
+  const { t } = useTranslation();
   const [prices, setPrices] = useState<PriceMap>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -72,7 +74,7 @@ export default function SettingsPage() {
         }
         setPrices(map);
       } catch (e) {
-        toast.error("Kunde inte ladda priser", {
+        toast.error(t("admin.settings.loadPricesError"), {
           description: e instanceof Error ? e.message : String(e),
         });
       } finally {
@@ -119,15 +121,19 @@ export default function SettingsPage() {
       }
     }
     if (rows.length === 0) {
-      toast.message("Inga priser att spara", { description: "Fyll i minst ett pris." });
+      toast.message(t("admin.settings.noPricesToSave"), {
+        description: t("admin.settings.noPricesToSaveDescription"),
+      });
       return;
     }
     setSaving(true);
     try {
       await invokeAdmin("prices-upsert", { prices: rows }, "admin-settings");
-      toast.success("Priser sparade", { description: `${rows.length} pris(er) uppdaterade` });
+      toast.success(t("admin.settings.pricesSaved"), {
+        description: t("admin.settings.pricesSavedDescription", { count: rows.length }),
+      });
     } catch (e) {
-      toast.error("Kunde inte spara", {
+      toast.error(t("admin.settings.saveError"), {
         description: e instanceof Error ? e.message : String(e),
       });
     } finally {
@@ -143,22 +149,22 @@ export default function SettingsPage() {
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3 min-w-0">
             <Button asChild variant="ghost" size="icon">
-              <Link to="/admin/configs" aria-label="Tillbaka">
+              <Link to="/admin/configs" aria-label={t("admin.settings.back")}>
                 <ArrowLeft className="h-4 w-4" />
               </Link>
             </Button>
             <div className="min-w-0">
-              <h1 className="text-xl font-bold">Prisinställningar</h1>
+              <h1 className="text-xl font-bold">{t("admin.settings.title")}</h1>
               <p className="text-sm text-muted-foreground">
-                Globala standardpriser per material och variant, i{" "}
-                <span className="font-medium">{currency ?? "butikens valuta"}</span>{" "}
-                (butikens valuta — kan inte ändras). Tomma fält = erbjuds ej.
+                {t("admin.settings.introPrefix")}{" "}
+                <span className="font-medium">{currency ?? t("admin.settings.storeCurrency")}</span>{" "}
+                {t("admin.settings.introSuffix")}
               </p>
             </div>
           </div>
           <Button onClick={save} disabled={saving || loading}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-            Spara priser
+            {t("admin.settings.savePrices")}
           </Button>
         </div>
       </header>
@@ -178,7 +184,7 @@ export default function SettingsPage() {
                   size="sm"
                   onClick={() => setActive(m.key)}
                 >
-                  {m.label}
+                  {t(`admin.settings.material_${m.key}`)}
                 </Button>
               ))}
             </div>
@@ -187,7 +193,7 @@ export default function SettingsPage() {
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr>
-                    <th className="text-left font-medium p-2 sticky left-0 bg-card">Storlek</th>
+                    <th className="text-left font-medium p-2 sticky left-0 bg-card">{t("admin.settings.sizeColumn")}</th>
                     {activeMaterial.variants.map((v) => (
                       <th key={v} className="text-left font-medium p-2 whitespace-nowrap">{v}</th>
                     ))}
@@ -198,7 +204,10 @@ export default function SettingsPage() {
                       className="text-left text-xs text-muted-foreground font-normal px-2 pb-2"
                       colSpan={activeMaterial.variants.length}
                     >
-                      {activeMaterial.variantLabel} · pris i {currency ?? "butikens valuta"}
+                      {t("admin.settings.variantPriceHeader", {
+                        variantLabel: t(`admin.settings.variantLabel_${activeMaterial.key}`),
+                        currency: currency ?? t("admin.settings.storeCurrency"),
+                      })}
                     </th>
                   </tr>
                 </thead>
@@ -226,8 +235,7 @@ export default function SettingsPage() {
             </Card>
 
             <p className="text-xs text-muted-foreground mt-3">
-              {filledCount} pris(er) ifyllda totalt. Priser som lämnas tomma hoppas över vid
-              synk (varianten skapas inte i Shopify förrän ett pris angetts).
+              {t("admin.settings.filledCountNote", { count: filledCount })}
             </p>
           </>
         )}

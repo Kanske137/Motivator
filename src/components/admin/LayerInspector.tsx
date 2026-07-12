@@ -5,6 +5,7 @@
 //   - Map: search a default place (geocoding) → updates center/zoom +
 //     placeName/city/country, AND auto-builds text for any linked text layers.
 import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, Plus, Search, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import type { ProductConfig } from "@/lib/product-config";
@@ -56,22 +57,23 @@ interface Props {
   onLayersChange?: (next: TemplateLayer[]) => void;
 }
 
-const LOCK_LABELS: Array<{ key: keyof LayerLocks; label: string }> = [
-  { key: "position", label: "Position (karta pan/zoom)" },
-  { key: "move", label: "Förflytta lager" },
-  { key: "size", label: "Storlek" },
-  { key: "shape", label: "Form" },
-  { key: "content", label: "Innehåll" },
-  { key: "font", label: "Typsnitt" },
-  { key: "visibility", label: "Synlighet" },
-  { key: "style", label: "Stil" },
+const LOCK_LABELS: Array<{ key: keyof LayerLocks; labelKey: string }> = [
+  { key: "position", labelKey: "admin.layerInspector.lockPosition" },
+  { key: "move", labelKey: "admin.layerInspector.lockMove" },
+  { key: "size", labelKey: "admin.layerInspector.lockSize" },
+  { key: "shape", labelKey: "admin.layerInspector.lockShape" },
+  { key: "content", labelKey: "admin.layerInspector.lockContent" },
+  { key: "font", labelKey: "admin.layerInspector.lockFont" },
+  { key: "visibility", labelKey: "admin.layerInspector.lockVisibility" },
+  { key: "style", labelKey: "admin.layerInspector.lockStyle" },
 ];
 
 export default function LayerInspector({ config, layer, allLayers, onChange, onLayersChange }: Props) {
+  const { t } = useTranslation();
   if (!layer) {
     return (
       <p className="text-xs text-muted-foreground py-4 text-center">
-        Välj ett lager för att redigera dess inställningar.
+        {t("admin.layerInspector.selectLayerPrompt")}
       </p>
     );
   }
@@ -90,7 +92,7 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
   return (
     <div className="space-y-5">
       {/* Name */}
-      <Field label="Namn">
+      <Field label={t("admin.layerInspector.name")}>
         <Input
           value={layer.name}
           onChange={(e) => onChange({ ...layer, name: e.target.value })}
@@ -99,7 +101,7 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
 
       {/* Position + size */}
       <div className="grid grid-cols-2 gap-3">
-        <Field label="X (%)">
+        <Field label={t("admin.layerInspector.xPercent")}>
           <Input
             type="number"
             value={layer.xPct}
@@ -109,7 +111,7 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
             onChange={(e) => onChange({ ...layer, xPct: Number(e.target.value) })}
           />
         </Field>
-        <Field label="Y (%)">
+        <Field label={t("admin.layerInspector.yPercent")}>
           <Input
             type="number"
             value={layer.yPct}
@@ -119,7 +121,7 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
             onChange={(e) => onChange({ ...layer, yPct: Number(e.target.value) })}
           />
         </Field>
-        <Field label="Bredd (%)">
+        <Field label={t("admin.layerInspector.widthPercent")}>
           <Input
             type="number"
             value={layer.wPct}
@@ -129,7 +131,7 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
             onChange={(e) => onChange({ ...layer, wPct: Number(e.target.value) })}
           />
         </Field>
-        <Field label="Höjd (%)">
+        <Field label={t("admin.layerInspector.heightPercent")}>
           <Input
             type="number"
             value={layer.hPct}
@@ -145,7 +147,7 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
       {layer.type === "map" && (
         <div className="space-y-3 border-t pt-4">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Karta — defaults
+            {t("admin.layerInspector.mapDefaults")}
           </p>
 
           <DefaultPlaceSearch
@@ -177,21 +179,21 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
             }}
           />
 
-          <Field label="Form">
+          <Field label={t("admin.layerInspector.shape")}>
             <Select
               value={layer.defaults.shape}
               onValueChange={(v) => updateDefaults({ shape: v as typeof layer.defaults.shape })}
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="rect">Fyll lager (rektangel)</SelectItem>
-                <SelectItem value="circle">Cirkel</SelectItem>
-                <SelectItem value="heart">Hjärta</SelectItem>
-                <SelectItem value="star">Stjärna</SelectItem>
+                <SelectItem value="rect">{t("admin.layerInspector.mapShapeRect")}</SelectItem>
+                <SelectItem value="circle">{t("admin.layerInspector.shapeCircle")}</SelectItem>
+                <SelectItem value="heart">{t("admin.layerInspector.shapeHeart")}</SelectItem>
+                <SelectItem value="star">{t("admin.layerInspector.shapeStar")}</SelectItem>
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Kartstil">
+          <Field label={t("admin.layerInspector.mapStyle")}>
             <Select
               value={layer.defaults.styleId}
               onValueChange={(v) => updateDefaults({ styleId: v })}
@@ -205,7 +207,7 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
             </Select>
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Lng">
+            <Field label={t("admin.layerInspector.lng")}>
               <Input
                 type="number"
                 step="0.0001"
@@ -215,7 +217,7 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
                 }
               />
             </Field>
-            <Field label="Lat">
+            <Field label={t("admin.layerInspector.lat")}>
               <Input
                 type="number"
                 step="0.0001"
@@ -226,7 +228,7 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
               />
             </Field>
           </div>
-          <Field label="Zoom">
+          <Field label={t("admin.layerInspector.zoom")}>
             <Input
               type="number"
               step="0.5"
@@ -237,7 +239,7 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
             />
           </Field>
           <div className="flex items-center justify-between">
-            <Label className="text-sm">Visa labels</Label>
+            <Label className="text-sm">{t("admin.layerInspector.showLabels")}</Label>
             <Switch
               checked={layer.defaults.showLabels}
               onCheckedChange={(c) => updateDefaults({ showLabels: c })}
@@ -257,35 +259,35 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
       {layer.type === "photo" && (
         <div className="space-y-3 border-t pt-4">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Photo — defaults
+            {t("admin.layerInspector.photoDefaults")}
           </p>
-          <Field label="Shape">
+          <Field label={t("admin.layerInspector.shape")}>
             <Select
               value={layer.defaults.shape}
               onValueChange={(v) => updateDefaults({ shape: v as typeof layer.defaults.shape })}
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="rect">Rectangle</SelectItem>
-                <SelectItem value="circle">Circle</SelectItem>
-                <SelectItem value="heart">Heart</SelectItem>
-                <SelectItem value="star">Star</SelectItem>
+                <SelectItem value="rect">{t("admin.layerInspector.photoShapeRect")}</SelectItem>
+                <SelectItem value="circle">{t("admin.layerInspector.shapeCircle")}</SelectItem>
+                <SelectItem value="heart">{t("admin.layerInspector.shapeHeart")}</SelectItem>
+                <SelectItem value="star">{t("admin.layerInspector.shapeStar")}</SelectItem>
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Fit">
+          <Field label={t("admin.layerInspector.fit")}>
             <Select
               value={layer.defaults.fit}
               onValueChange={(v) => updateDefaults({ fit: v as typeof layer.defaults.fit })}
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="cover">Fill (cover)</SelectItem>
-                <SelectItem value="contain">Fit inside (contain)</SelectItem>
+                <SelectItem value="cover">{t("admin.layerInspector.fitCover")}</SelectItem>
+                <SelectItem value="contain">{t("admin.layerInspector.fitContain")}</SelectItem>
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Placeholder image (URL, optional)">
+          <Field label={t("admin.layerInspector.placeholderImage")}>
             <Input
               value={layer.defaults.placeholderUrl ?? ""}
               placeholder="https://…"
@@ -297,7 +299,7 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
             />
           </Field>
           <p className="text-[11px] text-muted-foreground -mt-1">
-            Shown in the admin canvas and customer editor before a photo is uploaded.
+            {t("admin.layerInspector.placeholderHint")}
           </p>
 
           <PhotoRecipeBinding
@@ -310,13 +312,12 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
       {layer.type === "margin" && (
         <div className="space-y-3 border-t pt-4">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Marginal — defaults
+            {t("admin.layerInspector.marginDefaults")}
           </p>
           <p className="text-[11px] text-muted-foreground">
-            Symmetrisk marginal runt hela motivet. Tjockleken är samma åt alla
-            sidor oavsett orientering. Kunden kan inte ändra detta.
+            {t("admin.layerInspector.marginHint")}
           </p>
-          <Field label={`Tjocklek: ${layer.defaults.thicknessPct}% av kortsidan`}>
+          <Field label={t("admin.layerInspector.thicknessOfShortSide", { pct: layer.defaults.thicknessPct })}>
             <Input
               type="number"
               min={0}
@@ -328,7 +329,7 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
               }
             />
           </Field>
-          <Field label="Färg">
+          <Field label={t("admin.layerInspector.color")}>
             <Input
               type="color"
               value={layer.defaults.color}
@@ -341,13 +342,12 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
       {layer.type === "line" && (
         <div className="space-y-3 border-t pt-4">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Linje — defaults
+            {t("admin.layerInspector.lineDefaults")}
           </p>
           <p className="text-[11px] text-muted-foreground">
-            Position och längd styrs via X/Y/Bredd/Höjd ovan. Kunden kan inte
-            ändra linjen.
+            {t("admin.layerInspector.lineHint")}
           </p>
-          <Field label="Orientering">
+          <Field label={t("admin.layerInspector.orientation")}>
             <Select
               value={layer.defaults.orientation}
               onValueChange={(v) => {
@@ -375,12 +375,12 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="horizontal">Horisontell</SelectItem>
-                <SelectItem value="vertical">Vertikal</SelectItem>
+                <SelectItem value="horizontal">{t("admin.layerInspector.orientationHorizontal")}</SelectItem>
+                <SelectItem value="vertical">{t("admin.layerInspector.orientationVertical")}</SelectItem>
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Tjocklek (mm)">
+          <Field label={t("admin.layerInspector.thicknessMm")}>
             <Input
               type="number"
               min={0.5}
@@ -390,7 +390,7 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
               onChange={(e) => updateDefaults({ thicknessMm: Number(e.target.value) })}
             />
           </Field>
-          <Field label="Färg">
+          <Field label={t("admin.layerInspector.color")}>
             <Input
               type="color"
               value={layer.defaults.color}
@@ -403,30 +403,29 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
       {layer.type === "shape" && (
         <div className="space-y-3 border-t pt-4">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Figur — defaults
+            {t("admin.layerInspector.shapeDefaults")}
           </p>
           <p className="text-[11px] text-muted-foreground">
-            Admin-bara dekoration. Position och storlek styrs via X/Y/Bredd/Höjd
-            ovan. Kunden kan inte ändra figuren.
+            {t("admin.layerInspector.shapeHint")}
           </p>
-          <Field label="Form">
+          <Field label={t("admin.layerInspector.shape")}>
             <Select
               value={layer.defaults.kind}
               onValueChange={(v) => updateDefaults({ kind: v as typeof layer.defaults.kind })}
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="line-horizontal">Horisontell linje</SelectItem>
-                <SelectItem value="line-vertical">Vertikal linje</SelectItem>
-                <SelectItem value="frame-rect">Rektangulär ram</SelectItem>
-                <SelectItem value="frame-oval">Oval ram</SelectItem>
-                <SelectItem value="frame-rounded">Rundad ram</SelectItem>
-                <SelectItem value="frame-double">Dubbel ram</SelectItem>
-                <SelectItem value="frame-corners">Hörn-dekoration</SelectItem>
+                <SelectItem value="line-horizontal">{t("admin.layerInspector.shapeKindLineHorizontal")}</SelectItem>
+                <SelectItem value="line-vertical">{t("admin.layerInspector.shapeKindLineVertical")}</SelectItem>
+                <SelectItem value="frame-rect">{t("admin.layerInspector.shapeKindFrameRect")}</SelectItem>
+                <SelectItem value="frame-oval">{t("admin.layerInspector.shapeKindFrameOval")}</SelectItem>
+                <SelectItem value="frame-rounded">{t("admin.layerInspector.shapeKindFrameRounded")}</SelectItem>
+                <SelectItem value="frame-double">{t("admin.layerInspector.shapeKindFrameDouble")}</SelectItem>
+                <SelectItem value="frame-corners">{t("admin.layerInspector.shapeKindFrameCorners")}</SelectItem>
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Tjocklek (mm)">
+          <Field label={t("admin.layerInspector.thicknessMm")}>
             <Input
               type="number"
               min={0.5}
@@ -436,7 +435,7 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
               onChange={(e) => updateDefaults({ strokeMm: Number(e.target.value) })}
             />
           </Field>
-          <Field label="Färg">
+          <Field label={t("admin.layerInspector.color")}>
             <Input
               type="color"
               value={layer.defaults.color}
@@ -444,7 +443,7 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
             />
           </Field>
           {layer.defaults.kind === "frame-rounded" && (
-            <Field label="Hörnradie (% av kortsida)">
+            <Field label={t("admin.layerInspector.cornerRadius")}>
               <Input
                 type="number"
                 min={0}
@@ -456,7 +455,7 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
             </Field>
           )}
           {layer.defaults.kind === "frame-double" && (
-            <Field label="Mellanrum (mm)">
+            <Field label={t("admin.layerInspector.gapMm")}>
               <Input
                 type="number"
                 min={0}
@@ -474,15 +473,15 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
       {layer.type !== "margin" && layer.type !== "line" && layer.type !== "shape" && (
         <div className="space-y-2 border-t pt-4">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Lås per egenskap
+            {t("admin.layerInspector.locksHeading")}
           </p>
           <p className="text-xs text-muted-foreground">
-            Olåsta egenskaper kan kunden ändra i editorn.
+            {t("admin.layerInspector.locksHint")}
           </p>
           <div className="grid grid-cols-2 gap-2 pt-2">
-            {LOCK_LABELS.map(({ key, label }) => (
+            {LOCK_LABELS.map(({ key, labelKey }) => (
               <label key={key} className="flex items-center justify-between gap-2 text-sm">
-                <span>{label}</span>
+                <span>{t(labelKey)}</span>
                 <Switch
                   checked={layer.locks[key]}
                   onCheckedChange={(c) => updateLock(key, c)}
@@ -519,6 +518,7 @@ function PhotoRecipeBinding({
   binding: MediaLayerAi | undefined;
   onChange: (ai: MediaLayerAi | undefined) => void;
 }) {
+  const { t } = useTranslation();
   const [saved, setSaved] = useState<SavedRecipe[]>([]);
   useEffect(() => {
     // Best-effort: starters always work even if the shop has no saved recipes.
@@ -545,22 +545,22 @@ function PhotoRecipeBinding({
   return (
     <div className="space-y-3 border-t pt-4">
       <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-        AI recipe
+        {t("admin.layerInspector.aiRecipe")}
       </p>
-      <Field label="Recipe">
+      <Field label={t("admin.layerInspector.recipe")}>
         <Select value={recipeId} onValueChange={pickRecipe}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value={NO_RECIPE}>No recipe (plain photo)</SelectItem>
+            <SelectItem value={NO_RECIPE}>{t("admin.layerInspector.noRecipe")}</SelectItem>
             <SelectGroup>
-              <SelectLabel>Starters</SelectLabel>
+              <SelectLabel>{t("admin.layerInspector.starters")}</SelectLabel>
               {BUILTIN_RECIPES.map((r) => (
                 <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
               ))}
             </SelectGroup>
             {saved.length > 0 && (
               <SelectGroup>
-                <SelectLabel>Your recipes</SelectLabel>
+                <SelectLabel>{t("admin.layerInspector.yourRecipes")}</SelectLabel>
                 {saved.map((r) => (
                   <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
                 ))}
@@ -586,10 +586,10 @@ function PhotoRecipeBinding({
 
           {(chosen.prompt ?? "").includes("{motif}") && (
             <>
-              <Field label="What is the customer's photo of?">
+              <Field label={t("admin.layerInspector.motifQuestion")}>
                 <Input
                   value={binding?.motif ?? ""}
-                  placeholder="e.g. a pet, a person, a residential house"
+                  placeholder={t("admin.layerInspector.motifPlaceholder")}
                   onChange={(e) =>
                     onChange({
                       recipeId,
@@ -600,8 +600,7 @@ function PhotoRecipeBinding({
                 />
               </Field>
               <p className="text-[11px] text-muted-foreground -mt-1">
-                Tells the AI what to keep when it removes the background. Without it a
-                whole-scene photo keeps its surroundings.
+                {t("admin.layerInspector.motifHint")}
               </p>
             </>
           )}
@@ -625,6 +624,7 @@ function ReferenceImagesEditor({
   references: RecipeReference[];
   onChange: (refs: RecipeReference[]) => void;
 }) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   // References are a picker pool — the customer chooses one and only that is
@@ -642,7 +642,7 @@ function ReferenceImagesEditor({
       onChange([...references, { id, url, orientation: "any" }]);
     } catch (e) {
       console.error("[LayerInspector] reference upload failed", e);
-      toast.error("Kunde inte ladda upp referensbilden");
+      toast.error(t("admin.layerInspector.uploadReferenceFailed"));
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -650,7 +650,7 @@ function ReferenceImagesEditor({
   }
 
   return (
-    <Field label={`Reference images${required ? "" : " (optional)"}`}>
+    <Field label={required ? t("admin.layerInspector.referenceImages") : t("admin.layerInspector.referenceImagesOptional")}>
       <div className="space-y-2">
         {references.length > 0 && (
           <div className="grid grid-cols-3 gap-2">
@@ -662,7 +662,7 @@ function ReferenceImagesEditor({
                     type="button"
                     onClick={() => onChange(references.filter((x) => x.id !== r.id))}
                     className="absolute top-1 right-1 bg-background/85 rounded-md p-1 text-destructive hover:bg-background"
-                    title="Ta bort"
+                    title={t("admin.layerInspector.remove")}
                   >
                     <Trash2 className="h-3 w-3" />
                   </button>
@@ -679,9 +679,9 @@ function ReferenceImagesEditor({
                 >
                   <SelectTrigger className="h-7 text-[11px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="any">Both</SelectItem>
-                    <SelectItem value="portrait">Portrait</SelectItem>
-                    <SelectItem value="landscape">Landscape</SelectItem>
+                    <SelectItem value="any">{t("admin.layerInspector.orientationBoth")}</SelectItem>
+                    <SelectItem value="portrait">{t("admin.layerInspector.orientationPortrait")}</SelectItem>
+                    <SelectItem value="landscape">{t("admin.layerInspector.orientationLandscape")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -700,7 +700,7 @@ function ReferenceImagesEditor({
           ) : (
             <Upload className="h-3.5 w-3.5 mr-1.5" />
           )}
-          Add reference
+          {t("admin.layerInspector.addReference")}
         </Button>
         <input
           ref={inputRef}
@@ -710,8 +710,7 @@ function ReferenceImagesEditor({
           onChange={(e) => onFiles(e.target.files)}
         />
         <p className="text-[11px] text-muted-foreground">
-          The costume / scene the customer's photo is placed onto. Add as many as
-          you like — the customer picks which one to use.
+          {t("admin.layerInspector.referenceHint")}
         </p>
       </div>
     </Field>
@@ -726,6 +725,7 @@ function DefaultPlaceSearch({
   current: string | undefined;
   onPick: (r: GeocodeResult) => void;
 }) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<GeocodeResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -750,9 +750,10 @@ function DefaultPlaceSearch({
 
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs">Förvald plats</Label>
+      <Label className="text-xs">{t("admin.layerInspector.defaultPlace")}</Label>
       <p className="text-[11px] text-muted-foreground -mt-1">
-        Vald: <span className="font-medium text-foreground">{current || "—"}</span>
+        {t("admin.layerInspector.selectedLabel")}{" "}
+        <span className="font-medium text-foreground">{current || "—"}</span>
       </p>
       <Popover open={results.length > 0}>
         <PopoverTrigger asChild>
@@ -761,7 +762,7 @@ function DefaultPlaceSearch({
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Sök stad eller adress…"
+              placeholder={t("admin.layerInspector.searchPlacePlaceholder")}
               className="pl-9 pr-9"
             />
             {searching && (
@@ -812,6 +813,7 @@ function TextLayerDefaults({
   allLayers: TemplateLayer[];
   updateDefaults: (patch: Partial<Extract<TemplateLayer, { type: "text" }>["defaults"]>) => void;
 }) {
+  const { t } = useTranslation();
   const d = layer.defaults;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const tokens = resolveLinkedTokens(d);
@@ -856,7 +858,7 @@ function TextLayerDefaults({
     const start = ta.selectionStart ?? 0;
     const end = ta.selectionEnd ?? 0;
     if (end <= start) {
-      toast.message("Markera först en del av texten");
+      toast.message(t("admin.layerInspector.selectTextFirst"));
       return;
     }
     const next: TextSpan[] = [...(d.spans ?? []), { start, end }];
@@ -877,9 +879,9 @@ function TextLayerDefaults({
   return (
     <div className="space-y-3 border-t pt-4">
       <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-        Text — defaults
+        {t("admin.layerInspector.textDefaults")}
       </p>
-      <Field label="Innehåll (Enter ger ny rad)">
+      <Field label={t("admin.layerInspector.contentEnterNewline")}>
         <Textarea
           ref={textareaRef}
           value={d.text}
@@ -890,7 +892,7 @@ function TextLayerDefaults({
       </Field>
       {(d.linkedMapLayerId || /\[\[(city|country|coords?)\]\]/.test(d.text)) && (
         <p className="text-[11px] text-muted-foreground -mt-1 px-0.5">
-          Förhandsvisning:{" "}
+          {t("admin.layerInspector.preview")}{" "}
           <span className="font-medium text-foreground/80 whitespace-pre-wrap">
             {(() => {
               const sibling = allLayers.find(
@@ -905,12 +907,12 @@ function TextLayerDefaults({
                       center: [sibling.defaults.center[0]!, sibling.defaults.center[1]!] as [number, number],
                     }
                   : FALLBACK_PLACE;
-              return substituteTokens(d, place).replace(/\n/g, " · ") || "(tom)";
+              return substituteTokens(d, place).replace(/\n/g, " · ") || t("admin.layerInspector.emptyPreview");
             })()}
           </span>
         </p>
       )}
-      <Field label="Typsnitt">
+      <Field label={t("admin.layerInspector.font")}>
         <Select value={d.font} onValueChange={(v) => updateDefaults({ font: v })}>
           <SelectTrigger>
             <SelectValue style={{ fontFamily: `"${d.font}", system-ui, sans-serif` }} />
@@ -938,7 +940,7 @@ function TextLayerDefaults({
         </Select>
       </Field>
       <div className="grid grid-cols-3 gap-3">
-        <Field label="Storlek (pt)">
+        <Field label={t("admin.layerInspector.sizePt")}>
           <Input
             type="number"
             min={4}
@@ -952,7 +954,7 @@ function TextLayerDefaults({
             }}
           />
         </Field>
-        <Field label="Radavstånd">
+        <Field label={t("admin.layerInspector.lineHeight")}>
           <Input
             type="number"
             min={0.8}
@@ -962,34 +964,33 @@ function TextLayerDefaults({
             onChange={(e) => updateDefaults({ lineHeight: Number(e.target.value) })}
           />
         </Field>
-        <Field label="Justering">
+        <Field label={t("admin.layerInspector.align")}>
           <Select
             value={d.align}
             onValueChange={(v) => updateDefaults({ align: v as typeof d.align })}
           >
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="left">Vänster</SelectItem>
-              <SelectItem value="center">Mitten</SelectItem>
-              <SelectItem value="right">Höger</SelectItem>
+              <SelectItem value="left">{t("admin.layerInspector.alignLeft")}</SelectItem>
+              <SelectItem value="center">{t("admin.layerInspector.alignCenter")}</SelectItem>
+              <SelectItem value="right">{t("admin.layerInspector.alignRight")}</SelectItem>
             </SelectContent>
           </Select>
         </Field>
       </div>
       {typeof d.fontSizePct === "number" && typeof d.fontSizePt !== "number" && (
         <p className="text-[11px] text-amber-600">
-          Använder gammal storlek (% av höjd: {d.fontSizePct}%). Sätt en pt-storlek
-          för att uppgradera.
+          {t("admin.layerInspector.legacySizeWarning", { pct: d.fontSizePct })}
         </p>
       )}
-      <Field label="Färg">
+      <Field label={t("admin.layerInspector.color")}>
         <Input
           type="color"
           value={d.color}
           onChange={(e) => updateDefaults({ color: e.target.value })}
         />
       </Field>
-      <Field label="Bakgrundsfärg">
+      <Field label={t("admin.layerInspector.backgroundColor")}>
         <div className="flex items-center gap-2">
           <Input
             type="color"
@@ -1004,7 +1005,7 @@ function TextLayerDefaults({
               onClick={() => updateDefaults({ backgroundColor: undefined })}
               className="text-[11px] px-2 py-1 rounded border hover:bg-muted"
             >
-              Ta bort
+              {t("admin.layerInspector.remove")}
             </button>
           ) : (
             <button
@@ -1012,7 +1013,7 @@ function TextLayerDefaults({
               onClick={() => updateDefaults({ backgroundColor: "#ffffff" })}
               className="text-[11px] px-2 py-1 rounded border hover:bg-muted"
             >
-              Lägg till
+              {t("admin.layerInspector.add")}
             </button>
           )}
         </div>
@@ -1021,9 +1022,9 @@ function TextLayerDefaults({
       {/* Decoration */}
       <div className="rounded-md border bg-muted/30 p-3 space-y-2">
         <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          Design (anpassar sig efter texten)
+          {t("admin.layerInspector.designHeading")}
         </p>
-        <Field label="Stil">
+        <Field label={t("admin.layerInspector.style")}>
           <Select
             value={decoration.kind}
             onValueChange={(v) =>
@@ -1034,15 +1035,15 @@ function TextLayerDefaults({
           >
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">Ingen</SelectItem>
-              <SelectItem value="box">Ruta runt texten</SelectItem>
-              <SelectItem value="side-rules">Streck på sidorna</SelectItem>
+              <SelectItem value="none">{t("admin.layerInspector.decorationNone")}</SelectItem>
+              <SelectItem value="box">{t("admin.layerInspector.decorationBox")}</SelectItem>
+              <SelectItem value="side-rules">{t("admin.layerInspector.decorationSideRules")}</SelectItem>
             </SelectContent>
           </Select>
         </Field>
         {decoration.kind !== "none" && (
           <div className="grid grid-cols-3 gap-2">
-            <Field label="Tjocklek (mm)">
+            <Field label={t("admin.layerInspector.thicknessMm")}>
               <Input
                 type="number"
                 min={0.1}
@@ -1056,7 +1057,7 @@ function TextLayerDefaults({
                 }
               />
             </Field>
-            <Field label="Padding (mm)">
+            <Field label={t("admin.layerInspector.paddingMm")}>
               <Input
                 type="number"
                 min={0}
@@ -1070,7 +1071,7 @@ function TextLayerDefaults({
                 }
               />
             </Field>
-            <Field label="Färg">
+            <Field label={t("admin.layerInspector.color")}>
               <Input
                 type="color"
                 value={decoration.color}
@@ -1085,14 +1086,14 @@ function TextLayerDefaults({
         )}
         {decoration.kind === "side-rules" && (
           <div className="grid grid-cols-2 gap-2">
-            <Field label="Strecklängd (mm) — tomt = elastisk">
+            <Field label={t("admin.layerInspector.ruleLength")}>
               <Input
                 type="number"
                 min={0}
                 max={300}
                 step={1}
                 value={decoration.ruleLengthMm ?? ""}
-                placeholder="t.ex. 25"
+                placeholder={t("admin.layerInspector.ruleLengthPlaceholder")}
                 onChange={(e) => {
                   const n = Number(e.target.value);
                   updateDefaults({
@@ -1104,7 +1105,7 @@ function TextLayerDefaults({
                 }}
               />
             </Field>
-            <Field label="Strecken börjar vid">
+            <Field label={t("admin.layerInspector.ruleStartAt")}>
               <Select
                 value={decoration.ruleAlign ?? "text-edge"}
                 onValueChange={(v) =>
@@ -1115,8 +1116,8 @@ function TextLayerDefaults({
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="text-edge">Texten</SelectItem>
-                  <SelectItem value="layer-edge">Layerkanten</SelectItem>
+                  <SelectItem value="text-edge">{t("admin.layerInspector.ruleAlignText")}</SelectItem>
+                  <SelectItem value="layer-edge">{t("admin.layerInspector.ruleAlignLayerEdge")}</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
@@ -1125,7 +1126,7 @@ function TextLayerDefaults({
       </div>
 
       {/* Map link */}
-      <Field label="Länka till karta">
+      <Field label={t("admin.layerInspector.linkToMap")}>
         <Select
           value={d.linkedMapLayerId ?? "__none__"}
           onValueChange={(v) =>
@@ -1134,7 +1135,7 @@ function TextLayerDefaults({
         >
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="__none__">Ingen (statisk text)</SelectItem>
+            <SelectItem value="__none__">{t("admin.layerInspector.noneStaticText")}</SelectItem>
             {allLayers
               .filter((l) => l.type === "map")
               .map((m) => (
@@ -1148,17 +1149,16 @@ function TextLayerDefaults({
       {d.linkedMapLayerId && (
         <div className="rounded-md border bg-muted/30 p-3 space-y-2">
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-            Länkade rader (drag för att ordna)
+            {t("admin.layerInspector.linkedRowsHeading")}
           </p>
           <p className="text-[10px] text-muted-foreground -mt-1">
-            Ordningen avgör visningsordning. För finkontroll: skriv
+            {t("admin.layerInspector.linkedRowsHintPre")}{" "}
             <code className="px-1">[[city]]</code>,
-            <code className="px-1">[[country]]</code> eller
-            <code className="px-1">[[coords]]</code> i innehållet — då följer
-            renderaren din egen layout (samma rad eller egen rad).
+            <code className="px-1">[[country]]</code> {t("admin.layerInspector.linkedRowsHintOr")}{" "}
+            <code className="px-1">[[coords]]</code> {t("admin.layerInspector.linkedRowsHintPost")}
           </p>
           {(["city", "country", "coordinates"] as const).map((tok) => {
-            const labels = { city: "Stad / ort [[city]]", country: "Land [[country]]", coordinates: "Koordinater [[coords]]" };
+            const labels = { city: t("admin.layerInspector.tokenLabelCity"), country: t("admin.layerInspector.tokenLabelCountry"), coordinates: t("admin.layerInspector.tokenLabelCoordinates") };
             const idx = tokens.indexOf(tok);
             const checked = idx !== -1;
             return (
@@ -1188,7 +1188,7 @@ function TextLayerDefaults({
                       className="text-[11px] px-1.5 py-0.5 rounded border hover:bg-muted"
                       onClick={() => insertAtCursor(`[[${tok === "coordinates" ? "coords" : tok}]]`)}
                     >
-                      Infoga
+                      {t("admin.layerInspector.insert")}
                     </button>
                   </>
                 )}
@@ -1202,22 +1202,21 @@ function TextLayerDefaults({
       <div className="rounded-md border bg-muted/30 p-3 space-y-2">
         <div className="flex items-center justify-between">
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-            Format-markeringar
+            {t("admin.layerInspector.formatMarkings")}
           </p>
           <button
             type="button"
             className="text-[11px] px-2 py-1 rounded border hover:bg-muted"
             onClick={addSpanFromSelection}
           >
-            + Markering
+            {t("admin.layerInspector.addMarking")}
           </button>
         </div>
         <p className="text-[10px] text-muted-foreground">
-          Markera text i innehållet ovan, klicka <em>+ Markering</em> och sätt
-          font/storlek/färg endast för det området.
+          {t("admin.layerInspector.spanHintPre")} <em>{t("admin.layerInspector.addMarking")}</em> {t("admin.layerInspector.spanHintPost")}
         </p>
         {(d.spans ?? []).length === 0 && (
-          <p className="text-[11px] text-muted-foreground italic">Inga markeringar.</p>
+          <p className="text-[11px] text-muted-foreground italic">{t("admin.layerInspector.noMarkings")}</p>
         )}
         {(d.spans ?? []).map((s, i) => (
           <SpanEditor
@@ -1244,6 +1243,7 @@ function SpanEditor({
   onChange: (p: Partial<TextSpan>) => void;
   onRemove: () => void;
 }) {
+  const { t } = useTranslation();
   const slice = text.slice(span.start, span.end);
   return (
     <div className="rounded border bg-background p-2 space-y-2">
@@ -1256,7 +1256,7 @@ function SpanEditor({
           className="text-[11px] text-destructive hover:underline"
           onClick={onRemove}
         >
-          Ta bort
+          {t("admin.layerInspector.remove")}
         </button>
       </div>
       <div className="grid grid-cols-3 gap-2">
@@ -1270,7 +1270,7 @@ function SpanEditor({
           }}
         />
         <Input
-          placeholder="Typsnitt"
+          placeholder={t("admin.layerInspector.font")}
           value={span.font ?? ""}
           onChange={(e) => onChange({ font: e.target.value || undefined })}
         />
@@ -1286,21 +1286,21 @@ function SpanEditor({
             checked={!!span.bold}
             onCheckedChange={(c) => onChange({ bold: c === true })}
           />
-          Fet
+          {t("admin.layerInspector.bold")}
         </label>
         <label className="flex items-center gap-1">
           <Checkbox
             checked={!!span.italic}
             onCheckedChange={(c) => onChange({ italic: c === true })}
           />
-          Kursiv
+          {t("admin.layerInspector.italic")}
         </label>
         <label className="flex items-center gap-1">
           <Checkbox
             checked={!!span.underline}
             onCheckedChange={(c) => onChange({ underline: c === true })}
           />
-          Understruken
+          {t("admin.layerInspector.underline")}
         </label>
       </div>
     </div>

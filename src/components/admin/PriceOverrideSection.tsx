@@ -3,6 +3,8 @@
 // value overrides just that variant for this template (written to
 // template.priceOverrides). Empty = use the global default.
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -19,16 +21,16 @@ interface MaterialView {
   variants: string[];
 }
 
-function materialsFrom(po: ProductOptions): MaterialView[] {
+function materialsFrom(po: ProductOptions, t: TFunction): MaterialView[] {
   const out: MaterialView[] = [];
   if (po.poster?.enabled)
-    out.push({ key: "poster", label: "Poster", variantLabel: "Ram", sizes: po.poster.allowedSizes ?? [], variants: po.poster.allowedFrames ?? [] });
+    out.push({ key: "poster", label: t("admin.pricing.productPoster"), variantLabel: t("admin.pricing.variantLabelFrame"), sizes: po.poster.allowedSizes ?? [], variants: po.poster.allowedFrames ?? [] });
   if (po.canvas?.enabled)
-    out.push({ key: "canvas", label: "Canvas", variantLabel: "Djup", sizes: po.canvas.allowedSizes ?? [], variants: po.canvas.allowedDepths ?? [] });
+    out.push({ key: "canvas", label: t("admin.pricing.productCanvas"), variantLabel: t("admin.pricing.variantLabelDepth"), sizes: po.canvas.allowedSizes ?? [], variants: po.canvas.allowedDepths ?? [] });
   if (po.aluminum?.enabled)
-    out.push({ key: "aluminum", label: "Aluminium", variantLabel: "Variant", sizes: po.aluminum.allowedSizes ?? [], variants: po.aluminum.allowedMaterials ?? [] });
+    out.push({ key: "aluminum", label: t("admin.pricing.productAluminum"), variantLabel: t("admin.pricing.variantLabelVariant"), sizes: po.aluminum.allowedSizes ?? [], variants: po.aluminum.allowedMaterials ?? [] });
   if (po.acrylic?.enabled)
-    out.push({ key: "acrylic", label: "Akryl", variantLabel: "Finish", sizes: po.acrylic.allowedSizes ?? [], variants: po.acrylic.allowedFinishes ?? [] });
+    out.push({ key: "acrylic", label: t("admin.pricing.productAcrylic"), variantLabel: t("admin.pricing.variantLabelFinish"), sizes: po.acrylic.allowedSizes ?? [], variants: po.acrylic.allowedFinishes ?? [] });
   return out;
 }
 
@@ -47,13 +49,14 @@ export default function PriceOverrideSection({
   currency,
   onChange,
 }: Props) {
-  const materials = materialsFrom(productOptions);
+  const { t } = useTranslation();
+  const materials = materialsFrom(productOptions, t);
   const [active, setActive] = useState(materials[0]?.key ?? "");
 
   if (materials.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        Aktivera minst en produkttyp (med storlekar) ovan för att kunna överstyra priser.
+        {t("admin.pricing.noMaterials")}
       </p>
     );
   }
@@ -95,7 +98,7 @@ export default function PriceOverrideSection({
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr>
-              <th className="text-left font-medium p-2 sticky left-0 bg-card">Storlek</th>
+              <th className="text-left font-medium p-2 sticky left-0 bg-card">{t("admin.pricing.sizeColumn")}</th>
               {activeMaterial.variants.map((v) => (
                 <th key={v} className="text-left font-medium p-2 whitespace-nowrap">{v}</th>
               ))}
@@ -106,7 +109,7 @@ export default function PriceOverrideSection({
                 className="text-left text-xs text-muted-foreground font-normal px-2 pb-2"
                 colSpan={activeMaterial.variants.length}
               >
-                {activeMaterial.variantLabel} · överstyr i {currency ?? "butikens valuta"} · placeholder = global standard
+                {t("admin.pricing.overrideHint", { variantLabel: activeMaterial.variantLabel, currency: currency ?? t("admin.pricing.storeCurrency") })}
               </th>
             </tr>
           </thead>
@@ -138,8 +141,7 @@ export default function PriceOverrideSection({
       </Card>
 
       <p className="text-xs text-muted-foreground">
-        Tomma fält använder det globala standardpriset (från Priser-fliken). Ifyllda värden
-        gäller bara denna mall. Sparas med mallen; synk uppdaterar Shopify-priset.
+        {t("admin.pricing.footerNote")}
       </p>
     </div>
   );

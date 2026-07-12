@@ -9,6 +9,7 @@
 // All template state lives here. Saving writes the whole `template` jsonb to
 // product_configs. Publish stamps `publishedAt` and runs zod validation.
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronDown, Eye, Image as ImageIcon, Loader2, MapPin, Minus, Save, Send, Shapes, Square, Type, Undo2, Zap } from "lucide-react";
 import { toast } from "sonner";
@@ -51,6 +52,7 @@ import LanguageToggle from "@/components/admin/LanguageToggle";
 import { applyStoredAdminLocale } from "@/lib/admin-locale";
 
 export default function DesignerPage() {
+  const { t } = useTranslation();
   // Apply the merchant's saved admin language (default English) on mount.
   useEffect(() => {
     applyStoredAdminLocale();
@@ -193,10 +195,10 @@ export default function DesignerPage() {
     const code = (data as { code?: string } | null)?.code;
     if (error || !data?.ok) {
       const isAuth = code === "invalid_token" || code === "no_token" || code === "missing_scope";
-      toast.error(isAuth ? "Shopify-anslutningen är ogiltig" : "Synk misslyckades", {
+      toast.error(isAuth ? t("admin.designer.syncInvalidTitle") : t("admin.designer.syncFailedTitle"), {
         description: isAuth
-          ? "Backendens Shopify Admin-token avvisades. Återanslut Shopify-integrationen i Lovable och försök igen."
-          : (error?.message ?? data?.error ?? "Okänt fel"),
+          ? t("admin.designer.syncAuthDescription")
+          : (error?.message ?? data?.error ?? t("admin.designer.unknownError")),
       });
     } else {
       // Invalidate the variant resolver cache so the editor picks up newly
@@ -223,21 +225,21 @@ export default function DesignerPage() {
       );
       const allPublished = results.every((r) => r.publishedToOnlineStore);
       const parts: string[] = [];
-      parts.push(`${results.length} produkt(er)`);
-      if (totalCreated) parts.push(`${totalCreated} nya varianter`);
-      if (totalUpdated) parts.push(`${totalUpdated} uppdaterade`);
-      if (totalSkipped) parts.push(`${totalSkipped} hoppades över`);
+      parts.push(t("admin.designer.productCount", { count: results.length }));
+      if (totalCreated) parts.push(t("admin.designer.newVariants", { count: totalCreated }));
+      if (totalUpdated) parts.push(t("admin.designer.updatedVariants", { count: totalUpdated }));
+      if (totalSkipped) parts.push(t("admin.designer.skippedVariants", { count: totalSkipped }));
       parts.push(
-        allPublished ? "publicerade i Online Store" : "OBS: ej publicerade i Online Store",
+        allPublished ? t("admin.designer.publishedToStore") : t("admin.designer.notPublishedToStore"),
       );
-      toast.success("Synkad till Shopify", { description: parts.join(" · ") });
+      toast.success(t("admin.designer.syncedToShopify"), { description: parts.join(" · ") });
       if (totalSkippedFields > 0) {
         const sample = results
           .flatMap((r) => r.skippedFields ?? [])
           .slice(0, 5)
           .map((f) => `${f.field} (${f.reason})`)
           .join(", ");
-        toast.warning(`${totalSkippedFields} fält hoppades över — ändrade i Shopify`, {
+        toast.warning(t("admin.designer.skippedFields", { count: totalSkippedFields }), {
           description: sample,
         });
       }
@@ -255,22 +257,22 @@ export default function DesignerPage() {
         const res = await invokeAdmin<{ config: ProductConfig | null }>("get", { handle });
         cfg = res.config ?? null;
       } catch (e) {
-        toast.error("Kunde inte ladda mallen", {
+        toast.error(t("admin.designer.loadTemplateFailed"), {
           description: e instanceof Error ? e.message : String(e),
         });
         setLoading(false);
         return;
       }
       if (!cfg) {
-        toast.error("Hittade ingen produkt med detta handle");
+        toast.error(t("admin.designer.productNotFound"));
         setLoading(false);
         return;
       }
       const raw = (cfg as unknown as { template?: unknown }).template;
       const { template: tpl, fellBack } = resolveTemplate(cfg, raw);
       if (fellBack) {
-        toast.message("Mall genererades från legacy-config", {
-          description: "Spara för att låsa in den i databasen.",
+        toast.message(t("admin.designer.legacyConfigTitle"), {
+          description: t("admin.designer.legacyConfigDescription"),
         });
       }
       setConfig(cfg);
@@ -421,7 +423,7 @@ export default function DesignerPage() {
     if (enabled) set.add(o);
     else set.delete(o);
     if (set.size === 0) {
-      toast.error("Minst en orientering måste vara aktiv");
+      toast.error(t("admin.designer.minOneOrientation"));
       return;
     }
     const nextOrients: Orientation[] = (["portrait", "landscape"] as Orientation[]).filter(
@@ -449,7 +451,7 @@ export default function DesignerPage() {
     const parsed = parseTemplate(finalTemplate);
     if (parsed.ok !== true) {
       console.error(parsed.error);
-      toast.error("Mallen är ogiltig", { description: parsed.error.issues[0]?.message });
+      toast.error(t("admin.designer.templateInvalid"), { description: parsed.error.issues[0]?.message });
       return;
     }
 
@@ -484,14 +486,14 @@ export default function DesignerPage() {
       });
     } catch (e) {
       setSaving(false);
-      toast.error("Kunde inte spara", {
+      toast.error(t("admin.designer.saveFailed"), {
         description: e instanceof Error ? e.message : String(e),
       });
       return;
     }
     setSaving(false);
     setTemplate(finalTemplate);
-    toast.success(opts.publish ? "Publicerad" : "Sparad som draft");
+    toast.success(opts.publish ? t("admin.designer.published") : t("admin.designer.savedAsDraft"));
   }
 
   if (loading) {
@@ -505,9 +507,9 @@ export default function DesignerPage() {
   if (!config || !template || !layout) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <p className="text-muted-foreground">Mall kunde inte laddas.</p>
+        <p className="text-muted-foreground">{t("admin.designer.templateLoadError")}</p>
         <Button asChild variant="outline">
-          <Link to="/admin/configs">Tillbaka</Link>
+          <Link to="/admin/configs">{t("admin.designer.back")}</Link>
         </Button>
       </div>
     );
@@ -519,7 +521,7 @@ export default function DesignerPage() {
         <div className="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <div className="flex items-center gap-3 min-w-0">
             <Button asChild variant="ghost" size="icon">
-              <Link to="/admin/configs" aria-label="Tillbaka">
+              <Link to="/admin/configs" aria-label={t("admin.designer.back")}>
                 <ArrowLeft className="h-4 w-4" />
               </Link>
             </Button>
@@ -527,7 +529,7 @@ export default function DesignerPage() {
               <h1 className="text-lg font-semibold truncate">{config.title}</h1>
               <p className="text-xs text-muted-foreground font-mono truncate">
                 {config.shopify_handle}
-                {template.publishedAt ? " · publicerad" : " · draft"}
+                {template.publishedAt ? t("admin.designer.publishedSuffix") : t("admin.designer.draftSuffix")}
               </p>
             </div>
           </div>
@@ -540,7 +542,7 @@ export default function DesignerPage() {
                 rel="noreferrer"
               >
                 <Eye className="h-4 w-4 mr-2" />
-                Visa som kund
+                {t("admin.designer.viewAsCustomer")}
               </a>
             </Button>
             <Button
@@ -548,10 +550,10 @@ export default function DesignerPage() {
               size="sm"
               onClick={undo}
               disabled={!canUndo}
-              title="Ångra (Cmd/Ctrl+Z)"
+              title={t("admin.designer.undoTooltip")}
             >
               <Undo2 className="h-4 w-4 mr-2" />
-              Ångra
+              {t("admin.designer.undo")}
             </Button>
             <Button
               variant="outline"
@@ -560,7 +562,7 @@ export default function DesignerPage() {
               disabled={saving}
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-              Spara draft
+              {t("admin.designer.saveDraft")}
             </Button>
             <Button
               variant="outline"
@@ -569,7 +571,7 @@ export default function DesignerPage() {
               disabled={syncing}
             >
               {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
-              Synka till Shopify
+              {t("admin.designer.syncToShopify")}
             </Button>
             <Button
               size="sm"
@@ -577,7 +579,7 @@ export default function DesignerPage() {
               disabled={saving}
             >
               <Send className="h-4 w-4 mr-2" />
-              Publicera
+              {t("admin.designer.publish")}
             </Button>
             <DeleteTemplateDialog
               productConfigId={config.id}
@@ -600,17 +602,16 @@ export default function DesignerPage() {
             <AccordionItem value="price-overrides" className="border-0">
               <AccordionTrigger className="px-5 py-4 hover:no-underline">
                 <div className="text-left">
-                  <h2 className="text-base font-semibold">Prisöverstyrning (denna mall)</h2>
+                  <h2 className="text-base font-semibold">{t("admin.designer.priceOverrideTitle")}</h2>
                   <p className="text-xs text-muted-foreground font-normal">
-                    Ändra enstaka variantpriser för just den här mallen. Globala standardpriser
-                    sätts i Priser-fliken.
+                    {t("admin.designer.priceOverrideDescription")}
                   </p>
                 </div>
               </AccordionTrigger>
               <AccordionContent className="px-5 pb-5">
                 {pricesLoading ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Laddar priser…
+                    <Loader2 className="h-4 w-4 animate-spin" /> {t("admin.designer.loadingPrices")}
                   </div>
                 ) : (
                   <PriceOverrideSection
@@ -631,9 +632,9 @@ export default function DesignerPage() {
         <Card className="p-5 space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-base font-semibold">Fri mall</h2>
+              <h2 className="text-base font-semibold">{t("admin.designer.freeformTitle")}</h2>
               <p className="text-xs text-muted-foreground">
-                När påslagen får kunden en "Lager"-flik och kan själv lägga till bild, AI-bild, karta, text, form, linje och marginal. Mallens egna lager fungerar som startläge.
+                {t("admin.designer.freeformDescription")}
               </p>
             </div>
             <Switch
@@ -654,27 +655,27 @@ export default function DesignerPage() {
         <Card className="p-5 space-y-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
-              <h2 className="text-base font-semibold">Designyta</h2>
+              <h2 className="text-base font-semibold">{t("admin.designer.canvasTitle")}</h2>
               <p className="text-xs text-muted-foreground">
-                Drag & drop · 5% snap · alignment-guides under drag.
+                {t("admin.designer.canvasSubtitle")}
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <Tabs value={orientation} onValueChange={(v) => setOrientation(v as Orientation)}>
                 <TabsList>
                   <TabsTrigger value="portrait" disabled={!template.orientations.includes("portrait")}>
-                    Stående
+                    {t("admin.designer.portrait")}
                   </TabsTrigger>
                   <TabsTrigger value="landscape" disabled={!template.orientations.includes("landscape")}>
-                    Liggande
+                    {t("admin.designer.landscape")}
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
               {showDesignModeToggle && (
                 <Tabs value={designMode} onValueChange={(v) => { setDesignMode(v as "standard" | "canvas"); setSelectedId(null); }}>
                   <TabsList>
-                    <TabsTrigger value="standard">Standard</TabsTrigger>
-                    <TabsTrigger value="canvas">Canvas</TabsTrigger>
+                    <TabsTrigger value="standard">{t("admin.designer.designModeStandard")}</TabsTrigger>
+                    <TabsTrigger value="canvas">{t("admin.designer.designModeCanvas")}</TabsTrigger>
                   </TabsList>
                 </Tabs>
               )}
@@ -684,70 +685,70 @@ export default function DesignerPage() {
                     checked={template.orientations.includes("portrait")}
                     onCheckedChange={(c) => toggleOrientationEnabled("portrait", c)}
                   />
-                  Aktiv stående
+                  {t("admin.designer.activePortrait")}
                 </Label>
                 <Label className="flex items-center gap-1.5 text-xs cursor-pointer">
                   <Switch
                     checked={template.orientations.includes("landscape")}
                     onCheckedChange={(c) => toggleOrientationEnabled("landscape", c)}
                   />
-                  Aktiv liggande
+                  {t("admin.designer.activeLandscape")}
                 </Label>
               </div>
               <Button size="sm" variant="outline" onClick={() => addLayer("map")}>
                 <MapPin className="h-3.5 w-3.5 mr-1.5" />
-                Lägg till karta
+                {t("admin.designer.addMap")}
               </Button>
               <Button size="sm" variant="outline" onClick={() => addLayer("text")}>
                 <Type className="h-3.5 w-3.5 mr-1.5" />
-                Lägg till text
+                {t("admin.designer.addText")}
               </Button>
               <Button size="sm" variant="outline" onClick={() => addLayer("photo")}>
                 <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
-                Lägg till bild
+                {t("admin.designer.addImage")}
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button size="sm" variant="outline">
                     <Shapes className="h-3.5 w-3.5 mr-1.5" />
-                    Lägg till figur
+                    {t("admin.designer.addShape")}
                     <ChevronDown className="h-3 w-3 ml-1 opacity-60" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => addShape("line-horizontal")}>
-                    <Minus className="h-3.5 w-3.5 mr-2" /> Horisontell linje
+                    <Minus className="h-3.5 w-3.5 mr-2" /> {t("admin.designer.shapeHorizontalLine")}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => addShape("line-vertical")}>
-                    <Minus className="h-3.5 w-3.5 mr-2 rotate-90" /> Vertikal linje
+                    <Minus className="h-3.5 w-3.5 mr-2 rotate-90" /> {t("admin.designer.shapeVerticalLine")}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => addShape("frame-rect")}>
-                    <Square className="h-3.5 w-3.5 mr-2" /> Rektangulär ram
+                    <Square className="h-3.5 w-3.5 mr-2" /> {t("admin.designer.shapeRectFrame")}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => addShape("frame-oval")}>
-                    <Square className="h-3.5 w-3.5 mr-2 rounded-full" /> Oval ram
+                    <Square className="h-3.5 w-3.5 mr-2 rounded-full" /> {t("admin.designer.shapeOvalFrame")}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => addShape("frame-rounded")}>
-                    <Square className="h-3.5 w-3.5 mr-2" /> Rundad ram
+                    <Square className="h-3.5 w-3.5 mr-2" /> {t("admin.designer.shapeRoundedFrame")}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => addShape("frame-double")}>
-                    <Square className="h-3.5 w-3.5 mr-2" /> Dubbel ram
+                    <Square className="h-3.5 w-3.5 mr-2" /> {t("admin.designer.shapeDoubleFrame")}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => addShape("frame-corners")}>
-                    <Square className="h-3.5 w-3.5 mr-2" /> Hörn-dekoration
+                    <Square className="h-3.5 w-3.5 mr-2" /> {t("admin.designer.shapeCorners")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               <Button size="sm" variant="outline" onClick={() => addLayer("margin")}>
                 <Square className="h-3.5 w-3.5 mr-1.5" />
-                Lägg till marginal
+                {t("admin.designer.addMargin")}
               </Button>
             </div>
           </div>
 
           <div className="flex items-center gap-3 pb-3 border-b mb-4">
             <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              Bakgrundsfärg
+              {t("admin.designer.backgroundColor")}
             </Label>
             <div className="flex flex-wrap gap-2 items-center">
               {["#EFE7D6","#FFFFFF","#F8F4EC","#E5E5E5","#D9CDB5","#D6E4D2","#CFE0EA","#1A1A1A"].map((c) => {
@@ -778,7 +779,12 @@ export default function DesignerPage() {
               </label>
             </div>
             <span className="text-[11px] text-muted-foreground ml-auto">
-              Sätter kundens default-bakgrund för {orientation === "portrait" ? "stående" : "liggande"}.
+              {t("admin.designer.setsDefaultBackground", {
+                orientation:
+                  orientation === "portrait"
+                    ? t("admin.designer.portraitLower")
+                    : t("admin.designer.landscapeLower"),
+              })}
             </span>
           </div>
 
@@ -798,7 +804,7 @@ export default function DesignerPage() {
             return (
               <div className="text-[11px] text-muted-foreground mb-2 flex items-center gap-2">
                 <span className="inline-block h-2 w-2 rounded-sm bg-primary/60 border" />
-                Canvas-design · designar mot synlig framsida · wrap (ca {designDepthCm} cm) extenderas automatiskt vid tryck
+                {t("admin.designer.canvasDesignHint", { depth: designDepthCm })}
               </div>
             );
           })()}
@@ -818,9 +824,9 @@ export default function DesignerPage() {
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="pointer-events-auto bg-background/95 backdrop-blur border-2 border-dashed border-primary/40 rounded-lg p-6 text-center max-w-xs shadow-lg">
                   <Sparkles className="h-6 w-6 mx-auto mb-2 text-primary" />
-                  <p className="text-sm font-medium mb-1">Tomt — börja här</p>
+                  <p className="text-sm font-medium mb-1">{t("admin.designer.emptyTitle")}</p>
                   <p className="text-xs text-muted-foreground mb-3">
-                    Skapa en standardlayout (karta + text) eller lägg till lager manuellt ovan.
+                    {t("admin.designer.emptyDescription")}
                   </p>
                   <Button
                     size="sm"
@@ -830,7 +836,7 @@ export default function DesignerPage() {
                       setSelectedId(seed[0]?.id ?? null);
                     }}
                   >
-                    Skapa standardlayout
+                    {t("admin.designer.createDefaultLayout")}
                   </Button>
                 </div>
               </div>
@@ -840,7 +846,7 @@ export default function DesignerPage() {
 
         <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
           <Card className="p-5">
-            <h2 className="text-base font-semibold mb-3">Lager</h2>
+            <h2 className="text-base font-semibold mb-3">{t("admin.designer.layers")}</h2>
             <LayerList
               layers={layers}
               selectedId={selectedId}
@@ -852,7 +858,7 @@ export default function DesignerPage() {
             />
           </Card>
           <Card className="p-5">
-            <h2 className="text-base font-semibold mb-3">Egenskaper</h2>
+            <h2 className="text-base font-semibold mb-3">{t("admin.designer.properties")}</h2>
             <LayerInspector
               config={config}
               layer={selectedLayer}
@@ -881,6 +887,7 @@ function StylesSection({
   onSelect: (id: string) => void;
   onChange: (t: Template) => void;
 }) {
+  const { t } = useTranslation();
   const extras = template.extraLayouts ?? [];
   const [thumbDialogId, setThumbDialogId] = useState<string | null>(null);
   const [thumbUrlDraft, setThumbUrlDraft] = useState("");
@@ -896,7 +903,7 @@ function StylesSection({
       portrait: { aspect: template.defaultLayout.portrait.aspect, background: { color: "#FFFFFF" }, layers: [] },
       landscape: { aspect: template.defaultLayout.landscape.aspect, background: { color: "#FFFFFF" }, layers: [] },
     };
-    onChange({ ...template, extraLayouts: [...extras, { id, name: `Stil ${extras.length + 1}`, defaultLayout: fresh }] });
+    onChange({ ...template, extraLayouts: [...extras, { id, name: t("admin.designer.styleDefaultNameNumbered", { number: extras.length + 1 }), defaultLayout: fresh }] });
     onSelect(id);
   }
 
@@ -917,30 +924,30 @@ function StylesSection({
       }
     }
     const baseName = isStandard(editingLayoutId)
-      ? (template.defaultLayoutName?.trim() || "Standard")
-      : (extras.find((l) => l.id === editingLayoutId)?.name ?? "Stil");
-    onChange({ ...template, extraLayouts: [...extras, { id, name: `${baseName} (kopia)`, ...cloned }] });
+      ? (template.defaultLayoutName?.trim() || t("admin.designer.styleDefaultName"))
+      : (extras.find((l) => l.id === editingLayoutId)?.name ?? t("admin.designer.styleFallbackName"));
+    onChange({ ...template, extraLayouts: [...extras, { id, name: t("admin.designer.styleCopyName", { name: baseName }), ...cloned }] });
     onSelect(id);
   }
 
   function rename(id: string) {
     if (isStandard(id)) {
-      const cur = template.defaultLayoutName?.trim() || "Standard";
-      const name = window.prompt("Namn", cur);
+      const cur = template.defaultLayoutName?.trim() || t("admin.designer.styleDefaultName");
+      const name = window.prompt(t("admin.designer.namePrompt"), cur);
       if (!name?.trim()) return;
       onChange({ ...template, defaultLayoutName: name.trim() });
       return;
     }
     const cur = extras.find((l) => l.id === id);
     if (!cur) return;
-    const name = window.prompt("Namn", cur.name);
+    const name = window.prompt(t("admin.designer.namePrompt"), cur.name);
     if (!name?.trim()) return;
     onChange({ ...template, extraLayouts: extras.map((l) => l.id === id ? { ...l, name: name.trim() } : l) });
   }
 
   function remove(id: string) {
     if (isStandard(id)) return;
-    if (!window.confirm("Ta bort denna stil?")) return;
+    if (!window.confirm(t("admin.designer.removeStyleConfirm"))) return;
     onChange({ ...template, extraLayouts: extras.filter((l) => l.id !== id) });
     if (editingLayoutId === id) onSelect(DEFAULT_LAYOUT_ID);
   }
@@ -948,10 +955,10 @@ function StylesSection({
   function makeDefault(id: string) {
     const cur = extras.find((l) => l.id === id);
     if (!cur) return;
-    if (!window.confirm("Sätt som standard? Den nuvarande Standard-layouten flyttas till en stil.")) return;
+    if (!window.confirm(t("admin.designer.makeDefaultConfirm"))) return;
     const oldStandard = {
       id: `style-${Date.now().toString(36)}`,
-      name: template.defaultLayoutName?.trim() || "Tidigare standard",
+      name: template.defaultLayoutName?.trim() || t("admin.designer.previousDefaultName"),
       thumbnailUrl: template.defaultLayoutThumbnailUrl,
       defaultLayout: template.defaultLayout,
       canvasLayout: template.canvasLayout,
@@ -997,10 +1004,10 @@ function StylesSection({
       const url = await uploadCartPreview(dataUrl, designId);
       setThumbUrlDraft(url);
       setThumbnailUrl(id, url);
-      toast.success("Thumbnail uppladdad");
+      toast.success(t("admin.designer.thumbnailUploaded"));
     } catch (e) {
       console.error("[styles] thumbnail upload failed", e);
-      toast.error("Kunde inte ladda upp", { description: e instanceof Error ? e.message : String(e) });
+      toast.error(t("admin.designer.uploadFailed"), { description: e instanceof Error ? e.message : String(e) });
     } finally {
       setUploadingThumb(false);
     }
@@ -1009,7 +1016,7 @@ function StylesSection({
   async function generateThumbnail(id: string) {
     const isStd = isStandard(id);
     const sourceBlock = isStd
-      ? { defaultLayout: template.defaultLayout, canvasLayout: template.canvasLayout, name: template.defaultLayoutName?.trim() || "Standard" }
+      ? { defaultLayout: template.defaultLayout, canvasLayout: template.canvasLayout, name: template.defaultLayoutName?.trim() || t("admin.designer.styleDefaultName") }
       : (() => {
           const l = extras.find((x) => x.id === id);
           return l ? { defaultLayout: l.defaultLayout, canvasLayout: l.canvasLayout, name: l.name } : null;
@@ -1052,10 +1059,10 @@ function StylesSection({
       const url = await uploadCartPreview(dataUrl, designId);
       setThumbUrlDraft(url);
       setThumbnailUrl(id, url);
-      toast.success("Thumbnail genererad");
+      toast.success(t("admin.designer.thumbnailGenerated"));
     } catch (e) {
       console.error("[styles] thumbnail generation failed", e);
-      toast.error("Kunde inte generera thumbnail", { description: e instanceof Error ? e.message : String(e) });
+      toast.error(t("admin.designer.thumbnailGenerateFailed"), { description: e instanceof Error ? e.message : String(e) });
     } finally {
       setGeneratingId(null);
     }
@@ -1072,7 +1079,7 @@ function StylesSection({
   const items: CardItem[] = [
     {
       id: DEFAULT_LAYOUT_ID,
-      name: template.defaultLayoutName?.trim() || "Standard",
+      name: template.defaultLayoutName?.trim() || t("admin.designer.styleDefaultName"),
       isDefault: true,
       thumbnailUrl: template.defaultLayoutThumbnailUrl,
       defaultLayout: template.defaultLayout,
@@ -1100,14 +1107,14 @@ function StylesSection({
     <Card className="p-5 space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h2 className="text-base font-semibold">Stilar</h2>
+          <h2 className="text-base font-semibold">{t("admin.designer.stylesTitle")}</h2>
           <p className="text-xs text-muted-foreground">
-            Flera layouter för samma mall — kunden kan växla i editorn. Designytan nedan editar den valda stilen.
+            {t("admin.designer.stylesDescription")}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={duplicateCurrent}>Duplicera vald</Button>
-          <Button size="sm" variant="outline" onClick={addEmpty}>+ Tom stil</Button>
+          <Button size="sm" variant="outline" onClick={duplicateCurrent}>{t("admin.designer.duplicateSelected")}</Button>
+          <Button size="sm" variant="outline" onClick={addEmpty}>{t("admin.designer.emptyStyle")}</Button>
         </div>
       </div>
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4">
@@ -1141,23 +1148,23 @@ function StylesSection({
                         fill
                       />
                       <span className="absolute top-1 left-1 text-[8px] uppercase tracking-wider font-semibold bg-background/80 backdrop-blur-sm px-1.5 py-0.5 rounded text-muted-foreground">
-                        Auto
+                        {t("admin.designer.autoBadge")}
                       </span>
                     </>
                   )}
                 </div>
                 <div className="px-3 pt-2 pb-1 flex items-center gap-1.5 min-w-0">
                   <span className="text-xs font-medium truncate">{it.name}</span>
-                  {it.isDefault && <span className="text-[9px] uppercase tracking-wider text-muted-foreground">·  std</span>}
+                  {it.isDefault && <span className="text-[9px] uppercase tracking-wider text-muted-foreground">{t("admin.designer.defaultBadge")}</span>}
                 </div>
               </button>
               <div className="px-2 pb-2 flex items-center gap-1 text-[11px]">
-                <button type="button" title="Byt namn" onClick={() => rename(it.id)} className="px-1.5 py-1 rounded hover:bg-muted">✎</button>
-                <button type="button" title="Sätt thumbnail (override auto)" onClick={() => openThumbDialog(it.id, it.thumbnailUrl)} className="px-1.5 py-1 rounded hover:bg-muted">🖼</button>
+                <button type="button" title={t("admin.designer.renameTooltip")} onClick={() => rename(it.id)} className="px-1.5 py-1 rounded hover:bg-muted">✎</button>
+                <button type="button" title={t("admin.designer.setThumbnailTooltip")} onClick={() => openThumbDialog(it.id, it.thumbnailUrl)} className="px-1.5 py-1 rounded hover:bg-muted">🖼</button>
                 {!it.isDefault && (
                   <>
-                    <button type="button" title="Sätt som standard" onClick={() => makeDefault(it.id)} className="px-1.5 py-1 rounded hover:bg-muted">★</button>
-                    <button type="button" title="Ta bort" onClick={() => remove(it.id)} className="ml-auto px-1.5 py-1 rounded hover:bg-muted text-destructive">×</button>
+                    <button type="button" title={t("admin.designer.setAsDefaultTooltip")} onClick={() => makeDefault(it.id)} className="px-1.5 py-1 rounded hover:bg-muted">★</button>
+                    <button type="button" title={t("admin.designer.removeTooltip")} onClick={() => remove(it.id)} className="ml-auto px-1.5 py-1 rounded hover:bg-muted text-destructive">×</button>
                   </>
                 )}
               </div>
@@ -1177,20 +1184,20 @@ function StylesSection({
             onClick={(e) => e.stopPropagation()}
           >
             <div>
-              <h3 className="text-base font-semibold">Thumbnail för "{dialogItem.name}"</h3>
-              <p className="text-xs text-muted-foreground">Ladda upp en bild, klistra in en URL eller låt systemet generera en ögonblicksbild av stilen.</p>
+              <h3 className="text-base font-semibold">{t("admin.designer.thumbnailDialogTitle", { name: dialogItem.name })}</h3>
+              <p className="text-xs text-muted-foreground">{t("admin.designer.thumbnailDialogDescription")}</p>
             </div>
 
             <Tabs value={thumbMode} onValueChange={(v) => setThumbMode(v as "url" | "file")}>
               <TabsList className="grid grid-cols-2 w-full">
-                <TabsTrigger value="url">URL</TabsTrigger>
-                <TabsTrigger value="file">Ladda upp fil</TabsTrigger>
+                <TabsTrigger value="url">{t("admin.designer.tabUrl")}</TabsTrigger>
+                <TabsTrigger value="file">{t("admin.designer.tabUploadFile")}</TabsTrigger>
               </TabsList>
             </Tabs>
 
             {thumbMode === "url" ? (
               <div className="space-y-2">
-                <Label className="text-xs">Bild-URL</Label>
+                <Label className="text-xs">{t("admin.designer.imageUrlLabel")}</Label>
                 <input
                   type="url"
                   value={thumbUrlDraft}
@@ -1201,7 +1208,7 @@ function StylesSection({
               </div>
             ) : (
               <div className="space-y-2">
-                <Label className="text-xs">Välj bildfil</Label>
+                <Label className="text-xs">{t("admin.designer.chooseImageFile")}</Label>
                 <input
                   type="file"
                   accept="image/*"
@@ -1215,7 +1222,7 @@ function StylesSection({
                 />
                 {uploadingThumb && (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" /> Laddar upp…
+                    <Loader2 className="h-3 w-3 animate-spin" /> {t("admin.designer.uploading")}
                   </div>
                 )}
               </div>
@@ -1223,7 +1230,7 @@ function StylesSection({
 
             {thumbUrlDraft.trim() && (
               <div className="aspect-square w-32 rounded-md overflow-hidden border bg-muted">
-                <img src={thumbUrlDraft} alt="preview" className="w-full h-full object-cover" />
+                <img src={thumbUrlDraft} alt={t("admin.designer.previewAlt")} className="w-full h-full object-cover" />
               </div>
             )}
 
@@ -1235,7 +1242,7 @@ function StylesSection({
                 onClick={() => generateThumbnail(dialogItem.id)}
               >
                 {generatingId === dialogItem.id ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
-                Generera från stil
+                {t("admin.designer.generateFromStyle")}
               </Button>
               <div className="ml-auto flex items-center gap-2">
                 <Button
@@ -1243,13 +1250,13 @@ function StylesSection({
                   variant="ghost"
                   onClick={() => { setThumbnailUrl(dialogItem.id, undefined); setThumbDialogId(null); }}
                 >
-                  Ta bort
+                  {t("admin.designer.remove")}
                 </Button>
                 <Button
                   size="sm"
                   onClick={() => { setThumbnailUrl(dialogItem.id, thumbUrlDraft); setThumbDialogId(null); }}
                 >
-                  Spara
+                  {t("admin.designer.save")}
                 </Button>
               </div>
             </div>

@@ -5,6 +5,7 @@
 //   - Lock icon to lock/unlock everything
 //   - Trash to delete
 import { ChevronDown, ChevronUp, Eye, EyeOff, Lock, Trash2, Unlock } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { TemplateLayer } from "@/lib/template-schema";
@@ -20,16 +21,6 @@ interface Props {
   onDelete: (id: string) => void;
 }
 
-const typeLabel: Record<TemplateLayer["type"], string> = {
-  map: "Karta",
-  text: "Text",
-  image: "Bild",
-  photo: "Foto",
-  line: "Linje",
-  margin: "Marginal",
-  shape: "Figur",
-};
-
 export default function LayerList({
   layers,
   selectedId,
@@ -39,13 +30,24 @@ export default function LayerList({
   onToggleLockAll,
   onDelete,
 }: Props) {
+  const { t } = useTranslation();
+  const typeLabel: Record<TemplateLayer["type"], string> = {
+    map: t("admin.layerList.typeMap"),
+    text: t("admin.layerList.typeText"),
+    image: t("admin.layerList.typeImage"),
+    photo: t("admin.layerList.typePhoto"),
+    line: t("admin.layerList.typeLine"),
+    margin: t("admin.layerList.typeMargin"),
+    shape: t("admin.layerList.typeShape"),
+  };
+
   // Display top → bottom = highest zIndex first (matches visual stacking).
   const sorted = [...layers].sort((a, b) => b.zIndex - a.zIndex);
 
   if (sorted.length === 0) {
     return (
       <p className="text-xs text-muted-foreground py-4 text-center">
-        Inga lager än. Lägg till en karta eller text via verktygsknapparna.
+        {t("admin.layerList.empty")}
       </p>
     );
   }
@@ -73,7 +75,7 @@ export default function LayerList({
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7"
-                title="Flytta upp"
+                title={t("admin.layerList.moveUp")}
                 onClick={(e) => {
                   e.stopPropagation();
                   onMove(layer.id, "up");
@@ -85,7 +87,7 @@ export default function LayerList({
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7"
-                title="Flytta ner"
+                title={t("admin.layerList.moveDown")}
                 onClick={(e) => {
                   e.stopPropagation();
                   onMove(layer.id, "down");
@@ -97,7 +99,7 @@ export default function LayerList({
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7"
-                title={layer.locks.visibility ? "Lås upp synlighet" : "Lås synlighet"}
+                title={layer.locks.visibility ? t("admin.layerList.unlockVisibility") : t("admin.layerList.lockVisibility")}
                 onClick={(e) => {
                   e.stopPropagation();
                   onToggleVisibility(layer.id);
@@ -113,7 +115,7 @@ export default function LayerList({
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7"
-                title={fullyLocked ? "Lås upp allt" : "Lås allt"}
+                title={fullyLocked ? t("admin.layerList.unlockAll") : t("admin.layerList.lockAll")}
                 onClick={(e) => {
                   e.stopPropagation();
                   onToggleLockAll(layer.id);
@@ -129,7 +131,7 @@ export default function LayerList({
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 text-destructive hover:text-destructive"
-                title="Ta bort"
+                title={t("admin.layerList.delete")}
                 onClick={(e) => {
                   e.stopPropagation();
                   onDelete(layer.id);

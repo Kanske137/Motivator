@@ -5,6 +5,7 @@
 // RecipeEditorDialog; persistence goes through the tenant-scoped
 // `admin-ai-recipes` edge function (the browser can't touch the table).
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Loader2, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -30,23 +31,25 @@ import { deleteRecipe, listRecipes, type SavedRecipe } from "@/lib/ai-recipes-ap
 import { BUILTIN_RECIPES, MODEL_CATALOG, recipeChain, type AiRecipe, type ModelId } from "@/lib/ai-recipe";
 
 const MODEL_LABEL: Record<ModelId, string> = {
-  "face-swap": "Face swap",
-  "ai-edit": "AI edit",
-  "art-style": "Art style",
-  cutout: "Cutout",
+  "face-swap": "modelFaceSwap",
+  "ai-edit": "modelAiEdit",
+  "art-style": "modelArtStyle",
+  cutout: "modelCutout",
 };
 
 /** The whole chain, not just the head — otherwise a style+cutout recipe reads as
  *  a plain "Art style" and the badge quietly lies. */
 function ChainBadge({ recipe }: { recipe: AiRecipe }) {
+  const { t } = useTranslation();
   return (
     <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide px-2 py-1 rounded-full bg-accent text-accent-foreground whitespace-nowrap">
-      {recipeChain(recipe).map((m) => MODEL_LABEL[m]).join(" → ")}
+      {recipeChain(recipe).map((m) => t(`admin.aiLibrary.${MODEL_LABEL[m]}`)).join(" → ")}
     </span>
   );
 }
 
 export default function AiLibraryPage() {
+  const { t } = useTranslation();
   const [recipes, setRecipes] = useState<SavedRecipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -61,7 +64,7 @@ export default function AiLibraryPage() {
     try {
       setRecipes(await listRecipes());
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : "Could not load your recipes");
+      setLoadError(e instanceof Error ? e.message : t("admin.aiLibrary.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -86,11 +89,11 @@ export default function AiLibraryPage() {
     setDeleting(true);
     try {
       await deleteRecipe(pendingDelete.id);
-      toast.success("Recipe deleted");
+      toast.success(t("admin.aiLibrary.recipeDeleted"));
       setPendingDelete(null);
       await refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not delete the recipe");
+      toast.error(e instanceof Error ? e.message : t("admin.aiLibrary.deleteFailed"));
     } finally {
       setDeleting(false);
     }
@@ -103,33 +106,31 @@ export default function AiLibraryPage() {
           to="/admin/configs"
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4"
         >
-          <ArrowLeft className="h-4 w-4" /> Template
+          <ArrowLeft className="h-4 w-4" /> {t("admin.aiLibrary.backToTemplate")}
         </Link>
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-              <Sparkles className="h-6 w-6 text-primary" /> AI recipes
+              <Sparkles className="h-6 w-6 text-primary" /> {t("admin.aiLibrary.title")}
             </h1>
             <p className="text-sm text-muted-foreground mt-1 max-w-xl">
-              A recipe defines what the AI does to a customer&rsquo;s photo — a face swap, a
-              pet portrait, a style. Write it once and reuse it across templates. Start from a
-              template below, or build your own.
+              {t("admin.aiLibrary.intro")}
             </p>
           </div>
           <Button onClick={openNew} className="shrink-0">
-            <Plus className="h-4 w-4" /> New recipe
+            <Plus className="h-4 w-4" /> {t("admin.aiLibrary.newRecipe")}
           </Button>
         </div>
       </div>
 
       <section className="space-y-3">
         <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Your recipes
+          {t("admin.aiLibrary.yourRecipes")}
         </h2>
 
         {loading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground py-6">
-            <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+            <Loader2 className="h-4 w-4 animate-spin" /> {t("admin.aiLibrary.loading")}
           </div>
         ) : loadError ? (
           <Card className="p-4 text-sm text-destructive border-destructive/30 bg-destructive/5">
@@ -138,7 +139,7 @@ export default function AiLibraryPage() {
         ) : recipes.length === 0 ? (
           <Card className="p-6 text-center">
             <p className="text-sm text-muted-foreground">
-              No recipes yet. Clone a starter below, or build one from scratch.
+              {t("admin.aiLibrary.emptyState")}
             </p>
           </Card>
         ) : (
@@ -160,14 +161,14 @@ export default function AiLibraryPage() {
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <ChainBadge recipe={r} />
-                  <Button variant="ghost" size="icon" onClick={() => openEdit(r)} aria-label="Edit">
+                  <Button variant="ghost" size="icon" onClick={() => openEdit(r)} aria-label={t("admin.aiLibrary.edit")}>
                     <Pencil className="h-4 w-4" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => setPendingDelete(r)}
-                    aria-label="Delete"
+                    aria-label={t("admin.aiLibrary.delete")}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -180,7 +181,7 @@ export default function AiLibraryPage() {
 
       <section className="space-y-3">
         <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Starter recipes
+          {t("admin.aiLibrary.starterRecipes")}
         </h2>
         <div className="grid gap-3 sm:grid-cols-2">
           {BUILTIN_RECIPES.map((r) => (
@@ -195,7 +196,7 @@ export default function AiLibraryPage() {
                 <ChainBadge recipe={r} />
               </div>
               <Button variant="secondary" size="sm" className="self-start" onClick={() => openEdit(r)}>
-                Use this
+                {t("admin.aiLibrary.useThis")}
               </Button>
             </Card>
           ))}
@@ -206,7 +207,7 @@ export default function AiLibraryPage() {
           model's blurb when you select it, so this stays collapsed. */}
       <Collapsible>
         <CollapsibleTrigger className="text-xs font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground">
-          Which models can a recipe use?
+          {t("admin.aiLibrary.whichModels")}
         </CollapsibleTrigger>
         <CollapsibleContent className="pt-3">
           <Card className="divide-y">
@@ -217,8 +218,8 @@ export default function AiLibraryPage() {
                   <p className="text-xs text-muted-foreground mt-0.5">{m.blurb}</p>
                 </div>
                 <div className="shrink-0 text-[11px] text-muted-foreground text-right whitespace-nowrap">
-                  <div>{m.usesPrompt ? "Prompt-driven" : "No prompt"}</div>
-                  <div className="opacity-70">{m.costTier} cost</div>
+                  <div>{m.usesPrompt ? t("admin.aiLibrary.promptDriven") : t("admin.aiLibrary.noPrompt")}</div>
+                  <div className="opacity-70">{t("admin.aiLibrary.costTier", { tier: m.costTier })}</div>
                 </div>
               </div>
             ))}
@@ -236,17 +237,16 @@ export default function AiLibraryPage() {
       <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete &ldquo;{pendingDelete?.name}&rdquo;?</AlertDialogTitle>
+            <AlertDialogTitle>{t("admin.aiLibrary.deleteTitle", { name: pendingDelete?.name })}</AlertDialogTitle>
             <AlertDialogDescription>
-              Templates that still point at this recipe will stop generating until you pick
-              another one. This can&rsquo;t be undone.
+              {t("admin.aiLibrary.deleteWarning")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>{t("admin.aiLibrary.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} disabled={deleting}>
               {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
-              Delete
+              {t("admin.aiLibrary.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

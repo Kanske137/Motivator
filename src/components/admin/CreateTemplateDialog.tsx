@@ -131,12 +131,12 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
 
   async function handleCreate() {
     if (!title.trim() || !handle.trim()) {
-      toast.error("Titel och handle krävs");
+      toast.error(t("admin.createTemplate.titleAndHandleRequired"));
       return;
     }
     const kinds = (Object.keys(selected) as Kind[]).filter((k) => selected[k]);
     if (kinds.length === 0) {
-      toast.error("Välj minst en produkttyp");
+      toast.error(t("admin.createTemplate.selectAtLeastOne"));
       return;
     }
     setSaving(true);
@@ -169,7 +169,7 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
       });
     } catch (e) {
       setSaving(false);
-      toast.error("Kunde inte skapa", {
+      toast.error(t("admin.createTemplate.createFailed"), {
         description: e instanceof Error ? e.message : String(e),
       });
       return;
@@ -182,15 +182,15 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
     );
     setSaving(false);
     if (syncErr || !syncData?.ok) {
-      toast.warning("Mall skapad — Shopify-synk misslyckades", {
+      toast.warning(t("admin.createTemplate.createdSyncFailed"), {
         description:
           syncErr?.message ??
           syncData?.error ??
-          "Återanslut Shopify-integrationen i Lovable och kör Synka igen.",
+          t("admin.createTemplate.reconnectShopify"),
       });
     } else {
-      toast.success("Mall skapad och synkad till Shopify", {
-        description: `${kinds.length} produkttyp(er) som varianter`,
+      toast.success(t("admin.createTemplate.createdAndSynced"), {
+        description: t("admin.createTemplate.createdVariantsDesc", { count: kinds.length }),
       });
     }
     onOpenChange(false);
@@ -201,26 +201,26 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Skapa ny mall</DialogTitle>
+          <DialogTitle>{t("admin.createTemplate.dialogTitle")}</DialogTitle>
           <DialogDescription>
-            En tom mall skapas. Du kan lägga till lager och varianter direkt efteråt.
+            {t("admin.createTemplate.dialogDescription")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label htmlFor="tpl-title">Titel</Label>
+            <Label htmlFor="tpl-title">{t("admin.createTemplate.titleLabel")}</Label>
             <Input
               id="tpl-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Personlig stadkarta"
+              placeholder={t("admin.createTemplate.titlePlaceholder")}
               autoFocus
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="tpl-handle">Shopify-handle</Label>
+            <Label htmlFor="tpl-handle">{t("admin.createTemplate.handleLabel")}</Label>
             <Input
               id="tpl-handle"
               value={handle}
@@ -228,15 +228,15 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
                 setHandle(slugify(e.target.value));
                 setHandleEdited(true);
               }}
-              placeholder="personlig-stadkarta"
+              placeholder={t("admin.createTemplate.handlePlaceholder")}
               className="font-mono text-sm"
             />
           </div>
 
           <div className="space-y-2">
-            <Label>Produkttyper</Label>
+            <Label>{t("admin.createTemplate.productTypesLabel")}</Label>
             <p className="text-xs text-muted-foreground">
-              En Shopify-produkt skapas där produkttyperna blir varianter (Produkttyp/Storlek/Utförande).
+              {t("admin.createTemplate.productTypesHint")}
             </p>
             <div className="grid grid-cols-2 gap-2">
               {(Object.keys(KIND_META) as Kind[]).map((k) => (
@@ -257,11 +257,11 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
-            Avbryt
+            {t("admin.createTemplate.cancel")}
           </Button>
           <Button onClick={handleCreate} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Skapa & öppna
+            {t("admin.createTemplate.createAndOpen")}
           </Button>
         </DialogFooter>
       </DialogContent>

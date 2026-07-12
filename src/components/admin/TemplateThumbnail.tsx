@@ -8,6 +8,7 @@
 //     wrapper that sets `aspect-ratio`). `width`/`height` then act only as
 //     resolution hints for Mapbox/text scaling (default 240×320).
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import type { Orientation, Template } from "@/lib/template-schema";
 import MapLayerPreview from "./MapLayerPreview";
 import TextLayerPreview from "./TextLayerPreview";
@@ -44,6 +45,7 @@ export default function TemplateThumbnail({
   layoutOverride,
   productType,
 }: Props) {
+  const { t } = useTranslation();
   const isCanvas = productType === "canvas";
   const isAcrylic = productType === "acrylic";
 
@@ -76,7 +78,7 @@ export default function TemplateThumbnail({
         }
         style={fill ? undefined : { width, height }}
       >
-        Tom
+        {t("admin.thumbnail.empty")}
       </div>
     );
   }

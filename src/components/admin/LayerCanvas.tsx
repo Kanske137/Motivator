@@ -10,6 +10,7 @@
 // Each layer renders a TYPE-SPECIFIC mini preview (real Mapbox tile, real
 // text with chosen font, etc.) so the admin sees what the customer will see.
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Rnd } from "react-rnd";
 import type { Aspect, TemplateLayer } from "@/lib/template-schema";
 import { buildShapeClipPath, type ClipShape } from "@/lib/shape-clip";
@@ -64,6 +65,7 @@ export default function LayerCanvas({
   wrapInsetPctY = 0,
   productType = null,
 }: Props) {
+  const { t } = useTranslation();
   const isAcrylic = productType === "acrylic";
   // Derive an approximate front size in cm from the aspect so the overlay's
   // 1.4 cm inset / 1.5 cm disc translate to reasonable %-positions in admin.
@@ -147,7 +149,7 @@ export default function LayerCanvas({
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground bg-muted">
-            🖼 Bild
+            🖼 {t("admin.layerCanvas.imagePlaceholder")}
           </div>
         );
       case "line":
@@ -177,7 +179,7 @@ export default function LayerCanvas({
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground bg-muted/60 border border-dashed border-foreground/30 text-center px-1">
-                📷 Bildplats
+                📷 {t("admin.layerCanvas.photoPlaceholder")}
               </div>
             )}
           </div>
@@ -251,7 +253,7 @@ export default function LayerCanvas({
                 zIndex: 42,
               }}
             >
-              Synlig framsida
+              {t("admin.layerCanvas.visibleFront")}
             </div>
           </>
         )}
