@@ -12,6 +12,8 @@ import {
   type TemplateLayer,
 } from "./template-schema";
 import { DEFAULT_AI_STYLES } from "./ai-style-defaults";
+import { legacyBuiltinRecipeId } from "./legacy-ai-recipe";
+import type { MediaLayerAi } from "./ai-recipe";
 
 const DEFAULT_BG = "#EFE7D6";
 
@@ -61,7 +63,48 @@ export function buildTemplateFromLegacy(config: ProductConfig): Template {
   };
 }
 
-/** Coerce legacy shape values silently to a supported one. */
+/** Map a legacy aiPhoto layer's defaults onto a recipe binding. subjectKind (+
+ *  simpleStyleMode) picks the built-in via the same routing the runtime resolver
+ *  uses; references + motif carry over. removeBackground collapses to ONE recipe
+ *  (its legacy per-style watercolor/backdrop auto-switch is replaced by the
+ *  merchant choosing the recipe) — with no style selected it maps to the legacy
+ *  DEFAULT (watercolor splatter); a merchant can switch to the backdrop recipe
+ *  per template afterwards. */
+export function legacyAiPhotoBinding(defaults: Record<string, unknown>): MediaLayerAi {
+  const skRaw = defaults.subjectKind;
+  const subjectKind =
+    skRaw === "cat" || skRaw === "dog" || skRaw === "other"
+      ? "pet"
+      : skRaw === "pet" || skRaw === "removeBackground"
+        ? skRaw
+        : "human";
+  // At migration there is no selected style, so the runtime resolver can't pick
+  // the chain — map a simpleStyleMode removeBackground layer straight to the
+  // art-style→cutout recipe it was.
+  const recipeId =
+    subjectKind === "removeBackground" && defaults.simpleStyleMode === true
+      ? "builtin-style-cutout"
+      : legacyBuiltinRecipeId({ subjectKind, simpleStyleMode: false, style: null });
+  const refList = Array.isArray(defaults.referenceImages) ? defaults.referenceImages : [];
+  const references = refList.map((r: Record<string, unknown>) => ({
+    id: String(r.id),
+    url: String(r.url),
+    label: typeof r.label === "string" ? r.label : undefined,
+    orientation: (r.orientation as "portrait" | "landscape" | "any") ?? "any",
+    focalX: typeof r.focalX === "number" ? r.focalX : undefined,
+    focalY: typeof r.focalY === "number" ? r.focalY : undefined,
+  }));
+  if (references.length === 0 && typeof defaults.referenceImageUrl === "string") {
+    references.push({ id: "legacy", url: defaults.referenceImageUrl, label: undefined, orientation: "any", focalX: undefined, focalY: undefined });
+  }
+  const motifRaw = defaults.fluxStylePrompt;
+  const motif = typeof motifRaw === "string" && motifRaw.trim() ? motifRaw : undefined;
+  return { recipeId, references, ...(motif ? { motif } : {}) };
+}
+
+/** Coerce legacy shape values silently to a supported one, and migrate legacy
+ *  aiPhoto layers to the unified photo-with-recipe-binding shape. Runs at
+ *  template-read time so existing saved templates upgrade transparently. */
 function migrateLayer(layer: TemplateLayer): TemplateLayer {
   if (layer.type === "map") {
     const s = layer.defaults.shape as string;
@@ -72,8 +115,31 @@ function migrateLayer(layer: TemplateLayer): TemplateLayer {
       };
     }
   }
-  // aiPhoto: collapse legacy "cat" / "dog" / "other" → "pet". This runs at
-  // template-read time so existing saved templates upgrade transparently.
+  // Retire the aiPhoto type: a non-multiFace aiPhoto layer becomes a photo layer
+  // carrying an `.ai` recipe binding (the unified media layer). multiFaceSwap
+  // layers are out of scope and stay aiPhoto for now.
+  if (layer.type === "aiPhoto" && !layer.defaults.multiFaceSwap?.enabled) {
+    const d = layer.defaults as unknown as Record<string, unknown>;
+    return {
+      id: layer.id,
+      name: layer.name,
+      xPct: layer.xPct,
+      yPct: layer.yPct,
+      wPct: layer.wPct,
+      hPct: layer.hPct,
+      rotation: layer.rotation,
+      zIndex: layer.zIndex,
+      locks: layer.locks,
+      type: "photo",
+      defaults: {
+        shape: (d.shape as "rect" | "circle" | "heart" | "star") ?? "rect",
+        fit: (d.fit as "cover" | "contain") ?? "cover",
+        ...(typeof d.placeholderUrl === "string" ? { placeholderUrl: d.placeholderUrl } : {}),
+        ai: legacyAiPhotoBinding(d),
+      },
+    } as TemplateLayer;
+  }
+  // Remaining aiPhoto (multiFace): collapse legacy "cat"/"dog"/"other" → "pet".
   if (layer.type === "aiPhoto") {
     const sk = layer.defaults.subjectKind as string;
     if (sk === "cat" || sk === "dog" || sk === "other") {

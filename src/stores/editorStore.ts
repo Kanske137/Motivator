@@ -1596,8 +1596,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (state.hiddenLayerIds[layer.id]) continue;
       const v = state.layerValues[layer.id];
       if (layer.type === "photo") {
-        const src = state.photoSources[layer.id];
-        if (src?.previewUrl || src?.originalUrl) return true;
+        if (layer.defaults.ai?.recipeId) {
+          // A recipe-bound photo layer fills via the AI section (aiPhotoResults /
+          // aiPhotoSources), not the plain photo upload.
+          if (state.aiPhotoResults[layer.id]) return true;
+          const src = state.aiPhotoSources[layer.id];
+          if (src?.previewUrl || src?.uploadedUrl) return true;
+        } else {
+          const src = state.photoSources[layer.id];
+          if (src?.previewUrl || src?.originalUrl) return true;
+        }
       } else if (layer.type === "aiPhoto") {
         if (state.aiPhotoResults[layer.id]) return true;
         const src = state.aiPhotoSources[layer.id];

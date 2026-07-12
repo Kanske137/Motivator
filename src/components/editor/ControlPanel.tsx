@@ -25,22 +25,12 @@ import { LayersSection } from "./LayersSection";
 import { Loader2, Search } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { effectiveLayerRect, clampLayerRect } from "@/lib/layer-utils";
+import { effectiveLayerRect, clampLayerRect, isAiBoundPhoto, isAiLayer } from "@/lib/layer-utils";
 import type { TemplateLayer, Template } from "@/lib/template-schema";
 import { getAllLayouts, DEFAULT_LAYOUT_ID } from "@/lib/template-schema";
 import TemplateThumbnail from "@/components/admin/TemplateThumbnail";
 import { MAP_ICONS, MAP_ICON_INITIAL_COUNT, getMapIcon } from "@/lib/map-icon-catalog";
 import { OnboardingHint } from "./OnboardingHint";
-
-/** A photo layer that points at a recipe behaves as an AI layer, not a plain
- *  upload — `recipeId` set-or-empty is the switch (the unified media layer). */
-function isAiBoundPhoto(l: TemplateLayer): l is Extract<TemplateLayer, { type: "photo" }> {
-  return l.type === "photo" && !!l.defaults.ai?.recipeId;
-}
-/** Layers the customer AI section renders for: legacy aiPhoto + bound photo. */
-function isAiLayer(l: TemplateLayer): l is Extract<TemplateLayer, { type: "photo" | "aiPhoto" }> {
-  return l.type === "aiPhoto" || isAiBoundPhoto(l);
-}
 
 /** Per-layer slider that scales a layer up/down while preserving aspect ratio.
  *  Shown in the customer editor for any layer where `locks.size === false`.

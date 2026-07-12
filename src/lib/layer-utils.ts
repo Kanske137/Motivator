@@ -11,6 +11,17 @@ import {
   type TemplateLayer,
 } from "@/lib/template-schema";
 
+/** A photo layer that points at a recipe behaves as an AI layer, not a plain
+ *  upload — `recipeId` set-or-empty is the switch (the unified media layer). */
+export function isAiBoundPhoto(l: TemplateLayer): l is Extract<TemplateLayer, { type: "photo" }> {
+  return l.type === "photo" && !!l.defaults.ai?.recipeId;
+}
+
+/** Layers the customer AI section drives: legacy aiPhoto + recipe-bound photo. */
+export function isAiLayer(l: TemplateLayer): l is Extract<TemplateLayer, { type: "photo" | "aiPhoto" }> {
+  return l.type === "aiPhoto" || isAiBoundPhoto(l);
+}
+
 const SNAP_PCT = 1.25;
 
 export function snapPct(value: number, snap = SNAP_PCT): number {
