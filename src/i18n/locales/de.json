@@ -786,6 +786,35 @@
       "aspectPortrait23": "Hochformat (2:3)",
       "aspectLandscape32": "Querformat (3:2)",
       "aspectLandscape169": "Querformat (16:9)"
+    },
+    "productOptions": {
+      "title": "Produkt & Varianten",
+      "subtitle": "Wählen Sie, als welche Produkte, Größen und Varianten diese Vorlage verkauft wird.",
+      "missingSku_one": "{{count}} Variantenkombination fehlt eine Gelato-SKU und wird beim Sync mit Shopify übersprungen (z. B. {{example}}).",
+      "missingSku_other": "{{count}} Variantenkombinationen fehlt eine Gelato-SKU und werden beim Sync mit Shopify übersprungen (z. B. {{example}}).",
+      "allowedSizes": "Erlaubte Größen",
+      "allowedFrames": "Erlaubte Rahmen",
+      "allowedDepths": "Erlaubte Tiefen",
+      "materials": "Materialien",
+      "finish": "Oberfläche"
+    },
+    "multiSelect": {
+      "noOptions": "Keine Optionen",
+      "noneSelected": "Nichts ausgewählt",
+      "countSelected": "{{count}} von {{total}} ausgewählt",
+      "selectAll": "Alle auswählen",
+      "clearAll": "Alle entfernen"
+    },
+    "mapStyles": {
+      "title": "Kartenstile",
+      "subtitle": "{{count}} von {{total}} aktiviert. Stile, die der Kunde für die Kartenebene wählen kann.",
+      "enableAria": "{{label}} aktivieren"
+    },
+    "fonts": {
+      "title": "Erlaubte Schriftarten",
+      "subtitle": "{{count}} von {{total}} aktiviert. Schriftarten, die der Kunde für Textebenen wählen kann.",
+      "enableAll": "Alle aktivieren",
+      "disableAll": "Alle deaktivieren"
     }
   }
 }

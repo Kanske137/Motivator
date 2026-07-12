@@ -786,6 +786,35 @@
       "aspectPortrait23": "Verticale (2:3)",
       "aspectLandscape32": "Orizzontale (3:2)",
       "aspectLandscape169": "Orizzontale (16:9)"
+    },
+    "productOptions": {
+      "title": "Prodotto e varianti",
+      "subtitle": "Scegli con quali prodotti, dimensioni e varianti viene venduto questo modello.",
+      "missingSku_one": "{{count}} combinazione di varianti non ha uno SKU Gelato e verrà saltata durante la sincronizzazione con Shopify (es. {{example}}).",
+      "missingSku_other": "{{count}} combinazioni di varianti non hanno uno SKU Gelato e verranno saltate durante la sincronizzazione con Shopify (es. {{example}}).",
+      "allowedSizes": "Dimensioni consentite",
+      "allowedFrames": "Cornici consentite",
+      "allowedDepths": "Profondità consentite",
+      "materials": "Materiali",
+      "finish": "Finitura"
+    },
+    "multiSelect": {
+      "noOptions": "Nessuna opzione",
+      "noneSelected": "Nessuno selezionato",
+      "countSelected": "{{count}} di {{total}} selezionati",
+      "selectAll": "Seleziona tutto",
+      "clearAll": "Deseleziona tutto"
+    },
+    "mapStyles": {
+      "title": "Stili mappa",
+      "subtitle": "{{count}} di {{total}} attivati. Stili che il cliente può scegliere per il livello mappa.",
+      "enableAria": "Attiva {{label}}"
+    },
+    "fonts": {
+      "title": "Font consentiti",
+      "subtitle": "{{count}} di {{total}} attivati. Font che il cliente può scegliere per i livelli di testo.",
+      "enableAll": "Attiva tutti",
+      "disableAll": "Disattiva tutti"
     }
   }
 }

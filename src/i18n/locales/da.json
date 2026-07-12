@@ -786,6 +786,35 @@
       "aspectPortrait23": "Stående (2:3)",
       "aspectLandscape32": "Liggende (3:2)",
       "aspectLandscape169": "Liggende (16:9)"
+    },
+    "productOptions": {
+      "title": "Produkt og varianter",
+      "subtitle": "Vælg hvilke produkter, størrelser og varianter denne skabelon sælges som.",
+      "missingSku_one": "{{count}} variantkombination mangler et Gelato-SKU og springes over ved synkronisering til Shopify (f.eks. {{example}}).",
+      "missingSku_other": "{{count}} variantkombinationer mangler et Gelato-SKU og springes over ved synkronisering til Shopify (f.eks. {{example}}).",
+      "allowedSizes": "Tilladte størrelser",
+      "allowedFrames": "Tilladte rammer",
+      "allowedDepths": "Tilladte dybder",
+      "materials": "Materialer",
+      "finish": "Finish"
+    },
+    "multiSelect": {
+      "noOptions": "Ingen muligheder",
+      "noneSelected": "Ingen valgt",
+      "countSelected": "{{count}} af {{total}} valgt",
+      "selectAll": "Vælg alle",
+      "clearAll": "Ryd alle"
+    },
+    "mapStyles": {
+      "title": "Kortstile",
+      "subtitle": "{{count}} af {{total}} aktiveret. Stile, kunden kan vælge til kortlaget.",
+      "enableAria": "Aktivér {{label}}"
+    },
+    "fonts": {
+      "title": "Tilladte skrifttyper",
+      "subtitle": "{{count}} af {{total}} aktiveret. Skrifttyper, kunden kan vælge til tekstlag.",
+      "enableAll": "Aktivér alle",
+      "disableAll": "Deaktivér alle"
     }
   }
 }

@@ -786,6 +786,35 @@
       "aspectPortrait23": "Pionowy (2:3)",
       "aspectLandscape32": "Poziomy (3:2)",
       "aspectLandscape169": "Poziomy (16:9)"
+    },
+    "productOptions": {
+      "title": "Produkt i warianty",
+      "subtitle": "Wybierz, jako jakie produkty, rozmiary i warianty sprzedawany jest ten szablon.",
+      "missingSku_one": "{{count}} kombinacja wariantów nie ma SKU Gelato i zostanie pominięta podczas synchronizacji z Shopify (np. {{example}}).",
+      "missingSku_other": "{{count}} kombinacji wariantów nie ma SKU Gelato i zostanie pominiętych podczas synchronizacji z Shopify (np. {{example}}).",
+      "allowedSizes": "Dozwolone rozmiary",
+      "allowedFrames": "Dozwolone ramy",
+      "allowedDepths": "Dozwolone głębokości",
+      "materials": "Materiały",
+      "finish": "Wykończenie"
+    },
+    "multiSelect": {
+      "noOptions": "Brak opcji",
+      "noneSelected": "Nic nie wybrano",
+      "countSelected": "Wybrano {{count}} z {{total}}",
+      "selectAll": "Zaznacz wszystko",
+      "clearAll": "Wyczyść wszystko"
+    },
+    "mapStyles": {
+      "title": "Style mapy",
+      "subtitle": "Włączono {{count}} z {{total}}. Style, które klient może wybrać dla warstwy mapy.",
+      "enableAria": "Włącz {{label}}"
+    },
+    "fonts": {
+      "title": "Dozwolone czcionki",
+      "subtitle": "Włączono {{count}} z {{total}}. Czcionki, które klient może wybrać dla warstw tekstowych.",
+      "enableAll": "Włącz wszystkie",
+      "disableAll": "Wyłącz wszystkie"
     }
   }
 }

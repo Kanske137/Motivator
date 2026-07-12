@@ -786,6 +786,35 @@
       "aspectPortrait23": "Pysty (2:3)",
       "aspectLandscape32": "Vaaka (3:2)",
       "aspectLandscape169": "Vaaka (16:9)"
+    },
+    "productOptions": {
+      "title": "Tuote ja variantit",
+      "subtitle": "Valitse, mitä tuotteita, kokoja ja variantteja tämä malli myydään.",
+      "missingSku_one": "{{count}} varianttiyhdistelmältä puuttuu Gelato-SKU, ja se ohitetaan Shopifyyn synkronoitaessa (esim. {{example}}).",
+      "missingSku_other": "{{count}} varianttiyhdistelmältä puuttuu Gelato-SKU, ja ne ohitetaan Shopifyyn synkronoitaessa (esim. {{example}}).",
+      "allowedSizes": "Sallitut koot",
+      "allowedFrames": "Sallitut kehykset",
+      "allowedDepths": "Sallitut syvyydet",
+      "materials": "Materiaalit",
+      "finish": "Viimeistely"
+    },
+    "multiSelect": {
+      "noOptions": "Ei vaihtoehtoja",
+      "noneSelected": "Ei valintoja",
+      "countSelected": "{{count}} / {{total}} valittu",
+      "selectAll": "Valitse kaikki",
+      "clearAll": "Tyhjennä kaikki"
+    },
+    "mapStyles": {
+      "title": "Karttatyylit",
+      "subtitle": "{{count}} / {{total}} käytössä. Tyylit, jotka asiakas voi valita karttatasolle.",
+      "enableAria": "Ota {{label}} käyttöön"
+    },
+    "fonts": {
+      "title": "Sallitut fontit",
+      "subtitle": "{{count}} / {{total}} käytössä. Fontit, jotka asiakas voi valita tekstitasoille.",
+      "enableAll": "Ota kaikki käyttöön",
+      "disableAll": "Poista kaikki käytöstä"
     }
   }
 }

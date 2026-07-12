@@ -786,6 +786,35 @@
       "aspectPortrait23": "Vertical (2:3)",
       "aspectLandscape32": "Horizontal (3:2)",
       "aspectLandscape169": "Horizontal (16:9)"
+    },
+    "productOptions": {
+      "title": "Producto y variantes",
+      "subtitle": "Elige con qué productos, tamaños y variantes se vende esta plantilla.",
+      "missingSku_one": "{{count}} combinación de variantes no tiene SKU de Gelato y se omitirá al sincronizar con Shopify (p. ej. {{example}}).",
+      "missingSku_other": "{{count}} combinaciones de variantes no tienen SKU de Gelato y se omitirán al sincronizar con Shopify (p. ej. {{example}}).",
+      "allowedSizes": "Tamaños permitidos",
+      "allowedFrames": "Marcos permitidos",
+      "allowedDepths": "Profundidades permitidas",
+      "materials": "Materiales",
+      "finish": "Acabado"
+    },
+    "multiSelect": {
+      "noOptions": "Sin opciones",
+      "noneSelected": "Ninguno seleccionado",
+      "countSelected": "{{count}} de {{total}} seleccionados",
+      "selectAll": "Seleccionar todo",
+      "clearAll": "Borrar todo"
+    },
+    "mapStyles": {
+      "title": "Estilos de mapa",
+      "subtitle": "{{count}} de {{total}} activados. Estilos que el cliente puede elegir para la capa de mapa.",
+      "enableAria": "Activar {{label}}"
+    },
+    "fonts": {
+      "title": "Fuentes permitidas",
+      "subtitle": "{{count}} de {{total}} activadas. Fuentes que el cliente puede elegir para las capas de texto.",
+      "enableAll": "Activar todas",
+      "disableAll": "Desactivar todas"
     }
   }
 }

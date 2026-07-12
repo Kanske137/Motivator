@@ -786,6 +786,35 @@
       "aspectPortrait23": "Staand (2:3)",
       "aspectLandscape32": "Liggend (3:2)",
       "aspectLandscape169": "Liggend (16:9)"
+    },
+    "productOptions": {
+      "title": "Product en varianten",
+      "subtitle": "Kies als welke producten, maten en varianten deze template wordt verkocht.",
+      "missingSku_one": "{{count}} variantcombinatie heeft geen Gelato-SKU en wordt overgeslagen bij het synchroniseren met Shopify (bijv. {{example}}).",
+      "missingSku_other": "{{count}} variantcombinaties hebben geen Gelato-SKU en worden overgeslagen bij het synchroniseren met Shopify (bijv. {{example}}).",
+      "allowedSizes": "Toegestane maten",
+      "allowedFrames": "Toegestane lijsten",
+      "allowedDepths": "Toegestane dieptes",
+      "materials": "Materialen",
+      "finish": "Afwerking"
+    },
+    "multiSelect": {
+      "noOptions": "Geen opties",
+      "noneSelected": "Niets geselecteerd",
+      "countSelected": "{{count}} van {{total}} geselecteerd",
+      "selectAll": "Alles selecteren",
+      "clearAll": "Alles wissen"
+    },
+    "mapStyles": {
+      "title": "Kaartstijlen",
+      "subtitle": "{{count}} van {{total}} ingeschakeld. Stijlen die de klant kan kiezen voor de kaartlaag.",
+      "enableAria": "{{label}} inschakelen"
+    },
+    "fonts": {
+      "title": "Toegestane lettertypen",
+      "subtitle": "{{count}} van {{total}} ingeschakeld. Lettertypen die de klant kan kiezen voor tekstlagen.",
+      "enableAll": "Alles inschakelen",
+      "disableAll": "Alles uitschakelen"
     }
   }
 }

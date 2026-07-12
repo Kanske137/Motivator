@@ -786,6 +786,35 @@
       "aspectPortrait23": "Stående (2:3)",
       "aspectLandscape32": "Liggende (3:2)",
       "aspectLandscape169": "Liggende (16:9)"
+    },
+    "productOptions": {
+      "title": "Produkt og varianter",
+      "subtitle": "Velg hvilke produkter, størrelser og varianter denne malen selges som.",
+      "missingSku_one": "{{count}} variantkombinasjon mangler en Gelato-SKU og hoppes over ved synkronisering til Shopify (f.eks. {{example}}).",
+      "missingSku_other": "{{count}} variantkombinasjoner mangler en Gelato-SKU og hoppes over ved synkronisering til Shopify (f.eks. {{example}}).",
+      "allowedSizes": "Tillatte størrelser",
+      "allowedFrames": "Tillatte rammer",
+      "allowedDepths": "Tillatte dybder",
+      "materials": "Materialer",
+      "finish": "Finish"
+    },
+    "multiSelect": {
+      "noOptions": "Ingen alternativer",
+      "noneSelected": "Ingen valgt",
+      "countSelected": "{{count}} av {{total}} valgt",
+      "selectAll": "Velg alle",
+      "clearAll": "Fjern alle"
+    },
+    "mapStyles": {
+      "title": "Kartstiler",
+      "subtitle": "{{count}} av {{total}} aktivert. Stiler kunden kan velge for kartlaget.",
+      "enableAria": "Aktiver {{label}}"
+    },
+    "fonts": {
+      "title": "Tillatte skrifttyper",
+      "subtitle": "{{count}} av {{total}} aktivert. Skrifttyper kunden kan velge for tekstlag.",
+      "enableAll": "Aktiver alle",
+      "disableAll": "Deaktiver alle"
     }
   }
 }

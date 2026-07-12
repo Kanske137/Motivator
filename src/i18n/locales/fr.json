@@ -786,6 +786,35 @@
       "aspectPortrait23": "Portrait (2:3)",
       "aspectLandscape32": "Paysage (3:2)",
       "aspectLandscape169": "Paysage (16:9)"
+    },
+    "productOptions": {
+      "title": "Produit et variantes",
+      "subtitle": "Choisissez les produits, tailles et variantes sous lesquels ce modèle est vendu.",
+      "missingSku_one": "{{count}} combinaison de variantes n'a pas de SKU Gelato et sera ignorée lors de la synchronisation avec Shopify (p. ex. {{example}}).",
+      "missingSku_other": "{{count}} combinaisons de variantes n'ont pas de SKU Gelato et seront ignorées lors de la synchronisation avec Shopify (p. ex. {{example}}).",
+      "allowedSizes": "Tailles autorisées",
+      "allowedFrames": "Cadres autorisés",
+      "allowedDepths": "Profondeurs autorisées",
+      "materials": "Matériaux",
+      "finish": "Finition"
+    },
+    "multiSelect": {
+      "noOptions": "Aucune option",
+      "noneSelected": "Aucune sélection",
+      "countSelected": "{{count}} sur {{total}} sélectionné(s)",
+      "selectAll": "Tout sélectionner",
+      "clearAll": "Tout effacer"
+    },
+    "mapStyles": {
+      "title": "Styles de carte",
+      "subtitle": "{{count}} sur {{total}} activés. Styles que le client peut choisir pour le calque de carte.",
+      "enableAria": "Activer {{label}}"
+    },
+    "fonts": {
+      "title": "Polices autorisées",
+      "subtitle": "{{count}} sur {{total}} activées. Polices que le client peut choisir pour les calques de texte.",
+      "enableAll": "Tout activer",
+      "disableAll": "Tout désactiver"
     }
   }
 }
