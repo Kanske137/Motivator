@@ -16,6 +16,24 @@ describe("buildAiLayerDriver — plain photo", () => {
   it("returns null for a binding to a non-builtin (saved) recipe — unresolvable here", () => {
     expect(buildAiLayerDriver(photo({ recipeId: "uuid-saved", references: [] }), "portrait")).toBeNull();
   });
+
+  it("resolves a saved recipe when it is supplied via availableRecipes", () => {
+    const saved = {
+      id: "uuid-saved",
+      name: "My pet",
+      model: "ai-edit" as const,
+      prompt: "Replace the pet {motif}",
+      params: { aspectRatio: "match_reference" },
+    };
+    const d = buildAiLayerDriver(
+      photo({ recipeId: "uuid-saved", references: [], motif: "a dog" }),
+      "portrait",
+      [saved],
+    );
+    expect(d).not.toBeNull();
+    expect(d!.resolve(null, null).recipe.id).toBe("uuid-saved");
+    expect(d!.motif).toBe("a dog");
+  });
 });
 
 describe("buildAiLayerDriver — binding path", () => {

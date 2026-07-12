@@ -6,6 +6,9 @@ import type { ProductOptions, Template, TemplateLayer } from "@/lib/template-sch
 import { getActiveLayoutBlock } from "@/lib/template-schema";
 import { resolveTemplate } from "@/lib/template-migrate";
 import { clampLayerRect } from "@/lib/layer-utils";
+import type { AiRecipe } from "@/lib/ai-recipe";
+import { collectRecipeIds, resolveStorefrontRecipes } from "@/lib/storefront-recipes-api";
+import { useShopContextStore } from "@/stores/shopContextStore";
 import {
   createFreeformLayer,
   mutateActiveLayoutBlock,
@@ -175,6 +178,12 @@ interface EditorState {
   aiPhotoSources: Record<string, AiPhotoSource>;
   /** Face-swap result URLs per aiPhoto layer (current selection only). */
   aiPhotoResults: Record<string, string>;
+  /** The shop's SAVED (non-builtin) recipes the template's layers bind to, keyed
+   *  by id. Built-ins resolve from code; these are fetched (storefront) or
+   *  embedded (published snapshot) so a custom-recipe layer resolves. */
+  resolvedRecipes: Record<string, AiRecipe>;
+  /** Fetch the saved recipes the current template needs (storefront path). */
+  loadTemplateRecipes: () => Promise<void>;
   /** Customer-selected reference image URL per aiPhoto layer (when admin
    *  uploaded multiple references). Drives live preview before "Skapa nu". */
   aiPhotoSelectedRefUrl: Record<string, string>;
@@ -521,6 +530,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   aiResultCache: loadAiCache(),
   aiPhotoSources: {},
   aiPhotoResults: {},
+  resolvedRecipes: {},
   aiPhotoSelectedRefUrl: {},
   faceSwapCache: loadFaceSwapCache(),
   hiddenLayerIds: {},
@@ -1183,6 +1193,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (url) cur[layerId] = url;
     else delete cur[layerId];
     set({ aiPhotoResults: cur });
+  },
+  loadTemplateRecipes: async () => {
+    const tpl = get().template;
+    if (!tpl) return;
+    const have = get().resolvedRecipes;
+    const missing = collectRecipeIds(tpl)
+      .filter((id) => !id.startsWith("builtin-"))
+      .filter((id) => !have[id]);
+    if (missing.length === 0) return;
+    const shop = useShopContextStore.getState().shop;
+    const recipes = await resolveStorefrontRecipes(shop, missing);
+    if (recipes.length === 0) return;
+    const next = { ...get().resolvedRecipes };
+    for (const r of recipes) next[r.id] = r;
+    set({ resolvedRecipes: next });
   },
   setAiPhotoSelectedRef: (layerId, url) => {
     const cur = { ...get().aiPhotoSelectedRefUrl };

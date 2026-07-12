@@ -9,6 +9,7 @@
 // differ only in HOW the recipe is chosen (fixed by id vs picked per style); the
 // upload / cache / generate machinery downstream is identical.
 import {
+  BUILTIN_RECIPES,
   MODEL_CATALOG,
   resolveBindingRecipe,
   type AiRecipe,
@@ -63,12 +64,16 @@ function forOrientation(refs: DriverReference[], orientation: Orientation): Driv
 }
 
 /** Build the driver, or null when the layer is a plain photo (no recipe) — i.e.
- *  not an AI layer and nothing for the AI section to render. */
+ *  not an AI layer and nothing for the AI section to render. `availableRecipes`
+ *  are the shop's saved (non-builtin) recipes the storefront resolved (via the
+ *  storefront-recipes endpoint or a published snapshot); built-ins always
+ *  resolve. A binding to an unavailable saved recipe still yields null. */
 export function buildAiLayerDriver(
   layer: MediaLayer,
   orientation: Orientation,
+  availableRecipes: AiRecipe[] = [],
 ): AiLayerDriver | null {
-  const bound = resolveBindingRecipe(layer.defaults.ai);
+  const bound = resolveBindingRecipe(layer.defaults.ai, [...BUILTIN_RECIPES, ...availableRecipes]);
   if (bound) {
     const { recipe, styleOption, motif } = bound;
     const references = forOrientation(

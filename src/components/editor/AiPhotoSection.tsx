@@ -64,6 +64,9 @@ export function AiPhotoSection({ layer, heading }: Props) {
   const getCachedFaceSwap = useEditorStore((s) => s.getCachedFaceSwap);
   const aiPhotoSelectedRefUrl = useEditorStore((s) => s.aiPhotoSelectedRefUrl);
   const setAiPhotoSelectedRef = useEditorStore((s) => s.setAiPhotoSelectedRef);
+  // The shop's saved recipes (fetched storefront-side) so a layer bound to a
+  // custom recipe resolves; built-ins always resolve without this.
+  const resolvedRecipes = useEditorStore((s) => s.resolvedRecipes);
   // Subscribe to the cache so thumbnails re-render when new swaps complete.
   const faceSwapCache = useEditorStore((s) => s.faceSwapCache);
   void faceSwapCache;
@@ -79,7 +82,7 @@ export function AiPhotoSection({ layer, heading }: Props) {
   // Normalize both worlds — a bound photo layer and a legacy aiPhoto layer — to
   // one driver, so nothing below branches on layer type. Null only for a plain
   // photo (no recipe), which ControlPanel never routes here (guarded on render).
-  const driver = buildAiLayerDriver(layer, editorOrientation);
+  const driver = buildAiLayerDriver(layer, editorOrientation, Object.values(resolvedRecipes));
   const needsReference = driver?.needsReference ?? false;
   const references = driver?.references ?? [];
   const styleChoices = driver?.styleChoices ?? [];

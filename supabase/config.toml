@@ -8,6 +8,10 @@ verify_jwt = false
 [functions.shopify-storefront]
 verify_jwt = false
 
+# Public, shop-scoped: resolves a shop's saved recipes for the customer editor.
+[functions.storefront-recipes]
+verify_jwt = false
+
 # Gelato anropar webhooken utan Lovable-JWT — vi auth:ar via shared secret.
 [functions.gelato-webhook]
 verify_jwt = false

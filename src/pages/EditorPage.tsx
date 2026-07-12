@@ -213,6 +213,14 @@ export default function EditorPage() {
     }
   }, [configs, handleParam, typeParam, setConfig]);
 
+  // Resolve any custom (saved) recipes the template's layers bind to, so a
+  // layer bound to a non-builtin recipe renders in the customer editor. Built-in
+  // recipes need no fetch. Re-runs when the template or shop context changes.
+  const loadTemplateRecipes = useEditorStore((s) => s.loadTemplateRecipes);
+  useEffect(() => {
+    if (template) void loadTemplateRecipes();
+  }, [template, shopCtx.shop, loadTemplateRecipes]);
+
   const onProductChange = (newHandle: string, newType?: import("@/lib/product-config").ProductType) => {
     // Konsoliderad mall: alla virtuella configs delar samma handle, så vi
     // måste matcha även på product_type. Falla tillbaka till äldre beteende
