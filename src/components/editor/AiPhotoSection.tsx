@@ -1,15 +1,14 @@
-// Customer-side AI section. One instance per `aiPhoto` layer.
+// Customer-side AI section. Renders for an AI layer — either a photo layer with
+// a recipe `.ai` binding (the unified media layer) or a legacy `aiPhoto` layer.
 //
-// The layer's legacy `subjectKind` (+ simpleStyleMode + the customer's chosen
-// style) is resolved to a built-in recipe by `resolveLegacyRecipe`, and this
-// component sends that recipe — model + prompt + params + steps + the injected
-// {style} option + the {motif} — to `replicate-face-swap`. It no longer sends
-// the old bag of behaviour flags; the edge routes purely on `recipe`. The five
-// legacy modes map to: face-swap (human), pet, and the three removeBackground
-// recipes (style→cutout chain, Nano watercolor, Nano backdrop).
+// `buildAiLayerDriver` normalizes both into one driver (style choices, whether a
+// reference is needed, motif, and a `resolve(styleId, refUrl)`), so nothing here
+// branches on layer type. The driver's recipe — model + prompt + params + steps
+// + the injected {style} option + the {motif} — is POSTed to `replicate-face-swap`,
+// which routes purely on `recipe`.
 //
 // Results are cached in localStorage keyed by (layerId, faceHash, slot) where
-// `slot` is `aiRecipeCacheSlot` (recipe id + injected option values + motif +
+// `slot` comes from the driver (recipe id + injected option values + motif +
 // reference URL) — two runs share a slot only if they'd send the model
 // identical inputs, so a cached image is never reused for a different recipe.
 import { useEffect, useRef, useState } from "react";
@@ -22,20 +21,21 @@ import { useAiBusyStore } from "@/stores/aiBusyStore";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadCartPreview } from "@/lib/upload-preview";
 import { hashFile } from "@/lib/ai-cache-storage";
-import { resolveLegacyRecipe, aiRecipeCacheSlot } from "@/lib/legacy-ai-recipe";
+import { buildAiLayerDriver } from "@/lib/ai-layer-driver";
 import type { TemplateLayer, AiStylePreset } from "@/lib/template-schema";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { AiProgress } from "./AiProgress";
 
-type AiPhotoLayer = Extract<TemplateLayer, { type: "aiPhoto" }>;
+/** A bound photo layer OR a legacy aiPhoto layer — both drive this section. */
+type MediaLayer = Extract<TemplateLayer, { type: "photo" | "aiPhoto" }>;
 
 interface Props {
-  layer: AiPhotoLayer;
-  /** Heading shown when there are multiple aiPhoto layers in one template. */
+  layer: MediaLayer;
+  /** Heading shown when there are multiple AI layers in one template. */
   heading?: string | null;
-  /** Template-level AI style presets. Only `enabled !== false` ones are shown,
-   *  and only when the layer is in "removeBackground" mode. */
+  /** Template-level AI style presets — the legacy removeBackground style source.
+   *  Bound recipes carry their own style choices, so this is ignored for them. */
   aiStylePresets?: AiStylePreset[];
 }
 
@@ -73,80 +73,52 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
 
   const source = sources[layer.id];
   const result = results[layer.id] ?? null;
-  const subjectKind = layer.defaults.subjectKind ?? "human";
-  const isRemoveBg = subjectKind === "removeBackground";
-  const simpleStyleMode = isRemoveBg && layer.defaults.simpleStyleMode === true;
-  // Legacy aiPhoto layers carry the motif on the (misnamed) fluxStylePrompt
-  // field. It fills the recipe's reserved {motif} token — load-bearing for the
-  // Nano paths, ignored by the reference-based (face-swap / pet) recipes.
-  const motif = layer.defaults.fluxStylePrompt ?? undefined;
-
-  /** Single source of truth for the built-in recipe, its injected option values
-   *  and the cache slot, given a style pick + reference. Running a swap and
-   *  looking up cached thumbnails both go through this, so a written cache entry
-   *  and a later lookup can never compute different keys. */
-  const resolveFor = (style: AiStylePreset | null, refForSlot: string | null) => {
-    const { recipe, optionValues } = resolveLegacyRecipe({
-      subjectKind,
-      simpleStyleMode,
-      style: style
-        ? { prompt: style.prompt, styleInstruction: style.styleInstruction, bridge: style.bridge, label: style.label }
-        : null,
-    });
-    const slot = aiRecipeCacheSlot({
-      recipeId: recipe.id,
-      optionValues,
-      motif,
-      referenceImageUrl: isRemoveBg ? null : refForSlot,
-    });
-    return { recipe, optionValues, slot };
-  };
-
-  // Resolve admin-configured reference subjects. Falls back to the legacy
-  // single `referenceImageUrl` so old templates keep working unchanged.
-  const allReferenceImages = (() => {
-    const list = layer.defaults.referenceImages ?? [];
-    if (list.length > 0) return list;
-    if (layer.defaults.referenceImageUrl) {
-      return [{ id: "legacy", url: layer.defaults.referenceImageUrl, label: undefined, orientation: "any" as const }];
-    }
-    return [];
-  })();
-
-  // Filter by current canvas orientation. Refs tagged "any" (or missing the
-  // field on legacy data) show in both. The face-swap cache is already keyed
-  // by refUrl, so flipping orientation → different refUrl → automatically
-  // either re-uses a cached swap or shows the unswapped landscape/portrait ref.
+  // Filter references by the current canvas orientation inside the driver. Refs
+  // tagged "any" show in both; the cache is keyed by refUrl, so flipping
+  // orientation → different refUrl → either re-uses a cached swap or shows the
+  // unswapped ref.
   const editorOrientation = useEditorStore((s) => s.orientation);
-  const referenceImages = allReferenceImages.filter((r) => {
-    const o = (r as { orientation?: string }).orientation ?? "any";
-    return o === "any" || o === editorOrientation;
-  });
-  const showSubjectPicker = !isRemoveBg && referenceImages.length >= 2;
+
+  // Normalize both worlds — a bound photo layer and a legacy aiPhoto layer — to
+  // one driver, so nothing below branches on layer type. Null only for a plain
+  // photo (no recipe), which ControlPanel never routes here (guarded on render).
+  const driver = buildAiLayerDriver(layer, aiStylePresets, editorOrientation);
+  const needsReference = driver?.needsReference ?? false;
+  const references = driver?.references ?? [];
+  const styleChoices = driver?.styleChoices ?? [];
+  const motif = driver?.motif;
+  const hintKey = driver?.hintKey;
+  /** Single source of truth for the recipe to POST, its option values and the
+   *  cache slot, given a style pick + reference. Running a swap and cached-
+   *  thumbnail lookups both go through this, so a written entry and a later
+   *  lookup can never compute different keys. */
+  const resolveFor = driver?.resolve ?? ((): never => { throw new Error("AiPhotoSection: no driver"); });
+
+  const showSubjectPicker = needsReference && references.length >= 2;
 
   // Customer-selected reference. Defaults to the first one on mount/change.
   const selectedRefUrlFromStore = aiPhotoSelectedRefUrl[layer.id] ?? null;
   const selectedRef =
-    referenceImages.find((r) => r.url === selectedRefUrlFromStore) ?? referenceImages[0] ?? null;
-  const refUrl = selectedRef?.url ?? layer.defaults.referenceImageUrl ?? null;
+    references.find((r) => r.url === selectedRefUrlFromStore) ?? references[0] ?? null;
+  const refUrl = selectedRef?.url ?? null;
 
   useEffect(() => {
     // Initialize / heal the store's selection when references or orientation change.
-    if (isRemoveBg) return;
-    if (referenceImages.length === 0) return;
+    if (!needsReference) return;
+    if (references.length === 0) return;
     const stored = aiPhotoSelectedRefUrl[layer.id];
-    if (!stored || !referenceImages.some((r) => r.url === stored)) {
-      setAiPhotoSelectedRef(layer.id, referenceImages[0].url);
+    if (!stored || !references.some((r) => r.url === stored)) {
+      setAiPhotoSelectedRef(layer.id, references[0].url);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layer.id, isRemoveBg, editorOrientation, referenceImages.map((r) => r.url).join("|")]);
+  }, [layer.id, needsReference, editorOrientation, references.map((r) => r.url).join("|")]);
 
   // Sync the visible swap result to whatever reference subject is currently
   // selected. If we have a cached swap for (face, ref) → show it instantly.
   // Otherwise clear the stale result so the editor falls back to the newly
   // selected reference image (the customer can then tap "Skapa" to swap).
   useEffect(() => {
-    if (isRemoveBg) return;
+    if (!needsReference) return;
     if (!refUrl) return;
     const hash = source?.hash;
     if (!hash) return;
@@ -158,20 +130,18 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
       setAiPhotoResult(layer.id, "");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layer.id, isRemoveBg, refUrl, source?.hash, subjectKind]);
+  }, [layer.id, needsReference, refUrl, source?.hash]);
 
-  // Style picker state — only relevant for removeBackground mode.
-  const visibleStyles = (aiStylePresets ?? []).filter((p) => p.enabled !== false);
   const [selectedStyleId, setSelectedStyleId] = useState<string | null>(null);
 
-  // Auto-select the first available style when none is picked yet (the
-  // "Ingen stil"/no-style option has been removed — customers must pick one).
+  // Auto-select the first style when none is picked yet (the "no style" option
+  // was removed — a customer must pick one).
   useEffect(() => {
-    if (!isRemoveBg) return;
     if (selectedStyleId) return;
-    if (visibleStyles.length === 0) return;
-    setSelectedStyleId(visibleStyles[0].id);
-  }, [isRemoveBg, selectedStyleId, visibleStyles]);
+    if (styleChoices.length === 0) return;
+    setSelectedStyleId(styleChoices[0].id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStyleId, styleChoices.map((c) => c.id).join("|")]);
 
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState<string | null>(null);
@@ -233,8 +203,9 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
   };
 
   const runSwap = async (opts: { force?: boolean } = {}) => {
-    // human/pet need a reference image; removeBackground does NOT.
-    if (!isRemoveBg && !refUrl) {
+    // Reference-based recipes (face-swap / pet) need a reference; the
+    // removeBackground / style recipes do not.
+    if (needsReference && !refUrl) {
       toast.error(t("aiPhoto.missingReference"));
       return;
     }
@@ -249,10 +220,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
     startAiJob(jobId, { label: t("ai.creatingImage"), expectedSeconds, stage: t("ai.stagePrep") });
     try {
       const hash = await ensureHash();
-      const selectedPreset = isRemoveBg && selectedStyleId
-        ? visibleStyles.find((p) => p.id === selectedStyleId) ?? null
-        : null;
-      const { recipe, optionValues, slot: cacheRefSlot } = resolveFor(selectedPreset, refUrl);
+      const { recipe, optionValues, slot: cacheRefSlot } = resolveFor(selectedStyleId, refUrl);
       // Only use cache when the user hasn't explicitly asked for a regenerate.
       if (!opts.force && hash) {
         const cached = getCachedFaceSwap(layer.id, hash, cacheRefSlot);
@@ -271,8 +239,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
       console.info("[AiPhoto] invoking recipe", {
         layerId: layer.id,
         recipeId: recipe.id,
-        subjectKind,
-        styleId: selectedPreset?.id ?? null,
+        styleId: selectedStyleId,
         motif: motif ? "set" : "none",
         force: !!opts.force,
       });
@@ -286,7 +253,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         body: {
           recipe: { model: recipe.model, prompt: recipe.prompt, params: recipe.params, steps: recipe.steps },
           customerImageUrls: [faceImageUrl],
-          referenceImageUrls: isRemoveBg ? [] : refUrl ? [refUrl] : [],
+          referenceImageUrls: needsReference && refUrl ? [refUrl] : [],
           optionValues,
           motif,
           designId,
@@ -332,9 +299,12 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
     }
   };
 
-  // Disabled state for the create button. Reference image is only required
-  // for non-removeBackground modes.
-  const disabledCreate = !source || busy || (!isRemoveBg && !refUrl);
+  // Disabled state for the create button. A reference is only required for the
+  // reference-based recipes.
+  const disabledCreate = !source || busy || (needsReference && !refUrl);
+
+  // Plain photo (no recipe) is never routed here; render nothing defensively.
+  if (!driver) return null;
 
   return (
     <div className="space-y-3">
@@ -344,7 +314,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         </h4>
       )}
 
-      {!isRemoveBg && !refUrl && (
+      {needsReference && !refUrl && (
         <p className="text-xs text-destructive">
           {t("aiPhoto.notConfigured")}
         </p>
@@ -356,7 +326,7 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
             {t("aiPhoto.chooseSubject")}
           </Label>
           <div className="grid grid-cols-3 gap-2">
-            {referenceImages.map((r) => {
+            {references.map((r) => {
               const isActive = (selectedRef?.url ?? null) === r.url;
               const cachedUrl = source?.hash
                 ? getCachedFaceSwap(layer.id, source.hash, resolveFor(null, r.url).slot)
@@ -404,13 +374,11 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
           >
             <Upload className="h-5 w-5 text-muted-foreground" />
             <span className="text-sm font-medium">{t("photo.uploadCta")}</span>
-            <span className="text-[10px] text-muted-foreground px-3 text-center">
-              {subjectKind === "pet"
-                ? t("aiPhoto.subjectHintPet")
-                : subjectKind === "removeBackground"
-                  ? t("aiPhoto.subjectHintRemoveBg")
-                  : t("aiPhoto.subjectHintHuman")}
-            </span>
+            {hintKey && (
+              <span className="text-[10px] text-muted-foreground px-3 text-center">
+                {t(hintKey)}
+              </span>
+            )}
           </button>
         ) : (
           <div className="space-y-2">
@@ -449,17 +417,17 @@ export function AiPhotoSection({ layer, heading, aiStylePresets }: Props) {
         />
       </div>
 
-      {/* Style picker — only for removeBackground when the template has presets. */}
-      {isRemoveBg && visibleStyles.length > 1 && (
+      {/* Style picker — shown whenever the recipe offers style choices. */}
+      {styleChoices.length > 1 && (
         <div className="space-y-2">
           <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
             {t("aiPhoto.chooseStyleOptional")}
           </Label>
           <div className="grid grid-cols-3 gap-2">
-            {visibleStyles.map((p) => {
+            {styleChoices.map((p) => {
               const isActive = selectedStyleId === p.id;
               const cachedUrl = source?.hash
-                ? getCachedFaceSwap(layer.id, source.hash, resolveFor(p, null).slot)
+                ? getCachedFaceSwap(layer.id, source.hash, resolveFor(p.id, null).slot)
                 : null;
               const thumbSrc = cachedUrl ?? p.thumbnailUrl ?? null;
               return (
