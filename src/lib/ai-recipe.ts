@@ -230,21 +230,30 @@ export type AiStyle = z.infer<typeof aiStyleSchema>;
  *  because Kontext hands back a photograph when the instruction is that terse.
  *  Legacy inferred that bridge with a regex over the label; here it is data, so
  *  a merchant's own style simply carries its own wording. */
+/** The text a style contributes to a recipe's `{style}` slot. `prompt` picks the
+ *  long descriptive prompt (art-style / nano, which already name their own
+ *  medium); `styleInstruction` picks the terse instruction prefixed by the
+ *  style's `bridge` (the style→cutout chain, where Kontext needs the medium named
+ *  up front or it returns a photograph). Legacy inferred the bridge from the
+ *  label with a regex; here it is data. Shared with the legacy resolver so the
+ *  customer editor injects the identical value whether a layer carries an
+ *  explicit recipe or an old `subjectKind` mode. */
+export function resolveStyleValue(
+  style: { prompt: string; styleInstruction?: string; bridge?: string },
+  pick: "prompt" | "styleInstruction",
+): string {
+  if (pick === "prompt") return style.prompt;
+  const terse = style.styleInstruction || style.prompt;
+  return style.bridge ? `${style.bridge}. ${terse}` : terse;
+}
+
 function styleChoices(pick: "prompt" | "styleInstruction") {
-  return DEFAULT_AI_STYLES.map((s) => {
-    const terse = s.styleInstruction || s.prompt;
-    return {
-      id: s.id,
-      label: s.label,
-      value:
-        pick === "prompt"
-          ? s.prompt
-          : s.bridge
-            ? `${s.bridge}. ${terse}`
-            : terse,
-      thumbnailUrl: s.thumbnailUrl,
-    };
-  });
+  return DEFAULT_AI_STYLES.map((s) => ({
+    id: s.id,
+    label: s.label,
+    value: resolveStyleValue(s, pick),
+    thumbnailUrl: s.thumbnailUrl,
+  }));
 }
 
 function styleOption(pick: "prompt" | "styleInstruction"): CustomerOption {
