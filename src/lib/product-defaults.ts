@@ -1,47 +1,39 @@
-// Backward-compat shim. The single source of truth for available variants is
-// now `gelato-catalog.ts` (derived from gelato-sku-map.json).
-import {
-  getPosterSizes,
-  getPosterFrames,
-  getCanvasSizes,
-  getCanvasDepths,
-  getAluminumSizes,
-  getAluminumMaterials,
-  getAcrylicSizes,
-  getAcrylicFinishes,
-} from "./gelato-catalog";
+// Backward-compat shim. Available variants come from the active POD provider's
+// catalog via the PodProvider abstraction (which, for Gelato, derives them from
+// gelato-sku-map.json). No component imports Gelato specifics directly anymore.
+import { getPodProvider } from "./pod";
 
 export const DEFAULT_PRODUCT_VARIANTS = {
   poster: {
     get sizes() {
-      return getPosterSizes();
+      return getPodProvider().getKindSizes("poster");
     },
     get frames() {
-      return getPosterFrames();
+      return getPodProvider().getKindVariants("poster");
     },
   },
   canvas: {
     get sizes() {
-      return getCanvasSizes();
+      return getPodProvider().getKindSizes("canvas");
     },
     get depths() {
-      return getCanvasDepths();
+      return getPodProvider().getKindVariants("canvas");
     },
   },
   aluminum: {
     get sizes() {
-      return getAluminumSizes();
+      return getPodProvider().getKindSizes("aluminum");
     },
     get materials() {
-      return getAluminumMaterials();
+      return getPodProvider().getKindVariants("aluminum");
     },
   },
   acrylic: {
     get sizes() {
-      return getAcrylicSizes();
+      return getPodProvider().getKindSizes("acrylic");
     },
     get finishes() {
-      return getAcrylicFinishes();
+      return getPodProvider().getKindVariants("acrylic");
     },
   },
 } as const;
