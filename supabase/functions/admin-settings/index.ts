@@ -6,6 +6,8 @@
 //   prices-list                              -> { ok, prices: [...] }
 //   prices-upsert { prices: [PriceRow] }     -> { ok, count }
 //   prices-delete { provider?, material, size, variant } -> { ok }
+//   locale-get                               -> { ok, locale }   (admin UI language)
+//   locale-set { locale }                    -> { ok, locale }
 //
 // PriceRow = { provider?, material, size, variant, price }.
 // Keyed generically (provider/material/size/variant are free text) so new POD
@@ -39,6 +41,11 @@ interface PriceRow {
   variant: string;
   price: number;
 }
+
+// The admin UI languages we ship. Keep in sync with src/lib/admin-locale.ts.
+const ADMIN_LOCALES = new Set([
+  "en", "sv", "de", "no", "da", "fi", "fr", "es", "it", "nl", "pl",
+]);
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -119,6 +126,29 @@ Deno.serve(async (req) => {
           .eq("variant", p.variant);
         if (error) throw error;
         return json({ ok: true });
+      }
+
+      case "locale-get": {
+        const { data, error } = await supabase
+          .from("shopify_app_installations")
+          .select("admin_locale")
+          .eq("id", installationId)
+          .maybeSingle();
+        if (error) throw error;
+        return json({ ok: true, locale: (data?.admin_locale as string | null) ?? null });
+      }
+
+      case "locale-set": {
+        const locale = typeof body.locale === "string" ? body.locale : "";
+        if (!ADMIN_LOCALES.has(locale)) {
+          return json({ ok: false, error: `Ogiltigt språk: ${locale}` }, 400);
+        }
+        const { error } = await supabase
+          .from("shopify_app_installations")
+          .update({ admin_locale: locale })
+          .eq("id", installationId);
+        if (error) throw error;
+        return json({ ok: true, locale });
       }
 
       default:
