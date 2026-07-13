@@ -543,7 +543,10 @@
       "selectTextFirst": "Seleziona prima una parte del testo",
       "bold": "Grassetto",
       "italic": "Corsivo",
-      "underline": "Sottolineato"
+      "underline": "Sottolineato",
+      "mapStylesHint": "{{count}} di {{total}} attivi. Scegli quali stili di mappa può selezionare il cliente e riordina con le frecce.",
+      "moveUp": "Sposta su",
+      "moveDown": "Sposta giù"
     },
     "configs": {
       "loadError": "Impossibile caricare i template",

@@ -543,7 +543,10 @@
       "selectTextFirst": "Markér først en del af teksten",
       "bold": "Fed",
       "italic": "Kursiv",
-      "underline": "Understreget"
+      "underline": "Understreget",
+      "mapStylesHint": "{{count}} af {{total}} aktiveret. Vælg hvilke kortstile kunden kan vælge, og skift rækkefølgen med pilene.",
+      "moveUp": "Flyt op",
+      "moveDown": "Flyt ned"
     },
     "configs": {
       "loadError": "Kunne ikke indlæse skabeloner",

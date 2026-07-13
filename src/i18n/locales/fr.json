@@ -543,7 +543,10 @@
       "selectTextFirst": "Sélectionnez d'abord une partie du texte",
       "bold": "Gras",
       "italic": "Italique",
-      "underline": "Souligné"
+      "underline": "Souligné",
+      "mapStylesHint": "{{count}} sur {{total}} activés. Choisissez les styles de carte que le client peut sélectionner et réorganisez-les avec les flèches.",
+      "moveUp": "Monter",
+      "moveDown": "Descendre"
     },
     "configs": {
       "loadError": "Impossible de charger les modèles",

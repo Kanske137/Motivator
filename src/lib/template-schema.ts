@@ -59,9 +59,23 @@ export const defaultLocks = (overrides: Partial<LayerLocks> = {}): LayerLocks =>
 });
 
 // ---------- per-type defaults ----------
+export const mapStylePresetSchema = z.object({
+  id: z.string().min(1),
+  /** Visibility toggle. Defaults to true for backwards-compat. */
+  enabled: z.boolean().optional().default(true),
+});
+export type MapStylePreset = z.infer<typeof mapStylePresetSchema>;
+
 export const mapDefaultsSchema = z.object({
   shape: mapShapeSchema,
   styleId: z.string().min(1),
+  // Per-LAYER map style options: the ordered list of styles the customer may pick
+  // for THIS map layer, with per-style enable toggles. Array order = the order the
+  // customer sees them. Optional/backwards-compat: when missing the editor falls
+  // back to the template-level `productOptions.mapStyles`, then legacy
+  // `config.map_styles`, then the full catalog. `styleId` stays the default pick
+  // (kept in sync with the first enabled option by the admin editor).
+  styleOptions: z.array(mapStylePresetSchema).optional(),
   center: z.tuple([z.number(), z.number()]), // [lng, lat]
   zoom: z.number().min(0).max(22),
   showLabels: z.boolean(),
@@ -347,13 +361,6 @@ export const aiStylePresetSchema = z.object({
   bridge: z.string().optional(),
 });
 export type AiStylePreset = z.infer<typeof aiStylePresetSchema>;
-
-export const mapStylePresetSchema = z.object({
-  id: z.string().min(1),
-  /** Per-template visibility toggle. Defaults to true for backwards-compat. */
-  enabled: z.boolean().optional().default(true),
-});
-export type MapStylePreset = z.infer<typeof mapStylePresetSchema>;
 
 export const productOptionsSchema = z.object({
   poster: posterOptionsSchema.optional(),

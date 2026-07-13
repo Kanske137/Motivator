@@ -543,7 +543,10 @@
       "selectTextFirst": "Selecciona primero una parte del texto",
       "bold": "Negrita",
       "italic": "Cursiva",
-      "underline": "Subrayado"
+      "underline": "Subrayado",
+      "mapStylesHint": "{{count}} de {{total}} activados. Elige qué estilos de mapa puede seleccionar el cliente y cambia el orden con las flechas.",
+      "moveUp": "Subir",
+      "moveDown": "Bajar"
     },
     "configs": {
       "loadError": "No se pudieron cargar las plantillas",

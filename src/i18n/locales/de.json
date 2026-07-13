@@ -543,7 +543,10 @@
       "selectTextFirst": "Markiere zuerst einen Teil des Textes",
       "bold": "Fett",
       "italic": "Kursiv",
-      "underline": "Unterstrichen"
+      "underline": "Unterstrichen",
+      "mapStylesHint": "{{count}} von {{total}} aktiviert. Lege fest, welche Kartenstile der Kunde wählen kann, und ändere die Reihenfolge mit den Pfeilen.",
+      "moveUp": "Nach oben",
+      "moveDown": "Nach unten"
     },
     "configs": {
       "loadError": "Vorlagen konnten nicht geladen werden",

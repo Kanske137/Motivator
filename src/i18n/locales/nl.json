@@ -543,7 +543,10 @@
       "selectTextFirst": "Selecteer eerst een deel van de tekst",
       "bold": "Vet",
       "italic": "Cursief",
-      "underline": "Onderstreept"
+      "underline": "Onderstreept",
+      "mapStylesHint": "{{count}} van {{total}} ingeschakeld. Kies welke kaartstijlen de klant kan selecteren en wijzig de volgorde met de pijlen.",
+      "moveUp": "Omhoog",
+      "moveDown": "Omlaag"
     },
     "configs": {
       "loadError": "Kon sjablonen niet laden",

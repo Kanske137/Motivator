@@ -543,7 +543,10 @@
       "selectTextFirst": "Najpierw zaznacz część tekstu",
       "bold": "Pogrubienie",
       "italic": "Kursywa",
-      "underline": "Podkreślenie"
+      "underline": "Podkreślenie",
+      "mapStylesHint": "Włączono {{count}} z {{total}}. Wybierz, które style mapy może wybrać klient, i zmień kolejność za pomocą strzałek.",
+      "moveUp": "Przenieś w górę",
+      "moveDown": "Przenieś w dół"
     },
     "configs": {
       "loadError": "Nie można załadować szablonów",

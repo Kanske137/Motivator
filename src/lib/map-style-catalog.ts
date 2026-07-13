@@ -137,3 +137,24 @@ export function getEnabledMapStyleIds(
   }
   return MAP_STYLE_CATALOG.map((s) => s.id);
 }
+
+/**
+ * Resolve the enabled map style IDs for a SPECIFIC map layer, in customer display
+ * order. Priority:
+ *   1. The layer's own `styleOptions` (per-layer, Step B — array order = the order
+ *      the customer sees, `enabled:false` hides one).
+ *   2. Fallback to the template/legacy/catalog resolution above (for layers that
+ *      haven't been given per-layer options yet).
+ */
+export function getLayerMapStyleIds(
+  layerStyleOptions: Array<{ id: string; enabled?: boolean }> | null | undefined,
+  template: MapStyleTogglesLike | null | undefined,
+  legacyConfigStyles: string[] | null | undefined,
+): string[] {
+  if (layerStyleOptions && layerStyleOptions.length > 0) {
+    return layerStyleOptions
+      .filter((s) => s.enabled !== false && isKnownMapStyle(s.id))
+      .map((s) => s.id);
+  }
+  return getEnabledMapStyleIds(template, legacyConfigStyles);
+}

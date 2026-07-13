@@ -30,10 +30,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { ProductConfig } from "@/lib/product-config";
-import type { MapStylePreset, ProductOptions } from "@/lib/template-schema";
+import type { ProductOptions } from "@/lib/template-schema";
 import { DEFAULT_PRODUCT_VARIANTS, mergeUnique } from "@/lib/product-defaults";
 import { hasGelatoSku } from "@/lib/gelato-catalog";
-import { MAP_STYLE_CATALOG, mapStyleThumbnailUrl, mapStyleLabelKey } from "@/lib/map-style-catalog";
 import { uploadCartPreview } from "@/lib/upload-preview";
 import { FONT_CATALOG, FONT_CATEGORY_LABELS, FONT_FAMILIES, type FontCategory } from "@/lib/font-catalog";
 import { toast } from "sonner";
@@ -369,12 +368,7 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
         )}
       </Card>
 
-      {/* Map Styles — collapsible, per-template enabling */}
-      <MapStylesEditor
-        config={config}
-        value={value.mapStyles}
-        onChange={(mapStyles) => onChange({ ...value, mapStyles })}
-      />
+      {/* Map styles moved to the map LAYER's properties (per-layer toggle + order). */}
 
       {/* Allowed fonts — per-template customer font picker */}
       <AllowedFontsEditor
@@ -382,96 +376,6 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
         onChange={(allowedFonts) => onChange({ ...value, allowedFonts })}
       />
     </div>
-  );
-}
-
-function MapStylesEditor({
-  config,
-  value,
-  onChange,
-}: {
-  config: ProductConfig;
-  value: MapStylePreset[] | undefined;
-  onChange: (next: MapStylePreset[]) => void;
-}) {
-  const { t } = useTranslation();
-  // Build the working list: catalog order, with `enabled` resolved from
-  // (1) explicit template entry, (2) legacy config.map_styles, (3) default true.
-  const legacy = config.map_styles ?? [];
-  const explicit = new Map((value ?? []).map((m) => [m.id, m.enabled !== false]));
-  const presets: MapStylePreset[] = MAP_STYLE_CATALOG.map((s) => {
-    const enabled = explicit.has(s.id)
-      ? explicit.get(s.id)!
-      : value && value.length > 0
-        ? false // explicit list provided but this style not in it → disabled
-        : legacy.length > 0
-          ? legacy.includes(s.id)
-          : true;
-    return { id: s.id, enabled };
-  });
-  const enabledCount = presets.filter((p) => p.enabled).length;
-
-  const toggle = (id: string, enabled: boolean) => {
-    const next = presets.map((p) => (p.id === id ? { ...p, enabled } : p));
-    onChange(next);
-  };
-
-  return (
-    <Card className="p-0 overflow-hidden">
-      <Accordion type="single" collapsible defaultValue="">
-        <AccordionItem value="map-styles" className="border-0">
-          <AccordionTrigger className="px-5 py-4 hover:no-underline">
-            <div className="text-left">
-              <h2 className="text-base font-semibold">{t("admin.mapStyles.title")}</h2>
-              <p className="text-xs text-muted-foreground font-normal">
-                {t("admin.mapStyles.subtitle", { count: enabledCount, total: presets.length })}
-              </p>
-            </div>
-          </AccordionTrigger>
-          <AccordionContent className="px-5 pb-5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {MAP_STYLE_CATALOG.map((s) => {
-                const enabled = presets.find((p) => p.id === s.id)?.enabled ?? true;
-                const label = s.labelKey ? t(s.labelKey, { defaultValue: s.label }) : s.label;
-                return (
-                  <div
-                    key={s.id}
-                    className="flex items-center gap-3 rounded-md border bg-background p-2"
-                  >
-                    {mapStyleThumbnailUrl(s.id) ? (
-                      <img
-                        src={mapStyleThumbnailUrl(s.id)}
-                        alt={label}
-                        className="h-10 w-10 shrink-0 rounded-md border object-cover"
-                        loading="lazy"
-                        draggable={false}
-                      />
-                    ) : (
-                      <div
-                        className="h-10 w-10 shrink-0 rounded-md border"
-                        style={{ background: s.previewBg }}
-                        aria-hidden
-                      />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-medium ${enabled ? "" : "text-muted-foreground line-through"}`}>
-                        {label}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground font-mono truncate">{s.id}</p>
-                    </div>
-                    <Switch
-                      checked={enabled}
-                      onCheckedChange={(c) => toggle(s.id, c)}
-                      aria-label={t("admin.mapStyles.enableAria", { label })}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
-    </Card>
   );
 }
 

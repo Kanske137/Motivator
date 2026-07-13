@@ -863,6 +863,7 @@ export default function DesignerPage() {
               config={config}
               layer={selectedLayer}
               allLayers={layers}
+              productOptions={template?.productOptions ?? null}
               onChange={updateLayer}
               onLayersChange={setLayers}
             />

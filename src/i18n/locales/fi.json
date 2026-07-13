@@ -543,7 +543,10 @@
       "selectTextFirst": "Valitse ensin osa tekstistä",
       "bold": "Lihavoitu",
       "italic": "Kursivoitu",
-      "underline": "Alleviivattu"
+      "underline": "Alleviivattu",
+      "mapStylesHint": "{{count}} / {{total}} käytössä. Valitse, mitä karttatyylejä asiakas voi valita, ja muuta järjestystä nuolilla.",
+      "moveUp": "Siirrä ylös",
+      "moveDown": "Siirrä alas"
     },
     "configs": {
       "loadError": "Mallien lataus epäonnistui",

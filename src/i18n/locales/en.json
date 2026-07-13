@@ -575,7 +575,10 @@
       "selectTextFirst": "Select a part of the text first",
       "bold": "Bold",
       "italic": "Italic",
-      "underline": "Underlined"
+      "underline": "Underlined",
+      "mapStylesHint": "{{count}} of {{total}} enabled. Toggle which map styles the customer can pick, and drag the order with the arrows.",
+      "moveUp": "Move up",
+      "moveDown": "Move down"
     },
     "configs": {
       "loadError": "Could not load templates",

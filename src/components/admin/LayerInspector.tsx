@@ -6,7 +6,7 @@
 //     placeName/city/country, AND auto-builds text for any linked text layers.
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2, Plus, Search, Trash2, Upload } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2, Plus, Search, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import type { ProductConfig } from "@/lib/product-config";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import type {
   LayerLocks,
   LinkedTextToken,
+  MapStylePreset,
+  ProductOptions,
   TemplateLayer,
   TextDecoration,
   TextSpan,
@@ -35,7 +37,13 @@ import type {
 import { resolveLinkedTokens, substituteTokens, FALLBACK_PLACE } from "@/lib/text-typography";
 import { geocode, type GeocodeResult } from "@/lib/mapbox";
 import { applyAdminPlaceToLinkedTexts } from "@/lib/template-migrate";
-import { MAP_STYLE_CATALOG } from "@/lib/map-style-catalog";
+import {
+  MAP_STYLE_CATALOG,
+  MAP_STYLE_BY_ID,
+  getEnabledMapStyleIds,
+  isKnownMapStyle,
+  mapStyleThumbnailUrl,
+} from "@/lib/map-style-catalog";
 import { uploadAiReferenceImage } from "@/lib/ai-reference-upload";
 import { FONT_CATALOG, FONT_CATEGORY_LABELS, type FontCategory } from "@/lib/font-catalog";
 import { BUILTIN_RECIPES, MODEL_CATALOG, recipeUsesReferences, type AiRecipe, type MediaLayerAi, type RecipeReference } from "@/lib/ai-recipe";
@@ -52,6 +60,9 @@ interface Props {
   config: ProductConfig;
   layer: TemplateLayer | null;
   allLayers: TemplateLayer[];
+  /** Template-level product options — used to seed a map layer's style list from
+   *  the old template-level `mapStyles` the first time it's edited per-layer. */
+  productOptions?: ProductOptions | null;
   onChange: (next: TemplateLayer) => void;
   /** Bulk replacement (used when picking a default place updates linked texts). */
   onLayersChange?: (next: TemplateLayer[]) => void;
@@ -68,7 +79,7 @@ const LOCK_LABELS: Array<{ key: keyof LayerLocks; labelKey: string }> = [
   { key: "style", labelKey: "admin.layerInspector.lockStyle" },
 ];
 
-export default function LayerInspector({ config, layer, allLayers, onChange, onLayersChange }: Props) {
+export default function LayerInspector({ config, layer, allLayers, productOptions, onChange, onLayersChange }: Props) {
   const { t } = useTranslation();
   if (!layer) {
     return (
@@ -194,17 +205,20 @@ export default function LayerInspector({ config, layer, allLayers, onChange, onL
             </Select>
           </Field>
           <Field label={t("admin.layerInspector.mapStyle")}>
-            <Select
-              value={layer.defaults.styleId}
-              onValueChange={(v) => updateDefaults({ styleId: v })}
-            >
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {MAP_STYLE_CATALOG.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MapStyleListEditor
+              value={layer.defaults.styleOptions}
+              seedEnabledIds={getEnabledMapStyleIds(
+                productOptions ? { productOptions } : null,
+                config.map_styles,
+              )}
+              onChange={(next) => {
+                const firstEnabled = next.find((s) => s.enabled !== false)?.id;
+                updateDefaults({
+                  styleOptions: next,
+                  ...(firstEnabled ? { styleId: firstEnabled } : {}),
+                });
+              }}
+            />
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label={t("admin.layerInspector.lng")}>
@@ -504,6 +518,107 @@ const Field = React.forwardRef<HTMLDivElement, { label: string; children: React.
   ),
 );
 Field.displayName = "Field";
+
+// ---------- map layer → per-layer style list (toggle + reorder) ----------
+// Which map styles this layer offers the customer, and in what order. The array
+// order IS the customer-facing order; `enabled:false` hides a style. Seeds from
+// the old template-level list the first time so existing templates keep behaviour.
+function MapStyleListEditor({
+  value,
+  seedEnabledIds,
+  onChange,
+}: {
+  value: MapStylePreset[] | undefined;
+  seedEnabledIds: string[];
+  onChange: (next: MapStylePreset[]) => void;
+}) {
+  const { t } = useTranslation();
+
+  // Working list = the full catalog in the current order, with enable flags.
+  const list: MapStylePreset[] =
+    value && value.length > 0
+      ? [
+          ...value.filter((v) => isKnownMapStyle(v.id)),
+          // Append any catalog styles not yet in the stored list (disabled).
+          ...MAP_STYLE_CATALOG.filter((s) => !value.some((v) => v.id === s.id)).map((s) => ({
+            id: s.id,
+            enabled: false,
+          })),
+        ]
+      : MAP_STYLE_CATALOG.map((s) => ({ id: s.id, enabled: seedEnabledIds.includes(s.id) }));
+
+  const enabledCount = list.filter((x) => x.enabled !== false).length;
+  const toggle = (id: string, enabled: boolean) =>
+    onChange(list.map((x) => (x.id === id ? { ...x, enabled } : x)));
+  const move = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= list.length) return;
+    const next = [...list];
+    [next[i], next[j]] = [next[j], next[i]];
+    onChange(next);
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[11px] text-muted-foreground">
+        {t("admin.layerInspector.mapStylesHint", { count: enabledCount, total: list.length })}
+      </p>
+      {list.map((item, i) => {
+        const cat = MAP_STYLE_BY_ID[item.id];
+        const label = cat?.labelKey ? t(cat.labelKey, { defaultValue: cat.label }) : cat?.label ?? item.id;
+        const enabled = item.enabled !== false;
+        const thumb = mapStyleThumbnailUrl(item.id);
+        return (
+          <div key={item.id} className="flex items-center gap-2 rounded-md border bg-background p-1.5">
+            <div className="flex flex-col">
+              <button
+                type="button"
+                disabled={i === 0}
+                onClick={() => move(i, -1)}
+                aria-label={t("admin.layerInspector.moveUp")}
+                className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+              >
+                <ChevronUp className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                disabled={i === list.length - 1}
+                onClick={() => move(i, 1)}
+                aria-label={t("admin.layerInspector.moveDown")}
+                className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            {thumb ? (
+              <img
+                src={thumb}
+                alt={label}
+                className="h-8 w-8 shrink-0 rounded border object-cover"
+                loading="lazy"
+                draggable={false}
+              />
+            ) : (
+              <div
+                className="h-8 w-8 shrink-0 rounded border"
+                style={{ background: cat?.previewBg }}
+                aria-hidden
+              />
+            )}
+            <span className={`flex-1 truncate text-sm ${enabled ? "" : "text-muted-foreground line-through"}`}>
+              {label}
+            </span>
+            <Switch
+              checked={enabled}
+              onCheckedChange={(c) => toggle(item.id, c)}
+              aria-label={t("admin.mapStyles.enableAria", { label })}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 // ---------- photo layer → optional recipe binding ----------
 // The photo/aiPhoto merge at the UI: a photo layer optionally points at a

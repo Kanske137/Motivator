@@ -15,7 +15,7 @@ import { FONT_FAMILIES } from "@/lib/font-catalog";
 import { substituteTokens } from "@/lib/text-typography";
 import { geocode, type GeocodeResult } from "@/lib/mapbox";
 import { type ProductConfig, type ProductType } from "@/lib/product-config";
-import { getEnabledMapStyleIds, mapStyleLabel, mapStyleLabelKey, mapStylePreviewBg, mapStyleThumbnailUrl } from "@/lib/map-style-catalog";
+import { getLayerMapStyleIds, mapStyleLabel, mapStyleLabelKey, mapStylePreviewBg, mapStyleThumbnailUrl } from "@/lib/map-style-catalog";
 import { FormatSection } from "./FormatSection";
 import { PhotoUploadSection } from "./PhotoUploadSection";
 import { AiPhotoSection } from "./AiPhotoSection";
@@ -581,8 +581,9 @@ function MapStyleLayerSection({
   const showLabels = value?.showLabels ?? layer.defaults.showLabels;
   const shape = value?.shape ?? layer.defaults.shape;
 
-  // Per-template enabled list (Alt B), with legacy fallback.
-  const enabledStyleIds = getEnabledMapStyleIds(
+  // Per-LAYER enabled list (Step B), falling back to the template/legacy list.
+  const enabledStyleIds = getLayerMapStyleIds(
+    layer.defaults.styleOptions,
     productOptions ? { productOptions } : null,
     config.map_styles,
   );

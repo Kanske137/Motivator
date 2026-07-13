@@ -575,7 +575,10 @@
       "selectTextFirst": "Markera först en del av texten",
       "bold": "Fet",
       "italic": "Kursiv",
-      "underline": "Understruken"
+      "underline": "Understruken",
+      "mapStylesHint": "{{count}} av {{total}} aktiverade. Slå på/av vilka kartstilar kunden kan välja, och ändra ordningen med pilarna.",
+      "moveUp": "Flytta upp",
+      "moveDown": "Flytta ner"
     },
     "configs": {
       "loadError": "Kunde inte ladda mallar",

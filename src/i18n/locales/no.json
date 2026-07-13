@@ -543,7 +543,10 @@
       "selectTextFirst": "Merk først en del av teksten",
       "bold": "Fet",
       "italic": "Kursiv",
-      "underline": "Understreket"
+      "underline": "Understreket",
+      "mapStylesHint": "{{count}} av {{total}} aktivert. Velg hvilke kartstiler kunden kan velge, og endre rekkefølgen med pilene.",
+      "moveUp": "Flytt opp",
+      "moveDown": "Flytt ned"
     },
     "configs": {
       "loadError": "Kunne ikke laste maler",
