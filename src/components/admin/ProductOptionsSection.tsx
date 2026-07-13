@@ -32,7 +32,7 @@ import {
 import type { ProductConfig } from "@/lib/product-config";
 import type { ProductOptions } from "@/lib/template-schema";
 import { DEFAULT_PRODUCT_VARIANTS, mergeUnique } from "@/lib/product-defaults";
-import { hasGelatoSku } from "@/lib/gelato-catalog";
+import { getPodProvider } from "@/lib/pod";
 import { uploadCartPreview } from "@/lib/upload-preview";
 import { FONT_CATALOG, FONT_CATEGORY_LABELS, FONT_FAMILIES, type FontCategory } from "@/lib/font-catalog";
 import { toast } from "sonner";
@@ -173,33 +173,34 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
   // (t.ex. 13×18) — de visas som "ej tillgänglig" (greyed out) i kundvyn och
   // ska inte flaggas som synk-fel här.
   const missingSkus = useMemo(() => {
+    const provider = getPodProvider();
     const out: { kind: Kind; size: string; variant: string }[] = [];
     if (value.poster?.enabled) {
       for (const s of value.poster.allowedSizes ?? []) {
         for (const f of value.poster.allowedFrames ?? []) {
           if (/^Hängare/i.test(f)) continue; // medvetet otillgängliga kombinationer
-          if (!hasGelatoSku("poster", s, f)) out.push({ kind: "poster", size: s, variant: f });
+          if (!provider.hasSku("poster", s, f)) out.push({ kind: "poster", size: s, variant: f });
         }
       }
     }
     if (value.canvas?.enabled) {
       for (const s of value.canvas.allowedSizes ?? []) {
         for (const d of value.canvas.allowedDepths ?? []) {
-          if (!hasGelatoSku("canvas", s, d)) out.push({ kind: "canvas", size: s, variant: d });
+          if (!provider.hasSku("canvas", s, d)) out.push({ kind: "canvas", size: s, variant: d });
         }
       }
     }
     if (value.aluminum?.enabled) {
       for (const s of value.aluminum.allowedSizes ?? []) {
         for (const m of value.aluminum.allowedMaterials ?? []) {
-          if (!hasGelatoSku("aluminum", s, m)) out.push({ kind: "aluminum", size: s, variant: m });
+          if (!provider.hasSku("aluminum", s, m)) out.push({ kind: "aluminum", size: s, variant: m });
         }
       }
     }
     if (value.acrylic?.enabled) {
       for (const s of value.acrylic.allowedSizes ?? []) {
         for (const f of value.acrylic.allowedFinishes ?? []) {
-          if (!hasGelatoSku("acrylic", s, f)) out.push({ kind: "acrylic", size: s, variant: f });
+          if (!provider.hasSku("acrylic", s, f)) out.push({ kind: "acrylic", size: s, variant: f });
         }
       }
     }
