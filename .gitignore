@@ -24,3 +24,10 @@ dist-ssr
 *.sw?
 
 .env
+
+# Supabase CLI local temp
+supabase/.temp/
+
+# Local-only dev harness — paired with an uncommitted /dev/inspector route in
+# App.tsx for quick standalone admin-component checks. Never built on Cloudflare.
+src/pages/DevInspector.tsx

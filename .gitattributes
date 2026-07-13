@@ -1,0 +1,17 @@
+# Normalize line endings: LF in the repo AND the working tree (stops the
+# "LF will be replaced by CRLF" churn on Windows checkouts, keeps diffs clean).
+* text=auto eol=lf
+
+# Treat binary assets as binary (never touch their bytes).
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.avif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.pdf binary
