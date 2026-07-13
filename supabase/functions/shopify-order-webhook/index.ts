@@ -1,7 +1,13 @@
 // Receives Shopify orders/paid webhooks. Verifies HMAC, then asynchronously
 // generates print files and submits a Gelato order.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import GELATO_SKU_MAP_JSON from "../_shared/gelato-sku-map.json" with { type: "json" };
+import {
+  resolveGelatoProductUid,
+  productTypeFromHandle,
+  submitGelatoOrder,
+  type GelatoProductType,
+  type GelatoOrderItem,
+} from "../_shared/pod/gelato.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,15 +16,9 @@ const corsHeaders = {
 
 const SHOPIFY_API_VERSION = "2025-07";
 
-// ============================================================================
-// Gelato SKU map — single source of truth shared with shopify-sync-template.
-// ============================================================================
-const GELATO_SKU_MAP = GELATO_SKU_MAP_JSON as Record<
-  string,
-  Record<string, { portrait: string; landscape: string }>
->;
-
-type ProductType = "posters" | "canvas" | "aluminum" | "acrylic";
+// SKU map, UID resolution and the Gelato order API now live in the shared Gelato
+// adapter (_shared/pod/gelato.ts). This function only parses Shopify props.
+type ProductType = GelatoProductType;
 
 function normalizeProductType(raw: string | null | undefined): ProductType | null {
   if (!raw) return null;
@@ -28,78 +28,6 @@ function normalizeProductType(raw: string | null | undefined): ProductType | nul
   if (v === "aluminum" || v === "aluminium" || v === "metallic" || v === "metallposter") return "aluminum";
   if (v === "acrylic" || v === "akryl" || v === "plexiglas") return "acrylic";
   return null;
-}
-
-function productTypeFromHandle(handle: string): ProductType | null {
-  const h = (handle || "").toLowerCase();
-  if (h.endsWith("-acrylic") || h.includes("acrylic") || h.includes("akryl")) return "acrylic";
-  if (h.endsWith("-aluminum") || h.includes("aluminum") || h.includes("aluminium") || h.includes("metallic")) return "aluminum";
-  if (h.includes("canvas")) return "canvas";
-  if (h.includes("poster") || h.includes("karta")) return "posters";
-  return null;
-}
-
-interface ResolveResult {
-  productUid: string | null;
-  source: "db" | "local-exact" | "local-size-fallback" | "missing";
-  detail: string;
-}
-
-function resolveProductUid(args: {
-  handle: string;
-  size: string;
-  variant?: string | null;
-  orientation: "portrait" | "landscape";
-  productType?: ProductType | null;
-  dbMap?: Record<string, Record<string, string>> | null;
-}): ResolveResult {
-  const { handle, size, variant, orientation, productType, dbMap } = args;
-
-  // 1) DB-mapping (per-handle override). Konsoliderade mallar har nycklar som
-  //    "<type>|<size>|<variant>" — prova den först, annars legacy "size|variant".
-  if (variant && dbMap) {
-    if (productType && dbMap[`${productType}|${size}`]?.[variant]) {
-      return { productUid: dbMap[`${productType}|${size}`][variant], source: "db", detail: `${productType}|${size}|${variant}` };
-    }
-    if (dbMap[size]?.[variant]) {
-      return { productUid: dbMap[size][variant], source: "db", detail: `${size}|${variant}` };
-    }
-  }
-
-  const ptype = productType ?? productTypeFromHandle(handle);
-  if (!ptype) {
-    return { productUid: null, source: "missing", detail: `unknown product type for handle="${handle}"` };
-  }
-  const localForType = GELATO_SKU_MAP[ptype] ?? {};
-
-  // 2) Local exact size|variant
-  if (variant && localForType[`${size}|${variant}`]?.[orientation]) {
-    return {
-      productUid: localForType[`${size}|${variant}`][orientation],
-      source: "local-exact",
-      detail: `${ptype} ${size}|${variant} ${orientation}`,
-    };
-  }
-
-  // 3) Size-only fallback ONLY if variant is missing entirely.
-  // If a variant was specified but didn't match exactly, we MUST fail loudly
-  // instead of silently shipping the wrong product (e.g. "Hängare Ek" → flat poster).
-  if (!variant) {
-    const sizeMatch = Object.entries(localForType).find(([k]) => k.startsWith(`${size}|`));
-    if (sizeMatch && sizeMatch[1]?.[orientation]) {
-      return {
-        productUid: sizeMatch[1][orientation],
-        source: "local-size-fallback",
-        detail: `${ptype} ${sizeMatch[0]} ${orientation} (no variant supplied)`,
-      };
-    }
-  }
-
-  return {
-    productUid: null,
-    source: "missing",
-    detail: `no exact SKU for ${ptype} size=${size} variant=${variant ?? "(none)"} orientation=${orientation}`,
-  };
 }
 
 async function verifyHmac(rawBody: string, hmacHeader: string | null, secret: string): Promise<boolean> {
@@ -147,7 +75,7 @@ async function processOrder(supabase: any, order: any) {
   const configByHandle: Record<string, any> = {};
   (configs ?? []).forEach((c: any) => { configByHandle[c.shopify_handle] = c; });
 
-  const items: any[] = [];
+  const items: GelatoOrderItem[] = [];
   const printErrors: string[] = [];
   const skuErrors: string[] = [];
 
@@ -194,7 +122,7 @@ async function processOrder(supabase: any, order: any) {
 
     // 2) Resolve productUid
     const cfg = configByHandle[handle];
-    const resolved = resolveProductUid({
+    const resolved = resolveGelatoProductUid({
       handle,
       size: size!,
       variant,
@@ -215,7 +143,7 @@ async function processOrder(supabase: any, order: any) {
     items.push({
       itemReferenceId: String(li.id),
       productUid: resolved.productUid,
-      files: [{ type: "default", url: printUrl }],
+      fileUrl: printUrl,
       quantity: li.quantity ?? 1,
     });
   }
@@ -233,10 +161,12 @@ async function processOrder(supabase: any, order: any) {
     return;
   }
 
-  // 3) Build Gelato order
+  // 3) Build + submit the provider order (Gelato adapter).
   const ship = order.shipping_address ?? order.billing_address ?? {};
-  const gelatoBody = {
-    orderType: "order",
+  const partialErrors = [...printErrors, ...skuErrors];
+
+  const result = await submitGelatoOrder({
+    apiKey: gelatoKey,
     orderReferenceId: shopifyOrderName || shopifyOrderId,
     customerReferenceId: shopifyOrderId,
     currency: order.currency ?? "SEK",
@@ -253,46 +183,33 @@ async function processOrder(supabase: any, order: any) {
       email: order.email ?? order.contact_email ?? "",
       phone: ship.phone ?? order.phone ?? "",
     },
-  };
+  });
 
-  const partialErrors = [...printErrors, ...skuErrors];
+  if (!result.ok) {
+    console.error(`[shopify-webhook] Gelato API failed ${result.status}:`, String(result.error).slice(0, 800));
+    await supabase.from("gelato_orders").update({
+      status: "gelato_failed",
+      error: result.status ? `${result.status}: ${result.error}` : String(result.error),
+      payload: result.requestBody,
+    }).eq("shopify_order_id", shopifyOrderId);
 
-  try {
-    const res = await fetch("https://order.gelatoapis.com/v4/orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-API-KEY": gelatoKey },
-      body: JSON.stringify(gelatoBody),
-    });
-    const json = await res.json();
-    if (!res.ok) {
-      console.error(`[shopify-webhook] Gelato API failed ${res.status}:`, JSON.stringify(json).slice(0, 800));
-      await supabase.from("gelato_orders").update({
-        status: "gelato_failed",
-        error: `${res.status}: ${JSON.stringify(json).slice(0, 800)}`,
-        payload: gelatoBody,
-      }).eq("shopify_order_id", shopifyOrderId);
-
-      if (shopifyDomain && shopifyToken) {
-        await fetch(`https://${shopifyDomain}/admin/api/${SHOPIFY_API_VERSION}/orders/${shopifyOrderId}.json`, {
-          method: "PUT",
-          headers: { "X-Shopify-Access-Token": shopifyToken, "Content-Type": "application/json" },
-          body: JSON.stringify({ order: { id: shopifyOrderId, note: `Gelato fail: ${res.status}` } }),
-        }).catch(() => {});
-      }
-      return;
+    if (result.status && shopifyDomain && shopifyToken) {
+      await fetch(`https://${shopifyDomain}/admin/api/${SHOPIFY_API_VERSION}/orders/${shopifyOrderId}.json`, {
+        method: "PUT",
+        headers: { "X-Shopify-Access-Token": shopifyToken, "Content-Type": "application/json" },
+        body: JSON.stringify({ order: { id: shopifyOrderId, note: `Gelato fail: ${result.status}` } }),
+      }).catch(() => {});
     }
-    console.log(`[shopify-webhook] Gelato order submitted: ${json.id ?? json.orderId}`);
-    await supabase.from("gelato_orders").update({
-      status: "submitted",
-      gelato_order_id: json.id ?? json.orderId ?? null,
-      payload: gelatoBody,
-      error: partialErrors.length ? partialErrors.join(" | ") : null,
-    }).eq("shopify_order_id", shopifyOrderId);
-  } catch (e) {
-    await supabase.from("gelato_orders").update({
-      status: "gelato_failed", error: String(e), payload: gelatoBody,
-    }).eq("shopify_order_id", shopifyOrderId);
+    return;
   }
+
+  console.log(`[shopify-webhook] Gelato order submitted: ${result.providerOrderId}`);
+  await supabase.from("gelato_orders").update({
+    status: "submitted",
+    gelato_order_id: result.providerOrderId,
+    payload: result.requestBody,
+    error: partialErrors.length ? partialErrors.join(" | ") : null,
+  }).eq("shopify_order_id", shopifyOrderId);
 }
 
 Deno.serve(async (req) => {

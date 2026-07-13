@@ -12,7 +12,7 @@
 // - Online Store sales channel: published via publishablePublish.
 // - On update we sync productOptions (so newly-added sizes/frames actually
 //   become valid option-values BEFORE we try to bulk-create variants for them).
-import skuMap from "../_shared/gelato-sku-map.json" with { type: "json" };
+import { gelatoUid } from "../_shared/pod/gelato.ts";
 
 // Local CORS headers — MUST allow the x-shopify-session-token header so the
 // browser's preflight passes (the shared esm.sh corsHeaders doesn't list it).
@@ -80,12 +80,9 @@ const KIND_TO_SKU_KEY: Record<Kind, string> = {
   acrylic: "acrylic",
 };
 
-type SkuMap = Record<string, Record<string, { portrait: string; landscape: string }>>;
-const SKUS = skuMap as SkuMap;
-
 function getUid(kind: Kind, size: string, variant: string): string | null {
-  const block = SKUS[KIND_TO_SKU_KEY[kind]] ?? {};
-  return block[`${size}|${variant}`]?.portrait ?? null;
+  // Portrait UID becomes the Shopify variant SKU (unchanged; now via the adapter).
+  return gelatoUid(KIND_TO_SKU_KEY[kind], size, variant, "portrait");
 }
 
 // Effective price lookup: per-template override ?? per-tenant global default.
