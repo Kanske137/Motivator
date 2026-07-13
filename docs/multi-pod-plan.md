@@ -184,7 +184,21 @@ Ship = byte-identical behavior.
 - **Cost/margin:** store provider cost alongside `pricing_rules` retail.
 - **Print-area compatibility:** templates are print-area-bound; switching base may need re-fit.
 - **Color management:** ICC/color profile per spec (paper vs textile).
+- **Per-installation POD credentials (BYO) — REQUIRED for launch:** the order/submit path
+  must resolve the MERCHANT'S OWN provider connection from `pod_connections`, not a single
+  shared env key. Today `shopify-order-webhook` reads one shared `GELATO_API_KEY` env — that
+  must become a per-installation lookup keyed by the order's shop. (Phase 3e/4.)
+- **Webhook-handler multi-tenancy — REQUIRED for launch:** derive shop + access token
+  per-installation for ALL Shopify Admin calls inside the webhook. The failure-note PUT still
+  targets a hardcoded/env store domain + token (an Arthena-era single-store leftover) — must
+  come from the order's installation. Also set `SHOPIFY_API_SECRET` so app-managed webhooks are
+  HMAC-verified in production (today an unset secret makes the handler accept UNVERIFIED — DEV only).
 - **Provider webhooks:** per-provider registration/secret/verification; a `pod-webhook` router.
+  NOTE: Shopify order webhooks are DECLARATIVE in `shopify.app.toml` (`[[webhooks.subscriptions]]`)
+  → auto-registered for every install (and existing installs reconciled) on `shopify app deploy`;
+  no per-merchant step. The `orders/paid` subscription was missing entirely and was added (commit
+  31e3965) — deploy activates it. Gelato/Printful/Printify fulfillment webhooks are registered on
+  the PROVIDER side per connection.
 - **Rate limits + retries** per provider; keep the existing `pending_manual` manual-fallback.
 - **Availability:** made-to-order (no stock) but sync out-of-stock variants + geo availability.
 - **Cancellation:** pre-production cancel path (no returns flow).
