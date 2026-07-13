@@ -817,7 +817,14 @@
       "title": "Sallitut fontit",
       "subtitle": "{{count}} / {{total}} käytössä. Fontit, jotka asiakas voi valita tekstitasoille.",
       "enableAll": "Ota kaikki käyttöön",
-      "disableAll": "Poista kaikki käytöstä"
+      "disableAll": "Poista kaikki käytöstä",
+      "category": {
+        "sans": "Groteski",
+        "serif": "Antiikva",
+        "display": "Display",
+        "script": "Käsinkirjoitettu",
+        "mono": "Tasalevyinen"
+      }
     }
   }
 }

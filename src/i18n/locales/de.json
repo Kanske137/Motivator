@@ -817,7 +817,14 @@
       "title": "Erlaubte Schriftarten",
       "subtitle": "{{count}} von {{total}} aktiviert. Schriftarten, die der Kunde für Textebenen wählen kann.",
       "enableAll": "Alle aktivieren",
-      "disableAll": "Alle deaktivieren"
+      "disableAll": "Alle deaktivieren",
+      "category": {
+        "sans": "Serifenlos",
+        "serif": "Serif",
+        "display": "Display",
+        "script": "Handschrift",
+        "mono": "Monospace"
+      }
     }
   }
 }

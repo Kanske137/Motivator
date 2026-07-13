@@ -817,7 +817,14 @@
       "title": "Toegestane lettertypen",
       "subtitle": "{{count}} van {{total}} ingeschakeld. Lettertypen die de klant kan kiezen voor tekstlagen.",
       "enableAll": "Alles inschakelen",
-      "disableAll": "Alles uitschakelen"
+      "disableAll": "Alles uitschakelen",
+      "category": {
+        "sans": "Schreefloos",
+        "serif": "Serif",
+        "display": "Display",
+        "script": "Handschrift",
+        "mono": "Monospace"
+      }
     }
   }
 }

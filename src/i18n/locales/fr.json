@@ -817,7 +817,14 @@
       "title": "Polices autorisées",
       "subtitle": "{{count}} sur {{total}} activées. Polices que le client peut choisir pour les calques de texte.",
       "enableAll": "Tout activer",
-      "disableAll": "Tout désactiver"
+      "disableAll": "Tout désactiver",
+      "category": {
+        "sans": "Sans serif",
+        "serif": "Serif",
+        "display": "Display",
+        "script": "Manuscrite",
+        "mono": "Monospace"
+      }
     }
   }
 }

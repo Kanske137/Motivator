@@ -352,7 +352,14 @@
       "title": "Allowed fonts",
       "subtitle": "{{count}} of {{total}} enabled. Fonts the customer can pick for text layers.",
       "enableAll": "Enable all",
-      "disableAll": "Disable all"
+      "disableAll": "Disable all",
+      "category": {
+        "sans": "Sans-serif",
+        "serif": "Serif",
+        "display": "Display",
+        "script": "Handwritten",
+        "mono": "Monospace"
+      }
     },
     "designer": {
       "syncInvalidTitle": "Shopify connection is invalid",

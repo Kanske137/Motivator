@@ -817,7 +817,14 @@
       "title": "Tillatte skrifttyper",
       "subtitle": "{{count}} av {{total}} aktivert. Skrifttyper kunden kan velge for tekstlag.",
       "enableAll": "Aktiver alle",
-      "disableAll": "Deaktiver alle"
+      "disableAll": "Deaktiver alle",
+      "category": {
+        "sans": "Sans-serif",
+        "serif": "Serif",
+        "display": "Display",
+        "script": "Håndskrift",
+        "mono": "Monospace"
+      }
     }
   }
 }

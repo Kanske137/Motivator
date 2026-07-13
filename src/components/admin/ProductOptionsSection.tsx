@@ -507,7 +507,7 @@ function AllowedFontsEditor({
               return (
                 <div key={cat} className="space-y-2">
                   <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                    {FONT_CATEGORY_LABELS[cat]}
+                    {t(`admin.fonts.category.${cat}`, { defaultValue: FONT_CATEGORY_LABELS[cat] })}
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {items.map((f) => {

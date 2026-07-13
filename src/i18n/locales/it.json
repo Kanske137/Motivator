@@ -817,7 +817,14 @@
       "title": "Font consentiti",
       "subtitle": "{{count}} di {{total}} attivati. Font che il cliente può scegliere per i livelli di testo.",
       "enableAll": "Attiva tutti",
-      "disableAll": "Disattiva tutti"
+      "disableAll": "Disattiva tutti",
+      "category": {
+        "sans": "Senza grazie",
+        "serif": "Con grazie",
+        "display": "Display",
+        "script": "Corsiva",
+        "mono": "Monospazio"
+      }
     }
   }
 }

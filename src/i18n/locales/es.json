@@ -817,7 +817,14 @@
       "title": "Fuentes permitidas",
       "subtitle": "{{count}} de {{total}} activadas. Fuentes que el cliente puede elegir para las capas de texto.",
       "enableAll": "Activar todas",
-      "disableAll": "Desactivar todas"
+      "disableAll": "Desactivar todas",
+      "category": {
+        "sans": "Sans-serif",
+        "serif": "Serif",
+        "display": "Display",
+        "script": "Manuscrita",
+        "mono": "Monoespaciada"
+      }
     }
   }
 }

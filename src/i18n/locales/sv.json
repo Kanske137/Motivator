@@ -352,7 +352,14 @@
       "title": "Tillåtna typsnitt",
       "subtitle": "{{count}} av {{total}} aktiverade. Typsnitt kunden kan välja för text-lager.",
       "enableAll": "Aktivera alla",
-      "disableAll": "Avaktivera alla"
+      "disableAll": "Avaktivera alla",
+      "category": {
+        "sans": "Sans-serif",
+        "serif": "Serif",
+        "display": "Display",
+        "script": "Handskrivet",
+        "mono": "Monospace"
+      }
     },
     "designer": {
       "syncInvalidTitle": "Shopify-anslutningen är ogiltig",

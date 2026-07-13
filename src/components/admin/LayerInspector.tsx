@@ -1038,7 +1038,7 @@ function TextLayerDefaults({
               if (items.length === 0) return null;
               return (
                 <SelectGroup key={cat}>
-                  <SelectLabel>{FONT_CATEGORY_LABELS[cat]}</SelectLabel>
+                  <SelectLabel>{t(`admin.fonts.category.${cat}`, { defaultValue: FONT_CATEGORY_LABELS[cat] })}</SelectLabel>
                   {items.map((f) => (
                     <SelectItem
                       key={f.family}
