@@ -218,7 +218,11 @@ Deno.serve(async (req) => {
   const rawBody = await req.text();
   const hmac = req.headers.get("X-Shopify-Hmac-Sha256");
 
-  const secret = Deno.env.get("SHOPIFY_API_SECRET") ?? Deno.env.get("SHOPIFY_WEBHOOK_SECRET");
+  // App-managed webhooks are HMAC-signed with the app's CLIENT SECRET (same secret
+  // the OAuth callback verifies with). Prefer it; fall back to the older names.
+  const secret = Deno.env.get("SHOPIFY_APP_CLIENT_SECRET")
+    ?? Deno.env.get("SHOPIFY_API_SECRET")
+    ?? Deno.env.get("SHOPIFY_WEBHOOK_SECRET");
   if (secret) {
     const ok = await verifyHmac(rawBody, hmac, secret);
     if (!ok) {
