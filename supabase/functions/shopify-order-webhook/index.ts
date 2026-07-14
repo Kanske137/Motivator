@@ -218,19 +218,25 @@ Deno.serve(async (req) => {
   const rawBody = await req.text();
   const hmac = req.headers.get("X-Shopify-Hmac-Sha256");
 
-  // App-managed webhooks are HMAC-signed with the app's CLIENT SECRET (same secret
-  // the OAuth callback verifies with). Prefer it; fall back to the older names.
-  const secret = Deno.env.get("SHOPIFY_APP_CLIENT_SECRET")
-    ?? Deno.env.get("SHOPIFY_API_SECRET")
-    ?? Deno.env.get("SHOPIFY_WEBHOOK_SECRET");
-  if (secret) {
-    const ok = await verifyHmac(rawBody, hmac, secret);
+  // App-managed webhooks are HMAC-signed with the app's client secret. verify_jwt
+  // is OFF for this function (Shopify sends no Supabase apikey), so this HMAC check
+  // IS the authentication. Try the known secret env vars; accept if any matches.
+  const hmacSecrets = [
+    Deno.env.get("SHOPIFY_APP_CLIENT_SECRET"),
+    Deno.env.get("SHOPIFY_API_SECRET"),
+    Deno.env.get("SHOPIFY_WEBHOOK_SECRET"),
+  ].filter((s): s is string => Boolean(s));
+  if (hmacSecrets.length > 0) {
+    let ok = false;
+    for (const s of hmacSecrets) {
+      if (await verifyHmac(rawBody, hmac, s)) { ok = true; break; }
+    }
     if (!ok) {
       console.warn("HMAC verification failed");
       return new Response("invalid hmac", { status: 401, headers: corsHeaders });
     }
   } else {
-    console.warn("No SHOPIFY_API_SECRET configured — accepting webhook unverified (DEV)");
+    console.warn("No Shopify app secret configured — accepting webhook unverified (DEV)");
   }
 
   let order: any;

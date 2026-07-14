@@ -4,6 +4,12 @@ project_id = "qmqcvatfrcrgkcjblmyq"
 [functions.shopify-oauth-callback]
 verify_jwt = false
 
+# Shopify order webhook: called by Shopify with no Supabase apikey, so JWT
+# verification must be off or the gateway 401s every delivery before the function
+# runs. (Auth is instead the Shopify HMAC signature inside the function.)
+[functions.shopify-order-webhook]
+verify_jwt = false
+
 # Storefront-proxy anropas från editor-iframe utan användarsession.
 [functions.shopify-storefront]
 verify_jwt = false
