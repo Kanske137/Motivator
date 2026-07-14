@@ -7,14 +7,11 @@ name = "Wallery"
 
 [webhooks]
 api_version = "2026-07"
-
-  # Order fulfillment pipeline: Shopify notifies our edge function when an order is
-  # paid; the function submits it to the POD provider (Gelato). Registered on
-  # `shopify app deploy`. (This subscription was previously missing entirely, so
-  # orders never reached the backend.)
-  [[webhooks.subscriptions]]
-  topics = [ "orders/paid" ]
-  uri = "https://qmqcvatfrcrgkcjblmyq.supabase.co/functions/v1/shopify-order-webhook"
+# NOTE: app-specific (declarative) webhook subscriptions are NOT supported while
+# `use_legacy_install_flow = true`. The order webhook (orders/paid) is instead
+# registered PROGRAMMATICALLY per shop in shopify-oauth-callback (webhookSubscriptionCreate),
+# which also auto-registers it on every future install. Migrating off the legacy
+# install flow (to use declarative webhooks) is a separate, larger auth change.
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes

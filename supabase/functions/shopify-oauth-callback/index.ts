@@ -37,6 +37,49 @@ async function verifyHmac(params: URLSearchParams, secret: string): Promise<bool
   return diff === 0;
 }
 
+const ORDER_WEBHOOK_URL =
+  "https://qmqcvatfrcrgkcjblmyq.supabase.co/functions/v1/shopify-order-webhook";
+const SHOPIFY_API_VERSION = "2026-07";
+
+/**
+ * Subscribe orders/paid -> our edge function for this shop. Declarative
+ * (app-specific) webhooks aren't available with the legacy install flow, so we
+ * register per-shop here — which also auto-registers it on every future install.
+ * Idempotent (Shopify rejects a duplicate topic+address, which we treat as fine)
+ * and best-effort (never blocks the install).
+ */
+async function registerOrderWebhook(shop: string, accessToken: string): Promise<void> {
+  const query = `mutation {
+    webhookSubscriptionCreate(
+      topic: ORDERS_PAID,
+      webhookSubscription: { callbackUrl: "${ORDER_WEBHOOK_URL}", format: JSON }
+    ) {
+      webhookSubscription { id }
+      userErrors { field message }
+    }
+  }`;
+  try {
+    const res = await fetch(`https://${shop}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": accessToken },
+      body: JSON.stringify({ query }),
+    });
+    const json = await res.json().catch(() => null);
+    const created = json?.data?.webhookSubscriptionCreate?.webhookSubscription?.id;
+    const errs = json?.data?.webhookSubscriptionCreate?.userErrors ?? [];
+    if (created) {
+      console.log(`[oauth-callback] orders/paid webhook registered for ${shop}: ${created}`);
+    } else if (errs.length) {
+      // "…has already been taken" = already subscribed → fine.
+      console.log(`[oauth-callback] orders/paid webhook already present for ${shop}: ${JSON.stringify(errs)}`);
+    } else {
+      console.warn(`[oauth-callback] webhook register unexpected response for ${shop}: ${JSON.stringify(json).slice(0, 300)}`);
+    }
+  } catch (e) {
+    console.warn(`[oauth-callback] webhook register failed for ${shop}: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
 function htmlRedirect(url: string, message: string): Response {
   const safeMsg = message.replace(/[<>]/g, "");
   const body = `<!doctype html><meta charset="utf-8"><title>Shopify install</title>
@@ -116,6 +159,9 @@ Deno.serve(async (req) => {
     }
 
     console.log(`[oauth-callback] installed shop=${shop} scopes=${scopes}`);
+
+    // Register the order webhook for this shop (best-effort; won't block install).
+    await registerOrderWebhook(shop, accessToken);
 
     const back = `${APP_REDIRECT_FALLBACK}?installed=1&shop=${encodeURIComponent(shop)}`;
     return htmlRedirect(back, "Shopify-app installerad ✓");
