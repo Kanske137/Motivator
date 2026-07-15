@@ -36,15 +36,24 @@ this branch and read this log so two sessions don't edit the same file at once.
   both functions + verify via Gelato's test webhook (Deno type-check couldn't run locally — proxy
   blocks deno.land).
 
-### Next (reasonable order)
-1. **Deploy + verify 2b** — `supabase functions deploy gelato-webhook gelato-backfill`, then fire
-   Gelato's test webhook and confirm parse/tracking unchanged. (Or bundle with the DB-rename deploy.)
-2. **3a DB rename — LAST, its own coordinated pass.** `gelato_orders` → `pod_orders`
-   (+ `provider`, `provider_order_id`); `product_configs.gelato_sku_map` → `variant_map`.
-   Blast radius = 6 files (`gelato-webhook`, `gelato-backfill`, `shopify-order-webhook`,
-   `admin-templates`, `src/lib/product-config.ts`, generated `src/integrations/supabase/types.ts`)
-   + migration + regenerated types + atomic redeploy of every function that reads the tables.
-   Sensitive → ONE session owns it end-to-end; pull the slice-2a/2b + multi-tenancy commits first.
+- **3a DB rename — CODE + migration PREPARED (not applied).** Commit see below. Migration
+  `supabase/migrations/20260715120000_phase3a_pod_orders_rename.sql`: `gelato_orders` → `pod_orders`
+  (+ `provider default 'gelato'`, `gelato_order_id` → `provider_order_id`); `product_configs.gelato_sku_map`
+  → `variant_map`; index/trigger renames; provider index; grants re-asserted. All 6 code files updated
+  (`gelato-webhook`, `gelato-backfill`, `shopify-order-webhook`, `admin-templates`,
+  `src/lib/product-config.ts`, `src/integrations/supabase/types.ts`). Verified: zero stale refs in code,
+  old names only inside the rename migration. NOT compile-verified (env proxy blocks BOTH the private npm
+  registry and deno.land) and NOT applied.
+
+### Next (reasonable order) — ⚠️ APPLY + DEPLOY IS ONE ATOMIC, USER-TRIGGERED STEP
+1. **Apply the rename migration + redeploy together.** The migration renames a LIVE table/column, so the
+   moment it applies, any still-deployed OLD function breaks until redeployed. In ONE window:
+   `supabase db push` (or apply `20260715120000_phase3a_pod_orders_rename.sql`) **and** redeploy
+   `shopify-order-webhook`, `gelato-webhook`, `gelato-backfill`, `admin-templates`. Then regenerate
+   `src/integrations/supabase/types.ts` from the live DB (the hand-edit is a stopgap; it also still lacks
+   `installation_id`/`provider`). This same deploy also ships slice 2b (adapter parse) — one deploy covers both.
+2. **Verify post-deploy** — fire Gelato's test webhook (fulfillment parse), and confirm a paid order still
+   reaches Gelato (order path). Both exercise the renamed table.
 
 ### Still open (not 3a)
 - **Launch-blocker: per-install POD credentials.** Order/submit still reads one shared
