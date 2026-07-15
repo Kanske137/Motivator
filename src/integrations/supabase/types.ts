@@ -14,6 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_recipes: {
+        Row: {
+          created_at: string
+          customer_options: Json | null
+          description: string | null
+          id: string
+          installation_id: string
+          model: string
+          name: string
+          params: Json
+          prompt: string | null
+          steps: Json | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_options?: Json | null
+          description?: string | null
+          id?: string
+          installation_id: string
+          model: string
+          name: string
+          params?: Json
+          prompt?: string | null
+          steps?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_options?: Json | null
+          description?: string | null
+          id?: string
+          installation_id?: string
+          model?: string
+          name?: string
+          params?: Json
+          prompt?: string | null
+          steps?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_recipes_installation_id_fkey"
+            columns: ["installation_id"]
+            isOneToOne: false
+            referencedRelation: "shopify_app_installations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pod_orders: {
         Row: {
           carrier: string | null
@@ -21,10 +71,12 @@ export type Database = {
           delivered_at: string | null
           error: string | null
           fulfilled_at: string | null
-          provider_order_id: string | null
           id: string
+          installation_id: string | null
           last_status: string | null
           payload: Json | null
+          provider: string
+          provider_order_id: string | null
           raw: Json | null
           shopify_fulfillment_gid: string | null
           shopify_order_gid: string | null
@@ -41,10 +93,12 @@ export type Database = {
           delivered_at?: string | null
           error?: string | null
           fulfilled_at?: string | null
-          provider_order_id?: string | null
           id?: string
+          installation_id?: string | null
           last_status?: string | null
           payload?: Json | null
+          provider?: string
+          provider_order_id?: string | null
           raw?: Json | null
           shopify_fulfillment_gid?: string | null
           shopify_order_gid?: string | null
@@ -61,10 +115,12 @@ export type Database = {
           delivered_at?: string | null
           error?: string | null
           fulfilled_at?: string | null
-          provider_order_id?: string | null
           id?: string
+          installation_id?: string | null
           last_status?: string | null
           payload?: Json | null
+          provider?: string
+          provider_order_id?: string | null
           raw?: Json | null
           shopify_fulfillment_gid?: string | null
           shopify_order_gid?: string | null
@@ -75,7 +131,59 @@ export type Database = {
           tracking_url?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "gelato_orders_installation_id_fkey"
+            columns: ["installation_id"]
+            isOneToOne: false
+            referencedRelation: "shopify_app_installations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pricing_rules: {
+        Row: {
+          created_at: string
+          id: string
+          installation_id: string
+          material: string
+          price: number
+          provider: string
+          size: string
+          updated_at: string
+          variant: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          installation_id: string
+          material: string
+          price: number
+          provider?: string
+          size: string
+          updated_at?: string
+          variant: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          installation_id?: string
+          material?: string
+          price?: number
+          provider?: string
+          size?: string
+          updated_at?: string
+          variant?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pricing_rules_installation_id_fkey"
+            columns: ["installation_id"]
+            isOneToOne: false
+            referencedRelation: "shopify_app_installations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       product_configs: {
         Row: {
@@ -83,8 +191,8 @@ export type Database = {
           created_at: string
           description_html: string | null
           enabled_product_types: string[]
-          variant_map: Json
           id: string
+          installation_id: string | null
           is_consolidated: boolean
           is_freeform: boolean
           layouts: Json
@@ -102,14 +210,15 @@ export type Database = {
           text_config: Json
           title: string
           updated_at: string
+          variant_map: Json
         }
         Insert: {
           category_gid?: string | null
           created_at?: string
           description_html?: string | null
           enabled_product_types?: string[]
-          variant_map?: Json
           id?: string
+          installation_id?: string | null
           is_consolidated?: boolean
           is_freeform?: boolean
           layouts?: Json
@@ -127,14 +236,15 @@ export type Database = {
           text_config?: Json
           title: string
           updated_at?: string
+          variant_map?: Json
         }
         Update: {
           category_gid?: string | null
           created_at?: string
           description_html?: string | null
           enabled_product_types?: string[]
-          variant_map?: Json
           id?: string
+          installation_id?: string | null
           is_consolidated?: boolean
           is_freeform?: boolean
           layouts?: Json
@@ -152,32 +262,47 @@ export type Database = {
           text_config?: Json
           title?: string
           updated_at?: string
+          variant_map?: Json
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "product_configs_installation_id_fkey"
+            columns: ["installation_id"]
+            isOneToOne: false
+            referencedRelation: "shopify_app_installations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       shopify_app_installations: {
         Row: {
           access_token: string
+          admin_locale: string | null
           id: string
           installed_at: string
           scopes: string
           shop_domain: string
+          storefront_access_token: string | null
           updated_at: string
         }
         Insert: {
           access_token: string
+          admin_locale?: string | null
           id?: string
           installed_at?: string
           scopes: string
           shop_domain: string
+          storefront_access_token?: string | null
           updated_at?: string
         }
         Update: {
           access_token?: string
+          admin_locale?: string | null
           id?: string
           installed_at?: string
           scopes?: string
           shop_domain?: string
+          storefront_access_token?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -186,6 +311,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          installation_id: string | null
           last_synced_at: string | null
           last_synced_payload: Json
           product_config_id: string
@@ -195,6 +321,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          installation_id?: string | null
           last_synced_at?: string | null
           last_synced_payload?: Json
           product_config_id: string
@@ -204,6 +331,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          installation_id?: string | null
           last_synced_at?: string | null
           last_synced_payload?: Json
           product_config_id?: string
@@ -211,6 +339,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "shopify_sync_state_installation_id_fkey"
+            columns: ["installation_id"]
+            isOneToOne: false
+            referencedRelation: "shopify_app_installations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "shopify_sync_state_product_config_id_fkey"
             columns: ["product_config_id"]

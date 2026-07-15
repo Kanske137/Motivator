@@ -36,24 +36,31 @@ this branch and read this log so two sessions don't edit the same file at once.
   both functions + verify via Gelato's test webhook (Deno type-check couldn't run locally — proxy
   blocks deno.land).
 
-- **3a DB rename — CODE + migration PREPARED (not applied).** Commit see below. Migration
-  `supabase/migrations/20260715120000_phase3a_pod_orders_rename.sql`: `gelato_orders` → `pod_orders`
+- **3a DB rename — APPLIED + DEPLOYED (live).** Migration `20260715120000_phase3a_pod_orders_rename.sql`
+  applied to the Motivator project (`qmqcvatfrcrgkcjblmyq`) via MCP: `gelato_orders` → `pod_orders`
   (+ `provider default 'gelato'`, `gelato_order_id` → `provider_order_id`); `product_configs.gelato_sku_map`
-  → `variant_map`; index/trigger renames; provider index; grants re-asserted. All 6 code files updated
-  (`gelato-webhook`, `gelato-backfill`, `shopify-order-webhook`, `admin-templates`,
-  `src/lib/product-config.ts`, `src/integrations/supabase/types.ts`). Verified: zero stale refs in code,
-  old names only inside the rename migration. NOT compile-verified (env proxy blocks BOTH the private npm
-  registry and deno.land) and NOT applied.
+  → `variant_map`; indexes/trigger renamed; provider index added; grants re-asserted. Verified live:
+  `pod_orders` (3 rows) exists, `gelato_orders` gone, new columns present. All 6 code files updated;
+  `src/integrations/supabase/types.ts` REGENERATED from the live DB (now also carries
+  `installation_id`/`provider`/`ai_recipes`/`pricing_rules`).
+- **Redeployed (Supabase MCP — compiled clean on deploy = our server-side type-check):**
+  `shopify-order-webhook` → v7 (also brings the multi-tenancy fix live), `admin-templates` → v13.
+  These were the ONLY deployed functions referencing the renamed schema — `gelato-webhook`/`gelato-backfill`
+  are NOT deployed to this project (code is ready for when fulfillment gets wired). Post-DDL security
+  advisors: only pre-existing INFO/WARN, nothing new; `pod_orders` keeps the intended service-role-only
+  (RLS-on, no-policy) posture.
 
-### Next (reasonable order) — ⚠️ APPLY + DEPLOY IS ONE ATOMIC, USER-TRIGGERED STEP
-1. **Apply the rename migration + redeploy together.** The migration renames a LIVE table/column, so the
-   moment it applies, any still-deployed OLD function breaks until redeployed. In ONE window:
-   `supabase db push` (or apply `20260715120000_phase3a_pod_orders_rename.sql`) **and** redeploy
-   `shopify-order-webhook`, `gelato-webhook`, `gelato-backfill`, `admin-templates`. Then regenerate
-   `src/integrations/supabase/types.ts` from the live DB (the hand-edit is a stopgap; it also still lacks
-   `installation_id`/`provider`). This same deploy also ships slice 2b (adapter parse) — one deploy covers both.
-2. **Verify post-deploy** — fire Gelato's test webhook (fulfillment parse), and confirm a paid order still
-   reaches Gelato (order path). Both exercise the renamed table.
+### Next (reasonable order)
+1. **Post-deploy smoke test (recommended):** place a real paid test order → confirm it reaches Gelato and
+   `pod_orders.status` goes `received`→`submitted` with `provider_order_id` set. (Fulfillment via
+   gelato-webhook is only testable once that function is deployed + its Gelato webhook registered.)
+2. **Phase 3b** — generic `product_bases` + editor print-area (see §3b below): unblocks non-wall-art Gelato
+   products, then Printful/Printify become "register an adapter".
+
+Note: the migration is recorded remotely under name `phase3a_pod_orders_rename` (applied via MCP) and also
+lives as the timestamped file in `supabase/migrations/`. A fresh `supabase db push` against a NEW project
+replays the file; against THIS project it is already applied. FK constraints keep their old internal names
+(e.g. `gelato_orders_installation_id_fkey`) — cosmetic, intentionally not renamed.
 
 ### Still open (not 3a)
 - **Launch-blocker: per-install POD credentials.** Order/submit still reads one shared
