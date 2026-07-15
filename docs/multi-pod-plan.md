@@ -28,14 +28,17 @@ this branch and read this log so two sessions don't edit the same file at once.
   token from the ORDER'S OWN installation (`X-Shopify-Shop-Domain` → `shopify_app_installations`)
   instead of a hardcoded Arthena store + shared env token. Commit `5f8be94`. NOTE: this edited
   `shopify-order-webhook/index.ts` — the DB rename below must be rebased on top of it.
+- **3a slice 2b — fulfillment-parse behind the adapter (CODE done; deploy pending).** Commit
+  `529c6b8`. `_shared/pod/gelato.ts` now owns `parseFulfillmentWebhook(event)` (webhook shape) and
+  `parseGelatoOrderResponse(order)` (Order API shape); `gelato-webhook` + `gelato-backfill` import
+  them, inline copies deleted. Verbatim move → byte-identical behavior. Status→ship/event mapping
+  (`SHIP_STATUSES`/`EVENT_MAP`) deliberately left in each caller (they differ). REMAINING: deploy
+  both functions + verify via Gelato's test webhook (Deno type-check couldn't run locally — proxy
+  blocks deno.land).
 
 ### Next (reasonable order)
-1. **3a slice 2b — fulfillment-parse behind the adapter.** Move the Gelato-specific parse
-   (`pickTracking` + `parseGelatoEvent` → `ParsedEvent`) out of `gelato-webhook/index.ts`
-   (and the copy in `gelato-backfill/index.ts`) into `_shared/pod/gelato.ts` as
-   `parseFulfillmentWebhook(payload)`. The Shopify-side actions (`ensureFulfillment`, `postEvent`,
-   `findLink`, DB writes) are NOT Gelato-specific — leave them in the edge function. Independent of
-   the order path; deploy + verify with Gelato's test webhook. **Lower risk — do this first.**
+1. **Deploy + verify 2b** — `supabase functions deploy gelato-webhook gelato-backfill`, then fire
+   Gelato's test webhook and confirm parse/tracking unchanged. (Or bundle with the DB-rename deploy.)
 2. **3a DB rename — LAST, its own coordinated pass.** `gelato_orders` → `pod_orders`
    (+ `provider`, `provider_order_id`); `product_configs.gelato_sku_map` → `variant_map`.
    Blast radius = 6 files (`gelato-webhook`, `gelato-backfill`, `shopify-order-webhook`,
