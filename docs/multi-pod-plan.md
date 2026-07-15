@@ -6,7 +6,47 @@ the 4 wall-art types), then add Printful. Merchant self-serve onboarding, per-pr
 print files, mockups via each provider's API, live cost/shipping display, and a live
 print-area guide in the editor.
 
-Status: **planning / not started.** No code yet. This doc is the decided sequence.
+Status: **Phase 3a in progress.** Slice 2a shipped + verified against live Gelato;
+2b + the DB rename remain. This doc is the decided sequence.
+
+---
+
+## Progress log (living — keep updated across parallel sessions)
+
+Coordination note: work happens on branch `claude/parallel-claude-cli-workflow-okjppo`
+from more than one Claude session (web + CLI). Before starting a slice, `git pull`
+this branch and read this log so two sessions don't edit the same file at once.
+
+### Done
+- **3a slice 2a** — order-submit + SKU resolution behind `PodProvider` (server adapter
+  `supabase/functions/_shared/pod/gelato.ts`: `resolveGelatoProductUid`, `submitGelatoOrder`;
+  client `src/lib/pod/`). Verified against live Gelato. Commits `da9477b`, `21e44a9`, `4dbd7ea`.
+- **Order-webhook auth/delivery fix** — `verify_jwt=false` in `config.toml` + HMAC via the app
+  client secret; `orders/paid` registered. Verified end-to-end. Commits `31e3965`, `965bd3f`,
+  `09c9aba`, `57fc8ae`.
+- **Launch-blocker: webhook multi-tenancy** — `shopify-order-webhook` now resolves shop + Admin
+  token from the ORDER'S OWN installation (`X-Shopify-Shop-Domain` → `shopify_app_installations`)
+  instead of a hardcoded Arthena store + shared env token. Commit `5f8be94`. NOTE: this edited
+  `shopify-order-webhook/index.ts` — the DB rename below must be rebased on top of it.
+
+### Next (reasonable order)
+1. **3a slice 2b — fulfillment-parse behind the adapter.** Move the Gelato-specific parse
+   (`pickTracking` + `parseGelatoEvent` → `ParsedEvent`) out of `gelato-webhook/index.ts`
+   (and the copy in `gelato-backfill/index.ts`) into `_shared/pod/gelato.ts` as
+   `parseFulfillmentWebhook(payload)`. The Shopify-side actions (`ensureFulfillment`, `postEvent`,
+   `findLink`, DB writes) are NOT Gelato-specific — leave them in the edge function. Independent of
+   the order path; deploy + verify with Gelato's test webhook. **Lower risk — do this first.**
+2. **3a DB rename — LAST, its own coordinated pass.** `gelato_orders` → `pod_orders`
+   (+ `provider`, `provider_order_id`); `product_configs.gelato_sku_map` → `variant_map`.
+   Blast radius = 6 files (`gelato-webhook`, `gelato-backfill`, `shopify-order-webhook`,
+   `admin-templates`, `src/lib/product-config.ts`, generated `src/integrations/supabase/types.ts`)
+   + migration + regenerated types + atomic redeploy of every function that reads the tables.
+   Sensitive → ONE session owns it end-to-end; pull the slice-2a/2b + multi-tenancy commits first.
+
+### Still open (not 3a)
+- **Launch-blocker: per-install POD credentials.** Order/submit still reads one shared
+  `GELATO_API_KEY` env; must become a per-installation lookup. Needs a `pod_connections` table
+  (scoped to Phase 3e/4 in this plan) — do not invent the schema ad hoc.
 
 ---
 
