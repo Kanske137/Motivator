@@ -92,11 +92,11 @@ Deno.serve(async (req) => {
         const numericId = String(order.id).replace("gid://shopify/Order/", "");
 
         const { data: link } = await supabase
-          .from("gelato_orders")
+          .from("pod_orders")
           .select("*")
           .eq("shopify_order_id", numericId)
           .maybeSingle();
-        if (!link?.gelato_order_id) {
+        if (!link?.provider_order_id) {
           summary.skipped++;
           continue;
         }
@@ -104,9 +104,9 @@ Deno.serve(async (req) => {
 
         let gelato: any;
         try {
-          gelato = await fetchGelatoOrder(link.gelato_order_id);
+          gelato = await fetchGelatoOrder(link.provider_order_id);
         } catch (e) {
-          summary.errors.push(`gelato fetch ${link.gelato_order_id}: ${String(e)}`);
+          summary.errors.push(`gelato fetch ${link.provider_order_id}: ${String(e)}`);
           continue;
         }
         if (!gelato) {
@@ -184,7 +184,7 @@ Deno.serve(async (req) => {
         if (isShip && !link.fulfilled_at) patch.fulfilled_at = new Date().toISOString();
         if (eventStatus === "DELIVERED" && !link.delivered_at) patch.delivered_at = new Date().toISOString();
 
-        await supabase.from("gelato_orders").update(patch).eq("id", link.id);
+        await supabase.from("pod_orders").update(patch).eq("id", link.id);
       }
 
       if (!data.orders.pageInfo.hasNextPage) break;

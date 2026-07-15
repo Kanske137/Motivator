@@ -183,7 +183,7 @@ Deno.serve(async (req) => {
             map_styles: p.map_styles ?? [],
             text_config: p.text_config ?? {},
             sizes: [],
-            gelato_sku_map: {},
+            variant_map: {},
           })
           .select("id, shopify_handle")
           .maybeSingle();

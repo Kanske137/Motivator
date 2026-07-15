@@ -103,13 +103,13 @@ async function processOrder(supabase: any, order: any, shopDomainHeader: string 
     await resolveShopAuth(supabase, shopDomainHeader);
 
   if (!gelatoKey) {
-    await supabase.from("gelato_orders").update({ status: "gelato_failed", error: "GELATO_API_KEY missing" })
+    await supabase.from("pod_orders").update({ status: "gelato_failed", error: "GELATO_API_KEY missing" })
       .eq("shopify_order_id", shopifyOrderId);
     return;
   }
 
   // Load DB overrides per handle
-  const { data: configs } = await supabase.from("product_configs").select("shopify_handle, gelato_sku_map");
+  const { data: configs } = await supabase.from("product_configs").select("shopify_handle, variant_map");
   const configByHandle: Record<string, any> = {};
   (configs ?? []).forEach((c: any) => { configByHandle[c.shopify_handle] = c; });
 
@@ -166,7 +166,7 @@ async function processOrder(supabase: any, order: any, shopDomainHeader: string 
       variant,
       orientation,
       productType,
-      dbMap: cfg?.gelato_sku_map ?? null,
+      dbMap: cfg?.variant_map ?? null,
     });
 
     console.log(
@@ -194,7 +194,7 @@ async function processOrder(supabase: any, order: any, shopDomainHeader: string 
       ? `missing_print_file_url — ${printErrors.join(" | ")}`
       : [...skuErrors].join(" | ") || "no editor items in order";
     console.warn(`[shopify-webhook] order ${shopifyOrderId} → ${status}: ${error}`);
-    await supabase.from("gelato_orders").update({ status, error })
+    await supabase.from("pod_orders").update({ status, error })
       .eq("shopify_order_id", shopifyOrderId);
     return;
   }
@@ -225,7 +225,7 @@ async function processOrder(supabase: any, order: any, shopDomainHeader: string 
 
   if (!result.ok) {
     console.error(`[shopify-webhook] Gelato API failed ${result.status}:`, String(result.error).slice(0, 800));
-    await supabase.from("gelato_orders").update({
+    await supabase.from("pod_orders").update({
       status: "gelato_failed",
       error: result.status ? `${result.status}: ${result.error}` : String(result.error),
       payload: result.requestBody,
@@ -242,9 +242,9 @@ async function processOrder(supabase: any, order: any, shopDomainHeader: string 
   }
 
   console.log(`[shopify-webhook] Gelato order submitted: ${result.providerOrderId}`);
-  await supabase.from("gelato_orders").update({
+  await supabase.from("pod_orders").update({
     status: "submitted",
-    gelato_order_id: result.providerOrderId,
+    provider_order_id: result.providerOrderId,
     payload: result.requestBody,
     error: partialErrors.length ? partialErrors.join(" | ") : null,
   }).eq("shopify_order_id", shopifyOrderId);
@@ -290,7 +290,7 @@ Deno.serve(async (req) => {
   );
 
   const shopifyOrderId = String(order.id);
-  const { error: insertErr } = await supabase.from("gelato_orders").insert({
+  const { error: insertErr } = await supabase.from("pod_orders").insert({
     shopify_order_id: shopifyOrderId,
     shopify_order_name: order.name ?? null,
     status: "received",

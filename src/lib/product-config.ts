@@ -55,7 +55,7 @@ export interface ProductConfig {
   map_styles: string[];
   text_config: TextConfig;
   sizes: SizeDef[];
-  gelato_sku_map: Record<string, Record<string, string>>;
+  variant_map: Record<string, Record<string, string>>;
   // Shopify publishing metadata (Fas 3)
   tags?: string[];
   category_gid?: string | null;

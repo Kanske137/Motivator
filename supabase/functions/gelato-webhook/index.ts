@@ -12,7 +12,7 @@
 //                                         tracking-kolumner och postar event
 //                                         om vi redan har en fulfillment.
 //   * order_item_status_updated         → för granulärt för fulfillment;
-//                                         loggas bara i gelato_orders.
+//                                         loggas bara i pod_orders.
 //   * order_delivery_estimate_updated   → loggas bara.
 //
 // Auth: shared secret via ?secret=... eller header x-gelato-secret.
@@ -160,15 +160,15 @@ async function findLink(
 ): Promise<any | null> {
   if (parsed.gelatoOrderId) {
     const r = await supabase
-      .from("gelato_orders")
+      .from("pod_orders")
       .select("*")
-      .eq("gelato_order_id", parsed.gelatoOrderId)
+      .eq("provider_order_id", parsed.gelatoOrderId)
       .maybeSingle();
     if (r.data) return r.data;
   }
   if (parsed.shopifyOrderName) {
     const r = await supabase
-      .from("gelato_orders")
+      .from("pod_orders")
       .select("*")
       .eq("shopify_order_name", parsed.shopifyOrderName)
       .maybeSingle();
@@ -216,11 +216,11 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // 2) Hitta vår länk-rad. Sök på gelato_order_id → shopify_order_name.
+    // 2) Hitta vår länk-rad. Sök på provider_order_id → shopify_order_name.
     const link = await findLink(supabase, parsed);
     if (!link) {
       console.warn(
-        `[gelato-webhook] no gelato_orders row matched event ` +
+        `[gelato-webhook] no pod_orders row matched event ` +
           `(orderId=${parsed.gelatoOrderId}, ref=${parsed.shopifyOrderName})`,
       );
       return new Response("no link", { status: 200, headers: corsHeaders });
@@ -245,12 +245,12 @@ Deno.serve(async (req) => {
       parsed.eventType === "order_delivery_estimate_updated"
     ) {
       await supabase
-        .from("gelato_orders")
+        .from("pod_orders")
         .update({
           raw: event,
           shopify_order_gid: shopifyOrderGid,
-          ...(parsed.gelatoOrderId && !link.gelato_order_id
-            ? { gelato_order_id: parsed.gelatoOrderId }
+          ...(parsed.gelatoOrderId && !link.provider_order_id
+            ? { provider_order_id: parsed.gelatoOrderId }
             : {}),
         })
         .eq("id", link.id);
@@ -266,15 +266,15 @@ Deno.serve(async (req) => {
         tracking_url: parsed.trackingInfo.url ?? link.tracking_url,
         carrier: parsed.trackingInfo.company ?? link.carrier,
       };
-      if (parsed.gelatoOrderId && !link.gelato_order_id) {
-        patch.gelato_order_id = parsed.gelatoOrderId;
+      if (parsed.gelatoOrderId && !link.provider_order_id) {
+        patch.provider_order_id = parsed.gelatoOrderId;
       }
       // Om vi redan skapat fulfillment: posta ett IN_TRANSIT-event så att kunden
       // ser tracking-uppdateringen i Shopifys order-timeline.
       if (link.shopify_fulfillment_gid) {
         await postEvent(link.shopify_fulfillment_gid, "IN_TRANSIT");
       }
-      await supabase.from("gelato_orders").update(patch).eq("id", link.id);
+      await supabase.from("pod_orders").update(patch).eq("id", link.id);
       return new Response("tracking updated", { status: 200, headers: corsHeaders });
     }
 
@@ -296,13 +296,13 @@ Deno.serve(async (req) => {
     // 4c-i) Statuses vi inte agerar på (created/printed/in_production…) — logga bara.
     if (!isShip && !eventStatus) {
       await supabase
-        .from("gelato_orders")
+        .from("pod_orders")
         .update({
           last_status: parsed.status,
           raw: event,
           shopify_order_gid: shopifyOrderGid,
-          ...(parsed.gelatoOrderId && !link.gelato_order_id
-            ? { gelato_order_id: parsed.gelatoOrderId }
+          ...(parsed.gelatoOrderId && !link.provider_order_id
+            ? { provider_order_id: parsed.gelatoOrderId }
             : {}),
         })
         .eq("id", link.id);
@@ -318,7 +318,7 @@ Deno.serve(async (req) => {
 
     if (!fulfillmentGid) {
       await supabase
-        .from("gelato_orders")
+        .from("pod_orders")
         .update({
           last_status: parsed.status,
           raw: event,
@@ -343,8 +343,8 @@ Deno.serve(async (req) => {
       carrier: parsed.trackingInfo.company ?? link.carrier,
       raw: event,
     };
-    if (parsed.gelatoOrderId && !link.gelato_order_id) {
-      patch.gelato_order_id = parsed.gelatoOrderId;
+    if (parsed.gelatoOrderId && !link.provider_order_id) {
+      patch.provider_order_id = parsed.gelatoOrderId;
     }
     if (isShip && !link.fulfilled_at) {
       patch.fulfilled_at = new Date().toISOString();
@@ -353,7 +353,7 @@ Deno.serve(async (req) => {
       patch.delivered_at = new Date().toISOString();
     }
 
-    await supabase.from("gelato_orders").update(patch).eq("id", link.id);
+    await supabase.from("pod_orders").update(patch).eq("id", link.id);
 
     return new Response("ok", { status: 200, headers: corsHeaders });
   } catch (e) {

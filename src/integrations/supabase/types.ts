@@ -14,14 +14,14 @@ export type Database = {
   }
   public: {
     Tables: {
-      gelato_orders: {
+      pod_orders: {
         Row: {
           carrier: string | null
           created_at: string
           delivered_at: string | null
           error: string | null
           fulfilled_at: string | null
-          gelato_order_id: string | null
+          provider_order_id: string | null
           id: string
           last_status: string | null
           payload: Json | null
@@ -41,7 +41,7 @@ export type Database = {
           delivered_at?: string | null
           error?: string | null
           fulfilled_at?: string | null
-          gelato_order_id?: string | null
+          provider_order_id?: string | null
           id?: string
           last_status?: string | null
           payload?: Json | null
@@ -61,7 +61,7 @@ export type Database = {
           delivered_at?: string | null
           error?: string | null
           fulfilled_at?: string | null
-          gelato_order_id?: string | null
+          provider_order_id?: string | null
           id?: string
           last_status?: string | null
           payload?: Json | null
@@ -83,7 +83,7 @@ export type Database = {
           created_at: string
           description_html: string | null
           enabled_product_types: string[]
-          gelato_sku_map: Json
+          variant_map: Json
           id: string
           is_consolidated: boolean
           is_freeform: boolean
@@ -108,7 +108,7 @@ export type Database = {
           created_at?: string
           description_html?: string | null
           enabled_product_types?: string[]
-          gelato_sku_map?: Json
+          variant_map?: Json
           id?: string
           is_consolidated?: boolean
           is_freeform?: boolean
@@ -133,7 +133,7 @@ export type Database = {
           created_at?: string
           description_html?: string | null
           enabled_product_types?: string[]
-          gelato_sku_map?: Json
+          variant_map?: Json
           id?: string
           is_consolidated?: boolean
           is_freeform?: boolean
