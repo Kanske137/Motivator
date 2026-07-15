@@ -53,16 +53,54 @@ function getProp(props: Array<{ name: string; value: string }> | undefined, name
   return p ? String(p.value) : null;
 }
 
-async function processOrder(supabase: any, order: any) {
+/**
+ * Multi-tenant Shopify auth for this webhook. Resolves the shop + its offline
+ * Admin API token from the ORDER'S OWN installation — the shop is taken from
+ * the `X-Shopify-Shop-Domain` header Shopify sends with every webhook, and the
+ * token from that shop's `shopify_app_installations` row. This replaces the old
+ * Arthena-era single-store leftover (a hardcoded domain + a shared env token),
+ * so a webhook for shop A can never write to shop B's store.
+ *
+ * Falls back to env vars only when the header is absent (e.g. a manual replay)
+ * so legacy single-tenant setups keep working.
+ */
+async function resolveShopAuth(
+  supabase: any,
+  shopDomainHeader: string | null,
+): Promise<{ domain: string; token: string | null }> {
+  const domain = (
+    shopDomainHeader
+      ?? Deno.env.get("SHOPIFY_STORE_PERMANENT_DOMAIN")
+      ?? Deno.env.get("SHOPIFY_STORE_DOMAIN")
+      ?? ""
+  ).replace(/^https?:\/\//, "").replace(/\/$/, "");
+
+  if (domain) {
+    const { data, error } = await supabase
+      .from("shopify_app_installations")
+      .select("access_token")
+      .eq("shop_domain", domain)
+      .maybeSingle();
+    if (error) {
+      console.warn(`[shopify-webhook] install lookup failed for ${domain}: ${error.message}`);
+    } else if (data?.access_token) {
+      return { domain, token: data.access_token as string };
+    }
+  }
+
+  // No install row (or no header): fall back to the legacy env token.
+  return { domain, token: Deno.env.get("SHOPIFY_ACCESS_TOKEN") ?? null };
+}
+
+async function processOrder(supabase: any, order: any, shopDomainHeader: string | null) {
   const shopifyOrderId = String(order.id);
   const shopifyOrderName = String(order.name ?? "");
-  const projectUrl = Deno.env.get("SUPABASE_URL")!;
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const gelatoKey = Deno.env.get("GELATO_API_KEY");
-  const shopifyDomain = Deno.env.get("SHOPIFY_STORE_PERMANENT_DOMAIN")
-    ?? Deno.env.get("SHOPIFY_STORE_DOMAIN")
-    ?? "wdxugd-yq.myshopify.com";
-  const shopifyToken = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
+
+  // Resolve THIS order's shop + Admin token from its own installation, never a
+  // hardcoded store (see resolveShopAuth).
+  const { domain: shopifyDomain, token: shopifyToken } =
+    await resolveShopAuth(supabase, shopDomainHeader);
 
   if (!gelatoKey) {
     await supabase.from("gelato_orders").update({ status: "gelato_failed", error: "GELATO_API_KEY missing" })
@@ -217,6 +255,8 @@ Deno.serve(async (req) => {
 
   const rawBody = await req.text();
   const hmac = req.headers.get("X-Shopify-Hmac-Sha256");
+  // Shop that owns this webhook — used to resolve the tenant's own Admin token.
+  const shopDomainHeader = req.headers.get("X-Shopify-Shop-Domain");
 
   // App-managed webhooks are HMAC-signed with the app's client secret. verify_jwt
   // is OFF for this function (Shopify sends no Supabase apikey), so this HMAC check
@@ -265,7 +305,7 @@ Deno.serve(async (req) => {
   }
 
   // @ts-ignore — EdgeRuntime is available in Supabase Edge Functions
-  EdgeRuntime.waitUntil(processOrder(supabase, order));
+  EdgeRuntime.waitUntil(processOrder(supabase, order, shopDomainHeader));
 
   return new Response("ok", { status: 200, headers: corsHeaders });
 });
