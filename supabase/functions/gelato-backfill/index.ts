@@ -5,6 +5,7 @@
 // Idempotent — säker att köra om. Anropas manuellt (kräver Bearer-JWT).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import { shopifyAdmin } from "../_shared/shopify-admin.ts";
+import { parseGelatoOrderResponse } from "../_shared/pod/gelato.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -62,19 +63,6 @@ async function fetchGelatoOrder(gelatoOrderId: string): Promise<any | null> {
   return await r.json();
 }
 
-function extractTracking(g: any): { number: string | null; url: string | null; company: string | null } {
-  const ship =
-    (Array.isArray(g?.shipment?.fulfillments) && g.shipment.fulfillments[0]) ||
-    (Array.isArray(g?.fulfillments) && g.fulfillments[0]) ||
-    g?.shipment ||
-    {};
-  return {
-    number: ship.trackingCode ?? ship.trackingNumber ?? null,
-    url: ship.trackingUrl ?? null,
-    company: ship.shipmentMethodName ?? ship.carrier ?? "Gelato",
-  };
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -126,15 +114,13 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        const status = String(gelato.fulfillmentStatus ?? gelato.status ?? "").toLowerCase();
+        const { status, trackingInfo } = parseGelatoOrderResponse(gelato);
         const isShip = SHIP_STATUSES.has(status);
         const eventStatus = EVENT_MAP[status];
         if (!isShip && !eventStatus) {
           summary.skipped++;
           continue;
         }
-
-        const trackingInfo = extractTracking(gelato);
 
         // ensure fulfillment
         let fulfillmentGid = link.shopify_fulfillment_gid ?? null;

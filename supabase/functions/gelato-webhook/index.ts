@@ -25,6 +25,11 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import { shopifyAdmin } from "../_shared/shopify-admin.ts";
+import {
+  parseFulfillmentWebhook,
+  type ParsedFulfillmentEvent,
+  type TrackingInfo,
+} from "../_shared/pod/gelato.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -68,91 +73,6 @@ const CREATE_EVENT = `
       userErrors { field message }
     }
   }`;
-
-interface TrackingInfo {
-  number: string | null;
-  url: string | null;
-  company: string | null;
-}
-
-interface ParsedEvent {
-  eventType: string;           // Gelatos event-namn, t.ex. "order_status_updated"
-  eventId: string | null;      // Gelatos event-id, t.ex. "os_5e5680ce494f6"
-  status: string;              // fulfillmentStatus / status (lower-case)
-  gelatoOrderId: string | null;
-  shopifyOrderName: string | null; // vår orderReferenceId (ex "#1042")
-  trackingInfo: TrackingInfo;
-  fulfillmentCount: number;    // för loggning
-}
-
-function pickTracking(event: any): { info: TrackingInfo; count: number } {
-  // order_item_tracking_code_updated: allt på root.
-  if (event?.event === "order_item_tracking_code_updated") {
-    return {
-      info: {
-        number: event.trackingCode ?? null,
-        url: event.trackingUrl ?? null,
-        company: event.shipmentMethodName ?? "Gelato",
-      },
-      count: event.trackingCode ? 1 : 0,
-    };
-  }
-
-  // order_status_updated: items[].fulfillments[]
-  let count = 0;
-  let first: any = null;
-  const items = Array.isArray(event?.items) ? event.items : [];
-  for (const item of items) {
-    const fs = Array.isArray(item?.fulfillments) ? item.fulfillments : [];
-    for (const f of fs) {
-      count += 1;
-      if (!first && f?.trackingCode) first = f;
-    }
-  }
-  if (!first && items[0]?.fulfillments?.[0]) first = items[0].fulfillments[0];
-
-  return {
-    info: {
-      number: first?.trackingCode ?? null,
-      url: first?.trackingUrl ?? null,
-      company: first?.shipmentMethodName ?? "Gelato",
-    },
-    count,
-  };
-}
-
-function parseGelatoEvent(event: any): ParsedEvent {
-  const eventType = String(event?.event ?? "").trim();
-  const eventId = event?.id ? String(event.id) : null;
-
-  // Status per event-typ:
-  //   order_status_updated       → fulfillmentStatus
-  //   order_item_status_updated  → status
-  //   order_item_tracking_code_updated → alltid "shipped"-ish (använd eventType)
-  //   order_delivery_estimate_updated  → ingen status
-  const status = String(
-    event?.fulfillmentStatus ?? event?.status ?? "",
-  )
-    .toLowerCase()
-    .trim();
-
-  const gelatoOrderId = event?.orderId ? String(event.orderId) : null;
-  const shopifyOrderName = event?.orderReferenceId
-    ? String(event.orderReferenceId)
-    : null;
-
-  const { info: trackingInfo, count: fulfillmentCount } = pickTracking(event);
-
-  return {
-    eventType,
-    eventId,
-    status,
-    gelatoOrderId,
-    shopifyOrderName,
-    trackingInfo,
-    fulfillmentCount,
-  };
-}
 
 async function ensureFulfillment(
   shopifyOrderGid: string,
@@ -236,7 +156,7 @@ async function postEvent(fulfillmentGid: string, status: string) {
 
 async function findLink(
   supabase: ReturnType<typeof createClient>,
-  parsed: ParsedEvent,
+  parsed: ParsedFulfillmentEvent,
 ): Promise<any | null> {
   if (parsed.gelatoOrderId) {
     const r = await supabase
@@ -279,7 +199,7 @@ Deno.serve(async (req) => {
       return new Response("bad json", { status: 400, headers: corsHeaders });
     }
 
-    const parsed = parseGelatoEvent(event);
+    const parsed = parseFulfillmentWebhook(event);
     console.log(
       `[gelato-webhook] event=${parsed.eventType} id=${parsed.eventId} ` +
         `status=${parsed.status || "-"} gelatoOrderId=${parsed.gelatoOrderId} ` +

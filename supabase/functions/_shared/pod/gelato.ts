@@ -180,3 +180,115 @@ export async function submitGelatoOrder(input: {
     return { ok: false, providerOrderId: null, requestBody: body, status: null, error: String(e) };
   }
 }
+
+// --- Fulfillment parsing (Phase 3a slice 2b) ---
+//
+// Gelato reports fulfillment + tracking in two different shapes, and both are
+// Gelato-specific, so the parsing lives here (behind the adapter) and the edge
+// functions stay provider-agnostic:
+//   1. Webhook EVENTS (order_status_updated, order_item_tracking_code_updated, …)
+//      → parseFulfillmentWebhook(). Consumed by gelato-webhook.
+//   2. The Order API response (GET /v4/orders/:id) → parseGelatoOrderResponse().
+//      Consumed by gelato-backfill, which polls that endpoint.
+//
+// Logic moved VERBATIM from the previous inline copies so behavior is identical.
+// The status → ship/event MAPPING intentionally stays in each caller: the webhook
+// and backfill use deliberately different SHIP_STATUSES sets, so unifying them
+// here would change behavior. This slice moves the parse only.
+
+export interface TrackingInfo {
+  number: string | null;
+  url: string | null;
+  company: string | null;
+}
+
+export interface ParsedFulfillmentEvent {
+  eventType: string;           // Gelato's event name, e.g. "order_status_updated"
+  eventId: string | null;      // Gelato's event id, e.g. "os_5e5680ce494f6"
+  status: string;              // fulfillmentStatus / status (lower-case)
+  gelatoOrderId: string | null;
+  shopifyOrderName: string | null; // our orderReferenceId (e.g. "#1042")
+  trackingInfo: TrackingInfo;
+  fulfillmentCount: number;    // for logging
+}
+
+/** Pick the first tracking entry from a Gelato webhook event. (Was pickTracking.) */
+function pickWebhookTracking(event: any): { info: TrackingInfo; count: number } {
+  // order_item_tracking_code_updated: everything on root.
+  if (event?.event === "order_item_tracking_code_updated") {
+    return {
+      info: {
+        number: event.trackingCode ?? null,
+        url: event.trackingUrl ?? null,
+        company: event.shipmentMethodName ?? "Gelato",
+      },
+      count: event.trackingCode ? 1 : 0,
+    };
+  }
+
+  // order_status_updated: items[].fulfillments[]
+  let count = 0;
+  let first: any = null;
+  const items = Array.isArray(event?.items) ? event.items : [];
+  for (const item of items) {
+    const fs = Array.isArray(item?.fulfillments) ? item.fulfillments : [];
+    for (const f of fs) {
+      count += 1;
+      if (!first && f?.trackingCode) first = f;
+    }
+  }
+  if (!first && items[0]?.fulfillments?.[0]) first = items[0].fulfillments[0];
+
+  return {
+    info: {
+      number: first?.trackingCode ?? null,
+      url: first?.trackingUrl ?? null,
+      company: first?.shipmentMethodName ?? "Gelato",
+    },
+    count,
+  };
+}
+
+/** Parse a Gelato fulfillment WEBHOOK event into normalized fields. (Was parseGelatoEvent.) */
+export function parseFulfillmentWebhook(event: any): ParsedFulfillmentEvent {
+  const eventType = String(event?.event ?? "").trim();
+  const eventId = event?.id ? String(event.id) : null;
+
+  // Status per event type:
+  //   order_status_updated             → fulfillmentStatus
+  //   order_item_status_updated        → status
+  //   order_item_tracking_code_updated → always "shipped"-ish (use eventType)
+  //   order_delivery_estimate_updated  → no status
+  const status = String(event?.fulfillmentStatus ?? event?.status ?? "")
+    .toLowerCase()
+    .trim();
+
+  const gelatoOrderId = event?.orderId ? String(event.orderId) : null;
+  const shopifyOrderName = event?.orderReferenceId ? String(event.orderReferenceId) : null;
+
+  const { info: trackingInfo, count: fulfillmentCount } = pickWebhookTracking(event);
+
+  return { eventType, eventId, status, gelatoOrderId, shopifyOrderName, trackingInfo, fulfillmentCount };
+}
+
+/**
+ * Parse a Gelato Order API response (GET /v4/orders/:id) into a normalized
+ * status + tracking. (Was the inline status derivation + extractTracking in
+ * gelato-backfill.)
+ */
+export function parseGelatoOrderResponse(g: any): { status: string; trackingInfo: TrackingInfo } {
+  const status = String(g?.fulfillmentStatus ?? g?.status ?? "").toLowerCase();
+  const ship =
+    (Array.isArray(g?.shipment?.fulfillments) && g.shipment.fulfillments[0]) ||
+    (Array.isArray(g?.fulfillments) && g.fulfillments[0]) ||
+    g?.shipment ||
+    {};
+  return {
+    status,
+    trackingInfo: {
+      number: ship.trackingCode ?? ship.trackingNumber ?? null,
+      url: ship.trackingUrl ?? null,
+      company: ship.shipmentMethodName ?? ship.carrier ?? "Gelato",
+    },
+  };
+}
