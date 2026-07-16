@@ -66,6 +66,12 @@ replays the file; against THIS project it is already applied. FK constraints kee
 - **Launch-blocker: per-install POD credentials.** Order/submit still reads one shared
   `GELATO_API_KEY` env; must become a per-installation lookup. Needs a `pod_connections` table
   (scoped to Phase 3e/4 in this plan) — do not invent the schema ad hoc.
+- **Merchant setting: draft vs auto-submit (DECIDED, build later).** Orders now default to Gelato
+  `orderType: "draft"` (see `submitGelatoOrder`'s `orderType` param + `gelatoOrderType` in
+  `shopify-order-webhook`; stored as `pod_orders.status = "draft"`), so merchants can review/revise
+  before print. TODO: expose a per-installation admin toggle ("auto-submit orders to production")
+  that resolves to `"order"` vs `"draft"` from the shop's settings; until then every order is a
+  draft. Likely lands with the onboarding/settings work (Phase 6) or alongside `pod_connections`.
 
 ---
 
