@@ -49,11 +49,20 @@ this branch and read this log so two sessions don't edit the same file at once.
   are NOT deployed to this project (code is ready for when fulfillment gets wired). Post-DDL security
   advisors: only pre-existing INFO/WARN, nothing new; `pod_orders` keeps the intended service-role-only
   (RLS-on, no-policy) posture.
+- **Draft-default DEPLOYED (CLI session, 16 Jul).** The web session's last commit (`2553912`, Gelato
+  orders default to DRAFT) was made AFTER the v7 deploy and never shipped — deployed v7 still sent
+  `orderType: "order"` straight to production. Caught by diffing the deployed v7 source against the
+  branch. Fixed: branch merged to `main` (fast-forward, `2afa802`), verified locally (75/75 vitest,
+  `vite build` clean; the 4 pre-existing tsc errors in `ai-recipe.ts`/`DesignerPage.tsx` predate the
+  branch — confirmed against `57fc8ae`), then `shopify-order-webhook` redeployed → **v8** with
+  `verify_jwt=false` preserved. New orders now land in Gelato as reviewable DRAFTS
+  (`pod_orders.status = "draft"`).
 
 ### Next (reasonable order)
 1. **Post-deploy smoke test (recommended):** place a real paid test order → confirm it reaches Gelato and
-   `pod_orders.status` goes `received`→`submitted` with `provider_order_id` set. (Fulfillment via
-   gelato-webhook is only testable once that function is deployed + its Gelato webhook registered.)
+   `pod_orders.status` goes `received`→`draft` with `provider_order_id` set, and the order shows as a
+   DRAFT in the Gelato dashboard. (Fulfillment via gelato-webhook is only testable once that function
+   is deployed + its Gelato webhook registered.)
 2. **Phase 3b** — generic `product_bases` + editor print-area (see §3b below): unblocks non-wall-art Gelato
    products, then Printful/Printify become "register an adapter".
 
