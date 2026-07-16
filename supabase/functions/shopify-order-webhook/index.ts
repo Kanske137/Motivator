@@ -203,12 +203,21 @@ async function processOrder(supabase: any, order: any, shopDomainHeader: string 
   const ship = order.shipping_address ?? order.billing_address ?? {};
   const partialErrors = [...printErrors, ...skuErrors];
 
+  // Draft vs live. DEFAULT = "draft": Gelato creates a reviewable draft order
+  // that is NOT sent to production until the merchant approves it in Gelato, so
+  // orders can be reviewed/edited before they print.
+  // TODO(merchant-setting): make this a per-installation admin choice
+  // (an "auto-submit orders to production" toggle) resolved from the shop's
+  // settings; until that exists, every order is created as a draft.
+  const gelatoOrderType: "order" | "draft" = "draft";
+
   const result = await submitGelatoOrder({
     apiKey: gelatoKey,
     orderReferenceId: shopifyOrderName || shopifyOrderId,
     customerReferenceId: shopifyOrderId,
     currency: order.currency ?? "SEK",
     items,
+    orderType: gelatoOrderType,
     shippingAddress: {
       firstName: ship.first_name ?? "",
       lastName: ship.last_name ?? "",
@@ -241,9 +250,11 @@ async function processOrder(supabase: any, order: any, shopDomainHeader: string 
     return;
   }
 
-  console.log(`[shopify-webhook] Gelato order submitted: ${result.providerOrderId}`);
+  console.log(`[shopify-webhook] Gelato ${gelatoOrderType} created: ${result.providerOrderId}`);
   await supabase.from("pod_orders").update({
-    status: "submitted",
+    // "draft" = created in Gelato but awaiting merchant approval before print;
+    // "submitted" = sent to production.
+    status: gelatoOrderType === "draft" ? "draft" : "submitted",
     provider_order_id: result.providerOrderId,
     payload: result.requestBody,
     error: partialErrors.length ? partialErrors.join(" | ") : null,

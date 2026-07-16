@@ -138,9 +138,16 @@ export async function submitGelatoOrder(input: {
   currency: string;
   items: GelatoOrderItem[];
   shippingAddress: GelatoShippingAddress;
+  /**
+   * Gelato order type. "draft" (the SAFE DEFAULT) creates a reviewable draft
+   * that is NOT sent to production until it is approved in Gelato — so the
+   * merchant can review/edit an order before it prints. "order" prints
+   * immediately. This will become a per-merchant admin setting later.
+   */
+  orderType?: "order" | "draft";
 }): Promise<SubmitResult> {
   const body = {
-    orderType: "order",
+    orderType: input.orderType ?? "draft",
     orderReferenceId: input.orderReferenceId,
     customerReferenceId: input.customerReferenceId,
     currency: input.currency,
