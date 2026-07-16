@@ -222,9 +222,14 @@ export interface CatalogBase {
   raw: unknown; // the provider payload as returned (debugging / re-derivation)
 }
 
-async function gelatoProductApi(path: string, apiKey: string): Promise<any> {
+async function gelatoProductApi(path: string, apiKey: string, init?: RequestInit): Promise<any> {
   const res = await fetch(`${GELATO_PRODUCT_API}${path}`, {
-    headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
+    ...init,
+    headers: {
+      "X-API-KEY": apiKey,
+      "Content-Type": "application/json",
+      ...(init?.headers || {}),
+    },
   });
   const text = await res.text();
   let body: unknown = text;
@@ -280,6 +285,41 @@ export async function getProductCatalog(
     });
   }
   return { bases: out, failed };
+}
+
+/**
+ * Resolve a concrete productUid inside a catalog by attribute filters
+ * (e.g. { GarmentSize: ["m"], GarmentColor: ["black"] }). This is the generic
+ * building block sync uses to map a variant combination to a Gelato SKU —
+ * the data-driven replacement for the hand-built gelato-sku-map. Generalized
+ * from gelato-fetch-uids' searchProducts (POST /catalogs/{uid}/products:search).
+ */
+export async function searchGelatoProductUids(args: {
+  apiKey: string;
+  catalogUid: string;
+  attributeFilters: Record<string, string[]>;
+  limit?: number;
+}): Promise<{ productUids: string[]; total: number }> {
+  const data = await gelatoProductApi(
+    `/catalogs/${encodeURIComponent(args.catalogUid)}/products:search`,
+    args.apiKey,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        attributeFilters: args.attributeFilters,
+        limit: args.limit ?? 50,
+        offset: 0,
+      }),
+    },
+  );
+  const products: any[] = data?.products ?? data?.hits?.products ?? [];
+  const total = Number(data?.pagination?.total ?? products.length);
+  return {
+    productUids: products
+      .map((p) => p?.productUid ?? p?.uid ?? null)
+      .filter((u): u is string => Boolean(u)),
+    total,
+  };
 }
 
 // --- Fulfillment parsing (Phase 3a slice 2b) ---

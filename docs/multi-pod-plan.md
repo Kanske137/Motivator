@@ -70,10 +70,21 @@ this branch and read this log so two sessions don't edit the same file at once.
   its internal `default-flat-prices`/`enterprise` — per-catalog failures don't sink the import).
   Verified in DB: t-shirts → GarmentSize/GarmentColor/…, mugs → MugSize/MugMaterial.
 
+- **3b slice 2a — base-catalog client plumbing (DONE, 17 Jul).** Decision: the generic base
+  path is built ALONGSIDE the four legacy wall-art kinds, not by rewriting them — the legacy
+  kinds have a curated label vocabulary (13x18/Ek/2cm) tied to the sku-map, while bases carry
+  raw provider axis values (130x180-mm/natural-wood); mixing them in the same lists would show
+  unmapped combos. Shipped: `src/lib/pod/bases.ts` (typed ProductBase/VariantAxis/PrintArea +
+  jsonb narrowing + fetch), `useProductBases()` hook, `product_bases` added to generated
+  supabase types, server adapter got `searchGelatoProductUids()` (products:search by
+  attributeFilters — the generic sync building block). Verified: 7 new unit tests (82/82),
+  live anon read OK + anon write blocked (42501).
+
 ### Next (reasonable order)
-1. **3b slice 2:** client reads `variantAxes` from `product_bases` instead of the hardcoded
-   size/frame/depth vocab (`product-defaults.ts`, `gelato-catalog.ts` getters,
-   `ProductOptionsSection` type blocks). Template schema: layers reference a `printAreaId`.
+1. **3b slice 2b:** base-driven product configuration in admin — pick a base (e.g. mugs),
+   choose axis values, sync resolves productUids via `searchGelatoProductUids` and stores
+   them in the config's `variant_map` (order webhook already reads variant_map FIRST, so
+   orders work without webhook changes). Ship criteria: a mug/t-shirt template syncs.
 2. **3b slice 3:** editor print-area boundary + safe area + bleed live (needs per-product
    dimensions — Gelato `GET /v3/products/{uid}` dimensions, or size-label parsing for wall art).
 3. **3b slice 4:** variant-cap UI (X/2048 counter, ≤3 options, chunked bulk create in sync).

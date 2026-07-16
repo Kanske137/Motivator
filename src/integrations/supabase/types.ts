@@ -185,6 +185,51 @@ export type Database = {
           },
         ]
       }
+      product_bases: {
+        Row: {
+          category: string | null
+          created_at: string
+          id: string
+          imported_at: string
+          mockup: string
+          print_areas: Json
+          provider: string
+          provider_product_id: string
+          raw: Json | null
+          title: string
+          updated_at: string
+          variant_axes: Json
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          imported_at?: string
+          mockup?: string
+          print_areas?: Json
+          provider?: string
+          provider_product_id: string
+          raw?: Json | null
+          title?: string
+          updated_at?: string
+          variant_axes?: Json
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          imported_at?: string
+          mockup?: string
+          print_areas?: Json
+          provider?: string
+          provider_product_id?: string
+          raw?: Json | null
+          title?: string
+          updated_at?: string
+          variant_axes?: Json
+        }
+        Relationships: []
+      }
       product_configs: {
         Row: {
           category_gid: string | null
