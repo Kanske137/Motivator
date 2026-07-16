@@ -58,13 +58,25 @@ this branch and read this log so two sessions don't edit the same file at once.
   `verify_jwt=false` preserved. New orders now land in Gelato as reviewable DRAFTS
   (`pod_orders.status = "draft"`).
 
+- **3a smoke test PASSED (16 Jul):** real paid order → arrived in Gelato as a reviewable DRAFT.
+  Phase 3a is done end-to-end.
+- **3b slice 1 — `product_bases` + catalog import (LIVE + verified, 16 Jul).** Migration
+  `20260716120000_phase3b_product_bases.sql` applied (public-read/service-role-write, generic
+  `variant_axes`/`print_areas` jsonb). Server adapter got `getProductCatalog()` (Gelato
+  `GET /v3/catalogs` + per-catalog attributes → axes; shape verified against Gelato docs).
+  New edge function `pod-catalog-import` (auth: admin session token OR `x-import-secret` =
+  `POD_IMPORT_SECRET`, set in Supabase secrets). Ran live: **60 catalogs imported** (apparel,
+  mugs, phone-cases, t-shirts, wallpaper, photobooks, …), 2 skipped (Gelato's own API 550s on
+  its internal `default-flat-prices`/`enterprise` — per-catalog failures don't sink the import).
+  Verified in DB: t-shirts → GarmentSize/GarmentColor/…, mugs → MugSize/MugMaterial.
+
 ### Next (reasonable order)
-1. **Post-deploy smoke test (recommended):** place a real paid test order → confirm it reaches Gelato and
-   `pod_orders.status` goes `received`→`draft` with `provider_order_id` set, and the order shows as a
-   DRAFT in the Gelato dashboard. (Fulfillment via gelato-webhook is only testable once that function
-   is deployed + its Gelato webhook registered.)
-2. **Phase 3b** — generic `product_bases` + editor print-area (see §3b below): unblocks non-wall-art Gelato
-   products, then Printful/Printify become "register an adapter".
+1. **3b slice 2:** client reads `variantAxes` from `product_bases` instead of the hardcoded
+   size/frame/depth vocab (`product-defaults.ts`, `gelato-catalog.ts` getters,
+   `ProductOptionsSection` type blocks). Template schema: layers reference a `printAreaId`.
+2. **3b slice 3:** editor print-area boundary + safe area + bleed live (needs per-product
+   dimensions — Gelato `GET /v3/products/{uid}` dimensions, or size-label parsing for wall art).
+3. **3b slice 4:** variant-cap UI (X/2048 counter, ≤3 options, chunked bulk create in sync).
 
 Note: the migration is recorded remotely under name `phase3a_pod_orders_rename` (applied via MCP) and also
 lives as the timestamped file in `supabase/migrations/`. A fresh `supabase db push` against a NEW project

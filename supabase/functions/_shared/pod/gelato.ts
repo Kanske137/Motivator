@@ -188,6 +188,100 @@ export async function submitGelatoOrder(input: {
   }
 }
 
+// --- Catalog import (Phase 3b slice 1) ---
+//
+// provider.getProductCatalog(): fetch Gelato's FULL public catalog list and map
+// each catalog's productAttributes to GENERIC variant axes — this is what
+// replaces the hardcoded 4-category/size/frame vocabulary (gelato-fetch-uids).
+// Consumed by the `pod-catalog-import` edge function, which upserts the result
+// into `product_bases`.
+//
+// Verified API shape (Gelato docs):
+//   GET /v3/catalogs        → [{ catalogUid, title }]
+//   GET /v3/catalogs/{uid}  → { catalogUid, title, productAttributes:
+//     [{ productAttributeUid, title, values: [{ productAttributeValueUid, title }] }] }
+
+const GELATO_PRODUCT_API = "https://product.gelatoapis.com/v3";
+
+export interface VariantAxisValue {
+  key: string;
+  label: string;
+}
+
+export interface VariantAxis {
+  key: string;
+  label: string;
+  values: VariantAxisValue[];
+}
+
+/** One provider catalog/product family, normalized for `product_bases`. */
+export interface CatalogBase {
+  providerProductId: string; // Gelato catalogUid
+  title: string;
+  variantAxes: VariantAxis[];
+  raw: unknown; // the provider payload as returned (debugging / re-derivation)
+}
+
+async function gelatoProductApi(path: string, apiKey: string): Promise<any> {
+  const res = await fetch(`${GELATO_PRODUCT_API}${path}`, {
+    headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
+  });
+  const text = await res.text();
+  let body: unknown = text;
+  try { body = JSON.parse(text); } catch { /* keep raw text for the error below */ }
+  if (!res.ok) {
+    throw new Error(`Gelato ${path} ${res.status}: ${JSON.stringify(body).slice(0, 500)}`);
+  }
+  return body;
+}
+
+/**
+ * Fetch every Gelato catalog + its attributes as normalized bases.
+ *
+ * A single broken catalog must not sink the whole import — Gelato's own API
+ * 550s on some of its catalogs (observed live: "default-flat-prices") — so
+ * per-catalog failures are collected in `failed` and the rest imports fine.
+ */
+export async function getProductCatalog(
+  apiKey: string,
+): Promise<{ bases: CatalogBase[]; failed: { id: string; error: string }[] }> {
+  const list = await gelatoProductApi("/catalogs", apiKey);
+  // Tolerate both a bare array and a wrapped { data: [...] } response.
+  const catalogs: any[] = Array.isArray(list) ? list : (list?.data ?? []);
+
+  const out: CatalogBase[] = [];
+  const failed: { id: string; error: string }[] = [];
+  for (const c of catalogs) {
+    const uid = c?.catalogUid ? String(c.catalogUid) : null;
+    if (!uid) continue;
+    let detail: any;
+    try {
+      detail = await gelatoProductApi(`/catalogs/${encodeURIComponent(uid)}`, apiKey);
+    } catch (e) {
+      failed.push({ id: uid, error: String(e) });
+      continue;
+    }
+    out.push({
+      providerProductId: String(detail?.catalogUid ?? uid),
+      title: String(detail?.title ?? c?.title ?? uid),
+      variantAxes: (Array.isArray(detail?.productAttributes) ? detail.productAttributes : []).map(
+        (a: any): VariantAxis => ({
+          key: String(a?.productAttributeUid ?? ""),
+          label: String(a?.title ?? a?.productAttributeUid ?? ""),
+          values: (Array.isArray(a?.values) ? a.values : []).map(
+            (v: any): VariantAxisValue => ({
+              key: String(v?.productAttributeValueUid ?? ""),
+              label: String(v?.title ?? v?.productAttributeValueUid ?? ""),
+            }),
+          ),
+        }),
+      ),
+      raw: detail,
+    });
+  }
+  return { bases: out, failed };
+}
+
 // --- Fulfillment parsing (Phase 3a slice 2b) ---
 //
 // Gelato reports fulfillment + tracking in two different shapes, and both are

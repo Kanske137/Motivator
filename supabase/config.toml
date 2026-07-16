@@ -61,3 +61,8 @@ verify_jwt = false
 # Schemalagd storage-städning (triggas av pg_cron); egen secret-check i funktionen.
 [functions.cleanup-previews]
 verify_jwt = false
+
+# Katalogimport → product_bases: session-token ELLER x-import-secret verifieras
+# i funktionen (admin-UI resp. schemalagd refresh).
+[functions.pod-catalog-import]
+verify_jwt = false
