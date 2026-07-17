@@ -80,11 +80,32 @@ this branch and read this log so two sessions don't edit the same file at once.
   attributeFilters — the generic sync building block). Verified: 7 new unit tests (82/82),
   live anon read OK + anon write blocked (42501).
 
+- **3b slice 2b — base-driven sync (CODE DONE + deployed; awaiting live sync click).** Chose
+  approach **A**: the sync pipeline is now axis-list-driven, wall art is a special case.
+  - New `_shared/pod/sync-plan.ts`: axis-agnostic core — `PlannedGroup`/`PlannedVariant` carry
+    an ordered `optionValues` list; `buildVariantInput`, `keyFromSelectedOptions`/`keyFromPlannedVariant`
+    (replace the fixed `optionKeyFromSelected`/`desiredKey`), `desiredOptionValuesByAxis`,
+    `selectableAxesFromJson`, and `planBaseGroup` (cartesian enumerate → live `searchGelatoProductUids`
+    → UID; injected `resolveUid`/`priceOf` so it's pure/testable).
+  - `shopify-sync-template` refactored to use it; wall-art `plan()`/`planConsolidated()` fill
+    `optionValues` to MIRROR the old fixed `[Storlek,<variantOptionName>]` (+ Produkttyp) layout →
+    byte-identical wall-art output (locked by 12 parity unit tests). Base groups append after
+    wall-art groups; resolved UIDs written to `variant_map` (`<baseId>|<sizeSlot>` → {`<variantSlot>`: uid}).
+  - Base pricing = pricing_rules `material=baseId` with a **wildcard fallback** (`size="*" variant="*"`)
+    so a merchant sets ONE general price per material; per-combo/per-template overrides still win.
+    Seeded a `mugs *,* = 149` default for both installs.
+  - Admin UI: `ProductOptionsSection` "Fler produkter (POD-katalog)" — add a base, per-axis
+    ChecklistGroup (stores value keys, shows labels), wall-art catalogs hidden from the picker.
+  - **Verified:** 96 unit tests green; `deno check` clean on all 3 edge fns; client build + tsc
+    clean (only pre-existing ai-recipe/DesignerPage errors remain); live Gelato probe confirmed a
+    fully-pinned mug → exactly one UID. Got a local Deno typechecker working (npm `deno-bin`).
+  - **REMAINING (needs the merchant's admin click — sync requires an App Bridge session token):**
+    configure a mug on a template in admin → Save → Sync → then verify the Shopify product +
+    `variant_map`. Store `wallery-test-store` (install `ea36feef…`) has the active templates.
+
 ### Next (reasonable order)
-1. **3b slice 2b:** base-driven product configuration in admin — pick a base (e.g. mugs),
-   choose axis values, sync resolves productUids via `searchGelatoProductUids` and stores
-   them in the config's `variant_map` (order webhook already reads variant_map FIRST, so
-   orders work without webhook changes). Ship criteria: a mug/t-shirt template syncs.
+1. **Verify 2b live:** merchant configures + syncs a mug template; confirm Shopify variants +
+   `variant_map` populated with correct Gelato UIDs.
 2. **3b slice 3:** editor print-area boundary + safe area + bleed live (needs per-product
    dimensions — Gelato `GET /v3/products/{uid}` dimensions, or size-label parsing for wall art).
 3. **3b slice 4:** variant-cap UI (X/2048 counter, ≤3 options, chunked bulk create in sync).

@@ -32,7 +32,9 @@ import {
 import type { ProductConfig } from "@/lib/product-config";
 import type { ProductOptions } from "@/lib/template-schema";
 import { DEFAULT_PRODUCT_VARIANTS, mergeUnique } from "@/lib/product-defaults";
-import { getPodProvider } from "@/lib/pod";
+import { getPodProvider, selectableAxes, type ProductBase } from "@/lib/pod";
+import { useProductBases } from "@/hooks/useProductBases";
+import type { BaseOptions } from "@/lib/template-schema";
 import { uploadCartPreview } from "@/lib/upload-preview";
 import { FONT_CATALOG, FONT_CATEGORY_LABELS, FONT_FAMILIES, type FontCategory } from "@/lib/font-catalog";
 import { toast } from "sonner";
@@ -369,6 +371,12 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
         )}
       </Card>
 
+      {/* Generic POD-catalog products (mugs, apparel, …) — Phase 3b */}
+      <BaseProductsSection
+        value={value.bases ?? []}
+        onChange={(bases) => onChange({ ...value, bases })}
+      />
+
       {/* Map styles moved to the map LAYER's properties (per-layer toggle + order). */}
 
       {/* Allowed fonts — per-template customer font picker */}
@@ -388,12 +396,15 @@ function ChecklistGroup({
   selected,
   onToggle,
   onSelectAll,
+  labelFor,
 }: {
   title: string;
   all: string[];
   selected: string[];
   onToggle: (item: string, checked: boolean) => void;
   onSelectAll: (checked: boolean) => void;
+  /** Optional display label for an item key (base axes store keys, show labels). */
+  labelFor?: (item: string) => string;
 }) {
   const { t } = useTranslation();
   const selectedCount = all.filter((i) => selected.includes(i)).length;
@@ -446,7 +457,7 @@ function ChecklistGroup({
                     checked={checked}
                     onCheckedChange={(c) => onToggle(item, Boolean(c))}
                   />
-                  <span>{item}</span>
+                  <span>{labelFor ? labelFor(item) : item}</span>
                 </label>
               );
             })}
@@ -454,6 +465,151 @@ function ChecklistGroup({
         </PopoverContent>
       </Popover>
     </div>
+  );
+}
+
+/** Catalogs already covered by the curated wall-art kinds above — hidden from
+ *  the generic base picker to avoid two ways to configure the same product. */
+const WALL_ART_BASE_IDS = new Set([
+  "posters",
+  "canvas",
+  "metallic",
+  "acrylic",
+  "mounted-framed-posters",
+  "framed-posters",
+  "hanging-posters",
+  "poster-hangers",
+]);
+
+/** Generic POD-catalog products beyond the four wall-art kinds. Merchant adds a
+ *  base (e.g. Mugs), then picks which values of each of its OWN axes to offer.
+ *  Orientation-less products simply have no Orientation axis — portrait/landscape
+ *  never appears where it doesn't exist. */
+function BaseProductsSection({
+  value,
+  onChange,
+}: {
+  value: BaseOptions[];
+  onChange: (next: BaseOptions[]) => void;
+}) {
+  const { t } = useTranslation();
+  const { data: allBases, isLoading } = useProductBases();
+
+  const available = useMemo(
+    () => (allBases ?? []).filter((b) => !WALL_ART_BASE_IDS.has(b.providerProductId)),
+    [allBases],
+  );
+  const baseById = useMemo(() => {
+    const m = new Map<string, ProductBase>();
+    for (const b of available) m.set(b.providerProductId, b);
+    return m;
+  }, [available]);
+
+  const addedIds = new Set(value.map((b) => b.baseId));
+  const addable = available.filter((b) => !addedIds.has(b.providerProductId));
+
+  function addBase(baseId: string) {
+    if (!baseId || addedIds.has(baseId)) return;
+    onChange([...value, { baseId, provider: "gelato", enabled: true, selectedAxes: {} }]);
+  }
+  function removeBase(baseId: string) {
+    onChange(value.filter((b) => b.baseId !== baseId));
+  }
+  function patchBase(baseId: string, patch: Partial<BaseOptions>) {
+    onChange(value.map((b) => (b.baseId === baseId ? { ...b, ...patch } : b)));
+  }
+  function toggleAxisValue(baseId: string, axisKey: string, valueKey: string, checked: boolean) {
+    const b = value.find((x) => x.baseId === baseId);
+    if (!b) return;
+    const current = b.selectedAxes?.[axisKey] ?? [];
+    const next = checked ? [...new Set([...current, valueKey])] : current.filter((v) => v !== valueKey);
+    patchBase(baseId, { selectedAxes: { ...b.selectedAxes, [axisKey]: next } });
+  }
+  function setAxisField(baseId: string, axisKey: string, values: string[]) {
+    const b = value.find((x) => x.baseId === baseId);
+    if (!b) return;
+    patchBase(baseId, { selectedAxes: { ...b.selectedAxes, [axisKey]: values } });
+  }
+
+  return (
+    <Card className="p-5 space-y-4">
+      <div>
+        <h2 className="text-base font-semibold">{t("admin.baseProducts.title", { defaultValue: "Fler produkter (POD-katalog)" })}</h2>
+        <p className="text-xs text-muted-foreground">
+          {t("admin.baseProducts.subtitle", {
+            defaultValue: "Lägg till produkter från leverantörens katalog (muggar, kläder …) och välj vilka varianter kunden kan beställa.",
+          })}
+        </p>
+      </div>
+
+      {value.map((b) => {
+        const base = baseById.get(b.baseId);
+        const axes = base ? selectableAxes(base) : [];
+        return (
+          <div key={b.baseId} className="space-y-3 rounded-md border p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-3">
+                <Switch checked={b.enabled} onCheckedChange={(c) => patchBase(b.baseId, { enabled: c })} />
+                <Label className="text-sm font-medium">{base?.title ?? b.baseId}</Label>
+              </div>
+              <Button type="button" variant="ghost" size="sm" onClick={() => removeBase(b.baseId)}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+            {b.enabled && base && (
+              axes.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {t("admin.baseProducts.noAxes", { defaultValue: "Den här produkten har inga valbara varianter." })}
+                </p>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {axes.map((axis) => {
+                    const selected = b.selectedAxes?.[axis.key] ?? [];
+                    const allKeys = axis.values.map((v) => v.key);
+                    return (
+                      <ChecklistGroup
+                        key={axis.key}
+                        title={axis.label}
+                        all={allKeys}
+                        selected={selected}
+                        labelFor={(k) => axis.values.find((v) => v.key === k)?.label ?? k}
+                        onToggle={(item, c) => toggleAxisValue(b.baseId, axis.key, item, c)}
+                        onSelectAll={(c) => setAxisField(b.baseId, axis.key, c ? allKeys : [])}
+                      />
+                    );
+                  })}
+                </div>
+              )
+            )}
+            {b.enabled && !base && (
+              <p className="text-xs text-muted-foreground">
+                {isLoading
+                  ? t("admin.baseProducts.loading", { defaultValue: "Laddar katalog …" })
+                  : t("admin.baseProducts.missing", { defaultValue: "Produkten finns inte i katalogen längre." })}
+              </p>
+            )}
+          </div>
+        );
+      })}
+
+      {addable.length > 0 && (
+        <div className="flex items-center gap-2">
+          <select
+            className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+            value=""
+            onChange={(e) => { addBase(e.target.value); e.currentTarget.value = ""; }}
+            disabled={isLoading}
+          >
+            <option value="" disabled>
+              {t("admin.baseProducts.add", { defaultValue: "Lägg till produkt …" })}
+            </option>
+            {addable.map((b) => (
+              <option key={b.providerProductId} value={b.providerProductId}>{b.title}</option>
+            ))}
+          </select>
+        </div>
+      )}
+    </Card>
   );
 }
 

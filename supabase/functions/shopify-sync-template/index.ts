@@ -12,7 +12,19 @@
 // - Online Store sales channel: published via publishablePublish.
 // - On update we sync productOptions (so newly-added sizes/frames actually
 //   become valid option-values BEFORE we try to bulk-create variants for them).
-import { gelatoUid } from "../_shared/pod/gelato.ts";
+import { gelatoUid, searchGelatoProductUids } from "../_shared/pod/gelato.ts";
+import {
+  buildVariantInput,
+  desiredOptionValuesByAxis,
+  fullComboFingerprint,
+  keyFromPlannedVariant,
+  keyFromSelectedOptions,
+  planBaseGroup,
+  selectableAxesFromJson,
+  type PlannedGroup,
+  type PlannedVariant,
+  type VariantInput,
+} from "../_shared/pod/sync-plan.ts";
 
 // Local CORS headers — MUST allow the x-shopify-session-token header so the
 // browser's preflight passes (the shared esm.sh corsHeaders doesn't list it).
@@ -95,38 +107,10 @@ interface SyncBody {
   handle: string;
 }
 
-interface VariantInput {
-  optionValues: { optionName: string; name: string }[];
-  price: string;
-  inventoryItem: { sku: string; tracked: boolean };
-  inventoryPolicy: "CONTINUE";
-}
-
-interface PlannedVariant {
-  size: string;
-  variant: string;
-  sku: string;
-  price: number;
-  /** Konsoliderad: visar Produkttyp-värdet ("Poster", "Canvas", ...). */
-  productTypeLabel?: string;
-}
-
-interface OptionAxis {
-  name: string;
-  values: string[];
-}
-
-interface PlannedGroup {
-  kind: Kind | "multi";
-  productType: string;
-  variantOptionName: string; // "Ram" / "Djup" / "Material" / "Finish" / "Utförande"
-  /** Alla axlar i ordning (2 för legacy, 3 för konsoliderad). */
-  optionAxes: OptionAxis[];
-  /** True = konsoliderad multi-typ-produkt med Produkttyp-axel. */
-  isConsolidated?: boolean;
-  variants: PlannedVariant[];
-  skipped: { size: string; variant: string; reason: string }[];
-}
+// VariantInput / PlannedVariant / OptionAxis / PlannedGroup now live in the
+// shared axis-agnostic module (_shared/pod/sync-plan.ts) so wall art and generic
+// bases share one downstream. Wall-art plans below fill `optionValues` to mirror
+// the old fixed [Storlek, <variantOptionName>] (+ Produkttyp) layout exactly.
 
 const CANONICAL_POSTER_FRAMES = [
   "Ingen", "Vit", "Svart", "Ek", "Valnöt",
@@ -170,7 +154,17 @@ function plan(template: any, priceOf: PriceLookup): PlannedGroup[] {
         const price = priceOf(kind, size, v);
         if (!sku) { g.skipped.push({ size, variant: v, reason: "no Gelato SKU" }); continue; }
         if (!price) { g.skipped.push({ size, variant: v, reason: "no price" }); continue; }
-        g.variants.push({ size, variant: v, sku, price });
+        g.variants.push({
+          size,
+          variant: v,
+          sku,
+          price,
+          // Mirror the old fixed layout: [Storlek, <variantOptionName>].
+          optionValues: [
+            { optionName: "Storlek", value: size },
+            { optionName: variantOptionName, value: v },
+          ],
+        });
       }
     }
     return g;
@@ -245,7 +239,19 @@ function planConsolidated(template: any, enabledTypes: string[], priceOf: PriceL
         if (!sku) { skipped.push({ size: `${label}/${size}`, variant: v, reason: "no Gelato SKU" }); continue; }
         if (!price) { skipped.push({ size: `${label}/${size}`, variant: v, reason: "no price" }); continue; }
         variantsUnion.add(v);
-        variants.push({ size, variant: v, sku, price, productTypeLabel: label });
+        variants.push({
+          size,
+          variant: v,
+          sku,
+          price,
+          productTypeLabel: label,
+          // Mirror the old fixed consolidated layout: [Produkttyp, Storlek, Utförande].
+          optionValues: [
+            { optionName: "Produkttyp", value: label },
+            { optionName: "Storlek", value: size },
+            { optionName: "Utförande", value: v },
+          ],
+        });
       }
     }
   }
@@ -384,27 +390,6 @@ const DEFAULT_CATEGORY_GID: Record<Kind, string> = {
   acrylic:  "gid://shopify/TaxonomyCategory/hg-3-4-2-2",
 };
 
-function buildVariantInput(
-  group: PlannedGroup,
-  v: PlannedVariant,
-): VariantInput {
-  const optionValues: { optionName: string; name: string }[] = [];
-  if (group.isConsolidated && v.productTypeLabel) {
-    optionValues.push({ optionName: "Produkttyp", name: v.productTypeLabel });
-  }
-  optionValues.push({ optionName: "Storlek", name: v.size });
-  optionValues.push({ optionName: group.variantOptionName, name: v.variant });
-  // Shopify Admin API 2025-07: sku/barcode/tracked all live inside inventoryItem.
-  return {
-    optionValues,
-    price: v.price.toFixed(2),
-    inventoryItem: {
-      sku: v.sku,
-      tracked: false,
-    },
-    inventoryPolicy: "CONTINUE",
-  };
-}
 
 async function getAllPublications(
   admin: ShopifyAdminClient,
@@ -475,16 +460,9 @@ async function syncProductOptions(
   },
   group: PlannedGroup,
 ) {
-  const desiredByOption: Record<string, string[]> = {};
-  for (const axis of group.optionAxes) {
-    if (axis.name === "Storlek") {
-      desiredByOption["Storlek"] = [...new Set(group.variants.map((v) => v.size))];
-    } else if (axis.name === "Produkttyp") {
-      desiredByOption["Produkttyp"] = [...new Set(group.variants.map((v) => v.productTypeLabel ?? "").filter(Boolean))];
-    } else {
-      desiredByOption[axis.name] = [...new Set(group.variants.map((v) => v.variant))];
-    }
-  }
+  // Desired option values per axis, read from each variant's optionValues
+  // (axis-agnostic — works for wall art's 2-3 named axes and generic bases alike).
+  const desiredByOption = desiredOptionValuesByAxis(group);
 
   for (const optionName of Object.keys(desiredByOption)) {
     const existingOpt = existing.options.find((o) => o.name === optionName);
@@ -517,37 +495,12 @@ async function syncProductOptions(
   }
 }
 
-/** Build a stable key from a variant's selectedOptions (Storlek + Ram/Djup),
- *  independent of order. */
-function normalizeOptionValue(s: string): string {
-  return s.toLowerCase().replace(/\s*cm\s*$/i, "").replace(/\s+/g, " ").trim();
-}
-
-function optionKeyFromSelected(
-  selected: { name: string; value: string }[],
-  variantOptionName: string,
-  isConsolidated = false,
-): string | null {
-  const size = selected.find((s) => s.name === "Storlek")?.value;
-  const variant = selected.find((s) => s.name === variantOptionName)?.value;
-  if (!size || !variant) return null;
-  if (isConsolidated) {
-    const ptype = selected.find((s) => s.name === "Produkttyp")?.value;
-    if (!ptype) return null;
-    return `${normalizeOptionValue(ptype)}|${normalizeOptionValue(size)}|${normalizeOptionValue(variant)}`;
-  }
-  return `${normalizeOptionValue(size)}|${normalizeOptionValue(variant)}`;
-}
-
-/** Fingerprint of an entire variant's selectedOptions, regardless of option
- *  names — used as a defensive duplicate-detector when option-name matching
- *  drifts between Lovable and Shopify. */
-function fullComboFingerprint(selected: { name: string; value: string }[]): string {
-  return selected
-    .map((s) => normalizeOptionValue(s.value))
-    .sort()
-    .join("|");
-}
+// normalizeOptionValue / keyFromSelectedOptions / keyFromPlannedVariant /
+// fullComboFingerprint now live in _shared/pod/sync-plan.ts. The old
+// optionKeyFromSelected(selected, variantOptionName, isConsolidated) is replaced
+// by keyFromSelectedOptions(selected, group.optionAxes): building the key from
+// the group's ordered axes yields the SAME string (Produkttyp|Storlek|Utförande
+// or Storlek|Ram) while also handling arbitrary base axes.
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -620,6 +573,59 @@ Deno.serve(async (req) => {
     const groups: PlannedGroup[] = isConsolidated
       ? [planConsolidated(cfg.template, enabledTypes, priceOf)]
       : plan(cfg.template, priceOf);
+
+    // Generic POD-catalog bases (mugs, apparel, …) — Phase 3b. Each enabled base
+    // becomes its own Shopify product whose option axes are the base's own axes,
+    // with SKUs resolved live from Gelato. `baseKinds` marks which groups are
+    // bases so we can write their resolved UIDs to variant_map afterwards.
+    const baseKinds = new Set<string>();
+    const baseOpts = ((cfg.template as { productOptions?: { bases?: unknown } })?.productOptions?.bases
+      ?? []) as Array<{ baseId?: string; provider?: string; enabled?: boolean; selectedAxes?: Record<string, string[]> }>;
+    const gelatoKey = Deno.env.get("GELATO_API_KEY");
+    for (const b of baseOpts) {
+      if (!b?.enabled || !b?.baseId) continue;
+      const provider = b.provider ?? "gelato";
+      const { data: baseRow } = await supabase
+        .from("product_bases")
+        .select("provider_product_id, title, variant_axes")
+        .eq("provider", provider)
+        .eq("provider_product_id", b.baseId)
+        .maybeSingle();
+      if (!baseRow) { console.warn(`[plan] base "${b.baseId}" not in product_bases — skipped`); continue; }
+
+      const axes = selectableAxesFromJson(baseRow.variant_axes);
+      if (axes.length === 0 || axes.length > 3) {
+        console.warn(`[plan] base "${b.baseId}" has ${axes.length} selectable axes (Shopify allows 1–3) — skipped`);
+        continue;
+      }
+
+      const g = await planBaseGroup({
+        baseId: baseRow.provider_product_id,
+        title: baseRow.title || b.baseId,
+        axes,
+        selectedAxes: b.selectedAxes ?? {},
+        baseFilters: { ProductStatus: ["activated"] },
+        resolveUid: async (filters) => {
+          if (!gelatoKey) return null;
+          const r = await searchGelatoProductUids({
+            apiKey: gelatoKey, catalogUid: b.baseId!, attributeFilters: filters, limit: 2,
+          });
+          // Fully-pinned filters should yield exactly one UID.
+          return r.productUids[0] ?? null;
+        },
+        // Base pricing honours the "general price per material" model: an exact
+        // per-combo rule wins, else a material-level default (a pricing_rules row
+        // with size="*" variant="*"). Wall art has no "*" rows, so its lookup is
+        // unchanged.
+        priceOf: (size, variant) =>
+          priceOf(b.baseId!, size, variant)
+          || priceOf(b.baseId!, size, "*")
+          || priceOf(b.baseId!, "*", "*"),
+      });
+      baseKinds.add(g.kind);
+      groups.push(g);
+    }
+
     const totalVariants = groups.reduce((n, g) => n + g.variants.length, 0);
     const allSkipped = groups.flatMap((g) =>
       g.skipped.map((s) => ({ kind: g.kind, ...s })),
@@ -694,7 +700,11 @@ Deno.serve(async (req) => {
         ]),
       ];
       const categoryGid = cfgMeta.category_gid
-        ?? (group.isConsolidated ? DEFAULT_CATEGORY_GID.poster : DEFAULT_CATEGORY_GID[group.kind as Kind]);
+        ?? (group.isConsolidated
+          ? DEFAULT_CATEGORY_GID.poster
+          // Base groups (kind = a baseId) have no wall-art taxonomy entry — fall
+          // back to a generic category; refined per base category in a later slice.
+          : DEFAULT_CATEGORY_GID[group.kind as Kind] ?? DEFAULT_CATEGORY_GID.poster);
       const status = (cfgMeta.status ?? "DRAFT").toUpperCase();
       const descriptionHtml =
         cfgMeta.description_html ?? "<p>Personlig design — skapas i editorn.</p>";
@@ -879,23 +889,23 @@ Deno.serve(async (req) => {
         const existingByKey = new Map<string, typeof existing.variants.nodes[number]>();
         const existingByCombo = new Map<string, typeof existing.variants.nodes[number]>();
         for (const n of existing.variants.nodes) {
-          const k = optionKeyFromSelected(n.selectedOptions, group.variantOptionName, group.isConsolidated);
+          const k = keyFromSelectedOptions(n.selectedOptions, group.optionAxes);
           if (k) existingByKey.set(k, n);
           existingByCombo.set(fullComboFingerprint(n.selectedOptions), n);
         }
-        const desiredKey = (v: PlannedVariant) =>
-          group.isConsolidated && v.productTypeLabel
-            ? `${normalizeOptionValue(v.productTypeLabel)}|${normalizeOptionValue(v.size)}|${normalizeOptionValue(v.variant)}`
-            : `${normalizeOptionValue(v.size)}|${normalizeOptionValue(v.variant)}`;
-        const desiredKeys = new Set(group.variants.map(desiredKey));
+        const desiredKeys = new Set(
+          group.variants
+            .map((v) => keyFromPlannedVariant(v, group.optionAxes))
+            .filter((k): k is string => k !== null),
+        );
 
         const toCreate: VariantInput[] = [];
         const toUpdate: (VariantInput & { id: string })[] = [];
         const skippedDuplicates: string[] = [];
         for (const v of group.variants) {
-          const key = desiredKey(v);
-          const input = buildVariantInput(group, v);
-          const ex = existingByKey.get(key);
+          const key = keyFromPlannedVariant(v, group.optionAxes);
+          const input = buildVariantInput(v);
+          const ex = key ? existingByKey.get(key) : undefined;
           if (ex) {
             toUpdate.push({ ...input, id: ex.id });
             continue;
@@ -908,14 +918,14 @@ Deno.serve(async (req) => {
           const exByCombo = existingByCombo.get(fp);
           if (exByCombo) {
             toUpdate.push({ ...input, id: exByCombo.id });
-            skippedDuplicates.push(`${v.size}/${v.variant} (matched by combo fingerprint)`);
+            skippedDuplicates.push(`${v.size ?? ""}/${v.variant ?? ""} (matched by combo fingerprint)`);
             continue;
           }
           toCreate.push(input);
         }
         const toDelete = existing.variants.nodes
           .filter((n) => {
-            const k = optionKeyFromSelected(n.selectedOptions, group.variantOptionName, group.isConsolidated);
+            const k = keyFromSelectedOptions(n.selectedOptions, group.optionAxes);
             return k !== null && !desiredKeys.has(k);
           })
           .map((n) => n.id);
@@ -1012,6 +1022,33 @@ Deno.serve(async (req) => {
         skipped: group.skipped,
         skippedFields,
       });
+    }
+
+    // Persist resolved base UIDs to variant_map so the order webhook can resolve
+    // them at order time (it reads variant_map FIRST, keyed `<productType>|<size>`
+    // → { <variant>: uid } — here productType = baseId, size/variant = pricing
+    // slots). Wall-art groups still resolve via the static sku-map, untouched.
+    if (baseKinds.size > 0) {
+      const { data: cfgRow } = await supabase
+        .from("product_configs")
+        .select("variant_map")
+        .eq("installation_id", installationId)
+        .eq("id", cfgMeta.id)
+        .maybeSingle();
+      const variantMap = { ...((cfgRow?.variant_map ?? {}) as Record<string, Record<string, string>>) };
+      for (const group of groups) {
+        if (!baseKinds.has(group.kind)) continue;
+        for (const v of group.variants) {
+          if (!v.size || !v.variant) continue;
+          const key = `${group.kind}|${v.size}`;
+          (variantMap[key] ??= {})[v.variant] = v.sku;
+        }
+      }
+      await supabase
+        .from("product_configs")
+        .update({ variant_map: variantMap })
+        .eq("installation_id", installationId)
+        .eq("id", cfgMeta.id);
     }
 
     // Persist sync state (upsert).
