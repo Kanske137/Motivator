@@ -340,6 +340,25 @@ const acrylicOptionsSchema = z.object({
   allowedFinishes: z.array(z.string()),
 });
 
+// Generic POD-catalog product (Phase 3b). Unlike the four curated wall-art
+// kinds above, a "base" is any Gelato catalog (mugs, t-shirts, phone cases, …)
+// imported into `product_bases`. The merchant picks which VALUES of each of the
+// base's own axes to offer — `selectedAxes` is keyed by the provider axis uid
+// (e.g. "MugSize") → chosen value uids (e.g. ["11-oz"]). No hardcoded
+// size/frame/orientation vocabulary: a base carries only the axes it actually
+// has, so an orientation-less product (a mug) simply never has an Orientation
+// axis to show or store.
+const baseOptionsSchema = z.object({
+  /** Gelato catalogUid, matches `product_bases.provider_product_id`. */
+  baseId: z.string().min(1),
+  /** Provider id; defaults to gelato (the only provider today). */
+  provider: z.string().default("gelato"),
+  enabled: z.boolean(),
+  /** axisKey (provider attribute uid) → selected value uids. */
+  selectedAxes: z.record(z.string(), z.array(z.string())).default({}),
+});
+export type BaseOptions = z.infer<typeof baseOptionsSchema>;
+
 export const aiStylePresetSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
@@ -367,6 +386,9 @@ export const productOptionsSchema = z.object({
   canvas: canvasOptionsSchema.optional(),
   aluminum: aluminumOptionsSchema.optional(),
   acrylic: acrylicOptionsSchema.optional(),
+  /** Generic POD-catalog products (mugs, apparel, …) beyond the four curated
+   *  wall-art kinds. Additive — legacy templates simply have no `bases`. */
+  bases: z.array(baseOptionsSchema).optional(),
   /** Available AI style presets shown in the customer editor. Optional —
    *  when missing/empty the AI section is hidden. */
   aiStyles: z.array(aiStylePresetSchema).optional(),

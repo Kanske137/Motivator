@@ -11,7 +11,7 @@
 //   2. `x-import-secret` matching POD_IMPORT_SECRET — the scheduled/ops path,
 //      mirroring cleanup-previews' cron guard.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
-import { getProductCatalog } from "../_shared/pod/gelato.ts";
+import { getProductCatalog, searchGelatoProductUids } from "../_shared/pod/gelato.ts";
 import {
   AuthError,
   authErrorResponse,
@@ -49,6 +49,25 @@ Deno.serve(async (req) => {
 
   const apiKey = Deno.env.get("GELATO_API_KEY");
   if (!apiKey) return json(500, { ok: false, error: "GELATO_API_KEY missing" });
+
+  // Diagnostic probe: resolve a productUid for a given catalog + attributeFilters
+  // without importing anything. Used to verify base-driven SKU resolution before
+  // sync relies on it. Body: { probe: { catalogUid, attributeFilters } }.
+  let body: any = null;
+  try { body = await req.clone().json(); } catch { /* no body */ }
+  if (body?.probe?.catalogUid) {
+    try {
+      const r = await searchGelatoProductUids({
+        apiKey,
+        catalogUid: String(body.probe.catalogUid),
+        attributeFilters: body.probe.attributeFilters ?? {},
+        limit: Number(body.probe.limit ?? 5),
+      });
+      return json(200, { ok: true, probe: body.probe, result: r });
+    } catch (e) {
+      return json(502, { ok: false, error: String(e) });
+    }
+  }
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,

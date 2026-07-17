@@ -2,7 +2,7 @@
 // Exercises the jsonb → typed narrowing with real-shaped rows (the t-shirts
 // axes mirror what pod-catalog-import actually wrote) and with junk input.
 import { describe, expect, it } from "vitest";
-import { parsePrintAreas, parseVariantAxes, rowToProductBase } from "./bases";
+import { parsePrintAreas, parseVariantAxes, rowToProductBase, selectableAxes } from "./bases";
 
 describe("parseVariantAxes", () => {
   it("parses real imported axes (Gelato t-shirts shape)", () => {
@@ -84,6 +84,71 @@ describe("rowToProductBase", () => {
     expect(base.variantAxes[0].key).toBe("GarmentSize");
     expect(base.printAreas).toEqual([]);
     expect(base.mockup).toBe("api");
+  });
+
+  it("selectableAxes keeps only real customer choices (mugs shape)", () => {
+    // Exactly what pod-catalog-import wrote for the "mugs" catalog.
+    const base = rowToProductBase({
+      id: "m",
+      provider: "gelato",
+      provider_product_id: "mugs",
+      title: "Mugs",
+      category: null,
+      variant_axes: [
+        { key: "ColorType", label: "Color type", values: [{ key: "4-0", label: "4/0" }] },
+        {
+          key: "MugMaterial",
+          label: "Material",
+          values: [
+            { key: "ceramic-white", label: "Ceramic white" },
+            { key: "ceramic-black", label: "Ceramic black" },
+          ],
+        },
+        {
+          key: "MugSize",
+          label: "Size",
+          values: [
+            { key: "11-oz", label: "11 oz" },
+            { key: "15-oz", label: "15 oz" },
+          ],
+        },
+        { key: "ProductModel", label: "Model", values: [] },
+        { key: "ProductStatus", label: "Status", values: [{ key: "activated", label: "Activated" }] },
+        { key: "State", label: "State", values: [{ key: "published", label: "Published" }] },
+      ],
+      print_areas: [],
+      mockup: "api",
+      imported_at: "2026-07-17T00:00:00Z",
+    });
+    const axes = selectableAxes(base);
+    // Only the two multi-value, non-bookkeeping axes survive — and crucially
+    // there is NO Orientation axis, so portrait/landscape never shows for mugs.
+    expect(axes.map((a) => a.key)).toEqual(["MugMaterial", "MugSize"]);
+    expect(axes.some((a) => a.key === "Orientation")).toBe(false);
+  });
+
+  it("selectableAxes keeps Orientation when the base actually has it", () => {
+    const base = rowToProductBase({
+      id: "p",
+      provider: "gelato",
+      provider_product_id: "posters",
+      title: "Posters",
+      category: null,
+      variant_axes: [
+        {
+          key: "Orientation",
+          label: "Orientation",
+          values: [
+            { key: "hor", label: "Landscape" },
+            { key: "ver", label: "Portrait" },
+          ],
+        },
+      ],
+      print_areas: [],
+      mockup: "api",
+      imported_at: "2026-07-17T00:00:00Z",
+    });
+    expect(selectableAxes(base).map((a) => a.key)).toEqual(["Orientation"]);
   });
 
   it("normalizes unknown mockup values to \"api\"", () => {

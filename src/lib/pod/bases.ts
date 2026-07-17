@@ -88,6 +88,29 @@ function normalizeMockup(raw: unknown): ProductBase["mockup"] {
   return raw === "overlay" || raw === "procedural" ? raw : "api";
 }
 
+// Gelato returns bookkeeping attributes on every catalog that are NOT real
+// customer-facing choices — they carry the same value for every product, or are
+// internal routing flags. Hiding them keeps the merchant picker to axes that
+// actually vary the product (size, colour, material, …). "Orientation" is
+// included as a real axis when present, and simply absent for orientation-less
+// products like mugs — the mechanism that makes portrait/landscape not show up
+// where it doesn't exist.
+const NON_SELECTABLE_AXES = new Set([
+  "ProductStatus",
+  "State",
+  "ProductModel",
+  "Variable",
+  "ApparelManufacturerSKU",
+]);
+
+/** The axes a merchant should actually choose values from (drops bookkeeping
+ *  axes and any single-value axis, which offers no real choice). */
+export function selectableAxes(base: ProductBase): VariantAxis[] {
+  return base.variantAxes.filter(
+    (a) => !NON_SELECTABLE_AXES.has(a.key) && a.values.length > 1,
+  );
+}
+
 type BaseRow = {
   id: string;
   provider: string;
