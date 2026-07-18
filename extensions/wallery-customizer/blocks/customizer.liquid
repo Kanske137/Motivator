@@ -29,6 +29,7 @@
     data-subtext="{{ block.settings.subtext | escape }}"
     data-button-label="{{ block.settings.button_label | escape }}"
     data-overlay-title="{{ block.settings.overlay_title | escape }}"
+    data-siblings-label="{{ block.settings.siblings_label | escape }}"
     {{ block.shopify_attributes }}
   ></div>
   <script src="{{ 'wallery-widget.js' | asset_url }}" defer></script>
@@ -88,6 +89,7 @@
     },
     { "type": "text", "id": "button_label", "label": "Button label", "default": "Open customizer" },
     { "type": "text", "id": "overlay_title", "label": "Title inside the customizer", "default": "Customize your design" },
+    { "type": "text", "id": "siblings_label", "label": "\"Also available as\" label", "default": "Also available as:" },
     {
       "type": "checkbox",
       "id": "use_product_image",

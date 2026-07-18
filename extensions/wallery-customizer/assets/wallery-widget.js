@@ -180,7 +180,9 @@
         if (nodes.length < 2) return; // nothing to switch between
         var box = shadow.querySelector("[data-subs]");
         if (!box) return;
-        var html = '<span class="subs-l">Finns även som:</span>';
+        // Editable + translatable via the theme editor (block setting).
+        var lbl = host.dataset.siblingsLabel || "Also available as:";
+        var html = '<span class="subs-l">' + esc(lbl) + "</span>";
         nodes.forEach(function (n) {
           var label = esc(n.productType || n.title);
           if (n.handle === current) {
