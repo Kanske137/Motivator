@@ -11,7 +11,8 @@
 //   2. `x-import-secret` matching POD_IMPORT_SECRET — the scheduled/ops path,
 //      mirroring cleanup-previews' cron guard.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
-import { getProductCatalog, searchGelatoProductUids } from "../_shared/pod/gelato.ts";
+import { getProductCatalog, searchGelatoProductUids, GELATO_SKU_MAP } from "../_shared/pod/gelato.ts";
+import { POSTER_PRESET } from "../_shared/pod/presets.ts";
 import {
   AuthError,
   authErrorResponse,
@@ -50,11 +51,39 @@ Deno.serve(async (req) => {
   const apiKey = Deno.env.get("GELATO_API_KEY");
   if (!apiKey) return json(500, { ok: false, error: "GELATO_API_KEY missing" });
 
-  // Diagnostic probe: resolve a productUid for a given catalog + attributeFilters
-  // without importing anything. Used to verify base-driven SKU resolution before
-  // sync relies on it. Body: { probe: { catalogUid, attributeFilters } }.
   let body: any = null;
   try { body = await req.clone().json(); } catch { /* no body */ }
+
+  // Verification: does the composed Poster PRESET resolve to the SAME Gelato
+  // UIDs as the frozen gelato-sku-map (flat + framed; hangers skipped)? Proves
+  // the preset before sync is switched over. Body: { verifyPreset: "poster" }.
+  if (body?.verifyPreset === "poster") {
+    const map = (GELATO_SKU_MAP.posters ?? {}) as Record<string, { portrait: string; landscape: string }>;
+    const FRAMES = new Set(["Ingen", "Svart", "Vit", "Ek", "Valnöt"]); // hangers TODO
+    const mismatches: any[] = [];
+    let checked = 0, matches = 0;
+    for (const key of Object.keys(map)) {
+      const [size, frame] = key.split("|");
+      if (!FRAMES.has(frame)) continue;
+      const expected = map[key].portrait;
+      const res = POSTER_PRESET.resolve({ size, frame });
+      if (!res) { mismatches.push({ key, reason: "preset returned null" }); checked++; continue; }
+      const filters = { ...res.filters, Orientation: ["ver"] };
+      checked++;
+      try {
+        const r = await searchGelatoProductUids({ apiKey, catalogUid: res.catalog, attributeFilters: filters, limit: 3 });
+        const got = r.productUids[0] ?? null;
+        if (got === expected) matches++;
+        else mismatches.push({ key, catalog: res.catalog, expected, got, hits: r.productUids.length });
+      } catch (e) {
+        mismatches.push({ key, catalog: res.catalog, error: String(e) });
+      }
+    }
+    return json(200, { ok: true, verify: "poster", checked, matches, mismatches });
+  }
+
+  // Diagnostic probe: resolve a productUid for a given catalog + attributeFilters
+  // without importing anything. Body: { probe: { catalogUid, attributeFilters } }.
   if (body?.probe?.catalogUid) {
     try {
       const r = await searchGelatoProductUids({
