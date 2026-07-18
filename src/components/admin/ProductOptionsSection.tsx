@@ -33,6 +33,7 @@ import type { ProductConfig } from "@/lib/product-config";
 import type { ProductOptions } from "@/lib/template-schema";
 import { DEFAULT_PRODUCT_VARIANTS, mergeUnique } from "@/lib/product-defaults";
 import { getPodProvider, selectableAxes, pickableBases, ProductIcon, type ProductBase } from "@/lib/pod";
+import { POSTER_PRESET, presetAxisKeys } from "@/lib/pod/wall-art";
 import { useProductBases } from "@/hooks/useProductBases";
 import type { BaseOptions } from "@/lib/template-schema";
 import { uploadCartPreview } from "@/lib/upload-preview";
@@ -84,13 +85,15 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
   );
   const configSizes = useMemo(() => config.sizes.map((s) => s.size), [config]);
 
-  // Union per product type
+  // Poster options come from the PRESET (composed product) — the full catalog-
+  // derived size list + all frames — so the merchant sees far more than the old
+  // frozen 6. Union with config values so nothing already saved disappears.
   const posterSizes = useMemo(
-    () => mergeUnique(configSizes, DEFAULT_PRODUCT_VARIANTS.poster.sizes),
+    () => mergeUnique(configSizes, presetAxisKeys(POSTER_PRESET, "size")),
     [configSizes],
   );
   const posterFrames = useMemo(
-    () => mergeUnique(configVariantNames, DEFAULT_PRODUCT_VARIANTS.poster.frames),
+    () => mergeUnique(configVariantNames, presetAxisKeys(POSTER_PRESET, "frame")),
     [configVariantNames],
   );
   const canvasSizes = useMemo(
