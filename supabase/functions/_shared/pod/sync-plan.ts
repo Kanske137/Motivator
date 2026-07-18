@@ -316,11 +316,18 @@ export async function planPresetGroup(args: {
     return { axis: ax, values };
   });
 
+  // A single-value axis is NOT a real customer choice, so it becomes a PINNED
+  // filter (used in resolution) but NOT a Shopify option. This keeps a poster
+  // with one paper a 2-axis product (Storlek × Ram) — identical to today — and
+  // only promotes Paper to a real axis once the merchant offers more than one.
+  const visible = new Set(perAxis.filter((a) => a.values.length > 1).map((a) => a.axis.key));
+  const visibleAxes = perAxis.filter((a) => visible.has(a.axis.key));
+
   const group: PlannedGroup = {
     kind: preset.id,
     productType,
-    variantOptionName: preset.axes[preset.axes.length - 1]?.label ?? "",
-    optionAxes: perAxis.map((a) => ({ name: a.axis.label, values: a.values.map((v) => v.label) })),
+    variantOptionName: visibleAxes[visibleAxes.length - 1]?.axis.label ?? "",
+    optionAxes: visibleAxes.map((a) => ({ name: a.axis.label, values: a.values.map((v) => v.label) })),
     variants: [],
     skipped: [],
   };
@@ -353,10 +360,14 @@ export async function planPresetGroup(args: {
     if (!uid) { group.skipped.push({ size: sizeSlot, variant: variantSlot, reason: "no Gelato SKU" }); continue; }
 
     group.variants.push({
-      optionValues: combo.map((c) => {
-        const ax = perAxis.find((a) => a.axis.key === c.axisKey)!;
-        return { optionName: ax.axis.label, value: c.label };
-      }),
+      // Only VISIBLE axes contribute Shopify option values; pinned single-value
+      // axes (e.g. paper at default) are resolved but not shown.
+      optionValues: combo
+        .filter((c) => visible.has(c.axisKey))
+        .map((c) => {
+          const ax = perAxis.find((a) => a.axis.key === c.axisKey)!;
+          return { optionName: ax.axis.label, value: c.label };
+        }),
       sku: uid,
       price,
       size: sizeSlot,

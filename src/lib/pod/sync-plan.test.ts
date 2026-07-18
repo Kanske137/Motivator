@@ -213,9 +213,13 @@ describe("planPresetGroup (composed poster)", () => {
       priceOf: () => 249,
     });
     expect(g.kind).toBe("poster");
-    expect(g.optionAxes.map((a) => a.name)).toEqual(["Storlek", "Ram & upphängning", "Papper"]);
+    // One paper (default) is PINNED, not a Shopify option → 2 visible axes, so
+    // the poster stays Storlek × Ram exactly like today.
+    expect(g.optionAxes.map((a) => a.name)).toEqual(["Storlek", "Ram & upphängning"]);
     // 2 sizes × 3 frames × 1 paper = 6 combos, all resolvable/priced → 6 variants.
     expect(g.variants).toHaveLength(6);
+    // Paper is not in the variant's Shopify option values (it was pinned).
+    expect(g.variants[0].optionValues.some((o) => o.optionName === "Papper")).toBe(false);
     // Frame value drives the catalog: Ingen→posters, Ek→mounted, Hängare→hanging.
     const ekVariant = g.variants.find((v) => v.optionValues.some((o) => o.value === "Ram ek") && v.size === "30x40");
     expect(ekVariant!.sku).toBe("mounted-framed-posters:300x400-mm:natural-wood");
@@ -224,6 +228,17 @@ describe("planPresetGroup (composed poster)", () => {
     // Pricing stays 2-D: size + frame (paper is not a price dimension).
     expect(ekVariant!.size).toBe("30x40");
     expect(ekVariant!.variant).toBe("Ek");
+  });
+
+  it("promotes Papper to a real axis once the merchant offers more than one", async () => {
+    const g = await planPresetGroup({
+      preset: POSTER_PRESET, productType: "Poster",
+      selectedAxes: { size: ["30x40", "50x70"], frame: ["Ingen", "Ek"], paper: ["200-gsm-uncoated", "250-gsm-uncoated"] },
+      resolveUid: fakeResolve, priceOf: () => 249,
+    });
+    expect(g.optionAxes.map((a) => a.name)).toEqual(["Storlek", "Ram & upphängning", "Papper"]);
+    expect(g.variants).toHaveLength(8); // 2 sizes × 2 frames × 2 papers
+    expect(g.variants[0].optionValues.some((o) => o.optionName === "Papper")).toBe(true);
   });
 
   it("skips combos with no product (13×18 hanger) instead of emitting a bad SKU", async () => {
