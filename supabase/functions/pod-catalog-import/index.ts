@@ -12,7 +12,7 @@
 //      mirroring cleanup-previews' cron guard.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import { getProductCatalog, searchGelatoProductUids, GELATO_SKU_MAP } from "../_shared/pod/gelato.ts";
-import { POSTER_PRESET, resolvePreset } from "../_shared/pod/presets.ts";
+import { getPreset, resolvePreset } from "../_shared/pod/presets.ts";
 import {
   AuthError,
   authErrorResponse,
@@ -57,22 +57,28 @@ Deno.serve(async (req) => {
   // Verification: does the composed Poster PRESET resolve to the SAME Gelato
   // UIDs as the frozen gelato-sku-map (flat + framed; hangers skipped)? Proves
   // the preset before sync is switched over. Body: { verifyPreset: "poster" }.
-  if (body?.verifyPreset === "poster") {
-    // Iterate the PRESET's own size × frame axes (default paper) and report how
-    // many resolve to a live Gelato UID — so we see exactly which of the expanded
-    // sizes/frames Gelato actually offers (the rest are skipped as sparse).
-    const sizeAxis = POSTER_PRESET.axes.find((a) => a.key === "size")!;
-    const frameAxis = POSTER_PRESET.axes.find((a) => a.key === "frame")!;
-    // Only test the requested frames (default just "Ingen") to stay under the
-    // edge CPU budget — 28 sizes × all frames is too many live searches at once.
-    const wantFrames: string[] = body.frames ?? ["Ingen"];
-    const frameVals = frameAxis.values.filter((f) => wantFrames.includes(f.key));
+  if (body?.verifyPreset) {
+    // Iterate ANY preset's size × catalog-axis and report how many resolve to a
+    // live Gelato UID. `values` limits the catalog-axis values tested (default
+    // the first) to stay under the edge CPU budget.
+    const preset = getPreset(String(body.verifyPreset));
+    if (!preset) return json(400, { ok: false, error: "unknown preset" });
+    const sizeAxis = preset.axes.find((a) => a.key === "size")!;
+    const catAxis = preset.axes.find((a) => a.key === preset.catalogAxis)!;
+    const want: string[] = body.values ?? [catAxis.values[0]?.key];
+    const catVals = catAxis.values.filter((c) => want.includes(c.key));
+    // Fill every OTHER (non-size, non-catalog) axis with its first value so the
+    // combo is fully pinned (e.g. poster paper).
+    const fixed: Record<string, string> = {};
+    for (const ax of preset.axes) {
+      if (ax.key !== "size" && ax.key !== preset.catalogAxis) fixed[ax.key] = ax.values[0]?.key;
+    }
     const noProduct: string[] = []; const errors: any[] = [];
     let checked = 0, resolved = 0;
     for (const s of sizeAxis.values) {
-      for (const f of frameVals) {
-        const res = resolvePreset(POSTER_PRESET, { size: s.key, frame: f.key, paper: "200-gsm-uncoated" });
-        if (!res) { noProduct.push(`${s.key}|${f.key}`); continue; }
+      for (const c of catVals) {
+        const res = resolvePreset(preset, { ...fixed, size: s.key, [preset.catalogAxis]: c.key });
+        if (!res) { noProduct.push(`${s.key}|${c.key}`); continue; }
         checked++;
         try {
           const r = await searchGelatoProductUids({
@@ -80,13 +86,13 @@ Deno.serve(async (req) => {
             attributeFilters: { ...res.filters, Orientation: ["ver"] }, limit: 2,
           });
           if (r.productUids[0]) resolved++;
-          else noProduct.push(`${s.key}|${f.key}`);
-        } catch (e) { errors.push({ key: `${s.key}|${f.key}`, error: String(e) }); }
+          else noProduct.push(`${s.key}|${c.key}`);
+        } catch (e) { errors.push({ key: `${s.key}|${c.key}`, error: String(e) }); }
       }
     }
     return json(200, {
-      ok: true, verify: "poster",
-      sizes: sizeAxis.values.length, frames: frameAxis.values.length,
+      ok: true, verify: preset.id,
+      sizes: sizeAxis.values.length, catalogValues: catAxis.values.map((c) => c.key),
       checked, resolved, noProductCount: noProduct.length, errors,
       noProductSample: noProduct.slice(0, 20),
     });

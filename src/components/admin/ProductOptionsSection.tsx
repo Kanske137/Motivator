@@ -33,7 +33,7 @@ import type { ProductConfig } from "@/lib/product-config";
 import type { ProductOptions } from "@/lib/template-schema";
 import { DEFAULT_PRODUCT_VARIANTS, mergeUnique } from "@/lib/product-defaults";
 import { getPodProvider, selectableAxes, pickableBases, ProductIcon, type ProductBase } from "@/lib/pod";
-import { POSTER_PRESET, presetAxisKeys } from "@/lib/pod/wall-art";
+import { POSTER_PRESET, CANVAS_PRESET, ALUMINUM_PRESET, ACRYLIC_PRESET, presetAxisKeys } from "@/lib/pod/wall-art";
 import { useProductBases } from "@/hooks/useProductBases";
 import type { BaseOptions } from "@/lib/template-schema";
 import { uploadCartPreview } from "@/lib/upload-preview";
@@ -96,28 +96,30 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
     () => mergeUnique(configVariantNames, presetAxisKeys(POSTER_PRESET, "frame")),
     [configVariantNames],
   );
+  // Canvas / metal / acrylic options now come from their PRESETS (catalog-
+  // derived sizes + expanded variants) — same source the sync resolves.
   const canvasSizes = useMemo(
-    () => mergeUnique(configSizes, DEFAULT_PRODUCT_VARIANTS.canvas.sizes),
+    () => mergeUnique(configSizes, presetAxisKeys(CANVAS_PRESET, "size")),
     [configSizes],
   );
   const canvasDepths = useMemo(
-    () => mergeUnique(configVariantNames, DEFAULT_PRODUCT_VARIANTS.canvas.depths),
+    () => mergeUnique(configVariantNames, presetAxisKeys(CANVAS_PRESET, "depth")),
     [configVariantNames],
   );
   const aluminumSizes = useMemo(
-    () => mergeUnique(configSizes, DEFAULT_PRODUCT_VARIANTS.aluminum.sizes),
+    () => mergeUnique(configSizes, presetAxisKeys(ALUMINUM_PRESET, "size")),
     [configSizes],
   );
   const aluminumMaterials = useMemo(
-    () => mergeUnique(configVariantNames, DEFAULT_PRODUCT_VARIANTS.aluminum.materials),
+    () => mergeUnique(configVariantNames, presetAxisKeys(ALUMINUM_PRESET, "material")),
     [configVariantNames],
   );
   const acrylicSizes = useMemo(
-    () => mergeUnique(configSizes, DEFAULT_PRODUCT_VARIANTS.acrylic.sizes),
+    () => mergeUnique(configSizes, presetAxisKeys(ACRYLIC_PRESET, "size")),
     [configSizes],
   );
   const acrylicFinishes = useMemo(
-    () => mergeUnique(configVariantNames, DEFAULT_PRODUCT_VARIANTS.acrylic.finishes),
+    () => mergeUnique(configVariantNames, presetAxisKeys(ACRYLIC_PRESET, "finish")),
     [configVariantNames],
   );
 

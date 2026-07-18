@@ -13,7 +13,7 @@
 // - On update we sync productOptions (so newly-added sizes/frames actually
 //   become valid option-values BEFORE we try to bulk-create variants for them).
 import { gelatoUid, searchGelatoProductUids } from "../_shared/pod/gelato.ts";
-import { POSTER_PRESET, resolvePreset } from "../_shared/pod/presets.ts";
+import { getPreset, resolvePreset } from "../_shared/pod/presets.ts";
 import {
   buildVariantInput,
   desiredOptionValuesByAxis,
@@ -109,36 +109,50 @@ function getUid(
   return gelatoUid(KIND_TO_SKU_KEY[kind], size, variant, "portrait");
 }
 
-/** Pre-resolve poster UIDs through the generic preset (one live Gelato search
- *  per enabled size×frame), keyed `poster|<size>|<frame>`. Runs once per sync
- *  before planning so plan()/planConsolidated() stay synchronous. */
-async function resolvePosterPresetUids(
+// Which config field holds each wall-art kind's variant values, and any axes to
+// fix (poster paper). The preset catalogAxis value keys match these values.
+const WALL_ART_PRESET_KINDS: Record<Kind, { variantsFrom: (opts: any) => string[]; fixed?: Record<string, string> }> = {
+  poster: { variantsFrom: (o) => mergedPosterFrames(o.poster?.allowedFrames), fixed: { paper: "200-gsm-uncoated" } },
+  canvas: { variantsFrom: (o) => o.canvas?.allowedDepths ?? [] },
+  aluminum: { variantsFrom: (o) => o.aluminum?.allowedMaterials ?? [] },
+  acrylic: { variantsFrom: (o) => o.acrylic?.allowedFinishes ?? [] },
+};
+
+/** Pre-resolve wall-art UIDs through each kind's generic preset (one live Gelato
+ *  search per enabled size×variant), keyed `<kind>|<size>|<variant>`. Runs once
+ *  before planning so plan()/planConsolidated() stay synchronous. The frozen
+ *  sku-map remains the fallback inside getUid. */
+async function resolveWallArtPresetUids(
   template: any,
   apiKey: string | undefined,
 ): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
-  const poster = template?.productOptions?.poster;
-  if (!apiKey || !poster?.enabled) return out;
-  const sizes: string[] = poster.allowedSizes ?? [];
-  const frames = mergedPosterFrames(poster.allowedFrames);
-  for (const size of sizes) {
-    for (const frame of frames) {
-      const res = resolvePreset(POSTER_PRESET, { size, frame, paper: "200-gsm-uncoated" });
-      if (!res) continue;
-      try {
-        const r = await searchGelatoProductUids({
-          apiKey,
-          catalogUid: res.catalog,
-          attributeFilters: { ...res.filters, Orientation: ["ver"] },
-          limit: 2,
-        });
-        if (r.productUids[0]) out[`poster|${size}|${frame}`] = r.productUids[0];
-      } catch (e) {
-        console.warn(`[preset] poster ${size}|${frame} failed, using frozen map: ${e}`);
+  const opts = template?.productOptions ?? {};
+  if (!apiKey) return out;
+  for (const kind of Object.keys(WALL_ART_PRESET_KINDS) as Kind[]) {
+    if (!opts[kind]?.enabled) continue;
+    const preset = getPreset(kind);
+    if (!preset) continue;
+    const cfg = WALL_ART_PRESET_KINDS[kind];
+    const sizes: string[] = opts[kind].allowedSizes ?? [];
+    const variants = cfg.variantsFrom(opts);
+    for (const size of sizes) {
+      for (const variant of variants) {
+        const res = resolvePreset(preset, { ...(cfg.fixed ?? {}), size, [preset.catalogAxis]: variant });
+        if (!res) continue;
+        try {
+          const r = await searchGelatoProductUids({
+            apiKey, catalogUid: res.catalog,
+            attributeFilters: { ...res.filters, Orientation: ["ver"] }, limit: 2,
+          });
+          if (r.productUids[0]) out[`${kind}|${size}|${variant}`] = r.productUids[0];
+        } catch (e) {
+          console.warn(`[preset] ${kind} ${size}|${variant} failed, using frozen map: ${e}`);
+        }
       }
     }
   }
-  console.log(`[preset] pre-resolved ${Object.keys(out).length} poster UIDs via preset`);
+  console.log(`[preset] pre-resolved ${Object.keys(out).length} wall-art UIDs via presets`);
   return out;
 }
 
@@ -615,9 +629,9 @@ Deno.serve(async (req) => {
       return typeof g === "number" ? g : 0;
     };
 
-    // Resolve poster UIDs through the generic preset once (live catalog), with
-    // the frozen sku-map as fallback inside getUid.
-    const presetUids = await resolvePosterPresetUids(cfg.template, Deno.env.get("GELATO_API_KEY"));
+    // Resolve wall-art UIDs (poster/canvas/aluminum/acrylic) through their generic
+    // presets once (live catalog), with the frozen sku-map as fallback in getUid.
+    const presetUids = await resolveWallArtPresetUids(cfg.template, Deno.env.get("GELATO_API_KEY"));
 
     const groups: PlannedGroup[] = isConsolidated
       ? [planConsolidated(cfg.template, enabledTypes, priceOf, presetUids)]

@@ -158,29 +158,40 @@ async function processOrder(supabase: any, order: any, shopDomainHeader: string 
     console.log(`[shopify-webhook] line ${li.id}: using client print file ${printUrl}`);
 
 
-    // 2) Resolve productUid
-    const cfg = configByHandle[handle];
-    const resolved = resolveGelatoProductUid({
-      handle,
-      size: size!,
-      variant,
-      orientation,
-      productType,
-      dbMap: cfg?.variant_map ?? null,
-    });
-
-    console.log(
-      `[shopify-webhook] line ${li.id}: handle="${handle}" size=${size} variant=${variant} orient=${orientation} → source=${resolved.source} uid=${resolved.productUid ?? "NONE"} (${resolved.detail})`
-    );
-
-    if (!resolved.productUid) {
-      skuErrors.push(`line ${li.id}: ${resolved.detail}`);
-      continue;
+    // 2) Resolve productUid. PRIMARY: the Shopify variant's SKU IS the Gelato
+    //    productUid (sync writes it), so a UID-shaped SKU is used directly — this
+    //    makes EVERY synced variant orderable (all wall-art sizes/variants, bases)
+    //    regardless of the sku-map/variant_map. Fallback: the props-based lookup
+    //    for older variants whose SKU isn't a Gelato UID.
+    const liSku = typeof li.sku === "string" ? li.sku.trim() : "";
+    const skuIsUid = /^[a-z0-9][a-z0-9_-]{20,}$/.test(liSku);
+    let productUid: string | null = null;
+    let uidSource = "sku";
+    if (skuIsUid) {
+      productUid = liSku;
+    } else {
+      const cfg = configByHandle[handle];
+      const resolved = resolveGelatoProductUid({
+        handle, size: size!, variant, orientation, productType,
+        dbMap: cfg?.variant_map ?? null,
+      });
+      productUid = resolved.productUid;
+      uidSource = resolved.source;
+      if (!productUid) {
+        console.log(`[shopify-webhook] line ${li.id}: handle="${handle}" size=${size} variant=${variant} → NONE (${resolved.detail})`);
+        skuErrors.push(`line ${li.id}: ${resolved.detail}`);
+        continue;
+      }
     }
+
+    if (!productUid) continue;
+    console.log(
+      `[shopify-webhook] line ${li.id}: size=${size} variant=${variant} → source=${uidSource} uid=${productUid}`
+    );
 
     items.push({
       itemReferenceId: String(li.id),
-      productUid: resolved.productUid,
+      productUid,
       fileUrl: printUrl,
       quantity: li.quantity ?? 1,
     });

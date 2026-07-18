@@ -245,9 +245,97 @@ export const POSTER_PRESET: ProductPreset = {
   },
 };
 
+// --- Canvas / Metallic / Acrylic presets (single-catalog, derived sizes) -----
+//
+// Unlike poster these are ONE Gelato catalog each, so the "compose across
+// catalogs" machinery just points every variant value at the same catalog. Size
+// options are derived from the catalog's own format attribute (parsed).
+
+const CANVAS_FMT = sizeMapFromFormats([
+  "400x400-mm", "600x800-mm", "270x350-mm", "400x600-mm", "300x300-mm", "400x800-mm",
+  "450x600-mm", "300x400-mm", "600x900-mm", "500x700-mm", "600x750-mm", "300x450-mm",
+  "400x500-mm", "300x600-mm", "500x1000-mm", "200x250-mm", "500x750-mm", "200x300-mm",
+  "600x600-mm", "200x200-mm", "500x500-mm", "300x1000-mm", "500x600-mm", "700x1000-mm",
+  "200x600-mm", "300x900-mm",
+]);
+const METAL_FMT = sizeMapFromFormats([
+  "300x400-mm-12x16-inch", "500x750-mm-20x30-inch", "500x700-mm-20x28-inch", "300x450-mm-12x18-inch",
+  "200x600-mm-8x24-inch", "600x900-mm-24x36-inch", "400x600-mm-16x24-inch", "200x200-mm-8x8-inch",
+  "600x800-mm-24x32-inch", "600x600-mm-24x24-inch", "300x900-mm-12x36-inch", "700x1000-mm-28x40-inch",
+  "400x400-mm-16x16-inch", "300x300-mm-12x12-inch", "450x600-mm-18x24-inch", "400x500-mm-16x20-inch",
+  "200x300-mm-8x12-inch", "500x500-mm-20x20-inch",
+]);
+const ACRYLIC_FMT = sizeMapFromFormats([
+  "600x600-mm-24x24-inch", "400x500-mm-16x20-inch", "500x500-mm-20x20-inch", "300x900-mm-12x36-inch",
+  "300x300-mm-12x12-inch", "400x600-mm-16x24-inch", "500x700-mm-20x28-inch", "300x450-mm-12x18-inch",
+  "700x1000-mm-28x40-inch", "600x900-mm-24x36-inch", "200x600-mm-8x24-inch", "500x750-mm-20x30-inch",
+  "300x400-mm-12x16-inch", "450x600-mm-18x24-inch", "200x200-mm-8x8-inch", "600x800-mm-24x32-inch",
+  "400x400-mm-16x16-inch", "200x300-mm-8x12-inch",
+]);
+
+const areaSorted = (m: Record<string, string>) =>
+  Object.keys(m)
+    .sort((a, b) => {
+      const area = (s: string) => s.split("x").reduce((n, x) => n * parseInt(x, 10), 1);
+      return area(a) - area(b);
+    })
+    .map((k) => ({ key: k, label: k.replace("x", "×") + " cm" }));
+
+export const CANVAS_PRESET: ProductPreset = {
+  id: "canvas", title: "Canvas", provider: "gelato",
+  catalogAxis: "depth",
+  axes: [
+    { key: "size", label: "Storlek", values: areaSorted(CANVAS_FMT) },
+    {
+      key: "depth", label: "Djup",
+      values: [{ key: "2cm", label: "2 cm" }, { key: "3cm", label: "3 cm" }, { key: "4cm", label: "4 cm" }],
+    },
+  ],
+  targets: {
+    "2cm": { catalog: "canvas", filters: { CanvasFrame: ["wood-fsc-2-cm"] }, attributes: [{ axis: "size", attribute: "CanvasFormat", valueByAxisValue: CANVAS_FMT }] },
+    "3cm": { catalog: "canvas", filters: { CanvasFrame: ["wood-fsc-3-cm"] }, attributes: [{ axis: "size", attribute: "CanvasFormat", valueByAxisValue: CANVAS_FMT }] },
+    "4cm": { catalog: "canvas", filters: { CanvasFrame: ["wood-fsc-4-cm"] }, attributes: [{ axis: "size", attribute: "CanvasFormat", valueByAxisValue: CANVAS_FMT }] },
+  },
+};
+
+export const ALUMINUM_PRESET: ProductPreset = {
+  id: "aluminum", title: "Metallposter", provider: "gelato",
+  baseFilters: { ProductStatus: ["activated"] },
+  catalogAxis: "material",
+  axes: [
+    { key: "size", label: "Storlek", values: areaSorted(METAL_FMT) },
+    {
+      key: "material", label: "Yta",
+      values: [{ key: "Standard", label: "Standard" }, { key: "Borstad", label: "Borstad silver" }],
+    },
+  ],
+  targets: {
+    Standard: { catalog: "metallic", filters: { MetallicProperties: ["3-mm"] }, attributes: [{ axis: "size", attribute: "UnifiedMetallicFormat", valueByAxisValue: METAL_FMT }] },
+    Borstad: { catalog: "metallic", filters: { MetallicProperties: ["3-mm-silver-brushed"] }, attributes: [{ axis: "size", attribute: "UnifiedMetallicFormat", valueByAxisValue: METAL_FMT }] },
+  },
+};
+
+export const ACRYLIC_PRESET: ProductPreset = {
+  id: "acrylic", title: "Plexiglas", provider: "gelato",
+  catalogAxis: "finish",
+  axes: [
+    { key: "size", label: "Storlek", values: areaSorted(ACRYLIC_FMT) },
+    // Single fixed thickness (4 mm) → hidden by planPresetGroup, pinned in resolution.
+    { key: "finish", label: "Finish", values: [{ key: "Standard", label: "Standard" }] },
+  ],
+  targets: {
+    Standard: { catalog: "acrylic", filters: {}, attributes: [{ axis: "size", attribute: "UnifiedAcrylicFormat", valueByAxisValue: ACRYLIC_FMT }] },
+  },
+};
+
 /** Curated preset library (composed products). Single-catalog products (a mug)
  *  use the base path directly and are not listed here. */
-export const PRODUCT_PRESETS: Record<string, ProductPreset> = { poster: POSTER_PRESET };
+export const PRODUCT_PRESETS: Record<string, ProductPreset> = {
+  poster: POSTER_PRESET,
+  canvas: CANVAS_PRESET,
+  aluminum: ALUMINUM_PRESET,
+  acrylic: ACRYLIC_PRESET,
+};
 
 export function getPreset(id: string): ProductPreset | null {
   return PRODUCT_PRESETS[id] ?? null;

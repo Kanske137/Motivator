@@ -2,8 +2,10 @@
 // single source of truth for a composed product's merchant-facing options; the
 // admin reads its axes from here so it shows the SAME sizes/frames/paper the
 // sync resolves (both import the shared pure module). Provider-agnostic.
-import { POSTER_PRESET } from "../../../supabase/functions/_shared/pod/presets";
-export { POSTER_PRESET };
+import {
+  POSTER_PRESET, CANVAS_PRESET, ALUMINUM_PRESET, ACRYLIC_PRESET,
+} from "../../../supabase/functions/_shared/pod/presets";
+export { POSTER_PRESET, CANVAS_PRESET, ALUMINUM_PRESET, ACRYLIC_PRESET };
 
 /** The value keys of a preset axis, e.g. presetAxisKeys(POSTER_PRESET, "size"). */
 export function presetAxisKeys(
