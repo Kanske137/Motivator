@@ -111,6 +111,27 @@ export function selectableAxes(base: ProductBase): VariantAxis[] {
   );
 }
 
+// Catalogs already covered by the four curated wall-art kinds — hidden from the
+// generic base picker so there is only ONE way to configure the same product.
+export const WALL_ART_BASE_IDS = new Set([
+  "posters",
+  "canvas",
+  "metallic",
+  "acrylic",
+  "mounted-framed-posters",
+  "framed-posters",
+  "hanging-posters",
+  "poster-hangers",
+]);
+
+/** Bases offered in the generic picker: imported catalogs minus the wall-art
+ *  ones (those have a curated UI) and minus any base with no selectable axes. */
+export function pickableBases(bases: ProductBase[] | undefined): ProductBase[] {
+  return (bases ?? []).filter(
+    (b) => !WALL_ART_BASE_IDS.has(b.providerProductId) && selectableAxes(b).length > 0,
+  );
+}
+
 type BaseRow = {
   id: string;
   provider: string;

@@ -32,7 +32,7 @@ import {
 import type { ProductConfig } from "@/lib/product-config";
 import type { ProductOptions } from "@/lib/template-schema";
 import { DEFAULT_PRODUCT_VARIANTS, mergeUnique } from "@/lib/product-defaults";
-import { getPodProvider, selectableAxes, type ProductBase } from "@/lib/pod";
+import { getPodProvider, selectableAxes, pickableBases, type ProductBase } from "@/lib/pod";
 import { useProductBases } from "@/hooks/useProductBases";
 import type { BaseOptions } from "@/lib/template-schema";
 import { uploadCartPreview } from "@/lib/upload-preview";
@@ -369,13 +369,14 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
             )}
           </div>
         )}
-      </Card>
 
-      {/* Generic POD-catalog products (mugs, apparel, …) — Phase 3b */}
-      <BaseProductsSection
-        value={value.bases ?? []}
-        onChange={(bases) => onChange({ ...value, bases })}
-      />
+        {/* Generic POD-catalog products (mugs, apparel, …) — rendered inline as
+            more product blocks so wall art + bases share ONE uniform list. */}
+        <BaseProductsSection
+          value={value.bases ?? []}
+          onChange={(bases) => onChange({ ...value, bases })}
+        />
+      </Card>
 
       {/* Map styles moved to the map LAYER's properties (per-layer toggle + order). */}
 
@@ -468,19 +469,6 @@ function ChecklistGroup({
   );
 }
 
-/** Catalogs already covered by the curated wall-art kinds above — hidden from
- *  the generic base picker to avoid two ways to configure the same product. */
-const WALL_ART_BASE_IDS = new Set([
-  "posters",
-  "canvas",
-  "metallic",
-  "acrylic",
-  "mounted-framed-posters",
-  "framed-posters",
-  "hanging-posters",
-  "poster-hangers",
-]);
-
 /** Generic POD-catalog products beyond the four wall-art kinds. Merchant adds a
  *  base (e.g. Mugs), then picks which values of each of its OWN axes to offer.
  *  Orientation-less products simply have no Orientation axis — portrait/landscape
@@ -495,10 +483,7 @@ function BaseProductsSection({
   const { t } = useTranslation();
   const { data: allBases, isLoading } = useProductBases();
 
-  const available = useMemo(
-    () => (allBases ?? []).filter((b) => !WALL_ART_BASE_IDS.has(b.providerProductId)),
-    [allBases],
-  );
+  const available = useMemo(() => pickableBases(allBases), [allBases]);
   const baseById = useMemo(() => {
     const m = new Map<string, ProductBase>();
     for (const b of available) m.set(b.providerProductId, b);
@@ -532,16 +517,10 @@ function BaseProductsSection({
   }
 
   return (
-    <Card className="p-5 space-y-4">
-      <div>
-        <h2 className="text-base font-semibold">{t("admin.baseProducts.title", { defaultValue: "Fler produkter (POD-katalog)" })}</h2>
-        <p className="text-xs text-muted-foreground">
-          {t("admin.baseProducts.subtitle", {
-            defaultValue: "Lägg till produkter från leverantörens katalog (muggar, kläder …) och välj vilka varianter kunden kan beställa.",
-          })}
-        </p>
-      </div>
-
+    // A fragment, NOT its own Card — the base blocks render as more product
+    // blocks inside the shared "Produktalternativ" card so wall art + POD-catalog
+    // products read as one uniform list.
+    <div className="space-y-4">
       {value.map((b) => {
         const base = baseById.get(b.baseId);
         const axes = base ? selectableAxes(base) : [];
@@ -601,7 +580,7 @@ function BaseProductsSection({
             disabled={isLoading}
           >
             <option value="" disabled>
-              {t("admin.baseProducts.add", { defaultValue: "Lägg till produkt …" })}
+              {t("admin.baseProducts.add", { defaultValue: "Lägg till fler produkter (muggar, kläder …)" })}
             </option>
             {addable.map((b) => (
               <option key={b.providerProductId} value={b.providerProductId}>{b.title}</option>
@@ -609,7 +588,7 @@ function BaseProductsSection({
           </select>
         </div>
       )}
-    </Card>
+    </div>
   );
 }
 

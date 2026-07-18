@@ -22,6 +22,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { invokeAdmin, invokeWithSession } from "@/lib/admin-api";
 import { DEFAULT_PRODUCT_VARIANTS } from "@/lib/product-defaults";
+import { pickableBases } from "@/lib/pod";
+import { useProductBases } from "@/hooks/useProductBases";
 import type { Template } from "@/lib/template-schema";
 import type { ProductType } from "@/lib/product-config";
 
@@ -53,7 +55,7 @@ function slugify(s: string): string {
     .replace(/-+/gu, "-");
 }
 
-function buildSeedTemplate(kinds: Kind[]): Template {
+function buildSeedTemplate(kinds: Kind[], baseIds: string[]): Template {
   const productOptions: Template["productOptions"] = {};
   if (kinds.includes("poster")) {
     productOptions.poster = {
@@ -83,6 +85,16 @@ function buildSeedTemplate(kinds: Kind[]): Template {
       allowedFinishes: [...DEFAULT_PRODUCT_VARIANTS.acrylic.finishes],
     };
   }
+  // Generic POD-catalog bases (mugs, apparel, …). Seeded with no axis selection
+  // = "offer all values"; the merchant narrows them on the designer page.
+  if (baseIds.length > 0) {
+    productOptions.bases = baseIds.map((baseId) => ({
+      baseId,
+      provider: "gelato",
+      enabled: true,
+      selectedAxes: {},
+    }));
+  }
   return {
     version: 1,
     publishedAt: null,
@@ -103,13 +115,17 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
   const [title, setTitle] = useState("");
   const [handle, setHandle] = useState("");
   const [handleEdited, setHandleEdited] = useState(false);
-  const [selected, setSelected] = useState<Record<Kind, boolean>>({
+  // Unified selection keyed by product-type id: a wall-art Kind OR a base id.
+  const [selected, setSelected] = useState<Record<string, boolean>>({
     poster: true,
     canvas: true,
     aluminum: true,
     acrylic: true,
   });
   const [saving, setSaving] = useState(false);
+
+  const { data: allBases } = useProductBases();
+  const bases = pickableBases(allBases);
 
   useEffect(() => {
     if (!handleEdited) setHandle(slugify(title));
@@ -125,8 +141,8 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
     }
   }, [open]);
 
-  function toggleKind(kind: Kind, checked: boolean) {
-    setSelected((s) => ({ ...s, [kind]: checked }));
+  function toggleId(id: string, checked: boolean) {
+    setSelected((s) => ({ ...s, [id]: checked }));
   }
 
   async function handleCreate() {
@@ -134,8 +150,10 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
       toast.error(t("admin.createTemplate.titleAndHandleRequired"));
       return;
     }
-    const kinds = (Object.keys(selected) as Kind[]).filter((k) => selected[k]);
-    if (kinds.length === 0) {
+    const wallArtIds = Object.keys(KIND_META) as Kind[];
+    const kinds = wallArtIds.filter((k) => selected[k]);
+    const baseIds = bases.map((b) => b.providerProductId).filter((id) => selected[id]);
+    if (kinds.length === 0 && baseIds.length === 0) {
       toast.error(t("admin.createTemplate.selectAtLeastOne"));
       return;
     }
@@ -147,7 +165,7 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
     const templateSlug = trimmedHandle.replace(/-(poster|posters|canvas|aluminum|acrylic)$/i, "");
     const enabledProductTypes = kinds.map((k) => KIND_META[k].productType);
 
-    const tpl = buildSeedTemplate(kinds);
+    const tpl = buildSeedTemplate(kinds, baseIds);
     const baseTextConfig = {
       fonts: ["Inter", "Playfair Display"],
       maxChars: 24,
@@ -190,7 +208,7 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
       });
     } else {
       toast.success(t("admin.createTemplate.createdAndSynced"), {
-        description: t("admin.createTemplate.createdVariantsDesc", { count: kinds.length }),
+        description: t("admin.createTemplate.createdVariantsDesc", { count: kinds.length + baseIds.length }),
       });
     }
     onOpenChange(false);
@@ -238,6 +256,9 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
             <p className="text-xs text-muted-foreground">
               {t("admin.createTemplate.productTypesHint")}
             </p>
+            {/* One uniform picker: the four curated wall-art kinds AND the POD
+                catalog bases (mugs, apparel, …). All substrates share the
+                template_slug and are grouped for the shopper automatically. */}
             <div className="grid grid-cols-2 gap-2">
               {(Object.keys(KIND_META) as Kind[]).map((k) => (
                 <label
@@ -245,10 +266,22 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
                   className="flex items-center gap-2 rounded-md border p-3 cursor-pointer hover:bg-muted/40"
                 >
                   <Checkbox
-                    checked={selected[k]}
-                    onCheckedChange={(c) => toggleKind(k, c === true)}
+                    checked={selected[k] ?? false}
+                    onCheckedChange={(c) => toggleId(k, c === true)}
                   />
                   <span className="text-sm font-medium">{t(KIND_META[k].i18nKey)}</span>
+                </label>
+              ))}
+              {bases.map((b) => (
+                <label
+                  key={b.providerProductId}
+                  className="flex items-center gap-2 rounded-md border p-3 cursor-pointer hover:bg-muted/40"
+                >
+                  <Checkbox
+                    checked={selected[b.providerProductId] ?? false}
+                    onCheckedChange={(c) => toggleId(b.providerProductId, c === true)}
+                  />
+                  <span className="text-sm font-medium">{b.title}</span>
                 </label>
               ))}
             </div>

@@ -103,9 +103,25 @@ this branch and read this log so two sessions don't edit the same file at once.
     configure a mug on a template in admin → Save → Sync → then verify the Shopify product +
     `variant_map`. Store `wallery-test-store` (install `ea36feef…`) has the active templates.
 
+- **3b slice 2b VERIFIED LIVE (17 Jul):** merchant added mugs to the AITest template + synced.
+  `variant_map` populated with correct Gelato UIDs, and the per-combo search correctly kept only
+  the ~13 REAL mug combos out of 66 selected (invalid size×material skipped as "no SKU"). Slice 2b
+  works end-to-end.
+- **Grouping decision (see memory `motiv-product-grouping-model`):** one design across many
+  substrates → ONE Shopify product per substrate (own 3 axes / media / 2048 cap), grouped for the
+  shopper via the shared `custom.template_slug` metafield + our OWN storefront widget
+  (`wallery-customizer`). Native Combined Listings rejected — it's Plus-only; ours works on Basic
+  with no extra app. The consolidated single-3-axis product stays only WITHIN a family (wall art).
+- **Admin-UI unification DONE (points 1+2):** create-template dialog now lists the 4 wall-art kinds
+  AND POD-catalog bases in one uniform picker (`buildSeedTemplate` seeds `productOptions.bases[]`);
+  designer page renders bases as more product blocks INSIDE the shared "Produktalternativ" card so
+  wall art + bases read as one list. Shared `pickableBases`/`WALL_ART_BASE_IDS` in `src/lib/pod/bases.ts`.
+  Verified: 96 tests, tsc clean, build green.
+
 ### Next (reasonable order)
-1. **Verify 2b live:** merchant configures + syncs a mug template; confirm Shopify variants +
-   `variant_map` populated with correct Gelato UIDs.
+1. **Storefront substrate switcher:** in the `wallery-customizer` widget, resolve sibling products
+   by `template_slug` and render a "also available as: Mug · T-shirt" selector (the self-built
+   grouping — works on Basic).
 2. **3b slice 3:** editor print-area boundary + safe area + bleed live (needs per-product
    dimensions — Gelato `GET /v3/products/{uid}` dimensions, or size-label parsing for wall art).
 3. **3b slice 4:** variant-cap UI (X/2048 counter, ≤3 options, chunked bulk create in sync).
