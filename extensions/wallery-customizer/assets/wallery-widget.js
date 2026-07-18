@@ -15,6 +15,13 @@
   // The hosted Wallery app (editor). Later: custom domain.
   var APP_ORIGIN = "https://motivator-8uw.pages.dev";
 
+  // Storefront proxy for the substrate switcher. One Wallery Supabase project
+  // serves every shop; the key is the PUBLISHABLE (anon) key — public by design,
+  // same as the app bundles. Provider-agnostic: this is pure Shopify product
+  // grouping by the shared template_slug tag.
+  var SF_PROXY = "https://qmqcvatfrcrgkcjblmyq.supabase.co/functions/v1/shopify-storefront";
+  var SF_ANON = "sb_publishable_4KDdPGS9P52Z8FmIQ8brQg_IhieObmB";
+
   function esc(s) {
     return String(s == null ? "" : s)
       .replace(/&/g, "&amp;")
@@ -150,6 +157,42 @@
       primaryText: ok(b && b.color, "#ffffff"),
       radius: b && b.borderRadius && b.borderRadius !== "0px" ? b.borderRadius : "8px",
     };
+  }
+
+  // Fetch the sibling products that share this design's template_slug tag and
+  // render a substrate switcher. Pure Shopify grouping — no POD/provider
+  // knowledge. Defensive: any failure leaves the page untouched.
+  function loadSiblings(host, shadow) {
+    var slug = host.dataset.templateSlug;
+    var shop = host.dataset.shop;
+    var current = host.dataset.productHandle;
+    if (!slug || !shop) return;
+    var query =
+      "query($q:String!){products(first:20,query:$q){nodes{handle title productType}}}";
+    fetch(SF_PROXY, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: SF_ANON, Authorization: "Bearer " + SF_ANON },
+      body: JSON.stringify({ query: query, variables: { q: "tag:" + slug }, shop: shop }),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        var nodes = (res && res.data && res.data.products && res.data.products.nodes) || [];
+        if (nodes.length < 2) return; // nothing to switch between
+        var box = shadow.querySelector("[data-subs]");
+        if (!box) return;
+        var html = '<span class="subs-l">Finns även som:</span>';
+        nodes.forEach(function (n) {
+          var label = esc(n.productType || n.title);
+          if (n.handle === current) {
+            html += '<span class="chip cur">' + label + "</span>";
+          } else {
+            html += '<a class="chip" href="/products/' + encodeURIComponent(n.handle) + '">' + label + "</a>";
+          }
+        });
+        box.innerHTML = html;
+        box.hidden = false;
+      })
+      .catch(function () { /* silent — never break the product page */ });
   }
 
   function editorUrl(host) {
@@ -504,18 +547,30 @@
       ".w button:hover{filter:brightness(.94);}" +
       ".w button:active{transform:translateY(1px);}" +
       ".w button svg{width:18px;height:18px;}" +
+      // Substrate switcher: "also available as: Mug · T-shirt".
+      ".subs{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:14px;}" +
+      ".subs-l{font-size:.8em;opacity:.6;}" +
+      ".subs .chip{font:inherit;font-size:.82em;text-decoration:none;color:inherit;" +
+      "border:1px solid rgba(0,0,0,.14);border-radius:999px;padding:6px 12px;transition:border-color .12s;}" +
+      ".subs .chip:hover{border-color:var(--p);}" +
+      ".subs .chip.cur{background:var(--p);color:var(--pt);border-color:var(--p);}" +
       "</style>" +
       '<div class="w">' +
       '<div class="preview" data-open><img data-preview alt="" />' +
       '<div class="hint"><span>' + pencil + esc(buttonLabel) + "</span></div></div>" +
       textsHtml +
       '<button type="button" data-open>' + pencil + "<span>" + esc(buttonLabel) + "</span></button>" +
+      '<div class="subs" data-subs hidden></div>' +
       "</div>";
 
     // Open the customizer from either the button OR the preview image.
     shadow.querySelectorAll("[data-open]").forEach(function (el) {
       el.addEventListener("click", function () { openOverlay(host); });
     });
+
+    // Substrate switcher — unite this design's products (Poster · Mug · …) for
+    // the shopper. Never breaks the page: fails silently.
+    loadSiblings(host, shadow);
 
     // Route the theme's native "Add to cart" / "Buy now" through the customizer
     // (re-hooked periodically so async-rendered buttons + re-rendered forms stick).
