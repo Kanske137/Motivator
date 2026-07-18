@@ -1,137 +1,195 @@
 // Product presets (Phase 3b) — merchant-facing products composed from one or
-// more provider catalogs.
+// more provider catalogs, as DATA interpreted by a GENERIC resolver.
 //
-// The problem this solves: a merchant sells ONE "Poster" that can be plain,
-// framed (black/white/oak/walnut) or on a hanger. But Gelato splits those across
-// THREE catalogs — `posters` (flat), `mounted-framed-posters`, `hanging-posters`.
-// A preset keeps it a single product with a friendly "Ram" axis whose values map
-// to the right catalog + attribute filters under the hood. This formalizes what
-// the hardcoded `gelato-sku-map.json` did — but as data, so it can be maintained
-// and expanded (e.g. offer more paper types) instead of frozen in code.
-//
-// A single-catalog product (a mug) is just the trivial case: one catalog, axes =
-// its own attributes (the existing "base" path already handles those). Presets
-// are the curated, cross-catalog generalization.
+// The split that matters:
+//   * The ENGINE (resolvePreset below) is generic — no product- or provider-
+//     specific branching. It walks a declarative definition and emits a
+//     provider-neutral { catalog, attributeFilters }.
+//   * A PRESET DEFINITION is curated DATA. Some curation is irreducible: only a
+//     human decides that the merchant value "Ek" maps to Gelato's FrameColor
+//     "natural-wood" in the `mounted-framed-posters` catalog, or that flat +
+//     framed + hanging posters are ONE product. That knowledge can't be derived
+//     from any API — but it lives as data, not as code, so adding a product
+//     (Canvas) or a provider (Printful) is new data, never new engine logic.
 //
 // Pure (no Deno / esm.sh imports) so it is unit-testable from vitest.
 
 /** A merchant/customer-facing option value on a preset axis. */
-export interface PresetValue {
-  key: string; // stable value key, e.g. "Ek" or "21x30"
-  label: string; // shown to the merchant + customer
-}
+export interface PresetValue { key: string; label: string; }
 
 export interface PresetAxis {
-  key: string; // "frame" | "size" | "paper"
-  label: string; // "Ram" | "Storlek" | "Papper"
+  key: string;   // "size" | "frame" | "paper"
+  label: string; // "Storlek" | "Ram" | "Papper"
   values: PresetValue[];
-  /** Value keys offered by default when a merchant enables the preset. When
-   *  omitted, all values are default-on. */
-  defaultValues?: string[];
+  defaultValues?: string[]; // value keys enabled by default (all if omitted)
 }
 
-/** The provider target a specific variant-combo resolves to. */
-export interface PresetResolution {
-  catalog: string; // Gelato catalogUid to search in
-  filters: Record<string, string[]>; // attributeFilters that pin one product
+/** How one axis's selected value becomes a provider attribute filter, for a
+ *  specific catalog. `valueByAxisValue` is per-catalog because the same
+ *  merchant value maps to different provider vocab per catalog (30x40 →
+ *  "300x400-mm" in one catalog, "300x400-mm-12x16-inch" in another). */
+export interface AxisAttribute {
+  axis: string;       // which preset axis, e.g. "size"
+  attribute: string;  // provider attribute uid, e.g. "PaperFormat"
+  valueByAxisValue: Record<string, string>; // axisValueKey → provider value uid
+}
+
+/** The provider catalog a given catalog-axis value selects, plus fixed filters
+ *  and the per-axis attribute mappings for that catalog. */
+export interface CatalogTarget {
+  catalog: string;
+  filters?: Record<string, string[]>; // fixed filters (e.g. FrameColor)
+  attributes: AxisAttribute[];        // size/paper → provider attributes
 }
 
 export interface ProductPreset {
-  id: string; // "poster"
+  id: string;
   title: string;
-  provider: string; // "gelato"
+  provider: string;
   axes: PresetAxis[];
-  /**
-   * Map ONE selected value per axis (keyed by axis.key) to the provider catalog
-   * + attribute filters that pin a single product. Returns null for a
-   * combination that has no product (e.g. a paper type a given frame doesn't
-   * offer) — the caller skips it. This is where cross-catalog composition lives.
-   */
-  resolve(selection: Record<string, string>): PresetResolution | null;
+  baseFilters?: Record<string, string[]>; // every lookup carries these (e.g. ProductStatus)
+  catalogAxis: string;                     // which axis picks the catalog, e.g. "frame"
+  targets: Record<string, CatalogTarget>;  // catalogAxis value key → target
 }
 
-// --- Poster preset -----------------------------------------------------------
+/** The provider lookup a variant-combo resolves to (provider-neutral shape). */
+export interface PresetResolution {
+  catalog: string;
+  filters: Record<string, string[]>;
+}
+
+/**
+ * GENERIC resolver. Given any preset + one selected value per axis, produce the
+ * provider catalog + attributeFilters that pin a single product — or null for a
+ * combination that has no product (caller skips it). No product/provider
+ * branching lives here; everything specific comes from the preset DATA.
+ */
+export function resolvePreset(
+  preset: ProductPreset,
+  selection: Record<string, string>,
+): PresetResolution | null {
+  const catalogValue = selection[preset.catalogAxis];
+  const target = preset.targets[catalogValue];
+  if (!target) return null;
+
+  const filters: Record<string, string[]> = { ...(preset.baseFilters ?? {}), ...(target.filters ?? {}) };
+  for (const attr of target.attributes) {
+    const axisValue = selection[attr.axis];
+    if (axisValue === undefined) return null;
+    const providerValue = attr.valueByAxisValue[axisValue];
+    if (providerValue === undefined) return null; // this value isn't offered for this catalog
+    filters[attr.attribute] = [providerValue];
+  }
+  return { catalog: target.catalog, filters };
+}
+
+// --- Poster preset (DATA) ----------------------------------------------------
 //
-// Composes three Gelato catalogs behind one "Ram" axis. Grounded in the live
-// catalog attributes (verified): mounted-framed-posters has FrameColor
-// {black,white,natural-wood,dark-wood,gold,silver,copper} × FrameMaterial
-// {wood,aluminum}; the 21×30 framed size uses PaperFormat "A4" (a real quirk).
+// Composes three Gelato catalogs behind one "Ram & upphängning" axis. All keys
+// below are verified against the live catalogs. The size→format vocab genuinely
+// differs per catalog — that difference is DATA the generic engine reads, not
+// special-case code.
 
-/** Ram value → which catalog + frame filters it selects. */
-const POSTER_FRAME: Record<string, PresetResolution> = {
-  Ingen: { catalog: "posters", filters: {} },
-  Svart: { catalog: "mounted-framed-posters", filters: { FrameColor: ["black"], FrameMaterial: ["wood"] } },
-  Vit: { catalog: "mounted-framed-posters", filters: { FrameColor: ["white"], FrameMaterial: ["wood"] } },
-  Ek: { catalog: "mounted-framed-posters", filters: { FrameColor: ["natural-wood"], FrameMaterial: ["wood"] } },
-  Valnöt: { catalog: "mounted-framed-posters", filters: { FrameColor: ["dark-wood"], FrameMaterial: ["wood"] } },
-  // TODO(hanger): "Hängare Vit/Svart/Ek/Valnöt" → catalog "hanging-posters"
-  // once its hanger-colour attribute is mapped. Left out here so the resolver
-  // never returns a wrong SKU for a hanger; added in the next slice.
+/** size → PaperFormat in the flat `posters` catalog. */
+const FMT_FLAT: Record<string, string> = {
+  "13x18": "130x180-mm", "21x30": "210x300-mm", "30x40": "300x400-mm",
+  "40x50": "400x500-mm", "50x70": "500x700-mm", "70x100": "700x1000-mm",
+};
+/** size → PaperFormat in `mounted-framed-posters` (21×30 is "A4", not mm). */
+const FMT_FRAMED: Record<string, string> = {
+  "13x18": "130x180-mm", "21x30": "A4", "30x40": "300x400-mm",
+  "40x50": "400x500-mm", "50x70": "500x700-mm", "70x100": "700x1000-mm",
+};
+/** size → UnifiedPaperFormat in `hanging-posters` (combined mm+inch vocab;
+ *  only offered for these four sizes). */
+const FMT_HANGER: Record<string, string> = {
+  "21x30": "A4-8x12-inch", "30x40": "300x400-mm-12x16-inch",
+  "40x50": "400x500-mm-16x20-inch", "50x70": "500x700-mm-20x28-inch",
+  "70x100": "700x1000-mm-28x40-inch",
 };
 
-/** Size key → PaperFormat value PER catalog (framed 21×30 is "A4", not mm). */
-const POSTER_FORMAT: Record<string, Record<string, string>> = {
-  "13x18": { posters: "130x180-mm", "mounted-framed-posters": "130x180-mm" },
-  "21x30": { posters: "210x300-mm", "mounted-framed-posters": "A4" },
-  "30x40": { posters: "300x400-mm", "mounted-framed-posters": "300x400-mm" },
-  "40x50": { posters: "400x500-mm", "mounted-framed-posters": "400x500-mm" },
-  "50x70": { posters: "500x700-mm", "mounted-framed-posters": "500x700-mm" },
-  "70x100": { posters: "700x1000-mm", "mounted-framed-posters": "700x1000-mm" },
+/** paper → PaperType (flat + framed catalogs share this vocab). */
+const PAPER_STD: Record<string, string> = {
+  "200-gsm-uncoated": "200-gsm-uncoated",
+  "250-gsm-uncoated": "250-gsm-uncoated",
+  "200-gsm-coated-silk": "200-gsm-coated-silk",
+};
+/** paper → UnifiedPaperType (hanging-posters uses the 80lb-suffixed vocab). */
+const PAPER_HANGER: Record<string, string> = {
+  "200-gsm-uncoated": "200-gsm-80lb-uncoated",
 };
 
-/** Default paper — the one the frozen sku-map used. Expandable via the Paper axis. */
-const POSTER_DEFAULT_PAPER = "200-gsm-uncoated";
+const framedTarget = (frameColor: string): CatalogTarget => ({
+  catalog: "mounted-framed-posters",
+  filters: { FrameColor: [frameColor], FrameMaterial: ["wood"] },
+  attributes: [
+    { axis: "size", attribute: "PaperFormat", valueByAxisValue: FMT_FRAMED },
+    { axis: "paper", attribute: "PaperType", valueByAxisValue: PAPER_STD },
+  ],
+});
+const hangerTarget = (hangerColor: string): CatalogTarget => ({
+  catalog: "hanging-posters",
+  filters: { WallHangerColor: [hangerColor], WallHangerMaterial: ["wood"] },
+  attributes: [
+    { axis: "size", attribute: "UnifiedPaperFormat", valueByAxisValue: FMT_HANGER },
+    { axis: "paper", attribute: "UnifiedPaperType", valueByAxisValue: PAPER_HANGER },
+  ],
+});
 
 export const POSTER_PRESET: ProductPreset = {
   id: "poster",
   title: "Poster",
   provider: "gelato",
+  baseFilters: { ProductStatus: ["activated"] },
+  catalogAxis: "frame",
   axes: [
     {
-      key: "size",
-      label: "Storlek",
-      values: Object.keys(POSTER_FORMAT).map((k) => ({ key: k, label: k.replace("x", "×") + " cm" })),
+      key: "size", label: "Storlek",
+      values: Object.keys(FMT_FLAT).map((k) => ({ key: k, label: k.replace("x", "×") + " cm" })),
     },
     {
-      key: "frame",
-      label: "Ram",
-      values: Object.keys(POSTER_FRAME).map((k) => ({ key: k, label: k })),
+      key: "frame", label: "Ram & upphängning",
+      // Value keys match the frozen sku-map's frame labels exactly.
+      values: [
+        { key: "Ingen", label: "Ingen ram" },
+        { key: "Svart", label: "Ram svart" }, { key: "Vit", label: "Ram vit" },
+        { key: "Ek", label: "Ram ek" }, { key: "Valnöt", label: "Ram valnöt" },
+        { key: "Hängare Vit", label: "Hängare vit" }, { key: "Hängare Svart", label: "Hängare svart" },
+        { key: "Hängare Ek", label: "Hängare ek" }, { key: "Hängare Valnöt", label: "Hängare valnöt" },
+      ],
     },
     {
-      key: "paper",
-      label: "Papper",
-      // A curated shortlist; the full catalog has 32 paper types to expand into.
+      key: "paper", label: "Papper",
       values: [
         { key: "200-gsm-uncoated", label: "200 g obestruket" },
         { key: "250-gsm-uncoated", label: "250 g obestruket" },
         { key: "200-gsm-coated-silk", label: "200 g silke" },
       ],
-      defaultValues: [POSTER_DEFAULT_PAPER],
+      defaultValues: ["200-gsm-uncoated"],
     },
   ],
-  resolve(selection) {
-    const frame = POSTER_FRAME[selection.frame];
-    if (!frame) return null;
-    const format = POSTER_FORMAT[selection.size]?.[frame.catalog];
-    if (!format) return null;
-    const paper = selection.paper || POSTER_DEFAULT_PAPER;
-    return {
-      catalog: frame.catalog,
-      filters: {
-        ...frame.filters,
-        PaperFormat: [format],
-        PaperType: [paper],
-        ProductStatus: ["activated"],
-      },
-    };
+  targets: {
+    Ingen: {
+      catalog: "posters",
+      attributes: [
+        { axis: "size", attribute: "PaperFormat", valueByAxisValue: FMT_FLAT },
+        { axis: "paper", attribute: "PaperType", valueByAxisValue: PAPER_STD },
+      ],
+    },
+    Svart: framedTarget("black"),
+    Vit: framedTarget("white"),
+    Ek: framedTarget("natural-wood"),
+    Valnöt: framedTarget("dark-wood"),
+    "Hängare Vit": hangerTarget("white"),
+    "Hängare Svart": hangerTarget("black"),
+    "Hängare Ek": hangerTarget("natural-wood"),
+    "Hängare Valnöt": hangerTarget("dark-wood"),
   },
 };
 
-/** Curated preset library (composed products). Single-catalog products use the
- *  base path directly and are not listed here. */
-export const PRODUCT_PRESETS: Record<string, ProductPreset> = {
-  poster: POSTER_PRESET,
-};
+/** Curated preset library (composed products). Single-catalog products (a mug)
+ *  use the base path directly and are not listed here. */
+export const PRODUCT_PRESETS: Record<string, ProductPreset> = { poster: POSTER_PRESET };
 
 export function getPreset(id: string): ProductPreset | null {
   return PRODUCT_PRESETS[id] ?? null;

@@ -12,7 +12,7 @@
 //      mirroring cleanup-previews' cron guard.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import { getProductCatalog, searchGelatoProductUids, GELATO_SKU_MAP } from "../_shared/pod/gelato.ts";
-import { POSTER_PRESET } from "../_shared/pod/presets.ts";
+import { POSTER_PRESET, resolvePreset } from "../_shared/pod/presets.ts";
 import {
   AuthError,
   authErrorResponse,
@@ -59,14 +59,12 @@ Deno.serve(async (req) => {
   // the preset before sync is switched over. Body: { verifyPreset: "poster" }.
   if (body?.verifyPreset === "poster") {
     const map = (GELATO_SKU_MAP.posters ?? {}) as Record<string, { portrait: string; landscape: string }>;
-    const FRAMES = new Set(["Ingen", "Svart", "Vit", "Ek", "Valnöt"]); // hangers TODO
     const mismatches: any[] = [];
     let checked = 0, matches = 0;
     for (const key of Object.keys(map)) {
       const [size, frame] = key.split("|");
-      if (!FRAMES.has(frame)) continue;
       const expected = map[key].portrait;
-      const res = POSTER_PRESET.resolve({ size, frame });
+      const res = resolvePreset(POSTER_PRESET, { size, frame, paper: "200-gsm-uncoated" });
       if (!res) { mismatches.push({ key, reason: "preset returned null" }); checked++; continue; }
       const filters = { ...res.filters, Orientation: ["ver"] };
       checked++;
