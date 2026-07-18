@@ -92,6 +92,22 @@ Deno.serve(async (req) => {
     });
   }
 
+  // Cost probe: fetch Gelato's wholesale prices for a productUid (the foundation
+  // of the cost/margin pricing UI). Body: { costProbe: "<productUid>" }.
+  if (body?.costProbe) {
+    try {
+      const res = await fetch(
+        `https://product.gelatoapis.com/v3/products/${encodeURIComponent(String(body.costProbe))}/prices`,
+        { headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" } },
+      );
+      const text = await res.text();
+      let parsed: unknown = text; try { parsed = JSON.parse(text); } catch { /* raw */ }
+      return json(res.ok ? 200 : 502, { ok: res.ok, status: res.status, prices: parsed });
+    } catch (e) {
+      return json(502, { ok: false, error: String(e) });
+    }
+  }
+
   // Diagnostic probe: resolve a productUid for a given catalog + attributeFilters
   // without importing anything. Body: { probe: { catalogUid, attributeFilters } }.
   if (body?.probe?.catalogUid) {
