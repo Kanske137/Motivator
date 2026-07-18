@@ -600,7 +600,7 @@
       "handleLabel": "Handle Shopify",
       "handlePlaceholder": "mappa-personale-citta",
       "productTypesLabel": "Tipi di prodotto",
-      "productTypesHint": "Viene creato un prodotto Shopify in cui i tipi di prodotto diventano varianti (Tipo di prodotto/Dimensione/Finitura).",
+      "productTypesHint": "Scegli su quali prodotti è possibile ordinare lo stesso design — prima le stampe da parete, poi il resto del catalogo del fornitore. Ogni prodotto selezionato diventa un prodotto Shopify a sé, ma viene raggruppato per il cliente. Regoli formati e varianti nel passaggio successivo.",
       "cancel": "Annulla",
       "createAndOpen": "Crea e apri"
     },
@@ -825,6 +825,13 @@
         "script": "Corsiva",
         "mono": "Monospazio"
       }
+    },
+    "baseProducts": {
+      "add": "Aggiungi altri prodotti (tazze, abbigliamento …)",
+      "noAxes": "Questo prodotto non ha varianti selezionabili.",
+      "loading": "Caricamento catalogo …",
+      "missing": "Questo prodotto non è più nel catalogo.",
+      "remove": "Rimuovi prodotto"
     }
   }
 }

@@ -600,7 +600,7 @@
       "handleLabel": "Shopify handle",
       "handlePlaceholder": "personalna-mapa-miasta",
       "productTypesLabel": "Typy produktów",
-      "productTypesHint": "Tworzony jest produkt Shopify, w którym typy produktów stają się wariantami (Typ produktu/Rozmiar/Wykończenie).",
+      "productTypesHint": "Wybierz, na jakich produktach można zamówić ten sam projekt — najpierw dekoracje ścienne, potem reszta katalogu dostawcy. Każdy wybrany produkt staje się osobnym produktem Shopify, ale jest grupowany dla klienta. Rozmiary i warianty dopracujesz w następnym kroku.",
       "cancel": "Anuluj",
       "createAndOpen": "Utwórz i otwórz"
     },
@@ -825,6 +825,13 @@
         "script": "Odręczne",
         "mono": "Monospace"
       }
+    },
+    "baseProducts": {
+      "add": "Dodaj więcej produktów (kubki, odzież …)",
+      "noAxes": "Ten produkt nie ma wybieralnych wariantów.",
+      "loading": "Ładowanie katalogu …",
+      "missing": "Tego produktu nie ma już w katalogu.",
+      "remove": "Usuń produkt"
     }
   }
 }

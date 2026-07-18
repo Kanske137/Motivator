@@ -32,7 +32,7 @@ import {
 import type { ProductConfig } from "@/lib/product-config";
 import type { ProductOptions } from "@/lib/template-schema";
 import { DEFAULT_PRODUCT_VARIANTS, mergeUnique } from "@/lib/product-defaults";
-import { getPodProvider, selectableAxes, pickableBases, type ProductBase } from "@/lib/pod";
+import { getPodProvider, selectableAxes, pickableBases, ProductIcon, type ProductBase } from "@/lib/pod";
 import { useProductBases } from "@/hooks/useProductBases";
 import type { BaseOptions } from "@/lib/template-schema";
 import { uploadCartPreview } from "@/lib/upload-preview";
@@ -46,6 +46,34 @@ interface Props {
 }
 
 type Kind = "poster" | "canvas" | "aluminum" | "acrylic";
+
+/** Shared header for every product block (wall art AND bases) so they render
+ *  identically: representative icon + name on the LEFT, enable switch on the
+ *  RIGHT. Any block-specific extras (e.g. a base's remove) go in the body, not
+ *  here, so the header row stays uniform. */
+function ProductBlockHeader({
+  iconId,
+  label,
+  enabled,
+  onToggle,
+}: {
+  iconId: string;
+  label: string;
+  enabled: boolean;
+  onToggle: (checked: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border bg-muted/30 text-muted-foreground">
+          <ProductIcon id={iconId} className="h-5 w-5" />
+        </span>
+        <Label className="text-sm font-medium">{label}</Label>
+      </div>
+      <Switch checked={enabled} onCheckedChange={onToggle} />
+    </div>
+  );
+}
 
 export default function ProductOptionsSection({ config, value, onChange }: Props) {
   const { t } = useTranslation();
@@ -240,13 +268,12 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
           return showPoster;
         })() && (
           <div className="space-y-3 rounded-md border p-4">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">{t("productKind.poster")}</Label>
-              <Switch
-                checked={value.poster?.enabled ?? false}
-                onCheckedChange={(c) => toggleEnabled("poster", c)}
-              />
-            </div>
+            <ProductBlockHeader
+              iconId="posters"
+              label={t("productKind.poster")}
+              enabled={value.poster?.enabled ?? false}
+              onToggle={(c) => toggleEnabled("poster", c)}
+            />
             {value.poster?.enabled && (
               <div className="grid gap-4 md:grid-cols-2">
                 <ChecklistGroup
@@ -274,13 +301,12 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
           return consolidated ? enabled.includes("canvas") : config.product_type === "canvas";
         })() && (
           <div className="space-y-3 rounded-md border p-4">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">{t("productKind.canvas")}</Label>
-              <Switch
-                checked={value.canvas?.enabled ?? false}
-                onCheckedChange={(c) => toggleEnabled("canvas", c)}
-              />
-            </div>
+            <ProductBlockHeader
+              iconId="canvas"
+              label={t("productKind.canvas")}
+              enabled={value.canvas?.enabled ?? false}
+              onToggle={(c) => toggleEnabled("canvas", c)}
+            />
             {value.canvas?.enabled && (
               <div className="grid gap-4 md:grid-cols-2">
                 <ChecklistGroup
@@ -308,13 +334,12 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
           return consolidated ? enabled.includes("aluminum") : config.product_type === "aluminum";
         })() && (
           <div className="space-y-3 rounded-md border p-4">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">{t("productKind.aluminum")}</Label>
-              <Switch
-                checked={value.aluminum?.enabled ?? false}
-                onCheckedChange={(c) => toggleEnabled("aluminum", c)}
-              />
-            </div>
+            <ProductBlockHeader
+              iconId="aluminum"
+              label={t("productKind.aluminum")}
+              enabled={value.aluminum?.enabled ?? false}
+              onToggle={(c) => toggleEnabled("aluminum", c)}
+            />
             {value.aluminum?.enabled && (
               <div className="grid gap-4 md:grid-cols-2">
                 <ChecklistGroup
@@ -342,13 +367,12 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
           return consolidated ? enabled.includes("acrylic") : config.product_type === "acrylic";
         })() && (
           <div className="space-y-3 rounded-md border p-4">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">{t("productKind.acrylic")}</Label>
-              <Switch
-                checked={value.acrylic?.enabled ?? false}
-                onCheckedChange={(c) => toggleEnabled("acrylic", c)}
-              />
-            </div>
+            <ProductBlockHeader
+              iconId="acrylic"
+              label={t("productKind.acrylic")}
+              enabled={value.acrylic?.enabled ?? false}
+              onToggle={(c) => toggleEnabled("acrylic", c)}
+            />
             {value.acrylic?.enabled && (
               <div className="grid gap-4 md:grid-cols-2">
                 <ChecklistGroup
@@ -526,15 +550,12 @@ function BaseProductsSection({
         const axes = base ? selectableAxes(base) : [];
         return (
           <div key={b.baseId} className="space-y-3 rounded-md border p-4">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-3">
-                <Switch checked={b.enabled} onCheckedChange={(c) => patchBase(b.baseId, { enabled: c })} />
-                <Label className="text-sm font-medium">{base?.title ?? b.baseId}</Label>
-              </div>
-              <Button type="button" variant="ghost" size="sm" onClick={() => removeBase(b.baseId)}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
+            <ProductBlockHeader
+              iconId={b.baseId}
+              label={base?.title ?? b.baseId}
+              enabled={b.enabled}
+              onToggle={(c) => patchBase(b.baseId, { enabled: c })}
+            />
             {b.enabled && base && (
               axes.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
@@ -567,6 +588,16 @@ function BaseProductsSection({
                   : t("admin.baseProducts.missing", { defaultValue: "Produkten finns inte i katalogen längre." })}
               </p>
             )}
+            {/* Remove lives in the body (not the header) so the header row stays
+                identical to the wall-art blocks, which are not removable. */}
+            <button
+              type="button"
+              onClick={() => removeBase(b.baseId)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {t("admin.baseProducts.remove", { defaultValue: "Ta bort produkt" })}
+            </button>
           </div>
         );
       })}

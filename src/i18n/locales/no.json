@@ -600,7 +600,7 @@
       "handleLabel": "Shopify-handle",
       "handlePlaceholder": "personlig-bykart",
       "productTypesLabel": "Produkttyper",
-      "productTypesHint": "Et Shopify-produkt opprettes der produkttypene blir varianter (Produkttype/Størrelse/Utførelse).",
+      "productTypesHint": "Velg hvilke produkter samme design skal kunne bestilles på – veggkunst øverst, deretter resten av leverandørens katalog. Hvert valgt produkt blir sitt eget Shopify-produkt, men grupperes sammen for kunden. Du finjusterer størrelser og varianter i neste steg.",
       "cancel": "Avbryt",
       "createAndOpen": "Opprett og åpne"
     },
@@ -825,6 +825,13 @@
         "script": "Håndskrift",
         "mono": "Monospace"
       }
+    },
+    "baseProducts": {
+      "add": "Legg til flere produkter (krus, klær …)",
+      "noAxes": "Dette produktet har ingen valgbare varianter.",
+      "loading": "Laster katalog …",
+      "missing": "Dette produktet finnes ikke lenger i katalogen.",
+      "remove": "Fjern produkt"
     }
   }
 }

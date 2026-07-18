@@ -639,7 +639,7 @@
       "handleLabel": "Shopify handle",
       "handlePlaceholder": "personal-city-map",
       "productTypesLabel": "Product types",
-      "productTypesHint": "A Shopify product is created where the product types become variants (Product type/Size/Finish).",
+      "productTypesHint": "Choose which products the same design can be ordered on — wall art first, then the rest of the supplier's catalog. Each selected product becomes its own Shopify product but is grouped together for the customer. You fine-tune sizes and variants in the next step.",
       "cancel": "Cancel",
       "createAndOpen": "Create & open"
     },
@@ -828,6 +828,13 @@
       "aspectPortrait23": "Portrait (2:3)",
       "aspectLandscape32": "Landscape (3:2)",
       "aspectLandscape169": "Landscape (16:9)"
+    },
+    "baseProducts": {
+      "add": "Add more products (mugs, apparel …)",
+      "noAxes": "This product has no selectable variants.",
+      "loading": "Loading catalog …",
+      "missing": "This product is no longer in the catalog.",
+      "remove": "Remove product"
     }
   }
 }

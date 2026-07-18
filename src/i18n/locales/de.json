@@ -600,7 +600,7 @@
       "handleLabel": "Shopify-Handle",
       "handlePlaceholder": "persoenliche-stadtkarte",
       "productTypesLabel": "Produkttypen",
-      "productTypesHint": "Ein Shopify-Produkt wird erstellt, bei dem die Produkttypen zu Varianten werden (Produkttyp/Größe/Ausführung).",
+      "productTypesHint": "Wählen Sie, auf welchen Produkten dasselbe Design bestellt werden kann – zuerst Wandkunst, dann der restliche Katalog des Anbieters. Jedes ausgewählte Produkt wird ein eigenes Shopify-Produkt, aber für den Kunden zusammengefasst. Größen und Varianten stellen Sie im nächsten Schritt fein ein.",
       "cancel": "Abbrechen",
       "createAndOpen": "Erstellen & öffnen"
     },
@@ -825,6 +825,13 @@
         "script": "Handschrift",
         "mono": "Monospace"
       }
+    },
+    "baseProducts": {
+      "add": "Weitere Produkte hinzufügen (Tassen, Kleidung …)",
+      "noAxes": "Dieses Produkt hat keine wählbaren Varianten.",
+      "loading": "Katalog wird geladen …",
+      "missing": "Dieses Produkt ist nicht mehr im Katalog.",
+      "remove": "Produkt entfernen"
     }
   }
 }

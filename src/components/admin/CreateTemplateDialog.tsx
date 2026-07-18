@@ -22,7 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { invokeAdmin, invokeWithSession } from "@/lib/admin-api";
 import { DEFAULT_PRODUCT_VARIANTS } from "@/lib/product-defaults";
-import { pickableBases } from "@/lib/pod";
+import { pickableBases, ProductIcon } from "@/lib/pod";
 import { useProductBases } from "@/hooks/useProductBases";
 import type { Template } from "@/lib/template-schema";
 import type { ProductType } from "@/lib/product-config";
@@ -107,6 +107,29 @@ function buildSeedTemplate(kinds: Kind[], baseIds: string[]): Template {
     sizeOverrides: {},
     extraLayouts: [],
   };
+}
+
+/** One selectable product row: representative icon + name + checkbox. */
+function ProductRow({
+  id,
+  label,
+  checked,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center gap-3 border-b px-3 py-2.5 last:border-b-0 hover:bg-muted/40">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border bg-muted/30 text-muted-foreground">
+        <ProductIcon id={id} className="h-5 w-5" />
+      </span>
+      <span className="flex-1 text-sm font-medium">{label}</span>
+      <Checkbox checked={checked} onCheckedChange={(c) => onChange(c === true)} />
+    </label>
+  );
 }
 
 export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
@@ -217,7 +240,9 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      {/* Cap height + let the body scroll: the product list can be long (wall art
+          + dozens of catalog products) and must not push the footer off-screen. */}
+      <DialogContent className="flex max-h-[85vh] flex-col">
         <DialogHeader>
           <DialogTitle>{t("admin.createTemplate.dialogTitle")}</DialogTitle>
           <DialogDescription>
@@ -225,7 +250,7 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto py-2 pr-1">
           <div className="space-y-2">
             <Label htmlFor="tpl-title">{t("admin.createTemplate.titleLabel")}</Label>
             <Input
@@ -254,35 +279,31 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
           <div className="space-y-2">
             <Label>{t("admin.createTemplate.productTypesLabel")}</Label>
             <p className="text-xs text-muted-foreground">
-              {t("admin.createTemplate.productTypesHint")}
+              {t("admin.createTemplate.productTypesHint", {
+                defaultValue:
+                  "Välj vilka produkter samma design ska kunna beställas på. Väggkonsten högst upp, sedan resten av leverantörens katalog. Varje vald produkt blir en egen Shopify-produkt men grupperas ihop för kunden. Du finjusterar storlekar och varianter i nästa steg.",
+              })}
             </p>
-            {/* One uniform picker: the four curated wall-art kinds AND the POD
-                catalog bases (mugs, apparel, …). All substrates share the
-                template_slug and are grouped for the shopper automatically. */}
-            <div className="grid grid-cols-2 gap-2">
+            {/* One uniform, scrollable picker: icon + name per row, wall art
+                first, then the POD catalog bases (mugs, apparel, …). */}
+            <div className="max-h-[42vh] overflow-y-auto rounded-md border">
               {(Object.keys(KIND_META) as Kind[]).map((k) => (
-                <label
+                <ProductRow
                   key={k}
-                  className="flex items-center gap-2 rounded-md border p-3 cursor-pointer hover:bg-muted/40"
-                >
-                  <Checkbox
-                    checked={selected[k] ?? false}
-                    onCheckedChange={(c) => toggleId(k, c === true)}
-                  />
-                  <span className="text-sm font-medium">{t(KIND_META[k].i18nKey)}</span>
-                </label>
+                  id={KIND_META[k].productType}
+                  label={t(KIND_META[k].i18nKey)}
+                  checked={selected[k] ?? false}
+                  onChange={(c) => toggleId(k, c)}
+                />
               ))}
               {bases.map((b) => (
-                <label
+                <ProductRow
                   key={b.providerProductId}
-                  className="flex items-center gap-2 rounded-md border p-3 cursor-pointer hover:bg-muted/40"
-                >
-                  <Checkbox
-                    checked={selected[b.providerProductId] ?? false}
-                    onCheckedChange={(c) => toggleId(b.providerProductId, c === true)}
-                  />
-                  <span className="text-sm font-medium">{b.title}</span>
-                </label>
+                  id={b.providerProductId}
+                  label={b.title}
+                  checked={selected[b.providerProductId] ?? false}
+                  onChange={(c) => toggleId(b.providerProductId, c)}
+                />
               ))}
             </div>
           </div>

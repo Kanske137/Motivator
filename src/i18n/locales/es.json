@@ -600,7 +600,7 @@
       "handleLabel": "Handle de Shopify",
       "handlePlaceholder": "mapa-personal-ciudad",
       "productTypesLabel": "Tipos de producto",
-      "productTypesHint": "Se crea un producto de Shopify en el que los tipos de producto se convierten en variantes (Tipo de producto/Tamaño/Acabado).",
+      "productTypesHint": "Elige en qué productos se puede pedir el mismo diseño: primero el arte mural y luego el resto del catálogo del proveedor. Cada producto seleccionado se convierte en su propio producto de Shopify, pero se agrupa para el cliente. Ajustas los tamaños y las variantes en el siguiente paso.",
       "cancel": "Cancelar",
       "createAndOpen": "Crear y abrir"
     },
@@ -825,6 +825,13 @@
         "script": "Manuscrita",
         "mono": "Monoespaciada"
       }
+    },
+    "baseProducts": {
+      "add": "Añadir más productos (tazas, ropa …)",
+      "noAxes": "Este producto no tiene variantes seleccionables.",
+      "loading": "Cargando catálogo …",
+      "missing": "Este producto ya no está en el catálogo.",
+      "remove": "Eliminar producto"
     }
   }
 }

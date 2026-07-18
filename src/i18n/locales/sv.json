@@ -639,7 +639,7 @@
       "handleLabel": "Shopify-handle",
       "handlePlaceholder": "personlig-stadkarta",
       "productTypesLabel": "Produkttyper",
-      "productTypesHint": "En Shopify-produkt skapas där produkttyperna blir varianter (Produkttyp/Storlek/Utförande).",
+      "productTypesHint": "Välj vilka produkter samma design ska kunna beställas på – väggkonst högst upp, sedan resten av leverantörens katalog. Varje vald produkt blir en egen Shopify-produkt men grupperas ihop för kunden. Du finjusterar storlekar och varianter i nästa steg.",
       "cancel": "Avbryt",
       "createAndOpen": "Skapa & öppna"
     },
@@ -828,6 +828,13 @@
       "aspectPortrait23": "Stående (2:3)",
       "aspectLandscape32": "Liggande (3:2)",
       "aspectLandscape169": "Liggande (16:9)"
+    },
+    "baseProducts": {
+      "add": "Lägg till fler produkter (muggar, kläder …)",
+      "noAxes": "Den här produkten har inga valbara varianter.",
+      "loading": "Laddar katalog …",
+      "missing": "Produkten finns inte i katalogen längre.",
+      "remove": "Ta bort produkt"
     }
   }
 }

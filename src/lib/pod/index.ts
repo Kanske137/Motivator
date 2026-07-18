@@ -2,3 +2,4 @@
 export * from "./types";
 export { getPodProvider, listPodProviderIds, DEFAULT_PROVIDER_ID } from "./registry";
 export * from "./bases";
+export { getProductIcon, ProductIcon } from "./product-icon";

@@ -600,7 +600,7 @@
       "handleLabel": "Shopify-handle",
       "handlePlaceholder": "henkilokohtainen-kaupunkikartta",
       "productTypesLabel": "Tuotetyypit",
-      "productTypesHint": "Luodaan Shopify-tuote, jossa tuotetyypeistä tulee variantteja (Tuotetyyppi/Koko/Viimeistely).",
+      "productTypesHint": "Valitse, mille tuotteille saman suunnittelun voi tilata – seinätaide ensin, sitten muu toimittajan valikoima. Jokaisesta valitusta tuotteesta tulee oma Shopify-tuotteensa, mutta ne ryhmitellään asiakkaalle yhteen. Hienosäädät koot ja variantit seuraavassa vaiheessa.",
       "cancel": "Peruuta",
       "createAndOpen": "Luo ja avaa"
     },
@@ -825,6 +825,13 @@
         "script": "Käsinkirjoitettu",
         "mono": "Tasalevyinen"
       }
+    },
+    "baseProducts": {
+      "add": "Lisää tuotteita (mukit, vaatteet …)",
+      "noAxes": "Tällä tuotteella ei ole valittavia variantteja.",
+      "loading": "Ladataan luetteloa …",
+      "missing": "Tätä tuotetta ei ole enää luettelossa.",
+      "remove": "Poista tuote"
     }
   }
 }

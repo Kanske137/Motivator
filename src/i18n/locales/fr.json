@@ -600,7 +600,7 @@
       "handleLabel": "Handle Shopify",
       "handlePlaceholder": "carte-ville-personnelle",
       "productTypesLabel": "Types de produit",
-      "productTypesHint": "Un produit Shopify est créé où les types de produit deviennent des variantes (Type de produit/Taille/Finition).",
+      "productTypesHint": "Choisissez sur quels produits le même design peut être commandé — l'art mural d'abord, puis le reste du catalogue du fournisseur. Chaque produit sélectionné devient son propre produit Shopify mais est regroupé pour le client. Vous affinez les tailles et les variantes à l'étape suivante.",
       "cancel": "Annuler",
       "createAndOpen": "Créer et ouvrir"
     },
@@ -825,6 +825,13 @@
         "script": "Manuscrite",
         "mono": "Monospace"
       }
+    },
+    "baseProducts": {
+      "add": "Ajouter d'autres produits (mugs, vêtements …)",
+      "noAxes": "Ce produit n'a pas de variantes sélectionnables.",
+      "loading": "Chargement du catalogue …",
+      "missing": "Ce produit n'est plus dans le catalogue.",
+      "remove": "Supprimer le produit"
     }
   }
 }
