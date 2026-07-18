@@ -241,10 +241,11 @@ describe("planPresetGroup (composed poster)", () => {
     expect(g.variants[0].optionValues.some((o) => o.optionName === "Papper")).toBe(true);
   });
 
-  it("skips combos with no product (13×18 hanger) instead of emitting a bad SKU", async () => {
+  it("skips combos with no product (a flat-only size on a hanger) instead of a bad SKU", async () => {
+    // 21×28 (210x279) exists in the flat catalog but not for hangers.
     const g = await planPresetGroup({
       preset: POSTER_PRESET, productType: "Poster",
-      selectedAxes: { size: ["13x18"], frame: ["Hängare Ek"], paper: ["200-gsm-uncoated"] },
+      selectedAxes: { size: ["21x28"], frame: ["Hängare Ek"], paper: ["200-gsm-uncoated"] },
       resolveUid: fakeResolve, priceOf: () => 249,
     });
     expect(g.variants).toHaveLength(0);

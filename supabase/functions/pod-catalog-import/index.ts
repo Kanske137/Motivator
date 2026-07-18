@@ -58,26 +58,38 @@ Deno.serve(async (req) => {
   // UIDs as the frozen gelato-sku-map (flat + framed; hangers skipped)? Proves
   // the preset before sync is switched over. Body: { verifyPreset: "poster" }.
   if (body?.verifyPreset === "poster") {
-    const map = (GELATO_SKU_MAP.posters ?? {}) as Record<string, { portrait: string; landscape: string }>;
-    const mismatches: any[] = [];
-    let checked = 0, matches = 0;
-    for (const key of Object.keys(map)) {
-      const [size, frame] = key.split("|");
-      const expected = map[key].portrait;
-      const res = resolvePreset(POSTER_PRESET, { size, frame, paper: "200-gsm-uncoated" });
-      if (!res) { mismatches.push({ key, reason: "preset returned null" }); checked++; continue; }
-      const filters = { ...res.filters, Orientation: ["ver"] };
-      checked++;
-      try {
-        const r = await searchGelatoProductUids({ apiKey, catalogUid: res.catalog, attributeFilters: filters, limit: 3 });
-        const got = r.productUids[0] ?? null;
-        if (got === expected) matches++;
-        else mismatches.push({ key, catalog: res.catalog, expected, got, hits: r.productUids.length });
-      } catch (e) {
-        mismatches.push({ key, catalog: res.catalog, error: String(e) });
+    // Iterate the PRESET's own size × frame axes (default paper) and report how
+    // many resolve to a live Gelato UID — so we see exactly which of the expanded
+    // sizes/frames Gelato actually offers (the rest are skipped as sparse).
+    const sizeAxis = POSTER_PRESET.axes.find((a) => a.key === "size")!;
+    const frameAxis = POSTER_PRESET.axes.find((a) => a.key === "frame")!;
+    // Only test the requested frames (default just "Ingen") to stay under the
+    // edge CPU budget — 28 sizes × all frames is too many live searches at once.
+    const wantFrames: string[] = body.frames ?? ["Ingen"];
+    const frameVals = frameAxis.values.filter((f) => wantFrames.includes(f.key));
+    const noProduct: string[] = []; const errors: any[] = [];
+    let checked = 0, resolved = 0;
+    for (const s of sizeAxis.values) {
+      for (const f of frameVals) {
+        const res = resolvePreset(POSTER_PRESET, { size: s.key, frame: f.key, paper: "200-gsm-uncoated" });
+        if (!res) { noProduct.push(`${s.key}|${f.key}`); continue; }
+        checked++;
+        try {
+          const r = await searchGelatoProductUids({
+            apiKey, catalogUid: res.catalog,
+            attributeFilters: { ...res.filters, Orientation: ["ver"] }, limit: 2,
+          });
+          if (r.productUids[0]) resolved++;
+          else noProduct.push(`${s.key}|${f.key}`);
+        } catch (e) { errors.push({ key: `${s.key}|${f.key}`, error: String(e) }); }
       }
     }
-    return json(200, { ok: true, verify: "poster", checked, matches, mismatches });
+    return json(200, {
+      ok: true, verify: "poster",
+      sizes: sizeAxis.values.length, frames: frameAxis.values.length,
+      checked, resolved, noProductCount: noProduct.length, errors,
+      noProductSample: noProduct.slice(0, 20),
+    });
   }
 
   // Diagnostic probe: resolve a productUid for a given catalog + attributeFilters
