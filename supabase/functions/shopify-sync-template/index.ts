@@ -13,6 +13,7 @@
 // - On update we sync productOptions (so newly-added sizes/frames actually
 //   become valid option-values BEFORE we try to bulk-create variants for them).
 import { gelatoUid, searchGelatoProductUids } from "../_shared/pod/gelato.ts";
+import { POSTER_PRESET, resolvePreset } from "../_shared/pod/presets.ts";
 import {
   buildVariantInput,
   desiredOptionValuesByAxis,
@@ -92,9 +93,53 @@ const KIND_TO_SKU_KEY: Record<Kind, string> = {
   acrylic: "acrylic",
 };
 
-function getUid(kind: Kind, size: string, variant: string): string | null {
-  // Portrait UID becomes the Shopify variant SKU (unchanged; now via the adapter).
+function getUid(
+  kind: Kind,
+  size: string,
+  variant: string,
+  presetUids?: Record<string, string>,
+): string | null {
+  // Poster resolves through the generic PRESET (data-driven, live catalog) when
+  // it was pre-resolved (see resolvePosterPresetUids); otherwise the frozen
+  // sku-map is the fallback, so a failed/absent live lookup never regresses sync.
+  // Proven byte-equivalent to the frozen map (verifyPreset: 50/50). Portrait UID
+  // is the Shopify SKU, exactly as before.
+  const fromPreset = presetUids?.[`${kind}|${size}|${variant}`];
+  if (fromPreset) return fromPreset;
   return gelatoUid(KIND_TO_SKU_KEY[kind], size, variant, "portrait");
+}
+
+/** Pre-resolve poster UIDs through the generic preset (one live Gelato search
+ *  per enabled size×frame), keyed `poster|<size>|<frame>`. Runs once per sync
+ *  before planning so plan()/planConsolidated() stay synchronous. */
+async function resolvePosterPresetUids(
+  template: any,
+  apiKey: string | undefined,
+): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  const poster = template?.productOptions?.poster;
+  if (!apiKey || !poster?.enabled) return out;
+  const sizes: string[] = poster.allowedSizes ?? [];
+  const frames = mergedPosterFrames(poster.allowedFrames);
+  for (const size of sizes) {
+    for (const frame of frames) {
+      const res = resolvePreset(POSTER_PRESET, { size, frame, paper: "200-gsm-uncoated" });
+      if (!res) continue;
+      try {
+        const r = await searchGelatoProductUids({
+          apiKey,
+          catalogUid: res.catalog,
+          attributeFilters: { ...res.filters, Orientation: ["ver"] },
+          limit: 2,
+        });
+        if (r.productUids[0]) out[`poster|${size}|${frame}`] = r.productUids[0];
+      } catch (e) {
+        console.warn(`[preset] poster ${size}|${frame} failed, using frozen map: ${e}`);
+      }
+    }
+  }
+  console.log(`[preset] pre-resolved ${Object.keys(out).length} poster UIDs via preset`);
+  return out;
 }
 
 // Effective price lookup: per-template override ?? per-tenant global default.
@@ -126,7 +171,7 @@ function mergedPosterFrames(saved: string[] | undefined): string[] {
   return out;
 }
 
-function plan(template: any, priceOf: PriceLookup): PlannedGroup[] {
+function plan(template: any, priceOf: PriceLookup, presetUids: Record<string, string> = {}): PlannedGroup[] {
   const groups: PlannedGroup[] = [];
   const opts = template?.productOptions ?? {};
 
@@ -150,7 +195,7 @@ function plan(template: any, priceOf: PriceLookup): PlannedGroup[] {
     };
     for (const size of sizes) {
       for (const v of variants) {
-        const sku = getUid(kind, size, v);
+        const sku = getUid(kind, size, v, presetUids);
         const price = priceOf(kind, size, v);
         if (!sku) { g.skipped.push({ size, variant: v, reason: "no Gelato SKU" }); continue; }
         if (!price) { g.skipped.push({ size, variant: v, reason: "no price" }); continue; }
@@ -208,7 +253,7 @@ const PRODUCT_TYPE_FROM_INTERNAL: Record<string, Kind> = {
 };
 
 /** Konsoliderad: bygg EN PlannedGroup med 3 axlar (Produkttyp/Storlek/Utförande). */
-function planConsolidated(template: any, enabledTypes: string[], priceOf: PriceLookup): PlannedGroup {
+function planConsolidated(template: any, enabledTypes: string[], priceOf: PriceLookup, presetUids: Record<string, string> = {}): PlannedGroup {
   const opts = template?.productOptions ?? {};
   const variants: PlannedVariant[] = [];
   const skipped: PlannedGroup["skipped"] = [];
@@ -234,7 +279,7 @@ function planConsolidated(template: any, enabledTypes: string[], priceOf: PriceL
     for (const size of block.sizes) {
       sizesUnion.add(size);
       for (const v of block.names) {
-        const sku = getUid(kind, size, v);
+        const sku = getUid(kind, size, v, presetUids);
         const price = priceOf(kind, size, v);
         if (!sku) { skipped.push({ size: `${label}/${size}`, variant: v, reason: "no Gelato SKU" }); continue; }
         if (!price) { skipped.push({ size: `${label}/${size}`, variant: v, reason: "no price" }); continue; }
@@ -570,9 +615,13 @@ Deno.serve(async (req) => {
       return typeof g === "number" ? g : 0;
     };
 
+    // Resolve poster UIDs through the generic preset once (live catalog), with
+    // the frozen sku-map as fallback inside getUid.
+    const presetUids = await resolvePosterPresetUids(cfg.template, Deno.env.get("GELATO_API_KEY"));
+
     const groups: PlannedGroup[] = isConsolidated
-      ? [planConsolidated(cfg.template, enabledTypes, priceOf)]
-      : plan(cfg.template, priceOf);
+      ? [planConsolidated(cfg.template, enabledTypes, priceOf, presetUids)]
+      : plan(cfg.template, priceOf, presetUids);
 
     // Generic POD-catalog bases (mugs, apparel, …) — Phase 3b. Each enabled base
     // becomes its own Shopify product whose option axes are the base's own axes,
