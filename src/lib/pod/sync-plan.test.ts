@@ -11,10 +11,12 @@ import {
   keyFromPlannedVariant,
   keyFromSelectedOptions,
   planBaseGroup,
+  planPresetGroup,
   pricingSlots,
   type PlannedGroup,
   type PlannedVariant,
 } from "../../../supabase/functions/_shared/pod/sync-plan";
+import { POSTER_PRESET } from "../../../supabase/functions/_shared/pod/presets";
 
 // Mirror how wall-art plan() fills optionValues: [Storlek, <variantOptionName>].
 function wallArtVariant(size: string, frame: string, sku: string, price: number): PlannedVariant {
@@ -189,5 +191,48 @@ describe("base planning (mugs)", () => {
     });
     expect(group.variants).toHaveLength(0);
     expect(group.skipped[0].reason).toBe("no Gelato SKU");
+  });
+});
+
+// --- planPresetGroup (composed poster as its own 3-axis product) ---
+describe("planPresetGroup (composed poster)", () => {
+  // Fake provider search: echo the pinned filters into a deterministic uid.
+  const fakeResolve = async (catalog: string, filters: Record<string, string[]>) =>
+    `${catalog}:${filters.PaperFormat?.[0] ?? filters.UnifiedPaperFormat?.[0] ?? "?"}:${filters.FrameColor?.[0] ?? filters.WallHangerColor?.[0] ?? "none"}`;
+
+  it("builds one product with Storlek × Ram × Papper and resolves each combo", async () => {
+    const g = await planPresetGroup({
+      preset: POSTER_PRESET,
+      productType: "Poster",
+      selectedAxes: {
+        size: ["30x40", "50x70"],
+        frame: ["Ingen", "Ek", "Hängare Ek"],
+        paper: ["200-gsm-uncoated"],
+      },
+      resolveUid: fakeResolve,
+      priceOf: () => 249,
+    });
+    expect(g.kind).toBe("poster");
+    expect(g.optionAxes.map((a) => a.name)).toEqual(["Storlek", "Ram & upphängning", "Papper"]);
+    // 2 sizes × 3 frames × 1 paper = 6 combos, all resolvable/priced → 6 variants.
+    expect(g.variants).toHaveLength(6);
+    // Frame value drives the catalog: Ingen→posters, Ek→mounted, Hängare→hanging.
+    const ekVariant = g.variants.find((v) => v.optionValues.some((o) => o.value === "Ram ek") && v.size === "30x40");
+    expect(ekVariant!.sku).toBe("mounted-framed-posters:300x400-mm:natural-wood");
+    const hangerVariant = g.variants.find((v) => v.optionValues.some((o) => o.value === "Hängare ek") && v.size === "30x40");
+    expect(hangerVariant!.sku).toBe("hanging-posters:300x400-mm-12x16-inch:natural-wood");
+    // Pricing stays 2-D: size + frame (paper is not a price dimension).
+    expect(ekVariant!.size).toBe("30x40");
+    expect(ekVariant!.variant).toBe("Ek");
+  });
+
+  it("skips combos with no product (13×18 hanger) instead of emitting a bad SKU", async () => {
+    const g = await planPresetGroup({
+      preset: POSTER_PRESET, productType: "Poster",
+      selectedAxes: { size: ["13x18"], frame: ["Hängare Ek"], paper: ["200-gsm-uncoated"] },
+      resolveUid: fakeResolve, priceOf: () => 249,
+    });
+    expect(g.variants).toHaveLength(0);
+    expect(g.skipped[0].reason).toBe("no product for combo");
   });
 });

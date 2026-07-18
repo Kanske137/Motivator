@@ -14,6 +14,7 @@
 // here knows the word "size" — it only knows "axis N".
 //
 // Pure logic (no Deno / esm.sh imports) so it is unit-testable from vitest.
+import { resolvePreset, type ProductPreset } from "./presets.ts";
 
 /** One option assignment on a variant, e.g. { optionName: "Storlek", value: "30x40" }. */
 export interface OptionValue {
@@ -276,6 +277,86 @@ export async function planBaseGroup(args: {
 
     group.variants.push({
       optionValues: combo.map((c) => ({ optionName: c.axisName, value: c.label })),
+      sku: uid,
+      price,
+      size: sizeSlot,
+      variant: variantSlot,
+    });
+  }
+  return group;
+}
+
+// --- composed-preset planning (wall art: poster, canvas, …) ---
+
+/**
+ * Plan a composed PRESET (e.g. Poster spanning 3 Gelato catalogs) into a
+ * PlannedGroup — its OWN product with the preset's axes (Storlek × Ram × Papper).
+ * Each combo is resolved via the generic preset engine → provider search. Same
+ * proven enumerate→resolve→variant_map shape as planBaseGroup (which is live-
+ * verified with mugs). Pricing stays 2-D (size × the catalog axis, e.g. frame) so
+ * existing per-frame pricing_rules keep matching; extra axes like paper are not a
+ * price dimension yet.
+ */
+export async function planPresetGroup(args: {
+  preset: ProductPreset;
+  productType: string; // Shopify productType label
+  selectedAxes: Record<string, string[]>; // axisKey → enabled value keys (empty = all)
+  resolveUid: (catalog: string, filters: Record<string, string[]>) => Promise<string | null>;
+  priceOf: (sizeSlot: string, variantSlot: string) => number;
+  cap?: number;
+}): Promise<PlannedGroup> {
+  const { preset, productType, selectedAxes, resolveUid, priceOf, cap = 500 } = args;
+
+  const sizeAxisKey = preset.axes.find((a) => /size|storlek/i.test(a.key))?.key ?? preset.axes[0]?.key ?? "";
+
+  // Values to iterate per axis: the merchant's picks, or ALL when none picked.
+  const perAxis = preset.axes.map((ax) => {
+    const chosen = selectedAxes[ax.key] ?? [];
+    const values = chosen.length ? ax.values.filter((v) => chosen.includes(v.key)) : ax.values;
+    return { axis: ax, values };
+  });
+
+  const group: PlannedGroup = {
+    kind: preset.id,
+    productType,
+    variantOptionName: preset.axes[preset.axes.length - 1]?.label ?? "",
+    optionAxes: perAxis.map((a) => ({ name: a.axis.label, values: a.values.map((v) => v.label) })),
+    variants: [],
+    skipped: [],
+  };
+  if (perAxis.some((a) => a.values.length === 0)) return group;
+
+  // Cartesian product across axes.
+  let combos: { axisKey: string; key: string; label: string }[][] = [[]];
+  for (const a of perAxis) {
+    const next: typeof combos = [];
+    for (const combo of combos) {
+      for (const v of a.values) {
+        next.push([...combo, { axisKey: a.axis.key, key: v.key, label: v.label }]);
+        if (next.length > cap) break;
+      }
+    }
+    combos = next;
+  }
+
+  for (const combo of combos) {
+    const selection: Record<string, string> = {};
+    for (const c of combo) selection[c.axisKey] = c.key;
+    const sizeSlot = selection[sizeAxisKey] ?? "";
+    const variantSlot = selection[preset.catalogAxis] ?? "";
+
+    const res = resolvePreset(preset, selection);
+    if (!res) { group.skipped.push({ size: sizeSlot, variant: variantSlot, reason: "no product for combo" }); continue; }
+    const price = priceOf(sizeSlot, variantSlot);
+    if (!price) { group.skipped.push({ size: sizeSlot, variant: variantSlot, reason: "no price" }); continue; }
+    const uid = await resolveUid(res.catalog, res.filters);
+    if (!uid) { group.skipped.push({ size: sizeSlot, variant: variantSlot, reason: "no Gelato SKU" }); continue; }
+
+    group.variants.push({
+      optionValues: combo.map((c) => {
+        const ax = perAxis.find((a) => a.axis.key === c.axisKey)!;
+        return { optionName: ax.axis.label, value: c.label };
+      }),
       sku: uid,
       price,
       size: sizeSlot,
