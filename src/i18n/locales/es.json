@@ -600,7 +600,7 @@
       "handleLabel": "Handle de Shopify",
       "handlePlaceholder": "mapa-personal-ciudad",
       "productTypesLabel": "Tipos de producto",
-      "productTypesHint": "Elige en qué productos se puede pedir el mismo diseño: primero el arte mural y luego el resto del catálogo del proveedor. Cada producto seleccionado se convierte en su propio producto de Shopify, pero se agrupa para el cliente. Ajustas los tamaños y las variantes en el siguiente paso.",
+      "productTypesHint": "Elige en qué productos se puede pedir el mismo diseño. El arte mural se combina en un producto; cada otro tipo (tazas, ropa …) se convierte en su propio producto: todos se agrupan para el cliente. Ajustas los tamaños y las variantes en el siguiente paso.",
       "cancel": "Cancelar",
       "createAndOpen": "Crear y abrir"
     },

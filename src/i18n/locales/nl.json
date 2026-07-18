@@ -600,7 +600,7 @@
       "handleLabel": "Shopify-handle",
       "handlePlaceholder": "persoonlijke-stadskaart",
       "productTypesLabel": "Producttypen",
-      "productTypesHint": "Kies op welke producten hetzelfde ontwerp besteld kan worden — eerst wandkunst, dan de rest van de catalogus van de leverancier. Elk gekozen product wordt een eigen Shopify-product, maar wordt voor de klant gegroepeerd. Je verfijnt maten en varianten in de volgende stap.",
+      "productTypesHint": "Kies op welke producten hetzelfde ontwerp besteld kan worden. Wandkunst wordt gecombineerd tot één product; elk ander type (mokken, kleding …) wordt een eigen product — allemaal gegroepeerd voor de klant. Je verfijnt maten en varianten in de volgende stap.",
       "cancel": "Annuleren",
       "createAndOpen": "Maken & openen"
     },

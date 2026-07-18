@@ -600,7 +600,7 @@
       "handleLabel": "Shopify-handle",
       "handlePlaceholder": "henkilokohtainen-kaupunkikartta",
       "productTypesLabel": "Tuotetyypit",
-      "productTypesHint": "Valitse, mille tuotteille saman suunnittelun voi tilata – seinätaide ensin, sitten muu toimittajan valikoima. Jokaisesta valitusta tuotteesta tulee oma Shopify-tuotteensa, mutta ne ryhmitellään asiakkaalle yhteen. Hienosäädät koot ja variantit seuraavassa vaiheessa.",
+      "productTypesHint": "Valitse, mille tuotteille saman suunnittelun voi tilata. Seinätaide yhdistetään yhdeksi tuotteeksi; jokainen muu tyyppi (mukit, vaatteet …) on oma tuotteensa – kaikki ryhmitellään asiakkaalle yhteen. Hienosäädät koot ja variantit seuraavassa vaiheessa.",
       "cancel": "Peruuta",
       "createAndOpen": "Luo ja avaa"
     },

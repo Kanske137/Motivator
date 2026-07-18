@@ -8,7 +8,7 @@
 // still see canvas-shaped sizes/depths instead of poster frames.
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Info, Plus, Trash2, Upload, Loader2, ChevronDown } from "lucide-react";
+import { Info, Plus, Upload, Loader2, ChevronDown } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -521,9 +521,6 @@ function BaseProductsSection({
     if (!baseId || addedIds.has(baseId)) return;
     onChange([...value, { baseId, provider: "gelato", enabled: true, selectedAxes: {} }]);
   }
-  function removeBase(baseId: string) {
-    onChange(value.filter((b) => b.baseId !== baseId));
-  }
   function patchBase(baseId: string, patch: Partial<BaseOptions>) {
     onChange(value.map((b) => (b.baseId === baseId ? { ...b, ...patch } : b)));
   }
@@ -588,16 +585,6 @@ function BaseProductsSection({
                   : t("admin.baseProducts.missing", { defaultValue: "Produkten finns inte i katalogen längre." })}
               </p>
             )}
-            {/* Remove lives in the body (not the header) so the header row stays
-                identical to the wall-art blocks, which are not removable. */}
-            <button
-              type="button"
-              onClick={() => removeBase(b.baseId)}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              {t("admin.baseProducts.remove", { defaultValue: "Ta bort produkt" })}
-            </button>
           </div>
         );
       })}

@@ -639,7 +639,7 @@
       "handleLabel": "Shopify-handle",
       "handlePlaceholder": "personlig-stadkarta",
       "productTypesLabel": "Produkttyper",
-      "productTypesHint": "Välj vilka produkter samma design ska kunna beställas på – väggkonst högst upp, sedan resten av leverantörens katalog. Varje vald produkt blir en egen Shopify-produkt men grupperas ihop för kunden. Du finjusterar storlekar och varianter i nästa steg.",
+      "productTypesHint": "Välj vilka produkter samma design ska kunna beställas på. Väggkonsten samlas i en produkt; varje annan typ (muggar, kläder …) blir en egen produkt – alla grupperas ihop för kunden. Du finjusterar storlekar och varianter i nästa steg.",
       "cancel": "Avbryt",
       "createAndOpen": "Skapa & öppna"
     },

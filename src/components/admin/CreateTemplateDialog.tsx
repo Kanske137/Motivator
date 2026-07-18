@@ -279,10 +279,7 @@ export default function CreateTemplateDialog({ open, onOpenChange }: Props) {
           <div className="space-y-2">
             <Label>{t("admin.createTemplate.productTypesLabel")}</Label>
             <p className="text-xs text-muted-foreground">
-              {t("admin.createTemplate.productTypesHint", {
-                defaultValue:
-                  "Välj vilka produkter samma design ska kunna beställas på. Väggkonsten högst upp, sedan resten av leverantörens katalog. Varje vald produkt blir en egen Shopify-produkt men grupperas ihop för kunden. Du finjusterar storlekar och varianter i nästa steg.",
-              })}
+              {t("admin.createTemplate.productTypesHint")}
             </p>
             {/* One uniform, scrollable picker: icon + name per row, wall art
                 first, then the POD catalog bases (mugs, apparel, …). */}

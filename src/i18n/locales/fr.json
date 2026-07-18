@@ -600,7 +600,7 @@
       "handleLabel": "Handle Shopify",
       "handlePlaceholder": "carte-ville-personnelle",
       "productTypesLabel": "Types de produit",
-      "productTypesHint": "Choisissez sur quels produits le même design peut être commandé — l'art mural d'abord, puis le reste du catalogue du fournisseur. Chaque produit sélectionné devient son propre produit Shopify mais est regroupé pour le client. Vous affinez les tailles et les variantes à l'étape suivante.",
+      "productTypesHint": "Choisissez sur quels produits le même design peut être commandé. L'art mural est regroupé en un seul produit ; chaque autre type (mugs, vêtements …) devient son propre produit — tous regroupés pour le client. Vous affinez les tailles et les variantes à l'étape suivante.",
       "cancel": "Annuler",
       "createAndOpen": "Créer et ouvrir"
     },

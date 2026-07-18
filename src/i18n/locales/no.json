@@ -600,7 +600,7 @@
       "handleLabel": "Shopify-handle",
       "handlePlaceholder": "personlig-bykart",
       "productTypesLabel": "Produkttyper",
-      "productTypesHint": "Velg hvilke produkter samme design skal kunne bestilles på – veggkunst øverst, deretter resten av leverandørens katalog. Hvert valgt produkt blir sitt eget Shopify-produkt, men grupperes sammen for kunden. Du finjusterer størrelser og varianter i neste steg.",
+      "productTypesHint": "Velg hvilke produkter samme design skal kunne bestilles på. Veggkunst samles i ett produkt; hver annen type (krus, klær …) blir sitt eget produkt – alle grupperes sammen for kunden. Du finjusterer størrelser og varianter i neste steg.",
       "cancel": "Avbryt",
       "createAndOpen": "Opprett og åpne"
     },

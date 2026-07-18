@@ -600,7 +600,7 @@
       "handleLabel": "Handle Shopify",
       "handlePlaceholder": "mappa-personale-citta",
       "productTypesLabel": "Tipi di prodotto",
-      "productTypesHint": "Scegli su quali prodotti è possibile ordinare lo stesso design — prima le stampe da parete, poi il resto del catalogo del fornitore. Ogni prodotto selezionato diventa un prodotto Shopify a sé, ma viene raggruppato per il cliente. Regoli formati e varianti nel passaggio successivo.",
+      "productTypesHint": "Scegli su quali prodotti è possibile ordinare lo stesso design. Le stampe da parete vengono unite in un unico prodotto; ogni altro tipo (tazze, abbigliamento …) diventa un prodotto a sé — tutti raggruppati per il cliente. Regoli formati e varianti nel passaggio successivo.",
       "cancel": "Annulla",
       "createAndOpen": "Crea e apri"
     },

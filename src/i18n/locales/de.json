@@ -600,7 +600,7 @@
       "handleLabel": "Shopify-Handle",
       "handlePlaceholder": "persoenliche-stadtkarte",
       "productTypesLabel": "Produkttypen",
-      "productTypesHint": "Wählen Sie, auf welchen Produkten dasselbe Design bestellt werden kann – zuerst Wandkunst, dann der restliche Katalog des Anbieters. Jedes ausgewählte Produkt wird ein eigenes Shopify-Produkt, aber für den Kunden zusammengefasst. Größen und Varianten stellen Sie im nächsten Schritt fein ein.",
+      "productTypesHint": "Wählen Sie, auf welchen Produkten dasselbe Design bestellt werden kann. Wandkunst wird zu einem Produkt zusammengefasst; jede andere Art (Tassen, Kleidung …) wird ein eigenes Produkt – alle für den Kunden gruppiert. Größen und Varianten stellen Sie im nächsten Schritt fein ein.",
       "cancel": "Abbrechen",
       "createAndOpen": "Erstellen & öffnen"
     },

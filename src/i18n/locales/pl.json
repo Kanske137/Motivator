@@ -600,7 +600,7 @@
       "handleLabel": "Shopify handle",
       "handlePlaceholder": "personalna-mapa-miasta",
       "productTypesLabel": "Typy produktów",
-      "productTypesHint": "Wybierz, na jakich produktach można zamówić ten sam projekt — najpierw dekoracje ścienne, potem reszta katalogu dostawcy. Każdy wybrany produkt staje się osobnym produktem Shopify, ale jest grupowany dla klienta. Rozmiary i warianty dopracujesz w następnym kroku.",
+      "productTypesHint": "Wybierz, na jakich produktach można zamówić ten sam projekt. Dekoracje ścienne są łączone w jeden produkt; każdy inny typ (kubki, odzież …) staje się osobnym produktem — wszystkie grupowane dla klienta. Rozmiary i warianty dopracujesz w następnym kroku.",
       "cancel": "Anuluj",
       "createAndOpen": "Utwórz i otwórz"
     },
