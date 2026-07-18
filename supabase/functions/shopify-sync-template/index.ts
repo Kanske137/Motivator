@@ -1073,11 +1073,19 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Persist resolved base UIDs to variant_map so the order webhook can resolve
-    // them at order time (it reads variant_map FIRST, keyed `<productType>|<size>`
-    // → { <variant>: uid } — here productType = baseId, size/variant = pricing
-    // slots). Wall-art groups still resolve via the static sku-map, untouched.
-    if (baseKinds.size > 0) {
+    // Persist resolved UIDs to variant_map so the order webhook resolves the
+    // EXACT synced product — the webhook reads variant_map FIRST. Two keyings:
+    //   * base groups  → `<baseId>|<size>` → { <variant>: uid }
+    //   * POSTER       → `<size>` → { <frame>: uid }  (size-only path; poster
+    //     frame values never collide with canvas/metal/acrylic variant values)
+    // This is what makes the EXPANDED poster sizes/frames orderable — they are
+    // not in the frozen sku-map. Canvas/metal/acrylic keep using the sku-map.
+    const isPosterVariant = (groupKind: string, v: PlannedVariant) =>
+      groupKind === "poster" || v.productTypeLabel === "Poster";
+    const writesVariantMap =
+      baseKinds.size > 0 ||
+      groups.some((g) => g.variants.some((v) => isPosterVariant(g.kind, v)));
+    if (writesVariantMap) {
       const { data: cfgRow } = await supabase
         .from("product_configs")
         .select("variant_map")
@@ -1086,11 +1094,13 @@ Deno.serve(async (req) => {
         .maybeSingle();
       const variantMap = { ...((cfgRow?.variant_map ?? {}) as Record<string, Record<string, string>>) };
       for (const group of groups) {
-        if (!baseKinds.has(group.kind)) continue;
         for (const v of group.variants) {
           if (!v.size || !v.variant) continue;
-          const key = `${group.kind}|${v.size}`;
-          (variantMap[key] ??= {})[v.variant] = v.sku;
+          if (baseKinds.has(group.kind)) {
+            (variantMap[`${group.kind}|${v.size}`] ??= {})[v.variant] = v.sku;
+          } else if (isPosterVariant(group.kind, v)) {
+            (variantMap[v.size] ??= {})[v.variant] = v.sku;
+          }
         }
       }
       await supabase

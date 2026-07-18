@@ -169,9 +169,9 @@ const PAPER_HANGER: Record<string, string> = {
   "200-gsm-uncoated": "200-gsm-80lb-uncoated",
 };
 
-const framedTarget = (frameColor: string): CatalogTarget => ({
+const framedTarget = (frameColor: string, material = "wood"): CatalogTarget => ({
   catalog: "mounted-framed-posters",
-  filters: { FrameColor: [frameColor], FrameMaterial: ["wood"] },
+  filters: { FrameColor: [frameColor], FrameMaterial: [material] },
   attributes: [
     { axis: "size", attribute: "PaperFormat", valueByAxisValue: FMT_FRAMED },
     { axis: "paper", attribute: "PaperType", valueByAxisValue: PAPER_STD },
@@ -210,6 +210,8 @@ export const POSTER_PRESET: ProductPreset = {
         { key: "Ingen", label: "Ingen ram" },
         { key: "Svart", label: "Ram svart" }, { key: "Vit", label: "Ram vit" },
         { key: "Ek", label: "Ram ek" }, { key: "Valnöt", label: "Ram valnöt" },
+        // NOTE: Gelato lists gold/silver/copper FrameColor values but no
+        // orderable products use them (verified live), so they are NOT offered.
         { key: "Hängare Vit", label: "Hängare vit" }, { key: "Hängare Svart", label: "Hängare svart" },
         { key: "Hängare Ek", label: "Hängare ek" }, { key: "Hängare Valnöt", label: "Hängare valnöt" },
       ],
