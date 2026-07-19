@@ -31,3 +31,6 @@ supabase/.temp/
 # Local-only dev harness — paired with an uncommitted /dev/inspector route in
 # App.tsx for quick standalone admin-component checks. Never built on Cloudflare.
 src/pages/DevInspector.tsx
+
+# stray Deno lock from local typecheck — must not reach the Cloudflare Pages build
+deno.lock
