@@ -130,9 +130,16 @@ async function resolveWallArtPresetUids(
   const opts = template?.productOptions ?? {};
   if (!apiKey) return out;
 
-  // Collect every (kind, size, variant) that resolves to a provider lookup.
-  type Job = { key: string; catalog: string; filters: Record<string, string[]> };
-  const jobs: Job[] = [];
+  // ONE search per (kind, variant) covering ALL selected sizes at once (Gelato's
+  // products:search takes an array of formats), then map each returned UID back
+  // to its size by the format string embedded in the UID. This is O(variants),
+  // not O(sizes × variants) — a merchant can select every size and it stays ~15
+  // searches. The frozen sku-map remains the fallback in getUid.
+  type Batch = {
+    kind: string; variant: string; catalog: string;
+    filters: Record<string, string[]>; fmtToSize: Record<string, string>;
+  };
+  const batches: Batch[] = [];
   for (const kind of Object.keys(WALL_ART_PRESET_KINDS) as Kind[]) {
     if (!opts[kind]?.enabled) continue;
     const preset = getPreset(kind);
@@ -140,38 +147,50 @@ async function resolveWallArtPresetUids(
     const cfg = WALL_ART_PRESET_KINDS[kind];
     const sizes: string[] = opts[kind].allowedSizes ?? [];
     const variants = cfg.variantsFrom(opts);
-    for (const size of sizes) {
-      for (const variant of variants) {
-        const res = resolvePreset(preset, { ...(cfg.fixed ?? {}), size, [preset.catalogAxis]: variant });
-        if (!res) continue;
-        jobs.push({
-          key: `${kind}|${size}|${variant}`,
-          catalog: res.catalog,
-          filters: { ...res.filters, Orientation: ["ver"] },
-        });
+    for (const variant of variants) {
+      const target = preset.targets[variant];
+      if (!target) continue;
+      const sizeAttr = target.attributes.find((a) => a.axis === "size");
+      if (!sizeAttr) continue;
+      const formats: string[] = [];
+      const fmtToSize: Record<string, string> = {};
+      for (const size of sizes) {
+        const fmt = sizeAttr.valueByAxisValue[size];
+        if (fmt) { formats.push(fmt); fmtToSize[fmt.toLowerCase()] = size; }
       }
+      if (formats.length === 0) continue;
+      // Fixed non-size, non-catalog axes (e.g. poster paper) → their filters.
+      // Map the axis-value key through valueByAxisValue: the same key can resolve
+      // to a different provider value per catalog (hanger paper differs from flat).
+      const fixed: Record<string, string[]> = {};
+      for (const [axKey, val] of Object.entries(cfg.fixed ?? {})) {
+        const fa = target.attributes.find((a) => a.axis === axKey);
+        if (fa) fixed[fa.attribute] = [fa.valueByAxisValue[val as string] ?? (val as string)];
+      }
+      batches.push({
+        kind, variant, catalog: target.catalog,
+        filters: { ...(preset.baseFilters ?? {}), ...(target.filters ?? {}), [sizeAttr.attribute]: formats, ...fixed, Orientation: ["ver"] },
+        fmtToSize,
+      });
     }
   }
 
-  // Run the live searches in PARALLEL batches — sequential would time out at
-  // hundreds of combos. The frozen sku-map is still the fallback in getUid.
-  const BATCH = 20;
-  for (let i = 0; i < jobs.length; i += BATCH) {
-    const slice = jobs.slice(i, i + BATCH);
-    await Promise.all(
-      slice.map(async (job) => {
-        try {
-          const r = await searchGelatoProductUids({
-            apiKey, catalogUid: job.catalog, attributeFilters: job.filters, limit: 2,
-          });
-          if (r.productUids[0]) out[job.key] = r.productUids[0];
-        } catch (e) {
-          console.warn(`[preset] ${job.key} failed, using frozen map: ${e}`);
-        }
-      }),
-    );
-  }
-  console.log(`[preset] resolved ${Object.keys(out).length}/${jobs.length} wall-art UIDs (${BATCH}-parallel)`);
+  await Promise.all(batches.map(async (b) => {
+    try {
+      const r = await searchGelatoProductUids({
+        apiKey, catalogUid: b.catalog, attributeFilters: b.filters, limit: 250,
+      });
+      const fmtsByLen = Object.keys(b.fmtToSize).sort((x, y) => y.length - x.length);
+      for (const uid of r.productUids) {
+        const lu = uid.toLowerCase();
+        const fmt = fmtsByLen.find((f) => lu.includes(f));
+        if (fmt) out[`${b.kind}|${b.fmtToSize[fmt]}|${b.variant}`] = uid;
+      }
+    } catch (e) {
+      console.warn(`[preset] batch ${b.kind}|${b.variant} failed, using frozen map: ${e}`);
+    }
+  }));
+  console.log(`[preset] resolved ${Object.keys(out).length} wall-art UIDs in ${batches.length} batched searches`);
   return out;
 }
 
