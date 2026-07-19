@@ -102,8 +102,12 @@ Deno.serve(async (req) => {
   // of the cost/margin pricing UI). Body: { costProbe: "<productUid>" }.
   if (body?.costProbe) {
     try {
+      const q = new URLSearchParams();
+      if (body.currency) q.set("currency", String(body.currency));
+      if (body.country) q.set("country", String(body.country));
+      const qs = q.toString() ? `?${q.toString()}` : "";
       const res = await fetch(
-        `https://product.gelatoapis.com/v3/products/${encodeURIComponent(String(body.costProbe))}/prices`,
+        `https://product.gelatoapis.com/v3/products/${encodeURIComponent(String(body.costProbe))}/prices${qs}`,
         { headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" } },
       );
       const text = await res.text();
