@@ -180,7 +180,10 @@ async function resolveWallArtPresetUids(
   await Promise.all(batches.map(async (b) => {
     try {
       const r = await searchGelatoProductUids({
-        apiKey, catalogUid: b.catalog, attributeFilters: b.filters, limit: 250,
+        // Gelato caps `limit` at 100. A batch returns one product per selected
+        // size (≤ ~28), so 100 covers every case; 250 would 400 the whole batch
+        // and silently resolve nothing.
+        apiKey, catalogUid: b.catalog, attributeFilters: b.filters, limit: 100,
       });
       const fmtsByLen = Object.keys(b.fmtToSize).sort((x, y) => y.length - x.length);
       for (const uid of r.productUids) {
