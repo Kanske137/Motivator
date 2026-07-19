@@ -152,16 +152,24 @@ export function FormatSection({ configs, activeHandle, activeProductType, onProd
 
   const currentVariantPrice = sizeDef?.variants.find((v) => v.name === variant)?.price ?? 0;
 
+  // Real availability comes from the synced Shopify variants (the price map),
+  // NOT the hardcoded price tables — that is what makes every catalog-derived
+  // size/frame combination work generically (any provider, any product). While
+  // the storefront is still loading (empty map) show everything as available so
+  // options don't flicker greyed-out.
+  const mapLoaded = priceMap.size > 0;
+  const isVariantAvailable = (name: string) =>
+    !mapLoaded || !size ? true : priceMap.has(`${size}|${name}`);
+
   // Auto-byte: om vald variant inte längre är tillgänglig (t.ex. valde Hängare
-  // Ek på 21×30 och bytte storlek till 13×18 där hängare saknas) → välj första
-  // tillgängliga variant.
+  // Ek på 21×30 och bytte storlek till en storlek där hängare saknas) → välj
+  // första tillgängliga variant.
   useEffect(() => {
     if (!variant || visibleVariants.length === 0) return;
-    const current = visibleVariants.find((v) => v.name === variant);
-    if (current && current.available !== false) return;
-    const firstAvailable = visibleVariants.find((v) => v.available !== false);
+    if (isVariantAvailable(variant)) return;
+    const firstAvailable = visibleVariants.find((v) => isVariantAvailable(v.name));
     if (firstAvailable) setVariant(firstAvailable.name);
-  }, [variant, visibleVariants, setVariant]);
+  }, [variant, visibleVariants, setVariant, priceMap, size]);
 
   // Build a stable Produkt toggle from the template group (each kind shows up
   // at most once even if multiple configs leak in).
@@ -348,7 +356,7 @@ export function FormatSection({ configs, activeHandle, activeProductType, onProd
               const live = liveDelta(size, variant, size ?? "", v.name);
               const isNoFrame = v.name.toLowerCase() === "ingen";
               const hangerHex = HANGER_HEX[v.name];
-              const isAvailable = v.available !== false;
+              const isAvailable = isVariantAvailable(v.name);
               return (
                 <FrameOption
                   key={v.name}

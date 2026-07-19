@@ -242,19 +242,17 @@ export function getEffectiveSizes(
     variantNames = block.allowedFrames ?? [];
     priceTable = POSTER_PRICES;
   }
-  const isPoster = config.product_type === "posters";
+  // Emit EVERY (size × variant) the admin enabled as a candidate. Real
+  // availability + price come from the live Shopify variant map (the synced
+  // products), not this table — the hardcoded *_PRICES tables only cover the
+  // legacy handful of sizes, so gating on them hid every catalog-derived size
+  // and forced posters to show "hängare only". `price` here is just a fallback
+  // for when the storefront hasn't answered yet; `available: true` = candidate.
   const out: SizeDef[] = [];
   for (const size of sizes) {
     const variants: SizeVariant[] = [];
     for (const name of variantNames) {
-      const price = priceTable[size]?.[name];
-      if (typeof price === "number") {
-        variants.push({ name, price, available: true });
-      } else if (isPoster && /^Hängare/i.test(name)) {
-        // Hängare visas alltid i UI, även för storlekar där Gelato saknar SKU
-        // (t.ex. 13×18). Markeras som otillgänglig så UI kan gråa ut.
-        variants.push({ name, price: 0, available: false });
-      }
+      variants.push({ name, price: priceTable[size]?.[name] ?? 0, available: true });
     }
     if (variants.length > 0) out.push({ size, variants });
   }

@@ -98,6 +98,37 @@ Deno.serve(async (req) => {
     });
   }
 
+  // Shop-info probe: read the stored admin token server-side and report the
+  // shop's currency (diagnosing why sync priced in the wrong currency). Body:
+  // { shopInfo: "<shop_domain>" }. Token never leaves the backend.
+  if (body?.shopInfo) {
+    try {
+      const supabase = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      );
+      const { data: inst } = await supabase
+        .from("shopify_app_installations")
+        .select("access_token")
+        .eq("shop_domain", String(body.shopInfo))
+        .maybeSingle();
+      if (!inst?.access_token) return json(404, { ok: false, error: "installation not found" });
+      const res = await fetch(
+        `https://${body.shopInfo}/admin/api/2025-01/graphql.json`,
+        {
+          method: "POST",
+          headers: { "X-Shopify-Access-Token": inst.access_token, "Content-Type": "application/json" },
+          body: JSON.stringify({ query: "{ shop { currencyCode name currencyFormats { moneyFormat } } }" }),
+        },
+      );
+      const text = await res.text();
+      let parsed: any = text; try { parsed = JSON.parse(text); } catch { /* raw */ }
+      return json(res.ok ? 200 : 502, { ok: res.ok, status: res.status, shop: parsed?.data?.shop ?? parsed, errors: parsed?.errors });
+    } catch (e) {
+      return json(502, { ok: false, error: String(e) });
+    }
+  }
+
   // Cost probe: fetch Gelato's wholesale prices for a productUid (the foundation
   // of the cost/margin pricing UI). Body: { costProbe: "<productUid>" }.
   if (body?.costProbe) {

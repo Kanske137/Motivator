@@ -18,10 +18,14 @@ export interface ShopifyMoney {
 // "Ingen"→"None" osv) — och kan bara appliceras på top-level query, inte på fält.
 // Vi gör därför TVÅ separata queries: en utan kontext för källspråkets options
 // (matchning), en med @inContext för priser. Variant-id är detsamma → join på id.
+// Paginated: a consolidated product (poster+canvas+… under one Shopify product)
+// can have hundreds of variants, so a single first:100 would silently truncate
+// availability + prices. We page in 250s until pageInfo says done.
 const SOURCE_QUERY = /* GraphQL */ `
-  query ProductSource($handle: String!) {
+  query ProductSource($handle: String!, $after: String) {
     productByHandle(handle: $handle) {
-      variants(first: 100) {
+      variants(first: 250, after: $after) {
+        pageInfo { hasNextPage endCursor }
         edges { node { id selectedOptions { name value } } }
       }
     }
@@ -29,10 +33,11 @@ const SOURCE_QUERY = /* GraphQL */ `
 `;
 
 const CONTEXTUAL_QUERY = /* GraphQL */ `
-  query ProductPrices($handle: String!, $country: CountryCode!)
+  query ProductPrices($handle: String!, $country: CountryCode!, $after: String)
   @inContext(country: $country) {
     productByHandle(handle: $handle) {
-      variants(first: 100) {
+      variants(first: 250, after: $after) {
+        pageInfo { hasNextPage endCursor }
         edges { node { id price { amount currencyCode } } }
       }
     }
@@ -74,40 +79,50 @@ async function fetchVariants(
   const existing = inflight.get(k);
   if (existing) return existing;
 
-  const promise = (async () => {
-    try {
-      const [sourceRes, contextRes] = await Promise.all([
-        supabase.functions.invoke("shopify-storefront", {
-          body: { query: SOURCE_QUERY, variables: { handle }, shop },
-        }),
-        supabase.functions.invoke("shopify-storefront", {
-          body: {
-            query: CONTEXTUAL_QUERY,
-            variables: { handle, country: country.toUpperCase() },
-            shop,
-          },
-        }),
-      ]);
-      if (sourceRes.error || contextRes.error) {
-        console.warn("[shopify-prices] proxy error", sourceRes.error?.message || contextRes.error?.message);
+  // Page one storefront query to the end, returning every variant edge.
+  const pageAll = async (query: string, extraVars: Record<string, unknown>): Promise<any[] | null> => {
+    const edges: any[] = [];
+    let after: string | null = null;
+    // Safety bound: 250/page × 20 = 5000 variants, far above any real product.
+    for (let page = 0; page < 20; page++) {
+      const res = await supabase.functions.invoke("shopify-storefront", {
+        body: { query, variables: { handle, ...extraVars, after }, shop },
+      });
+      if (res.error) {
+        console.warn("[shopify-prices] proxy error", res.error?.message);
         return null;
       }
-      const source = (sourceRes.data as any)?.data?.productByHandle;
-      const contextual = (contextRes.data as any)?.data?.productByHandle;
-      if (!source || !contextual) {
+      const product = (res.data as any)?.data?.productByHandle;
+      if (!product) return []; // no such product for this handle
+      const v = product.variants;
+      for (const e of v?.edges ?? []) edges.push(e);
+      if (!v?.pageInfo?.hasNextPage) break;
+      after = v.pageInfo.endCursor;
+    }
+    return edges;
+  };
+
+  const promise = (async () => {
+    try {
+      const [sourceEdges, contextEdges] = await Promise.all([
+        pageAll(SOURCE_QUERY, {}),
+        pageAll(CONTEXTUAL_QUERY, { country: country.toUpperCase() }),
+      ]);
+      if (sourceEdges === null || contextEdges === null) return null;
+      if (sourceEdges.length === 0 || contextEdges.length === 0) {
         console.info(
           `[shopify-prices] no Shopify product for handle="${handle}" (country=${country}). ` +
-          `Live prices will fall back to internal SEK pricing.`,
+          `Live prices will fall back to internal pricing.`,
         );
         cache.set(k, { ts: Date.now(), variants: [] });
         return [] as VariantNode[];
       }
       const priceById = new Map<string, { amount: string; currencyCode: string }>();
-      for (const e of contextual.variants?.edges ?? []) {
+      for (const e of contextEdges) {
         if (e?.node?.id && e.node.price) priceById.set(e.node.id, e.node.price);
       }
       const variants: VariantNode[] = [];
-      for (const e of source.variants?.edges ?? []) {
+      for (const e of sourceEdges) {
         const node = e?.node;
         const price = node?.id ? priceById.get(node.id) : null;
         if (node && price) {

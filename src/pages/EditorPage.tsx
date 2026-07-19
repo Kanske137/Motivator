@@ -488,12 +488,21 @@ export default function EditorPage() {
       return;
     }
 
+    // Cart-display price in the shop's REAL currency (from the synced Shopify
+    // variant), not a hardcoded SEK. Checkout recomputes from the variant anyway;
+    // this is what the cart drawer shows.
+    const cartAmount = livePrice
+      ? livePrice.amount
+      : derivedFx
+        ? currentPrice() * derivedFx.rate
+        : currentPrice();
+    const cartCurrency = livePrice?.currencyCode ?? derivedFx?.currencyCode ?? "SEK";
     await addItem({
       variantId: variantGid,
       productTitle: config.title,
       variantTitle: `${size} · ${variant}`,
       imageUrl: previewUrl,
-      price: { amount: String(currentPrice()), currencyCode: "SEK" },
+      price: { amount: String(cartAmount), currencyCode: cartCurrency },
       quantity: 1,
       attributes: Object.entries(properties).map(([key, value]) => ({ key, value: String(value) })),
     });
