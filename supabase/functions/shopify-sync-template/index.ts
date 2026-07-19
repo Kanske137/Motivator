@@ -129,6 +129,10 @@ async function resolveWallArtPresetUids(
   const out: Record<string, string> = {};
   const opts = template?.productOptions ?? {};
   if (!apiKey) return out;
+
+  // Collect every (kind, size, variant) that resolves to a provider lookup.
+  type Job = { key: string; catalog: string; filters: Record<string, string[]> };
+  const jobs: Job[] = [];
   for (const kind of Object.keys(WALL_ART_PRESET_KINDS) as Kind[]) {
     if (!opts[kind]?.enabled) continue;
     const preset = getPreset(kind);
@@ -140,19 +144,34 @@ async function resolveWallArtPresetUids(
       for (const variant of variants) {
         const res = resolvePreset(preset, { ...(cfg.fixed ?? {}), size, [preset.catalogAxis]: variant });
         if (!res) continue;
-        try {
-          const r = await searchGelatoProductUids({
-            apiKey, catalogUid: res.catalog,
-            attributeFilters: { ...res.filters, Orientation: ["ver"] }, limit: 2,
-          });
-          if (r.productUids[0]) out[`${kind}|${size}|${variant}`] = r.productUids[0];
-        } catch (e) {
-          console.warn(`[preset] ${kind} ${size}|${variant} failed, using frozen map: ${e}`);
-        }
+        jobs.push({
+          key: `${kind}|${size}|${variant}`,
+          catalog: res.catalog,
+          filters: { ...res.filters, Orientation: ["ver"] },
+        });
       }
     }
   }
-  console.log(`[preset] pre-resolved ${Object.keys(out).length} wall-art UIDs via presets`);
+
+  // Run the live searches in PARALLEL batches — sequential would time out at
+  // hundreds of combos. The frozen sku-map is still the fallback in getUid.
+  const BATCH = 20;
+  for (let i = 0; i < jobs.length; i += BATCH) {
+    const slice = jobs.slice(i, i + BATCH);
+    await Promise.all(
+      slice.map(async (job) => {
+        try {
+          const r = await searchGelatoProductUids({
+            apiKey, catalogUid: job.catalog, attributeFilters: job.filters, limit: 2,
+          });
+          if (r.productUids[0]) out[job.key] = r.productUids[0];
+        } catch (e) {
+          console.warn(`[preset] ${job.key} failed, using frozen map: ${e}`);
+        }
+      }),
+    );
+  }
+  console.log(`[preset] resolved ${Object.keys(out).length}/${jobs.length} wall-art UIDs (${BATCH}-parallel)`);
   return out;
 }
 

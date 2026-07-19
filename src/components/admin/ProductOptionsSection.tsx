@@ -32,7 +32,7 @@ import {
 import type { ProductConfig } from "@/lib/product-config";
 import type { ProductOptions } from "@/lib/template-schema";
 import { DEFAULT_PRODUCT_VARIANTS, mergeUnique } from "@/lib/product-defaults";
-import { getPodProvider, selectableAxes, pickableBases, ProductIcon, type ProductBase } from "@/lib/pod";
+import { selectableAxes, pickableBases, ProductIcon, type ProductBase } from "@/lib/pod";
 import { POSTER_PRESET, CANVAS_PRESET, ALUMINUM_PRESET, ACRYLIC_PRESET, presetAxisKeys } from "@/lib/pod/wall-art";
 import { useProductBases } from "@/hooks/useProductBases";
 import type { BaseOptions } from "@/lib/template-schema";
@@ -203,44 +203,11 @@ export default function ProductOptionsSection({ config, value, onChange }: Props
     onChange({ ...value, [kind]: { ...block, [field]: items } });
   }
 
-  // Banner only fires when an *enabled* combination lacks a Gelato SKU.
-  // Undantag: Hängare-varianter saknas medvetet hos Gelato för små storlekar
-  // (t.ex. 13×18) — de visas som "ej tillgänglig" (greyed out) i kundvyn och
-  // ska inte flaggas som synk-fel här.
-  const missingSkus = useMemo(() => {
-    const provider = getPodProvider();
-    const out: { kind: Kind; size: string; variant: string }[] = [];
-    if (value.poster?.enabled) {
-      for (const s of value.poster.allowedSizes ?? []) {
-        for (const f of value.poster.allowedFrames ?? []) {
-          if (/^Hängare/i.test(f)) continue; // medvetet otillgängliga kombinationer
-          if (!provider.hasSku("poster", s, f)) out.push({ kind: "poster", size: s, variant: f });
-        }
-      }
-    }
-    if (value.canvas?.enabled) {
-      for (const s of value.canvas.allowedSizes ?? []) {
-        for (const d of value.canvas.allowedDepths ?? []) {
-          if (!provider.hasSku("canvas", s, d)) out.push({ kind: "canvas", size: s, variant: d });
-        }
-      }
-    }
-    if (value.aluminum?.enabled) {
-      for (const s of value.aluminum.allowedSizes ?? []) {
-        for (const m of value.aluminum.allowedMaterials ?? []) {
-          if (!provider.hasSku("aluminum", s, m)) out.push({ kind: "aluminum", size: s, variant: m });
-        }
-      }
-    }
-    if (value.acrylic?.enabled) {
-      for (const s of value.acrylic.allowedSizes ?? []) {
-        for (const f of value.acrylic.allowedFinishes ?? []) {
-          if (!provider.hasSku("acrylic", s, f)) out.push({ kind: "acrylic", size: s, variant: f });
-        }
-      }
-    }
-    return out;
-  }, [value]);
+  // Sizes/variants now come from the live catalog via presets, and combos Gelato
+  // doesn't offer for a given paper/finish are simply skipped at sync (sparse
+  // matrix) — so we no longer pre-flag "missing SKU" from the frozen sku-map,
+  // which wrongly warned about every new catalog-derived size.
+  const missingSkus: { kind: Kind; size: string; variant: string }[] = [];
 
   return (
     <div className="space-y-5">
