@@ -12,8 +12,10 @@
 // - Online Store sales channel: published via publishablePublish.
 // - On update we sync productOptions (so newly-added sizes/frames actually
 //   become valid option-values BEFORE we try to bulk-create variants for them).
-import { gelatoUid, searchGelatoProductUids } from "../_shared/pod/gelato.ts";
+import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
+import { fetchGelatoProductPrice, gelatoUid, searchGelatoProductUids } from "../_shared/pod/gelato.ts";
 import { getPreset, resolvePreset } from "../_shared/pod/presets.ts";
+import { DEFAULT_PRICING, retailFromCost, type Rounding } from "../_shared/pod/pricing.ts";
 import {
   buildVariantInput,
   desiredOptionValuesByAxis,
@@ -191,6 +193,64 @@ async function resolveWallArtPresetUids(
     }
   }));
   console.log(`[preset] resolved ${Object.keys(out).length} wall-art UIDs in ${batches.length} batched searches`);
+  return out;
+}
+
+/** Resolve wholesale costs for a set of provider UIDs, cache-first. Reads
+ *  pod_costs, fetches the misses from Gelato (small concurrency cap), writes them
+ *  back, and returns a uid→cost map. A cached cost in a DIFFERENT currency than
+ *  the shop is ignored and refetched, so markup is never applied cross-currency. */
+async function loadCostsForUids(
+  supabase: SupabaseClient,
+  apiKey: string | undefined,
+  currency: string | undefined,
+  uids: string[],
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (uids.length === 0) return out;
+
+  const { data: cached } = await supabase
+    .from("pod_costs")
+    .select("product_uid,cost,currency")
+    .eq("provider", "gelato")
+    .in("product_uid", uids);
+  const have = new Set<string>();
+  for (const r of (cached ?? []) as { product_uid: string; cost: number; currency: string }[]) {
+    if (!currency || r.currency === currency) {
+      out.set(r.product_uid, Number(r.cost));
+      have.add(r.product_uid);
+    }
+  }
+  const missing = uids.filter((u) => !have.has(u));
+  if (missing.length === 0 || !apiKey) {
+    console.log(`[cost] ${out.size}/${uids.length} costs (all cached)`);
+    return out;
+  }
+
+  const now = new Date().toISOString();
+  const fetched: { provider: string; product_uid: string; cost: number; currency: string; fetched_at: string }[] = [];
+  let mismatched = 0;
+  const POOL = 25;
+  for (let i = 0; i < missing.length; i += POOL) {
+    await Promise.all(missing.slice(i, i + POOL).map(async (uid) => {
+      const p = await fetchGelatoProductPrice({ apiKey, productUid: uid, currency });
+      if (!p) return;
+      // Refuse a cost in the wrong currency — auto-pricing it would misprice by
+      // the FX ratio. Better to leave it unpriced (skipped, visible) than to sell
+      // a SEK product at a USD number.
+      if (currency && p.currency && p.currency !== currency) { mismatched++; return; }
+      out.set(uid, p.cost);
+      fetched.push({ provider: "gelato", product_uid: uid, cost: p.cost, currency: p.currency, fetched_at: now });
+    }));
+  }
+  if (mismatched) {
+    console.warn(`[cost] ${mismatched} costs skipped: Gelato quoted a currency other than ${currency}`);
+  }
+  if (fetched.length) {
+    const { error } = await supabase.from("pod_costs").upsert(fetched, { onConflict: "provider,product_uid" });
+    if (error) console.warn(`[cost] cache upsert failed: ${error.message}`);
+  }
+  console.log(`[cost] ${out.size}/${uids.length} costs (cached ${have.size}, fetched ${fetched.length})`);
   return out;
 }
 
@@ -415,6 +475,15 @@ const PRODUCT_OPTION_UPDATE = `
       userErrors { field message code }
     }
   }`;
+
+// Shopify caps productVariantsBulkCreate/Update at 250 variants per call. A
+// full-catalog poster is 250+ variants, so every bulk call is chunked.
+const VARIANT_CALL_LIMIT = 100;
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
 
 const PRODUCT_VARIANTS_BULK_CREATE = `
   mutation productVariantsBulkCreate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
@@ -649,6 +718,12 @@ Deno.serve(async (req) => {
     const isConsolidated = !!(cfg as { is_consolidated?: boolean }).is_consolidated;
     const enabledTypes = ((cfg as { enabled_product_types?: string[] }).enabled_product_types ?? []);
 
+    const gelatoApiKey = Deno.env.get("GELATO_API_KEY");
+
+    // Resolve wall-art UIDs (poster/canvas/aluminum/acrylic) through their generic
+    // presets once (live catalog), with the frozen sku-map as fallback in getUid.
+    const presetUids = await resolveWallArtPresetUids(cfg.template, gelatoApiKey);
+
     // Data-driven prices: this shop's global defaults + this template's overrides.
     const { data: priceRows } = await supabase
       .from("pricing_rules")
@@ -660,16 +735,46 @@ Deno.serve(async (req) => {
     }
     const overrides = ((cfg as { template?: { priceOverrides?: unknown } }).template?.priceOverrides
       ?? {}) as Record<string, Record<string, Record<string, number>>>;
+
+    // Auto-pricing: any variant WITHOUT an explicit price is priced from its POD
+    // wholesale cost × the merchant's markup. Without this, every catalog-derived
+    // size a merchant never hand-priced is skipped as "no price" and never reaches
+    // Shopify. Costs are cached in pod_costs (global) so only the first sync pays
+    // the provider price-API round-trips.
+    const { data: pcfg } = await supabase
+      .from("pricing_config")
+      .select("margin_pct,rounding")
+      .eq("installation_id", installationId)
+      .maybeSingle();
+    const pricing = {
+      marginPct: pcfg ? Number(pcfg.margin_pct) : DEFAULT_PRICING.marginPct,
+      rounding: (pcfg?.rounding as Rounding) ?? DEFAULT_PRICING.rounding,
+    };
+    let shopCurrency: string | undefined;
+    try {
+      const r = await admin<{ shop: { currencyCode: string } }>(`{ shop { currencyCode } }`);
+      shopCurrency = r.shop?.currencyCode ?? undefined;
+    } catch { /* cost still fetched in Gelato's default currency */ }
+
+    const costByUid = await loadCostsForUids(
+      supabase,
+      gelatoApiKey,
+      shopCurrency,
+      // Every UID this sync will need a price for (wall art; bases price below).
+      Array.from(new Set(Object.values(presetUids))),
+    );
+
     const priceOf: PriceLookup = (material, size, variant) => {
       const o = overrides?.[material]?.[size]?.[variant];
       if (typeof o === "number" && o > 0) return o;
       const g = globalPrices?.[material]?.[size]?.[variant];
-      return typeof g === "number" ? g : 0;
+      if (typeof g === "number" && g > 0) return g;
+      // Fallback: cost × markup. Reachable for wall art (UID via presetUids);
+      // bases resolve their UID later, so they auto-price in planBaseGroup below.
+      const uid = presetUids[`${material}|${size}|${variant}`];
+      const cost = uid ? costByUid.get(uid) : undefined;
+      return cost ? retailFromCost(cost, pricing) : 0;
     };
-
-    // Resolve wall-art UIDs (poster/canvas/aluminum/acrylic) through their generic
-    // presets once (live catalog), with the frozen sku-map as fallback in getUid.
-    const presetUids = await resolveWallArtPresetUids(cfg.template, Deno.env.get("GELATO_API_KEY"));
 
     const groups: PlannedGroup[] = isConsolidated
       ? [planConsolidated(cfg.template, enabledTypes, priceOf, presetUids)]
@@ -1047,13 +1152,13 @@ Deno.serve(async (req) => {
         }
 
 
-        if (toCreate.length) {
+        for (const batch of chunk(toCreate, VARIANT_CALL_LIMIT)) {
           const r = await admin<{
             productVariantsBulkCreate: {
               productVariants: { id: string }[];
               userErrors: { message: string; field?: string[] }[];
             };
-          }>(PRODUCT_VARIANTS_BULK_CREATE, { productId, variants: toCreate });
+          }>(PRODUCT_VARIANTS_BULK_CREATE, { productId, variants: batch });
           if (r.productVariantsBulkCreate.userErrors.length) {
             throw new Error(
               `bulkCreate(update) userErrors: ${r.productVariantsBulkCreate.userErrors
@@ -1061,19 +1166,19 @@ Deno.serve(async (req) => {
                 .join("; ")}`,
             );
           }
-          variantsCreated = r.productVariantsBulkCreate.productVariants.length;
+          variantsCreated += r.productVariantsBulkCreate.productVariants.length;
         }
-        if (toUpdate.length) {
+        for (const batch of chunk(toUpdate, VARIANT_CALL_LIMIT)) {
           const r = await admin<{
             productVariantsBulkUpdate: {
               productVariants: { id: string }[];
               userErrors: { message: string; field?: string[] }[];
             };
-          }>(PRODUCT_VARIANTS_BULK_UPDATE, { productId, variants: toUpdate });
+          }>(PRODUCT_VARIANTS_BULK_UPDATE, { productId, variants: batch });
           if (r.productVariantsBulkUpdate.userErrors.length) {
             console.error("bulkUpdate errors", r.productVariantsBulkUpdate.userErrors);
           }
-          variantsUpdated = r.productVariantsBulkUpdate.productVariants.length;
+          variantsUpdated += r.productVariantsBulkUpdate.productVariants.length;
         }
         if (toDelete.length) {
           const remaining = existing.variants.nodes.length - toDelete.length + toCreate.length;

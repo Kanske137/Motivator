@@ -322,6 +322,45 @@ export async function searchGelatoProductUids(args: {
   };
 }
 
+/**
+ * Fetch a Gelato product's wholesale COST (the foundation of auto-pricing).
+ * GET /v3/products/{uid}/prices returns one row per (quantity[, price-tier]);
+ * we take the unit cost at the smallest quantity. `currency` steers Gelato to
+ * quote in the shop's currency so retail = cost × markup stays in one currency.
+ * Returns null on any failure so a missing cost degrades to "no auto-price",
+ * never a thrown sync.
+ */
+export async function fetchGelatoProductPrice(args: {
+  apiKey: string;
+  productUid: string;
+  currency?: string;
+  country?: string;
+}): Promise<{ cost: number; currency: string } | null> {
+  const q = new URLSearchParams();
+  if (args.currency) q.set("currency", args.currency);
+  if (args.country) q.set("country", args.country);
+  const qs = q.toString() ? `?${q.toString()}` : "";
+  let arr: any;
+  try {
+    arr = await gelatoProductApi(
+      `/products/${encodeURIComponent(args.productUid)}/prices${qs}`,
+      args.apiKey,
+    );
+  } catch {
+    return null;
+  }
+  const rows: any[] = Array.isArray(arr) ? arr : (arr?.prices ?? arr?.data ?? []);
+  if (!rows.length) return null;
+  // Unit cost = lowest price at the smallest quantity offered.
+  const minQty = Math.min(...rows.map((r) => Number(r?.quantity ?? 1)));
+  const atMinQty = rows.filter((r) => Number(r?.quantity ?? 1) === minQty);
+  const best = atMinQty.reduce((a, b) => (Number(b?.price) < Number(a?.price) ? b : a));
+  const qty = Math.max(1, minQty);
+  const cost = Number(best?.price) / qty;
+  if (!isFinite(cost) || cost <= 0) return null;
+  return { cost, currency: String(best?.currency ?? args.currency ?? "") };
+}
+
 // --- Fulfillment parsing (Phase 3a slice 2b) ---
 //
 // Gelato reports fulfillment + tracking in two different shapes, and both are
