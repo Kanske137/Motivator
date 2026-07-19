@@ -10,7 +10,6 @@ import AdminConfigs from "./pages/AdminConfigs.tsx";
 import DesignerPage from "./pages/admin/DesignerPage.tsx";
 import SettingsPage from "./pages/admin/SettingsPage.tsx";
 import AiLibraryPage from "./pages/admin/AiLibraryPage.tsx";
-import DevInspector from "./pages/DevInspector.tsx";
 
 import { useCartSync } from "./hooks/useCartSync";
 import { useShopContextBootstrap } from "./hooks/useShopContextBootstrap";
@@ -43,7 +42,6 @@ const AppRoutes = () => {
       <Route path="/admin/designer/:handle" element={<DesignerPage />} />
       <Route path="/admin/settings" element={<SettingsPage />} />
       <Route path="/admin/ai" element={<AiLibraryPage />} />
-      <Route path="/dev/inspector" element={<DevInspector />} />
       <Route path="*" element={<NotFound />} />
       </Routes>
     </>
